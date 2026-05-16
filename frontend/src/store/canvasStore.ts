@@ -1,0 +1,23 @@
+import { create } from "zustand";
+import type { CanvasNode } from "../types";
+
+interface CanvasStore {
+  nodes: CanvasNode[];
+  messages: { role: "user" | "agent"; content: string }[];
+  setCanvas: (data: Record<string, CanvasNode>) => void;
+  addMessage: (role: "user" | "agent", content: string) => void;
+  clear: () => void;
+}
+
+export const useCanvasStore = create<CanvasStore>((set) => ({
+  nodes: [],
+  messages: [],
+
+  setCanvas: (data) =>
+    set({ nodes: Object.values(data) }),
+
+  addMessage: (role, content) =>
+    set((s) => ({ messages: [...s.messages, { role, content }] })),
+
+  clear: () => set({ nodes: [], messages: [] }),
+}));
