@@ -28,12 +28,14 @@ export function useWebSocket(onMessage: Handler) {
       console.log("[WS] 已连接");
       setConnecting(false);
       setConnected(true);
-      const queued = pendingRef.current.length;
-      if (queued) console.log(`[WS] 发送排队消息 x${queued}`);
-      for (const msg of pendingRef.current) {
-        ws.send(msg);
+      // 发送排队消息
+      if (pendingRef.current.length) {
+        console.log(`[WS] onopen 发送排队消息 x${pendingRef.current.length}`);
+        for (const msg of pendingRef.current) {
+          ws.send(msg);
+        }
+        pendingRef.current = [];
       }
-      pendingRef.current = [];
     };
 
     ws.onmessage = (e) => {
@@ -55,10 +57,23 @@ export function useWebSocket(onMessage: Handler) {
     };
   }, [onMessage]);
 
+  const _flushPending = useCallback(() => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    for (const msg of pendingRef.current) {
+      wsRef.current.send(msg);
+    }
+    pendingRef.current = [];
+  }, []);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const _send = useCallback((payload: Record<string, any>) => {
     const data = JSON.stringify(payload);
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      // 顺手清掉可能残留的排队消息
+      for (const msg of pendingRef.current) {
+        wsRef.current.send(msg);
+      }
+      pendingRef.current = [];
       wsRef.current.send(data);
     } else {
       console.log(`[WS] 排队 type=${payload.type}`);

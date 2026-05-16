@@ -41,6 +41,7 @@ interface Props {
 export function Canvas({ onPositionChange }: Props) {
   const nodes = useCanvasStore((s) => s.nodes);
   const updateNodePosition = useCanvasStore((s) => s.updateNodePosition);
+  const selectNode = useCanvasStore((s) => s.selectNode);
   const rfNodes = useMemo(() => defaultLayout(nodes), [nodes]);
 
   const persistRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -68,6 +69,7 @@ export function Canvas({ onPositionChange }: Props) {
         nodes={rfNodes}
         nodeTypes={nodeTypes}
         onNodeDrag={handleDrag}
+        onNodeClick={(_e, node) => selectNode(node.id)}
         fitView
       >
         <Background />

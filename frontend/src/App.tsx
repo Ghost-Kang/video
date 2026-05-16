@@ -4,6 +4,7 @@ import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { Canvas } from "./components/Canvas";
 import { ChatPanel } from "./components/ChatPanel";
+import { NodeDetail } from "./components/NodeDetail";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useCanvasStore } from "./store/canvasStore";
 import type { WSIncoming } from "./types";
@@ -41,6 +42,7 @@ export default function App() {
   const addMessage = useCanvasStore((s) => s.addMessage);
   const setMessages = useCanvasStore((s) => s.setMessages);
   const clearMessages = useCanvasStore((s) => s.clear);
+  const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
 
   const onMessage = useCallback(
     (res: WSIncoming) => {
@@ -218,6 +220,7 @@ export default function App() {
           </button>
         )}
         <Canvas onPositionChange={(pos) => sendPosition({ ...pos, thread_id: tid })} />
+        {selectedNodeId && <NodeDetail />}
       </div>
     </div>
   );
