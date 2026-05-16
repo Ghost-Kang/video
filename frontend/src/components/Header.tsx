@@ -1,77 +1,107 @@
-import { useState } from "react";
-
 interface Props {
   threadId: string;
-  onConnect: (id: string) => void;
+  sessionName: string;
   connected: boolean;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
+  onNewSession: () => void;
 }
 
-export function Header({ threadId, onConnect, connected }: Props) {
-  const [input, setInput] = useState(threadId);
-
-  const handleConnect = () => {
-    const tid = input.trim();
-    if (tid) onConnect(tid);
-  };
-
+export function Header({ threadId, sessionName, connected, sidebarOpen, onToggleSidebar, onNewSession }: Props) {
   return (
-    <div style={styles.bar}>
-      <span style={styles.logo}>OpenRHTV</span>
-      <span style={{
-        display: "inline-block",
-        width: 8,
-        height: 8,
-        borderRadius: "50%",
-        background: connected ? "#52c41a" : "#ff4d4f",
-      }} />
-      <div style={styles.session}>
-        <label style={styles.label}>会话:</label>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleConnect()}
-          style={styles.input}
-        />
-        <button onClick={handleConnect} style={styles.btn}>
-          进入
-        </button>
-      </div>
-      <span style={styles.hint}>script → storyboard → image → video → audio</span>
+    <div style={S.bar}>
+      <button onClick={onToggleSidebar} style={S.toggle} title={sidebarOpen ? "收起侧栏" : "展开侧栏"}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d={sidebarOpen ? "M10.5 3.5L5 8l5.5 4.5" : "M5.5 3.5L11 8l-5.5 4.5"} />
+        </svg>
+      </button>
+
+      <span style={S.logo}>OpenRHTV</span>
+      <span style={S.dot(connected)} />
+
+      <span style={S.sessionName}>{sessionName}</span>
+
+      <button onClick={onNewSession} style={S.plusBtn} title="新建会话">
+        +
+      </button>
+
+      <span style={S.hint}>script → storyboard → image → video → audio</span>
     </div>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const S = {
   bar: {
-    height: 44,
+    height: 48,
     display: "flex",
     alignItems: "center",
-    padding: "0 16px",
-    borderBottom: "1px solid #e8e8e8",
+    padding: "0 20px",
+    borderBottom: "1px solid #e4e4e7",
     background: "#fff",
     fontSize: 13,
-    color: "#666",
-    gap: 16,
-  },
-  logo: { fontWeight: 700, fontSize: 15, color: "#333" },
-  session: { display: "flex", alignItems: "center", gap: 6 },
-  label: { fontSize: 12 },
-  input: {
-    width: 120,
-    padding: "4px 8px",
-    border: "1px solid #d9d9d9",
-    borderRadius: 4,
-    fontSize: 12,
-    outline: "none",
-  },
-  btn: {
-    padding: "4px 10px",
-    background: "#1677ff",
-    color: "#fff",
+    color: "#71717a",
+    gap: 10,
+  } as React.CSSProperties,
+
+  toggle: {
+    width: 28,
+    height: 28,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "transparent",
+    color: "#71717a",
     border: "none",
-    borderRadius: 4,
+    borderRadius: 6,
     cursor: "pointer",
+    padding: 0,
+    transition: "background 0.1s",
+  } as React.CSSProperties,
+
+  logo: {
+    fontWeight: 600,
+    fontSize: 14,
+    letterSpacing: "-0.01em",
+    color: "#18181b",
+  } as React.CSSProperties,
+
+  dot: (on: boolean) => ({
+    display: "inline-block",
+    width: 7,
+    height: 7,
+    borderRadius: "50%",
+    background: on ? "#22c55e" : "#ef4444",
+    boxShadow: on ? "0 0 6px rgba(34,197,94,0.4)" : "0 0 6px rgba(239,68,68,0.4)",
+  }) as React.CSSProperties,
+
+  sessionName: {
     fontSize: 12,
-  },
-  hint: { marginLeft: "auto", fontSize: 11, color: "#bbb" },
+    color: "#a1a1aa",
+    marginLeft: 4,
+  } as React.CSSProperties,
+
+  plusBtn: {
+    width: 24,
+    height: 24,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "transparent",
+    color: "#71717a",
+    border: "1px solid #e4e4e7",
+    borderRadius: 6,
+    cursor: "pointer",
+    fontSize: 16,
+    fontWeight: 300,
+    lineHeight: 1,
+    padding: 0,
+    transition: "all 0.15s",
+  } as React.CSSProperties,
+
+  hint: {
+    marginLeft: "auto",
+    fontSize: 11,
+    color: "#d4d4d8",
+    letterSpacing: "0.02em",
+  } as React.CSSProperties,
 };
