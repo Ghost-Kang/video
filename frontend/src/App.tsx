@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { Canvas } from "./components/Canvas";
 import { ChatPanel } from "./components/ChatPanel";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useCanvasStore } from "./store/canvasStore";
-import type { WSAgentResponse } from "./types";
+import type { WSIncoming } from "./types";
 
 const LS_SESSIONS = "openrhtv_sessions";
 const LS_NAMES = "openrhtv_session_names";
@@ -26,40 +27,65 @@ function newSessionId() {
 }
 
 export default function App() {
+  const { threadId } = useParams<{ threadId: string }>();
+  const navigate = useNavigate();
+  const tid = threadId!;
+
   const [sessions, setSessions] = useState<string[]>(() => loadJSON<string[]>(LS_SESSIONS, []));
   const [names, setNames] = useState<Record<string, string>>(() => loadJSON<Record<string, string>>(LS_NAMES, {}));
-  const [threadId, setThreadId] = useState(() => {
-    const saved = loadJSON<string[]>(LS_SESSIONS, []);
-    return saved.length > 0 ? saved[0] : newSessionId();
-  });
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [chatOpen, setChatOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const messages = useCanvasStore((s) => s.messages);
   const setCanvas = useCanvasStore((s) => s.setCanvas);
   const addMessage = useCanvasStore((s) => s.addMessage);
+  const setMessages = useCanvasStore((s) => s.setMessages);
   const clearMessages = useCanvasStore((s) => s.clear);
 
-  const onResponse = useCallback(
-    (res: WSAgentResponse) => {
-      setLoading(false);
-      addMessage("agent", res.content);
-      if (res.canvas?.nodes) {
-        setCanvas(res.canvas.nodes);
-      } else if (res.canvas !== null) {
-        setCanvas({});
+  const onMessage = useCallback(
+    (res: WSIncoming) => {
+      const rid = "thread_id" in res ? res.thread_id : undefined;
+      if (rid && rid !== currentThreadIdRef.current) {
+        console.log(`[WS] 忽略消息 thread=${rid} (当前=${currentThreadIdRef.current}) type=${res.type}`);
+        return;
+      }
+      switch (res.type) {
+        case "agent_response":
+          console.log(`[WS] agent_response thread=${rid} content=${res.content?.slice(0, 50)}... nodes=${Object.keys(res.canvas?.nodes || {}).length}`);
+          if (res.content) {
+            setLoading(false);
+            addMessage("agent", res.content);
+          }
+          if (res.canvas?.nodes) {
+            setCanvas(res.canvas.nodes);
+          }
+          break;
+        case "processing":
+          console.log(`[WS] processing thread=${rid}`);
+          break;
+        case "session_state":
+          console.log(`[WS] session_state thread=${rid} msgs=${res.messages.length} nodes=${Object.keys(res.canvas?.nodes || {}).length}`);
+          setMessages(res.messages);
+          if (res.canvas?.nodes) {
+            setCanvas(res.canvas.nodes);
+          }
+          break;
       }
     },
-    [addMessage, setCanvas]
+    [addMessage, setMessages, setCanvas]
   );
 
-  const { connect, send, sendPosition, connected } = useWebSocket(onResponse);
+  const { connect, sendMessage, sendPosition, sendGetSessionState, connected, connecting } =
+    useWebSocket(onMessage);
   const didInit = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentThreadIdRef = useRef(tid);
+  currentThreadIdRef.current = tid;
 
   const addSession = useCallback((id: string) => {
     setSessions((prev) => {
-      const next = [id, ...prev.filter((s) => s !== id)];
+      if (prev.includes(id)) return prev;
+      const next = [id, ...prev];
       saveJSON(LS_SESSIONS, next);
       return next;
     });
@@ -75,58 +101,76 @@ export default function App() {
 
   const switchSession = useCallback(
     (id: string) => {
-      setThreadId(id);
+      if (id === tid) return;
+      console.log(`[会话] 切换到 ${id}`);
+      currentThreadIdRef.current = id;
+      clearTimeout(timerRef.current ?? undefined);
+      setLoading(false);
       clearMessages();
       setCanvas({});
-      addSession(id);
-      connect(id);
+      navigate(`/chat/${id}`);
     },
-    [connect, clearMessages, setCanvas, addSession]
+    [tid, navigate, clearMessages, setCanvas]
   );
 
-  const handleDelete = useCallback((id: string) => {
-    setSessions((prev) => {
-      const next = prev.filter((s) => s !== id);
-      saveJSON(LS_SESSIONS, next);
-      if (id === threadId && next.length > 0) {
-        switchSession(next[0]);
-      }
-      return next;
-    });
-    setNames((prev) => {
-      const { [id]: _, ...rest } = prev;
-      saveJSON(LS_NAMES, rest);
-      return rest;
-    });
-  }, [threadId, switchSession]);
+  const handleDelete = useCallback(
+    (id: string) => {
+      setSessions((prev) => {
+        const next = prev.filter((s) => s !== id);
+        saveJSON(LS_SESSIONS, next);
+        if (id === tid && next.length > 0) {
+          navigate(`/chat/${next[0]}`);
+        }
+        return next;
+      });
+      setNames((prev) => {
+        const { [id]: _, ...rest } = prev;
+        saveJSON(LS_NAMES, rest);
+        return rest;
+      });
+    },
+    [tid, navigate]
+  );
 
+  // 初始化 WS
   useEffect(() => {
     if (!didInit.current) {
       didInit.current = true;
-      connect(threadId);
-      addSession(threadId);
+      connect();
     }
-  }, [connect, threadId, addSession]);
+  }, [connect]);
+
+  // URL 变化时：同步会话列表 + 拉取状态
+  useEffect(() => {
+    addSession(tid);
+    clearMessages();
+    setCanvas({});
+    sendGetSessionState(tid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tid]);
+
+  // 当前会话被删时跳转
+  useEffect(() => {
+    if (sessions.length > 0 && !sessions.includes(tid)) {
+      navigate(`/chat/${sessions[0]}`);
+    }
+  }, [sessions, tid, navigate]);
 
   const handleNewSession = useCallback(() => {
-    switchSession(newSessionId());
-  }, [switchSession]);
+    navigate(`/chat/${newSessionId()}`);
+  }, [navigate]);
 
   const handleSend = useCallback(
     (text: string) => {
       addMessage("user", text);
-      const ok = send(text);
-      if (!ok) {
-        addMessage("agent", "未连接到后端服务，请先启动 backend");
-        return;
-      }
+      sendMessage(tid, text);
       setLoading(true);
       timerRef.current = setTimeout(() => {
         setLoading(false);
         addMessage("agent", "请求超时，请检查后端是否正常运行");
       }, 60_000);
     },
-    [addMessage, send]
+    [addMessage, sendMessage, tid]
   );
 
   useEffect(() => {
@@ -136,9 +180,9 @@ export default function App() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <Header
-        threadId={threadId}
-        sessionName={names[threadId] || threadId}
+        sessionName={names[tid] || tid}
         connected={connected}
+        connecting={connecting}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
         onNewSession={handleNewSession}
@@ -147,7 +191,7 @@ export default function App() {
         {sidebarOpen && (
           <Sidebar
             sessions={sessions}
-            current={threadId}
+            current={tid}
             names={names}
             onSwitch={switchSession}
             onRename={handleRename}
@@ -173,7 +217,7 @@ export default function App() {
             </svg>
           </button>
         )}
-        <Canvas onPositionChange={sendPosition} />
+        <Canvas onPositionChange={(pos) => sendPosition({ ...pos, thread_id: tid })} />
       </div>
     </div>
   );

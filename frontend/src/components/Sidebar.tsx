@@ -43,25 +43,31 @@ export function Sidebar({ sessions, current, names, onSwitch, onRename, onDelete
               style={S.editInput}
             />
           ) : (
-            <div key={id} style={id === current ? S.rowActive : S.row}>
+            <div key={id} style={id === current ? S.rowActive : S.row} className="session-row">
               <button onClick={() => onSwitch(id)} style={S.name}>
                 {displayName(id)}
               </button>
-              <button onClick={() => setEditing(id)} style={S.iconBtn} title="重命名">
+              <button onClick={() => setEditing(id)} style={S.actionBtn} className="action-btn" title="重命名">
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M11.5 1.5l3 3-10 10H1.5v-3z" />
                 </svg>
               </button>
-              <button onClick={() => onDelete(id)} style={S.iconBtn} title="删除">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M2.5 4.5h11M5.5 4.5V3a1 1 0 011-1h3a1 1 0 011 1v1.5M6.5 7.5v5M9.5 7.5v5M3.5 4.5l1 9h7l1-9" />
-                </svg>
-              </button>
+              {sessions.length > 1 && (
+                <button onClick={() => onDelete(id)} style={S.actionBtn} className="action-btn" title="删除">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M2.5 4.5h11M5.5 4.5V3a1 1 0 011-1h3a1 1 0 011 1v1.5M6.5 7.5v5M9.5 7.5v5M3.5 4.5l1 9h7l1-9" />
+                  </svg>
+                </button>
+              )}
             </div>
           )
         )}
         {sessions.length === 0 && <div style={S.empty}>暂无会话</div>}
       </div>
+      <style>{`
+        .session-row .action-btn { opacity: 0; }
+        .session-row:hover .action-btn { opacity: 1; }
+      `}</style>
     </div>
   );
 }
@@ -123,9 +129,9 @@ const S = {
     whiteSpace: "nowrap" as const,
   },
 
-  iconBtn: {
-    width: 26,
-    height: 26,
+  actionBtn: {
+    width: 24,
+    height: 24,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -136,7 +142,7 @@ const S = {
     color: "#a1a1aa",
     padding: 0,
     flexShrink: 0,
-    transition: "color 0.15s",
+    transition: "opacity 0.1s",
   },
 
   editInput: {

@@ -7,6 +7,7 @@ interface CanvasStore {
   setCanvas: (data: Record<string, CanvasNode>) => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
   addMessage: (role: "user" | "agent", content: string) => void;
+  setMessages: (msgs: { role: "user" | "agent"; content: string }[]) => void;
   clear: () => void;
 }
 
@@ -24,6 +25,8 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
 
   addMessage: (role, content) =>
     set((s) => ({ messages: [...s.messages, { role, content }] })),
+
+  setMessages: (msgs) => set({ messages: msgs }),
 
   clear: () => set({ nodes: [], messages: [] }),
 }));

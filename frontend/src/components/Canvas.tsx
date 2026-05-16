@@ -4,7 +4,6 @@ import {
   Background,
   Controls,
   type Node,
-  type NodeDragHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -46,17 +45,17 @@ export function Canvas({ onPositionChange }: Props) {
 
   const persistRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  const handleDrag: NodeDragHandler = useCallback(
-    (_evt, node) => {
+  const handleDrag = useCallback(
+    (_evt: unknown, node: Node) => {
       const id = node.id;
       const x = Math.round(node.position.x);
       const y = Math.round(node.position.y);
       // 本地即时更新
       updateNodePosition(id, x, y);
-      // 写文件 100ms 防抖
+      // 写文件 300ms 防抖
       if (persistRef.current[id]) clearTimeout(persistRef.current[id]);
       persistRef.current[id] = setTimeout(() => {
-        onPositionChange({ type: "update_position", node_id: id, x, y });
+        onPositionChange({ type: "update_position", thread_id: "", node_id: id, x, y });
         delete persistRef.current[id];
       }, 300);
     },

@@ -1,13 +1,13 @@
 interface Props {
-  threadId: string;
   sessionName: string;
   connected: boolean;
+  connecting: boolean;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   onNewSession: () => void;
 }
 
-export function Header({ threadId, sessionName, connected, sidebarOpen, onToggleSidebar, onNewSession }: Props) {
+export function Header({ sessionName, connected, connecting, sidebarOpen, onToggleSidebar, onNewSession }: Props) {
   return (
     <div style={S.bar}>
       <button onClick={onToggleSidebar} style={S.toggle} title={sidebarOpen ? "收起侧栏" : "展开侧栏"}>
@@ -18,7 +18,7 @@ export function Header({ threadId, sessionName, connected, sidebarOpen, onToggle
 
       <span style={S.logo}>OpenRHTV</span>
       <span style={S.slogan}>Make it easy</span>
-      <span style={S.dot(connected)} />
+      <span style={connecting ? S.dot("connecting") : S.dot(connected ? "on" : "off")} />
 
       <span style={S.sessionName}>{sessionName}</span>
 
@@ -74,13 +74,16 @@ const S = {
     letterSpacing: "0.02em",
   } as React.CSSProperties,
 
-  dot: (on: boolean) => ({
+  dot: (state: "on" | "off" | "connecting") => ({
     display: "inline-block",
     width: 7,
     height: 7,
     borderRadius: "50%",
-    background: on ? "#22c55e" : "#ef4444",
-    boxShadow: on ? "0 0 6px rgba(34,197,94,0.4)" : "0 0 6px rgba(239,68,68,0.4)",
+    background: state === "on" ? "#22c55e" : state === "connecting" ? "#f59e0b" : "#ef4444",
+    boxShadow:
+      state === "on" ? "0 0 6px rgba(34,197,94,0.4)"
+      : state === "connecting" ? "0 0 6px rgba(245,158,11,0.4)"
+      : "0 0 6px rgba(239,68,68,0.4)",
   }) as React.CSSProperties,
 
   sessionName: {

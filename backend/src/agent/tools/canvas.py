@@ -35,7 +35,10 @@ def _canvas_file() -> Path:
 def _load() -> dict:
     f = _canvas_file()
     if f.exists():
-        return json.loads(f.read_text(encoding="utf-8"))
+        try:
+            return json.loads(f.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            pass
     return {"nodes": {}, "edges": []}
 
 

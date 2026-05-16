@@ -1,53 +1,84 @@
 import { useRef, useCallback, useState } from "react";
-import type { WSAgentResponse, WSPositionUpdate } from "../types";
+import type { WSIncoming, WSPositionUpdate } from "../types";
+
+type Handler = (res: WSIncoming) => void;
 
 const WS_URL = "ws://localhost:8765";
 
-export function useWebSocket(onResponse: (res: WSAgentResponse) => void) {
+export function useWebSocket(onMessage: Handler) {
   const wsRef = useRef<WebSocket | null>(null);
+  const pendingRef = useRef<string[]>([]);
   const [connected, setConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
 
-  const connect = useCallback(
-    (threadId: string) => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
+  const connect = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    setConnecting(true);
+    setConnected(false);
+    pendingRef.current = [];
+
+    const ws = new WebSocket(WS_URL);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log("[WS] 已连接");
+      setConnecting(false);
+      setConnected(true);
+      const queued = pendingRef.current.length;
+      if (queued) console.log(`[WS] 发送排队消息 x${queued}`);
+      for (const msg of pendingRef.current) {
+        ws.send(msg);
       }
+      pendingRef.current = [];
+    };
 
-      const ws = new WebSocket(`${WS_URL}/${encodeURIComponent(threadId)}`);
-      wsRef.current = ws;
+    ws.onmessage = (e) => {
+      const res = JSON.parse(e.data);
+      onMessage(res);
+    };
 
-      ws.onopen = () => setConnected(true);
+    ws.onclose = () => {
+      console.log("[WS] 已断开");
+      setConnected(false);
+      setConnecting(false);
+      wsRef.current = null;
+    };
 
-      ws.onmessage = (e) => {
-        const res: WSAgentResponse = JSON.parse(e.data);
-        if (res.type === "agent_response") {
-          onResponse(res);
-        }
-      };
+    ws.onerror = () => {
+      console.log("[WS] 连接错误");
+      setConnected(false);
+      setConnecting(false);
+    };
+  }, [onMessage]);
 
-      ws.onclose = () => {
-        setConnected(false);
-        wsRef.current = null;
-      };
-
-      ws.onerror = () => {
-        setConnected(false);
-      };
-    },
-    [onResponse]
-  );
-
-  const send = useCallback((content: string) => {
-    if (wsRef.current?.readyState !== WebSocket.OPEN) return false;
-    wsRef.current.send(JSON.stringify({ type: "user_message", content }));
-    return true;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const _send = useCallback((payload: Record<string, any>) => {
+    const data = JSON.stringify(payload);
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(data);
+    } else {
+      console.log(`[WS] 排队 type=${payload.type}`);
+      pendingRef.current.push(data);
+    }
   }, []);
+
+  const sendMessage = useCallback((threadId: string, content: string) => {
+    console.log(`[WS] 发送 user_message thread=${threadId}`);
+    _send({ type: "user_message", thread_id: threadId, content });
+  }, [_send]);
 
   const sendPosition = useCallback((update: WSPositionUpdate) => {
-    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(JSON.stringify(update));
-  }, []);
+    _send(update);
+  }, [_send]);
 
-  return { connect, send, sendPosition, connected };
+  const sendGetSessionState = useCallback((threadId: string) => {
+    console.log(`[WS] 发送 get_session_state thread=${threadId}`);
+    _send({ type: "get_session_state", thread_id: threadId });
+  }, [_send]);
+
+  return { connect, sendMessage, sendPosition, sendGetSessionState, connected, connecting };
 }
