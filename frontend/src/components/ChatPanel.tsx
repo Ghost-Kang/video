@@ -12,7 +12,7 @@ export function ChatPanel({ messages, onSend, loading, onToggleCollapse }: Props
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ behavior: "instant" });
   }, [messages]);
 
   const handleSend = () => {
