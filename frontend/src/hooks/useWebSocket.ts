@@ -1,5 +1,5 @@
 import { useRef, useCallback, useState } from "react";
-import type { WSAgentResponse } from "../types";
+import type { WSAgentResponse, WSPositionUpdate } from "../types";
 
 const WS_URL = "ws://localhost:8765";
 
@@ -17,14 +17,7 @@ export function useWebSocket(onResponse: (res: WSAgentResponse) => void) {
       const ws = new WebSocket(`${WS_URL}/${encodeURIComponent(threadId)}`);
       wsRef.current = ws;
 
-      ws.onopen = () => {
-        setConnected(true);
-        onResponse({
-          type: "agent_response",
-          content: `已加入会话: ${threadId}`,
-          canvas: null,
-        });
-      };
+      ws.onopen = () => setConnected(true);
 
       ws.onmessage = (e) => {
         const res: WSAgentResponse = JSON.parse(e.data);
@@ -51,5 +44,10 @@ export function useWebSocket(onResponse: (res: WSAgentResponse) => void) {
     return true;
   }, []);
 
-  return { connect, send, connected };
+  const sendPosition = useCallback((update: WSPositionUpdate) => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify(update));
+  }, []);
+
+  return { connect, send, sendPosition, connected };
 }

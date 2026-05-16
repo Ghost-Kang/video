@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useCallback } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
   type Node,
+  type NodeDragHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -13,7 +14,7 @@ import { StoryboardNode } from "./nodes/StoryboardNode";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { AudioNode } from "./nodes/AudioNode";
-import type { CanvasNode } from "../types";
+import type { CanvasNode, WSPositionUpdate } from "../types";
 
 const nodeTypes = {
   script: ScriptNode,
@@ -23,31 +24,53 @@ const nodeTypes = {
   audio: AudioNode,
 };
 
-/** 将画布节点按类型分组，从上到下排列 */
-function layout(nodes: CanvasNode[]): Node[] {
+function defaultLayout(nodes: CanvasNode[]): Node[] {
   const order = ["script", "storyboard", "image", "video", "audio"];
   const gap = 200;
-
   return nodes.map((n, i) => {
     const col = order.indexOf(n.type);
-    const x = 100 + (col >= 0 ? col : 0) * 320;
-    const yPos = (i + 1) * gap;
-    return {
-      id: n.id,
-      type: n.type,
-      position: { x, y: yPos },
-      data: { node: n },
-    };
+    const x = n.x ?? 100 + (col >= 0 ? col : 0) * 320;
+    const y = n.y ?? (i + 1) * gap;
+    return { id: n.id, type: n.type, position: { x, y }, data: { node: n } };
   });
 }
 
-export function Canvas() {
-  const canvasNodes = useCanvasStore((s) => s.nodes);
-  const rfNodes = useMemo(() => layout(canvasNodes), [canvasNodes]);
+interface Props {
+  onPositionChange: (update: WSPositionUpdate) => void;
+}
+
+export function Canvas({ onPositionChange }: Props) {
+  const nodes = useCanvasStore((s) => s.nodes);
+  const updateNodePosition = useCanvasStore((s) => s.updateNodePosition);
+  const rfNodes = useMemo(() => defaultLayout(nodes), [nodes]);
+
+  const persistRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const handleDrag: NodeDragHandler = useCallback(
+    (_evt, node) => {
+      const id = node.id;
+      const x = Math.round(node.position.x);
+      const y = Math.round(node.position.y);
+      // 本地即时更新
+      updateNodePosition(id, x, y);
+      // 写文件 100ms 防抖
+      if (persistRef.current[id]) clearTimeout(persistRef.current[id]);
+      persistRef.current[id] = setTimeout(() => {
+        onPositionChange({ type: "update_position", node_id: id, x, y });
+        delete persistRef.current[id];
+      }, 300);
+    },
+    [updateNodePosition, onPositionChange]
+  );
 
   return (
     <div style={{ flex: 1, height: "100%" }}>
-      <ReactFlow nodes={rfNodes} nodeTypes={nodeTypes} fitView>
+      <ReactFlow
+        nodes={rfNodes}
+        nodeTypes={nodeTypes}
+        onNodeDrag={handleDrag}
+        fitView
+      >
         <Background />
         <Controls />
       </ReactFlow>

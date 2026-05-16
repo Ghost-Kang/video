@@ -53,7 +53,7 @@ export default function App() {
     [addMessage, setCanvas]
   );
 
-  const { connect, send, connected } = useWebSocket(onResponse);
+  const { connect, send, sendPosition, connected } = useWebSocket(onResponse);
   const didInit = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -173,7 +173,7 @@ export default function App() {
             </svg>
           </button>
         )}
-        <Canvas />
+        <Canvas onPositionChange={sendPosition} />
       </div>
     </div>
   );

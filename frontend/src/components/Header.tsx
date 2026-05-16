@@ -17,6 +17,7 @@ export function Header({ threadId, sessionName, connected, sidebarOpen, onToggle
       </button>
 
       <span style={S.logo}>OpenRHTV</span>
+      <span style={S.slogan}>Make it easy</span>
       <span style={S.dot(connected)} />
 
       <span style={S.sessionName}>{sessionName}</span>
@@ -63,6 +64,14 @@ const S = {
     fontSize: 14,
     letterSpacing: "-0.01em",
     color: "#18181b",
+  } as React.CSSProperties,
+
+  slogan: {
+    fontSize: 11,
+    fontWeight: 400,
+    color: "#a1a1aa",
+    fontStyle: "italic",
+    letterSpacing: "0.02em",
   } as React.CSSProperties,
 
   dot: (on: boolean) => ({

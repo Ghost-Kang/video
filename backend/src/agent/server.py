@@ -39,7 +39,21 @@ async def handle(websocket):
     try:
         async for raw in websocket:
             msg = json.loads(raw)
-            if msg.get("type") != "user_message":
+            msg_type = msg.get("type")
+
+            # 节点位置更新（不经过 agent，直接写 JSON）
+            if msg_type == "update_position":
+                canvas_file = canvas_tools._canvas_file()
+                if canvas_file.exists():
+                    data = json.loads(canvas_file.read_text(encoding="utf-8"))
+                    nid = msg["node_id"]
+                    if nid in data.get("nodes", {}):
+                        data["nodes"][nid]["x"] = msg["x"]
+                        data["nodes"][nid]["y"] = msg["y"]
+                        canvas_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+                continue
+
+            if msg_type != "user_message":
                 continue
 
             content = msg.get("content", "").strip()
