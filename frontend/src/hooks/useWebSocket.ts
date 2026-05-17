@@ -1,5 +1,5 @@
 import { useRef, useCallback, useState } from "react";
-import type { WSIncoming, WSPositionUpdate } from "../types";
+import type { WSIncoming, WSPositionUpdate, WSReviewNode } from "../types";
 
 type Handler = (res: WSIncoming) => void;
 
@@ -57,14 +57,6 @@ export function useWebSocket(onMessage: Handler) {
     };
   }, [onMessage]);
 
-  const _flushPending = useCallback(() => {
-    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
-    for (const msg of pendingRef.current) {
-      wsRef.current.send(msg);
-    }
-    pendingRef.current = [];
-  }, []);
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const _send = useCallback((payload: Record<string, any>) => {
     const data = JSON.stringify(payload);
@@ -95,5 +87,10 @@ export function useWebSocket(onMessage: Handler) {
     _send({ type: "get_session_state", thread_id: threadId });
   }, [_send]);
 
-  return { connect, sendMessage, sendPosition, sendGetSessionState, connected, connecting };
+  const sendReviewNode = useCallback((review: WSReviewNode) => {
+    console.log(`[WS] 发送 review_node action=${review.action} node=${review.node_id}`);
+    _send(review);
+  }, [_send]);
+
+  return { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, connected, connecting };
 }

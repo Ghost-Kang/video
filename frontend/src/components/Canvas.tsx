@@ -1,9 +1,12 @@
-import { useMemo, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
+  MiniMap,
+  applyNodeChanges,
   type Node,
+  type OnNodesChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -39,26 +42,49 @@ interface Props {
 }
 
 export function Canvas({ onPositionChange }: Props) {
-  const nodes = useCanvasStore((s) => s.nodes);
+  const canvasNodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
   const updateNodePosition = useCanvasStore((s) => s.updateNodePosition);
   const selectNode = useCanvasStore((s) => s.selectNode);
-  const rfNodes = useMemo(() => defaultLayout(nodes), [nodes]);
+
+  // 内部节点状态（包含 React Flow 管理的尺寸信息，MiniMap 需要）
+  const [rfNodes, setRfNodes] = useState<Node[]>(() => defaultLayout(canvasNodes));
+
+  // 当 store 中的节点数据变化时，同步位置（保留已有尺寸）
+  useEffect(() => {
+    setRfNodes((prev) => {
+      const prevMap = new Map(prev.map((n) => [n.id, n]));
+      return defaultLayout(canvasNodes).map((n) => {
+        const existing = prevMap.get(n.id);
+        if (existing) {
+          return { ...n, position: n.position, width: existing.width, height: existing.height };
+        }
+        return n;
+      });
+    });
+  }, [canvasNodes]);
 
   const persistRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  const handleDrag = useCallback(
-    (_evt: unknown, node: Node) => {
-      const id = node.id;
-      const x = Math.round(node.position.x);
-      const y = Math.round(node.position.y);
-      // 本地即时更新
-      updateNodePosition(id, x, y);
-      // 写文件 300ms 防抖
-      if (persistRef.current[id]) clearTimeout(persistRef.current[id]);
-      persistRef.current[id] = setTimeout(() => {
-        onPositionChange({ type: "update_position", thread_id: "", node_id: id, x, y });
-        delete persistRef.current[id];
-      }, 300);
+  const handleNodesChange: OnNodesChange = useCallback(
+    (changes) => {
+      setRfNodes((nds) => {
+        const updated = applyNodeChanges(changes, nds);
+        // 持久化位置变更
+        for (const c of changes) {
+          if (c.type === "position" && c.position) {
+            const x = Math.round(c.position.x);
+            const y = Math.round(c.position.y);
+            updateNodePosition(c.id, x, y);
+            if (persistRef.current[c.id]) clearTimeout(persistRef.current[c.id]);
+            persistRef.current[c.id] = setTimeout(() => {
+              onPositionChange({ type: "update_position", thread_id: "", node_id: c.id, x, y });
+              delete persistRef.current[c.id];
+            }, 300);
+          }
+        }
+        return updated;
+      });
     },
     [updateNodePosition, onPositionChange]
   );
@@ -67,13 +93,22 @@ export function Canvas({ onPositionChange }: Props) {
     <div style={{ flex: 1, height: "100%" }}>
       <ReactFlow
         nodes={rfNodes}
+        edges={edges}
         nodeTypes={nodeTypes}
-        onNodeDrag={handleDrag}
+        onNodesChange={handleNodesChange}
         onNodeClick={(_e, node) => selectNode(node.id)}
         fitView
       >
         <Background />
         <Controls />
+        <MiniMap
+          position="bottom-right"
+          style={{ background: "#fafafa", border: "1px solid #e4e4e7", borderRadius: 8 }}
+          nodeColor={(n) => {
+            const t = (n.data?.node as { type?: string })?.type;
+            return t === "script" ? "#c4b5fd" : t === "storyboard" ? "#fcd34d" : t === "image" ? "#86efac" : t === "video" ? "#c084fc" : t === "audio" ? "#fda4af" : "#d4d4d8";
+          }}
+        />
       </ReactFlow>
     </div>
   );

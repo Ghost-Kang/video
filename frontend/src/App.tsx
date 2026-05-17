@@ -36,11 +36,15 @@ export default function App() {
   const [names, setNames] = useState<Record<string, string>>(() => loadJSON<Record<string, string>>(LS_NAMES, {}));
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [chatOpen, setChatOpen] = useState(true);
+  const [thinking, setThinking] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const messages = useCanvasStore((s) => s.messages);
+  const streamingContent = useCanvasStore((s) => s.streamingContent);
   const setCanvas = useCanvasStore((s) => s.setCanvas);
   const addMessage = useCanvasStore((s) => s.addMessage);
   const setMessages = useCanvasStore((s) => s.setMessages);
+  const appendStreaming = useCanvasStore((s) => s.appendStreaming);
+  const finalizeStreaming = useCanvasStore((s) => s.finalizeStreaming);
   const clearMessages = useCanvasStore((s) => s.clear);
   const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
 
@@ -53,13 +57,17 @@ export default function App() {
       }
       switch (res.type) {
         case "agent_response":
-          console.log(`[WS] agent_response thread=${rid} content=${res.content?.slice(0, 50)}... nodes=${Object.keys(res.canvas?.nodes || {}).length}`);
-          if (res.content) {
-            setLoading(false);
-            addMessage("agent", res.content);
+          console.log(`[WS] agent_response thread=${rid} content=${res.content?.slice(0, 50)}...`);
+          setLoading(false);
+          setThinking([]);
+          finalizeStreaming(res.content);
+          if (res.canvas) {
+            setCanvas(res.canvas);
           }
-          if (res.canvas?.nodes) {
-            setCanvas(res.canvas.nodes);
+          break;
+        case "canvas_updated":
+          if (res.canvas) {
+            setCanvas(res.canvas);
           }
           break;
         case "processing":
@@ -68,16 +76,23 @@ export default function App() {
         case "session_state":
           console.log(`[WS] session_state thread=${rid} msgs=${res.messages.length} nodes=${Object.keys(res.canvas?.nodes || {}).length}`);
           setMessages(res.messages);
-          if (res.canvas?.nodes) {
-            setCanvas(res.canvas.nodes);
+          if (res.canvas) {
+            setCanvas(res.canvas);
+          }
+          break;
+        case "agent_stream":
+          if (res.event === "tool_call") {
+            setThinking((t) => [...t, `${res.name}(${res.args?.slice(0, 80) || ""})`]);
+          } else if (res.event === "text" && res.content) {
+            appendStreaming(res.content);
           }
           break;
       }
     },
-    [addMessage, setMessages, setCanvas]
+    [addMessage, setMessages, setCanvas, appendStreaming, finalizeStreaming]
   );
 
-  const { connect, sendMessage, sendPosition, sendGetSessionState, connected, connecting } =
+  const { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, connected, connecting } =
     useWebSocket(onMessage);
   const didInit = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -108,8 +123,9 @@ export default function App() {
       currentThreadIdRef.current = id;
       clearTimeout(timerRef.current ?? undefined);
       setLoading(false);
+      setThinking([]);
       clearMessages();
-      setCanvas({});
+      setCanvas({ nodes: {}, edges: [] });
       navigate(`/chat/${id}`);
     },
     [tid, navigate, clearMessages, setCanvas]
@@ -120,9 +136,6 @@ export default function App() {
       setSessions((prev) => {
         const next = prev.filter((s) => s !== id);
         saveJSON(LS_SESSIONS, next);
-        if (id === tid && next.length > 0) {
-          navigate(`/chat/${next[0]}`);
-        }
         return next;
       });
       setNames((prev) => {
@@ -131,7 +144,7 @@ export default function App() {
         return rest;
       });
     },
-    [tid, navigate]
+    []
   );
 
   // 初始化 WS
@@ -146,7 +159,7 @@ export default function App() {
   useEffect(() => {
     addSession(tid);
     clearMessages();
-    setCanvas({});
+    setCanvas({ nodes: {}, edges: [] });
     sendGetSessionState(tid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tid]);
@@ -170,9 +183,23 @@ export default function App() {
       timerRef.current = setTimeout(() => {
         setLoading(false);
         addMessage("agent", "请求超时，请检查后端是否正常运行");
-      }, 60_000);
+      }, 300_000);
     },
     [addMessage, sendMessage, tid]
+  );
+
+  const handleReview = useCallback(
+    (nodeId: string, action: "approve" | "reject", feedback?: string) => {
+      sendReviewNode({ type: "review_node", thread_id: tid, node_id: nodeId, action, feedback });
+      if (action === "reject") {
+        const f = feedback ? `，反馈意见：${feedback}` : "";
+        handleSend(`驳回节点「${nodeId}」${f}\n节点 ${nodeId} 审核未通过，请根据反馈重新生成。`);
+      }
+      if (action === "approve") {
+        handleSend(`节点「${nodeId}」审核已通过，请继续推进下一步。`);
+      }
+    },
+    [sendReviewNode, tid, handleSend]
   );
 
   useEffect(() => {
@@ -203,6 +230,8 @@ export default function App() {
         {chatOpen ? (
           <ChatPanel
             messages={messages}
+            streaming={streamingContent}
+            thinking={thinking}
             onSend={handleSend}
             loading={loading}
             onToggleCollapse={() => setChatOpen(false)}
@@ -220,7 +249,7 @@ export default function App() {
           </button>
         )}
         <Canvas onPositionChange={(pos) => sendPosition({ ...pos, thread_id: tid })} />
-        {selectedNodeId && <NodeDetail />}
+        {selectedNodeId && <NodeDetail onReview={handleReview} />}
       </div>
     </div>
   );

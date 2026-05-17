@@ -9,7 +9,12 @@ export function AudioNode({ data }: NodeProps) {
       <Handle type="target" position={Position.Top} />
       <strong>🎵 {node.title}</strong>
       {node.description && <p style={styles.desc}>{node.description.slice(0, 80)}</p>}
-      <span style={styles.badge(node.status)}>{node.status}</span>
+      {node.status === "executing" && <div style={styles.loading}>生成中...</div>}
+      <span style={styles.badge(node.status)} className={node.status === "executing" ? "badge-pulse" : ""}>{node.status}</span>
+      <style>{`
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .badge-pulse { animation: pulse 2s ease-in-out infinite; }
+      `}</style>
     </div>
   );
 }
@@ -24,6 +29,7 @@ const styles = {
     fontSize: 13,
   },
   desc: { color: "#666", fontSize: 12, margin: "4px 0" },
+  loading: { color: "#1890ff", fontSize: 12, margin: "4px 0" },
   badge: (s: string) => ({
     display: "inline-block",
     padding: "2px 6px",

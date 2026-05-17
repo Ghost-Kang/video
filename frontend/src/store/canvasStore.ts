@@ -1,25 +1,40 @@
 import { create } from "zustand";
 import type { CanvasNode } from "../types";
 
+interface Edge {
+  id: string;
+  source: string;
+  target: string;
+}
+
 interface CanvasStore {
   nodes: CanvasNode[];
+  edges: Edge[];
   messages: { role: "user" | "agent"; content: string }[];
   selectedNodeId: string | null;
-  setCanvas: (data: Record<string, CanvasNode>) => void;
+  streamingContent: string;
+  setCanvas: (data: { nodes: Record<string, CanvasNode>; edges?: unknown[] }) => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
   addMessage: (role: "user" | "agent", content: string) => void;
   setMessages: (msgs: { role: "user" | "agent"; content: string }[]) => void;
   selectNode: (id: string | null) => void;
+  appendStreaming: (text: string) => void;
+  finalizeStreaming: (content: string) => void;
   clear: () => void;
 }
 
 export const useCanvasStore = create<CanvasStore>((set) => ({
   nodes: [],
+  edges: [],
   messages: [],
   selectedNodeId: null,
+  streamingContent: "",
 
   setCanvas: (data) =>
-    set({ nodes: Object.values(data) }),
+    set({
+      nodes: Object.values(data.nodes),
+      edges: (data.edges || []) as Edge[],
+    }),
 
   updateNodePosition: (id, x, y) =>
     set((s) => ({
@@ -33,5 +48,14 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
 
   selectNode: (id) => set({ selectedNodeId: id }),
 
-  clear: () => set({ nodes: [], messages: [], selectedNodeId: null }),
+  appendStreaming: (text) =>
+    set((s) => ({ streamingContent: s.streamingContent + text })),
+
+  finalizeStreaming: (content) =>
+    set((s) => ({
+      messages: [...s.messages, { role: "agent" as const, content }],
+      streamingContent: "",
+    })),
+
+  clear: () => set({ nodes: [], edges: [], messages: [], selectedNodeId: null, streamingContent: "" }),
 }));

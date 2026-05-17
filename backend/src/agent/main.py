@@ -22,6 +22,7 @@ from agent.tools.canvas import (
     create_canvas_node,
     delete_canvas_node,
     execute_node,
+    get_canvas_state,
     update_canvas_node,
 )
 
@@ -54,6 +55,7 @@ def create_director_agent(checkpointer=None):
             update_canvas_node,
             delete_canvas_node,
             execute_node,
+            get_canvas_state,
         ],
         backend=_make_backend(),
         name="director",

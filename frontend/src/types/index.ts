@@ -1,12 +1,23 @@
 export type NodeType = "script" | "storyboard" | "image" | "video" | "audio";
 
+export interface Shot {
+  no: string;
+  scene: string;
+  description: string;
+  duration: string;
+  camera: string;
+  transition: string;
+  audio: string;
+}
+
 export interface CanvasNode {
   id: string;
   type: NodeType;
   title: string;
   description: string;
-  status: "pending" | "executing" | "done" | "failed";
+  status: "pending" | "approved" | "executing" | "awaiting_review" | "done" | "failed";
   result: Record<string, unknown> | null;
+  subtype?: string | null;
   x?: number;
   y?: number;
 }
@@ -43,6 +54,14 @@ export interface WSGetSessionState {
   thread_id: string;
 }
 
+export interface WSReviewNode {
+  type: "review_node";
+  thread_id: string;
+  node_id: string;
+  action: "approve" | "reject";
+  feedback?: string;
+}
+
 /** 后端 → 前端 */
 export interface WSAgentResponse {
   type: "agent_response";
@@ -63,4 +82,19 @@ export interface WSSessionState {
   canvas: CanvasData | null;
 }
 
-export type WSIncoming = WSAgentResponse | WSProcessing | WSSessionState;
+export interface WSAgentStream {
+  type: "agent_stream";
+  thread_id: string;
+  event: "tool_call" | "text";
+  name?: string;
+  args?: string;
+  content?: string;
+}
+
+export interface WSCanvasUpdated {
+  type: "canvas_updated";
+  thread_id: string;
+  canvas: CanvasData | null;
+}
+
+export type WSIncoming = WSAgentResponse | WSProcessing | WSSessionState | WSAgentStream | WSCanvasUpdated;

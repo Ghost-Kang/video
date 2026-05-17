@@ -18,7 +18,8 @@ LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3-flash-preview")
 
 # -------- 图片生成 --------
 IMAGE_GEN_API_KEY = os.getenv("IMAGE_GEN_API_KEY")
-IMAGE_GEN_BASE_URL = os.getenv("IMAGE_GEN_BASE_URL")
+IMAGE_GEN_BASE_URL = os.getenv("IMAGE_GEN_BASE_URL", "https://api.apimart.ai")
+IMAGE_GEN_MODEL = os.getenv("IMAGE_GEN_MODEL", "gpt-image-2")
 
 # -------- 视频生成 --------
 VIDEO_GEN_API_KEY = os.getenv("VIDEO_GEN_API_KEY")
@@ -31,3 +32,17 @@ TTS_BASE_URL = os.getenv("TTS_BASE_URL")
 # -------- ASR --------
 ASR_API_KEY = os.getenv("ASR_API_KEY")
 ASR_BASE_URL = os.getenv("ASR_BASE_URL")
+
+# -------- 分镜定义 --------
+STORYBOARD_COLUMNS = [
+    {"key": "no",          "label": "镜号",   "required": True},
+    {"key": "scene",       "label": "场景",   "required": False},
+    {"key": "duration",    "label": "时长",   "required": False},
+    {"key": "camera",      "label": "运镜",   "required": False},
+    {"key": "description", "label": "画面描述", "required": True},
+    {"key": "transition",  "label": "转场",   "required": False},
+    {"key": "audio",       "label": "声音",   "required": False},
+]
+# 生成 prompt 里的格式说明
+STORYBOARD_FORMAT_HINT = " | ".join(c["label"] for c in STORYBOARD_COLUMNS) + "\n" + \
+    " | ".join(f"<{c['key']}>" for c in STORYBOARD_COLUMNS)
