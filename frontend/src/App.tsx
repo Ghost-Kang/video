@@ -102,7 +102,7 @@ export default function App() {
     [addMessage, setMessages, setCanvas, appendStreaming, finalizeStreaming]
   );
 
-  const { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, connected, connecting } =
+  const { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, sendCreateEdge, sendDeleteEdge, connected, connecting } =
     useWebSocket(onMessage);
   const didInit = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -232,6 +232,20 @@ export default function App() {
     [sendUpdateNodeStatus, tid]
   );
 
+  const handleCreateEdge = useCallback(
+    (source: string, target: string) => {
+      sendCreateEdge(tid, source, target);
+    },
+    [sendCreateEdge, tid]
+  );
+
+  const handleDeleteEdge = useCallback(
+    (edgeId: string) => {
+      sendDeleteEdge(tid, edgeId);
+    },
+    [sendDeleteEdge, tid]
+  );
+
   const handleOptimizePrompt = useCallback(
     (nodeId: string, prompt: string, feedback: string) => {
       sendOptimizePrompt({ type: "optimize_prompt", thread_id: tid, node_id: nodeId, prompt, feedback });
@@ -285,8 +299,8 @@ export default function App() {
             </svg>
           </button>
         )}
-        <Canvas onPositionChange={(pos) => sendPosition({ ...pos, thread_id: tid })} />
-        {selectedNodeId && <NodeDetail onReview={handleReview} onExecuteNode={handleExecuteNode} onUpdateNodeStatus={handleUpdateNodeStatus} onOptimizePrompt={handleOptimizePrompt} />}
+        <Canvas onPositionChange={(pos) => sendPosition({ ...pos, thread_id: tid })} onCreateEdge={handleCreateEdge} onDeleteEdge={handleDeleteEdge} />
+        {selectedNodeId && <NodeDetail onReview={handleReview} onExecuteNode={handleExecuteNode} onUpdateNodeStatus={handleUpdateNodeStatus} onOptimizePrompt={handleOptimizePrompt} onDeleteEdge={handleDeleteEdge} />}
       </div>
     </div>
   );

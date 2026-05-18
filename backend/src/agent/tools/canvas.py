@@ -219,6 +219,38 @@ def _upsert_edge(edge: dict):
     db.close()
 
 
+def create_canvas_edge(source: str, target: str) -> dict:
+    """手动创建一条边。返回 edge 或 error。"""
+    # 验证两端节点存在
+    src_node = _load_node(source)
+    tgt_node = _load_node(target)
+    if not src_node:
+        return {"error": f"源节点 {source} 不存在"}
+    if not tgt_node:
+        return {"error": f"目标节点 {target} 不存在"}
+    # 检查重复
+    existing = _load_all_edges()
+    for e in existing:
+        if e["source"] == source and e["target"] == target:
+            return {"error": "边已存在"}
+    edge_id = f"e-{source}-{target}"
+    edge = {"id": edge_id, "source": source, "target": target}
+    _upsert_edge(edge)
+    return edge
+
+
+def delete_canvas_edge(edge_id: str) -> dict:
+    """手动删除一条边。"""
+    db = _db()
+    db.execute("DELETE FROM canvas_edges WHERE thread_id=? AND edge_id=?", (_current_thread_id, edge_id))
+    deleted = db.total_changes > 0
+    db.commit()
+    db.close()
+    if deleted:
+        return {"id": edge_id, "deleted": True}
+    return {"error": f"边 {edge_id} 不存在"}
+
+
 # ---------- 节点 CRUD ----------
 
 
@@ -229,7 +261,7 @@ def _default_position(node_type: str, parent_ids: list[str] | None) -> tuple[flo
     同类型节点横向错开。
     """
     # 类型 → x 偏移
-    x_offset = {"script": 0, "image": 300, "video": 600, "audio": 900}
+    x_offset = {"script": 0, "image": 400, "video": 800, "audio": 1200}
     base_x = x_offset.get(node_type, 0)
 
     # 从父节点获取参考位置
@@ -238,7 +270,7 @@ def _default_position(node_type: str, parent_ids: list[str] | None) -> tuple[flo
         for pid in parent_ids:
             parent = _load_node(pid)
             if parent and parent.get("y") is not None:
-                ref_y = max(ref_y, parent["y"] + 200)
+                ref_y = max(ref_y, parent["y"] + 280)
 
     # 无父节点：排在所有已有节点下方
     if ref_y == 0:

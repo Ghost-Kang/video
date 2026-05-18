@@ -78,6 +78,19 @@ export interface WSExecuteNode {
   image_gen_provider?: string;  // "apimart" | "google"
 }
 
+export interface WSCreateEdge {
+  type: "create_edge";
+  thread_id: string;
+  source: string;
+  target: string;
+}
+
+export interface WSDeleteEdge {
+  type: "delete_edge";
+  thread_id: string;
+  edge_id: string;
+}
+
 export interface WSOptimizePrompt {
   type: "optimize_prompt";
   thread_id: string;

@@ -9,9 +9,10 @@ interface Props {
   onExecuteNode: (nodeId: string, nodeType: string, description: string, provider?: string) => void;
   onUpdateNodeStatus: (nodeId: string, nodeStatus: NodeStatus) => void;
   onOptimizePrompt: (nodeId: string, prompt: string, feedback: string) => void;
+  onDeleteEdge: (edgeId: string) => void;
 }
 
-export function NodeDetail({ onReview, onExecuteNode, onUpdateNodeStatus, onOptimizePrompt }: Props) {
+export function NodeDetail({ onReview, onExecuteNode, onUpdateNodeStatus, onOptimizePrompt, onDeleteEdge }: Props) {
   const selectedId = useCanvasStore((s) => s.selectedNodeId);
   const node = useCanvasStore((s) => s.nodes.find((n) => n.id === selectedId));
   const allNodes = useCanvasStore((s) => s.nodes);
@@ -24,10 +25,11 @@ export function NodeDetail({ onReview, onExecuteNode, onUpdateNodeStatus, onOpti
   const parentIds = edges
     .filter((e) => e.target === node.id)
     .map((e) => e.source);
-  const refImages = allNodes
-    .filter((n) => parentIds.includes(n.id) && (n.type === "image" || n.type === "video"))
-    .map((n) => ({ id: n.id, title: n.title, url: n.result?.url as string | undefined }))
-    .filter((n) => n.url);
+  const nodeMap = new Map(allNodes.map((n) => [n.id, n]));
+  const refImages = parentIds
+    .map((pid) => nodeMap.get(pid))
+    .filter((n): n is CanvasNode => !!n && (n.type === "image" || n.type === "video") && !!n.result?.url)
+    .map((n) => ({ id: n.id, title: n.title, url: n.result!.url as string }));
 
   const isMedia = node.type === "image" || node.type === "video";
 
@@ -52,12 +54,24 @@ export function NodeDetail({ onReview, onExecuteNode, onUpdateNodeStatus, onOpti
           <section style={S.section}>
             <div style={S.label}>参考图</div>
             <div style={S.refGrid}>
-              {refImages.map((img) => (
-                <div key={img.id} style={S.refItem}>
-                  <img src={img.url} alt={img.title} style={S.refImg} />
-                  <span style={S.refTitle}>{img.title}</span>
-                </div>
-              ))}
+              {refImages.map((img) => {
+                const edge = edges.find((e) => e.source === img.id && e.target === node.id);
+                return (
+                  <div key={img.id} style={S.refItem}>
+                    <div style={{ position: "relative" }}>
+                      <img src={img.url} alt={img.title} style={S.refImg} />
+                      <button
+                        onClick={() => edge && onDeleteEdge(edge.id)}
+                        style={S.refDelete}
+                        title="删除参考图"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <span style={S.refTitle}>{img.title}</span>
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}
@@ -547,6 +561,26 @@ const S = {
     borderRadius: 4,
     border: "1px solid #e4e4e7",
   },
+
+  refDelete: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 18,
+    height: 18,
+    borderRadius: "50%",
+    background: "#ef4444",
+    color: "#fff",
+    border: "none",
+    fontSize: 10,
+    fontWeight: 700,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+    lineHeight: 1,
+  } as React.CSSProperties,
 
   refTitle: {
     fontSize: 10,

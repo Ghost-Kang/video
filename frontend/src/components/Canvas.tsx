@@ -5,8 +5,12 @@ import {
   Controls,
   MiniMap,
   applyNodeChanges,
+  applyEdgeChanges,
   type Node,
+  type Edge,
   type OnNodesChange,
+  type OnEdgesChange,
+  type OnConnect,
 } from "@xyflow/react";
 import dagre from "dagre";
 import "@xyflow/react/dist/style.css";
@@ -16,6 +20,7 @@ import { ScriptNode } from "./nodes/ScriptNode";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { AudioNode } from "./nodes/AudioNode";
+import { DeletableEdge } from "./DeletableEdge";
 import type { CanvasNode, WSPositionUpdate } from "../types";
 
 const nodeTypes = {
@@ -25,16 +30,20 @@ const nodeTypes = {
   audio: AudioNode,
 };
 
+const edgeTypes = {
+  default: DeletableEdge,
+};
+
 const NODE_W = 200;
 const NODE_H = 120;
 
 function defaultLayout(nodes: CanvasNode[]): Node[] {
-  const typeX: Record<string, number> = { script: 0, image: 300, video: 600, audio: 900 };
+  const typeX: Record<string, number> = { script: 0, image: 400, video: 800, audio: 1200 };
   return nodes.map((n, i) => ({
     id: n.id, type: n.type,
     position: {
       x: n.x ?? (typeX[n.type] ?? 100),
-      y: n.y ?? (100 + i * 180),
+      y: n.y ?? (100 + i * 240),
     },
     data: { node: n },
   }));
@@ -52,7 +61,7 @@ function dagreLayout(nodes: CanvasNode[], edges: { source: string; target: strin
   // 1. 全图跑一次 dagre LR，得到水平结构
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "LR", nodesep: 60, ranksep: 200, marginx: 40, marginy: 40 });
+  g.setGraph({ rankdir: "LR", nodesep: 120, ranksep: 300, marginx: 80, marginy: 80 });
 
   for (const n of nodes) {
     g.setNode(n.id, { width: NODE_W, height: NODE_H });
@@ -63,7 +72,7 @@ function dagreLayout(nodes: CanvasNode[], edges: { source: string; target: strin
   dagre.layout(g);
 
   // 2. 按 dagre x 坐标分列（同一横向层级）
-  const COL_GAP = 100;
+  const COL_GAP = 150;
   const columns: Map<number, { id: string; x: number; y: number; shotNo: number }[]> = new Map();
   for (const n of nodes) {
     const pos = g.node(n.id);
@@ -90,14 +99,14 @@ function dagreLayout(nodes: CanvasNode[], edges: { source: string; target: strin
     });
 
     // 重新分配 y，shot 之间加间距
-    let curY = 60;
+    let curY = 80;
     let prevShotNo = -1;
     for (const item of col) {
       if (item.shotNo > 0 && prevShotNo > 0 && item.shotNo !== prevShotNo) {
-        curY += 60; // 不同分镜之间额外间距
+        curY += 120; // 不同分镜之间额外间距
       }
       positions.set(item.id, { x: item.x, y: curY });
-      curY += NODE_H + 20;
+      curY += NODE_H + 60;
       if (item.shotNo > 0) prevShotNo = item.shotNo;
     }
   }
@@ -107,15 +116,29 @@ function dagreLayout(nodes: CanvasNode[], edges: { source: string; target: strin
 
 interface Props {
   onPositionChange: (update: WSPositionUpdate) => void;
+  onCreateEdge: (source: string, target: string) => void;
+  onDeleteEdge: (edgeId: string) => void;
 }
 
-export function Canvas({ onPositionChange }: Props) {
+export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) {
   const canvasNodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodePosition = useCanvasStore((s) => s.updateNodePosition);
+  const addEdge = useCanvasStore((s) => s.addEdge);
+  const removeEdge = useCanvasStore((s) => s.removeEdge);
   const selectNode = useCanvasStore((s) => s.selectNode);
 
   const [rfNodes, setRfNodes] = useState<Node[]>(() => defaultLayout(canvasNodes));
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { edgeId } = (e as CustomEvent).detail;
+      removeEdge(edgeId);
+      onDeleteEdge(edgeId);
+    };
+    window.addEventListener("delete_edge", handler);
+    return () => window.removeEventListener("delete_edge", handler);
+  }, [removeEdge, onDeleteEdge]);
 
   useEffect(() => {
     setRfNodes((prev) => {
@@ -154,6 +177,30 @@ export function Canvas({ onPositionChange }: Props) {
     [updateNodePosition, onPositionChange]
   );
 
+  const handleConnect: OnConnect = useCallback(
+    (connection) => {
+      if (!connection.source || !connection.target) return;
+      const edgeId = `e-${connection.source}-${connection.target}`;
+      // 检查重复
+      if (edges.some((e) => e.source === connection.source && e.target === connection.target)) return;
+      addEdge({ id: edgeId, source: connection.source, target: connection.target });
+      onCreateEdge(connection.source, connection.target);
+    },
+    [edges, addEdge, onCreateEdge]
+  );
+
+  const handleEdgesChange: OnEdgesChange = useCallback(
+    (changes) => {
+      for (const c of changes) {
+        if (c.type === "remove") {
+          removeEdge(c.id);
+          onDeleteEdge(c.id);
+        }
+      }
+    },
+    [removeEdge, onDeleteEdge]
+  );
+
   const handleAutoLayout = useCallback(() => {
     const positions = dagreLayout(canvasNodes, edges);
     for (const [id, pos] of positions) {
@@ -174,8 +221,12 @@ export function Canvas({ onPositionChange }: Props) {
         nodes={rfNodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={handleNodesChange}
+        onEdgesChange={handleEdgesChange}
+        onConnect={handleConnect}
         onNodeClick={(_e, node) => selectNode(node.id)}
+        defaultEdgeOptions={{ deletable: true, style: { stroke: "#a1a1aa", strokeWidth: 2 } }}
         fitView
       >
         <Background />

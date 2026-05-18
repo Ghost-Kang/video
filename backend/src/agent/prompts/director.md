@@ -49,6 +49,42 @@
 
 **锚点节点需要审核通过后，才能用于后续生产。**
 
+#### 角色图 description 规范
+
+角色图必须生成**三视图**（正面、侧面、背面），description 严格使用以下模板：
+
+```
+Character reference sheet of [角色名], [年龄性别], [核心外观特征].
+Three views layout: front view (center), side view (left), back view (right).
+Full body, standing pose, arms slightly away from body, neutral expression.
+White background, clean character design sheet, turnaround.
+Style: [统一的画面风格, 如 anime/manga/realistic/watercolor].
+```
+
+示例：
+```
+Character reference sheet of 小明, young man in his 20s, short black hair, wearing a black trench coat.
+Three views layout: front view (center), side view (left), back view (right).
+Full body, standing pose, arms slightly away from body, neutral expression.
+White background, clean character design sheet, turnaround.
+Style: semi-realistic anime style, clean lineart.
+```
+
+#### 场景图 description 规范
+
+```
+[场景名称], [时间/天气/氛围], [关键视觉元素].
+Wide establishing shot, cinematic composition.
+Style: [统一的画面风格].
+```
+
+示例：
+```
+公园, dusk, warm golden light, cherry blossom trees, stone pathway, wooden bench.
+Wide establishing shot, cinematic composition.
+Style: semi-realistic anime style, rich colors.
+```
+
 **阶段管理规则**：
 
 1. **不可跨阶段创建**：必须等前一阶段全部审核通过，才能进入下一阶段。策划书未通过 → 不能创建视觉锚点。视觉锚点未通过 → 不能创建宫格图。
@@ -63,6 +99,47 @@
 ### 5. 宫格图
 
 锚点全部确认后，为每个分镜创建宫格图（**只创建，不 execute**）：先问 `canvas-manager` 拿 parent_ids，再 `create_canvas_node` image（subtype="grid"）
+
+#### 宫格图 description 规范
+
+宫格图将单个分镜的关键情节拆分为多格漫画式布局，格数根据剧情紧密程度决定：
+
+| 剧情密度 | 格数 | 布局 | 适用场景 |
+|----------|------|------|----------|
+| 简单 | 4 格 | 2×2 | 单动作/单情绪变化的镜头 |
+| 中等 | 6 格 | 2×3 | 有起承转合的短情节 |
+| 复杂 | 9 格 | 3×3 | 多角色/多动作的复杂镜头 |
+
+description 模板：
+
+```
+Storyboard panel layout for shot [镜号]: "[镜头标题]".
+[剧情密度判断]，number of panels: [N] panels in grid.
+Panels:
+1. [第一个关键帧描述]
+2. [第二个关键帧描述]
+...
+N. [第N个关键帧描述]
+Characters: [出现的角色名，引用角色图形象].
+Background: [场景描述，引用场景图].
+Consistent art style throughout all panels, sequential manga/comic layout, [统一的画面风格].
+```
+
+示例：
+```
+Storyboard panel layout for shot 1: "小明在公园发现神秘信件".
+Medium complexity, number of panels: 6 panels in 2x3 grid.
+Panels:
+1. 小明走在公园石径上，阳光透过树叶洒落
+2. 突然停步，低头看向地面
+3. 地面上有一个泛黄的信封
+4. 小明蹲下，伸手去拿
+5. 拿起信封，观察四周
+6. 打开信封，表情由疑惑变为震惊
+Characters: 小明 (参照角色形象图，黑色风衣的年轻男子).
+Background: 公园，傍晚暖光，樱花树，石径.
+Consistent art style throughout all panels, sequential manga/comic layout, semi-realistic anime style.
+```
 
 ### 6. 剪辑输出
 串联镜头，添加转场、字幕、特效，输出最终成片。

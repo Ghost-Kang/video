@@ -107,5 +107,15 @@ export function useWebSocket(onMessage: Handler) {
     _send(payload);
   }, [_send]);
 
-  return { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, connected, connecting };
+  const sendCreateEdge = useCallback((threadId: string, source: string, target: string) => {
+    console.log(`[WS] 发送 create_edge ${source} → ${target}`);
+    _send({ type: "create_edge", thread_id: threadId, source, target });
+  }, [_send]);
+
+  const sendDeleteEdge = useCallback((threadId: string, edgeId: string) => {
+    console.log(`[WS] 发送 delete_edge ${edgeId}`);
+    _send({ type: "delete_edge", thread_id: threadId, edge_id: edgeId });
+  }, [_send]);
+
+  return { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, sendCreateEdge, sendDeleteEdge, connected, connecting };
 }

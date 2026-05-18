@@ -171,8 +171,30 @@ async def _submit_and_poll(thread_id: str, node_id: str, prompt: str, provider_n
             print(f"[生图提交失败] node={node_id} 耗时={elapsed:.0f}ms error={submitted.get('error')}")
             return
 
-        # 3. 轮询 + 结果上传 S3
-        await _poll_image_tasks(thread_id)
+        # 3. 只轮询自己的任务 → 上传 S3
+        result = await provider.poll(submitted["task_id"])
+        canvas_tools.set_thread_id(thread_id)
+        if result.get("url"):
+            canvas_tools.update_canvas_node(node_id, asset_status="done")
+            s3_url = await _upload_to_s3(result["url"], node_id)
+            final_url = s3_url or result["url"]
+            canvas_tools._update_node_result(node_id, {"url": final_url, "actual_time": result.get("actual_time", 0)})
+            print(f"[生图完成] node={node_id} url={final_url[:60]}...")
+        elif result.get("image_data"):
+            s3_url = _upload_bytes_to_s3(result["image_data"], f"{node_id}.png")
+            if s3_url:
+                canvas_tools.update_canvas_node(node_id, asset_status="done")
+                canvas_tools._update_node_result(node_id, {"url": s3_url, "actual_time": result.get("actual_time", 0)})
+                print(f"[生图完成] node={node_id} url={s3_url[:60]}...")
+            else:
+                canvas_tools.update_canvas_node(node_id, asset_status="failed")
+                print(f"[生图失败] node={node_id} S3上传失败")
+        else:
+            is_timeout = result.get("error") == "timeout"
+            status = "timeout" if is_timeout else "failed"
+            canvas_tools.update_canvas_node(node_id, asset_status=status)
+            canvas_tools._update_node_result(node_id, {"error": result.get("error", "")})
+            print(f"[生图{'超时' if is_timeout else '失败'}] node={node_id} {result.get('error')}")
         try:
             await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
         except (ConnectionClosedOK, Exception):
@@ -299,6 +321,27 @@ async def handle(websocket):
             thread_id = msg.get("thread_id", "")
 
             if not thread_id:
+                continue
+
+            if msg_type == "create_edge":
+                src = msg.get("source", "")
+                tgt = msg.get("target", "")
+                canvas_tools.set_thread_id(thread_id)
+                result = canvas_tools.create_canvas_edge(src, tgt)
+                if "error" not in result:
+                    await _send(ws=websocket, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
+                else:
+                    print(f"[边] 创建失败: {result['error']}")
+                continue
+
+            if msg_type == "delete_edge":
+                eid = msg.get("edge_id", "")
+                canvas_tools.set_thread_id(thread_id)
+                result = canvas_tools.delete_canvas_edge(eid)
+                if "deleted" in result:
+                    await _send(ws=websocket, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
+                else:
+                    print(f"[边] 删除失败: {result.get('error')}")
                 continue
 
             if msg_type == "update_position":
