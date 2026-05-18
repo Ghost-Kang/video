@@ -62,12 +62,12 @@ export default function App() {
           setThinking([]);
           finalizeStreaming(res.content);
           if (res.canvas) {
-            setCanvas(res.canvas);
+            queueMicrotask(() => setCanvas(res.canvas!));
           }
           break;
         case "canvas_updated":
           if (res.canvas) {
-            setCanvas(res.canvas);
+            queueMicrotask(() => setCanvas(res.canvas!));
           }
           break;
         case "processing":
@@ -77,7 +77,7 @@ export default function App() {
           console.log(`[WS] session_state thread=${rid} msgs=${res.messages.length} nodes=${Object.keys(res.canvas?.nodes || {}).length}`);
           setMessages(res.messages);
           if (res.canvas) {
-            setCanvas(res.canvas);
+            queueMicrotask(() => setCanvas(res.canvas!));
           }
           break;
         case "agent_stream":
@@ -87,12 +87,22 @@ export default function App() {
             appendStreaming(res.content);
           }
           break;
+        case "prompt_optimized":
+          console.log(`[WS] prompt_optimized node=${res.node_id}`);
+          queueMicrotask(() => {
+            useCanvasStore.setState((s) => ({
+              nodes: s.nodes.map((n) =>
+                n.id === res.node_id ? { ...n, description: res.optimized_prompt } : n
+              ),
+            }));
+          });
+          break;
       }
     },
     [addMessage, setMessages, setCanvas, appendStreaming, finalizeStreaming]
   );
 
-  const { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, connected, connecting } =
+  const { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, connected, connecting } =
     useWebSocket(onMessage);
   const didInit = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -195,11 +205,38 @@ export default function App() {
         const f = feedback ? `，反馈意见：${feedback}` : "";
         handleSend(`驳回节点「${nodeId}」${f}\n节点 ${nodeId} 审核未通过，请根据反馈重新生成。`);
       }
-      if (action === "approve") {
-        handleSend(`节点「${nodeId}」审核已通过，请继续推进下一步。`);
-      }
+      // approve 不自动发消息，由用户自己决定何时推进
     },
     [sendReviewNode, tid, handleSend]
+  );
+
+  const handleExecuteNode = useCallback(
+    (nodeId: string, nodeType: string, description: string, provider?: string) => {
+      sendExecuteNode({ type: "execute_node", thread_id: tid, node_id: nodeId, node_type: nodeType as any, description, image_gen_provider: provider });
+    },
+    [sendExecuteNode, tid]
+  );
+
+  const handleUpdateNodeStatus = useCallback(
+    (nodeId: string, nodeStatus: "reviewing" | "confirmed") => {
+      // 乐观更新本地 store（推迟到微任务避免跨渲染冲突）
+      queueMicrotask(() => {
+        useCanvasStore.setState((s) => ({
+          nodes: s.nodes.map((n) =>
+            n.id === nodeId ? { ...n, node_status: nodeStatus } : n
+          ),
+        }));
+      });
+      sendUpdateNodeStatus(tid, nodeId, nodeStatus);
+    },
+    [sendUpdateNodeStatus, tid]
+  );
+
+  const handleOptimizePrompt = useCallback(
+    (nodeId: string, prompt: string, feedback: string) => {
+      sendOptimizePrompt({ type: "optimize_prompt", thread_id: tid, node_id: nodeId, prompt, feedback });
+    },
+    [sendOptimizePrompt, tid]
   );
 
   useEffect(() => {
@@ -249,7 +286,7 @@ export default function App() {
           </button>
         )}
         <Canvas onPositionChange={(pos) => sendPosition({ ...pos, thread_id: tid })} />
-        {selectedNodeId && <NodeDetail onReview={handleReview} />}
+        {selectedNodeId && <NodeDetail onReview={handleReview} onExecuteNode={handleExecuteNode} onUpdateNodeStatus={handleUpdateNodeStatus} onOptimizePrompt={handleOptimizePrompt} />}
       </div>
     </div>
   );

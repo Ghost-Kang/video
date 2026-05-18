@@ -1,19 +1,20 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import type { CanvasNode } from "../../types";
+import type { CanvasNode, AssetStatus } from "../../types";
 
 export function ImageNode({ data }: NodeProps) {
   const node = data.node as CanvasNode;
-  const isExecuting = node.status === "executing";
+  const asset = node.asset_status || "idle";
+  const isGenerating = asset === "generating";
 
   return (
     <div style={S.wrapper}>
-      <Handle type="source" position={Position.Bottom} />
-      <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Right} />
+      <Handle type="target" position={Position.Left} />
       <strong>{node.title}</strong>
 
       {node.result?.url ? (
         <img src={node.result.url as string} alt={node.title} style={S.img} />
-      ) : isExecuting ? (
+      ) : isGenerating ? (
         <div className="img-loading" style={S.loading}>
           <span className="img-spinner" />
           <span>生成中...</span>
@@ -22,7 +23,8 @@ export function ImageNode({ data }: NodeProps) {
         <div style={S.placeholder}>🖼 等待生成</div>
       )}
 
-      <span style={S.badge(node.status)} className={isExecuting ? "badge-pulse" : ""}>{node.status}</span>
+      <span style={S.badge(node.node_status)}>{node.node_status}</span>
+      {asset !== "idle" && <span style={S.assetBadge(asset)} className={isGenerating ? "badge-pulse" : ""}>{asset}</span>}
 
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -42,14 +44,15 @@ export function ImageNode({ data }: NodeProps) {
 
 const S = {
   wrapper: {
-    background: "#f6ffed",
-    border: "1px solid #73d13d",
+    background: "#fff",
+    border: "1px solid #d4d4d8",
     borderRadius: 8,
-    padding: 12,
-    minWidth: 200,
-    fontSize: 13,
+    padding: 8,
+    minWidth: 140,
+    maxWidth: 180,
+    fontSize: 11,
   },
-  img: { width: "100%", borderRadius: 4, marginTop: 6 },
+  img: { width: "100%", maxHeight: 100, borderRadius: 4, marginTop: 4, objectFit: "cover" as const },
   placeholder: { color: "#999", fontSize: 12, margin: "8px 0", textAlign: "center" as const },
   loading: { color: "#1890ff", fontSize: 12, margin: "8px 0", padding: "8px 0" },
   badge: (s: string) => ({
@@ -57,7 +60,17 @@ const S = {
     padding: "2px 6px",
     borderRadius: 4,
     fontSize: 11,
-    background: s === "done" ? "#52c41a" : s === "executing" ? "#1890ff" : "#d9d9d9",
-    color: s === "done" || s === "executing" ? "#fff" : "#666",
+    background: s === "confirmed" ? "#18181b" : "#f4f4f5",
+    color: s === "confirmed" ? "#fff" : "#71717a",
+  }),
+  assetBadge: (s: AssetStatus) => ({
+    display: "inline-block",
+    padding: "2px 6px",
+    borderRadius: 4,
+    fontSize: 11,
+    marginLeft: 4,
+    background: s === "done" ? "#18181b" : s === "generating" ? "#f4f4f5" : s === "failed" ? "#f4f4f5" : s === "timeout" ? "#fef2f2" : "transparent",
+    color: s === "done" ? "#fff" : s === "generating" ? "#71717a" : s === "failed" ? "#a1a1aa" : s === "timeout" ? "#dc2626" : "#a1a1aa",
+    border: s === "failed" || s === "timeout" ? "1px solid #d4d4d8" : "none",
   }),
 };

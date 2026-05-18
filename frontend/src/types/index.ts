@@ -1,4 +1,4 @@
-export type NodeType = "script" | "storyboard" | "image" | "video" | "audio";
+export type NodeType = "script" | "image" | "video" | "audio";
 
 export interface Shot {
   no: string;
@@ -10,12 +10,17 @@ export interface Shot {
   audio: string;
 }
 
+export type NodeStatus = "reviewing" | "confirmed";
+export type AssetStatus = "idle" | "generating" | "done" | "failed" | "timeout";
+
 export interface CanvasNode {
   id: string;
   type: NodeType;
   title: string;
   description: string;
-  status: "pending" | "approved" | "executing" | "awaiting_review" | "done" | "failed";
+  status: string;  // 兼容旧数据
+  node_status: NodeStatus;
+  asset_status: AssetStatus;
   result: Record<string, unknown> | null;
   subtype?: string | null;
   x?: number;
@@ -62,6 +67,30 @@ export interface WSReviewNode {
   feedback?: string;
 }
 
+export interface WSExecuteNode {
+  type: "execute_node";
+  thread_id: string;
+  node_id: string;
+  node_type: NodeType;
+  description: string;
+  image_gen_provider?: string;  // "apimart" | "google"
+}
+
+export interface WSOptimizePrompt {
+  type: "optimize_prompt";
+  thread_id: string;
+  node_id: string;
+  prompt: string;
+  feedback: string;
+}
+
+export interface WSPromptOptimized {
+  type: "prompt_optimized";
+  thread_id: string;
+  node_id: string;
+  optimized_prompt: string;
+}
+
 /** 后端 → 前端 */
 export interface WSAgentResponse {
   type: "agent_response";
@@ -97,4 +126,4 @@ export interface WSCanvasUpdated {
   canvas: CanvasData | null;
 }
 
-export type WSIncoming = WSAgentResponse | WSProcessing | WSSessionState | WSAgentStream | WSCanvasUpdated;
+export type WSIncoming = WSAgentResponse | WSProcessing | WSSessionState | WSAgentStream | WSCanvasUpdated | WSPromptOptimized;

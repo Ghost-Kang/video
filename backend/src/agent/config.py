@@ -17,6 +17,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3-flash-preview")
 
 # -------- 图片生成 --------
+IMAGE_GEN_PROVIDER = os.getenv("IMAGE_GEN_PROVIDER", "apimart")  # "apimart" | "google"
 IMAGE_GEN_API_KEY = os.getenv("IMAGE_GEN_API_KEY")
 IMAGE_GEN_BASE_URL = os.getenv("IMAGE_GEN_BASE_URL", "https://api.apimart.ai")
 IMAGE_GEN_MODEL = os.getenv("IMAGE_GEN_MODEL", "gpt-image-2")
@@ -32,6 +33,14 @@ TTS_BASE_URL = os.getenv("TTS_BASE_URL")
 # -------- ASR --------
 ASR_API_KEY = os.getenv("ASR_API_KEY")
 ASR_BASE_URL = os.getenv("ASR_BASE_URL")
+
+# -------- S3 --------
+S3_AK = os.getenv("S3_AK", "Z6fJrAq1NvSw5blhil3pF9jpIB3eQkyWoz2yAu7P")
+S3_SK = os.getenv("S3_SK", "uItwo5VmcERdFwtZYWHLxd__U7e_0RYjk7pzmndE")
+S3_ENDPOINT = os.getenv("S3_ENDPOINT", "http://dg-test-south.wanyol.com")
+S3_REGION = os.getenv("S3_REGION", "cn-south-2")
+S3_BUCKET = os.getenv("S3_BUCKET", "redink")
+S3_BASE_URL = os.getenv("S3_BASE_URL", "https://storage.wanyol.com/redink")
 
 # -------- 分镜定义 --------
 STORYBOARD_COLUMNS = [

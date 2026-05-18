@@ -5,7 +5,12 @@ description = "OpenRHTV - Agent + Human + Infinite Canvas collaborative video cr
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "aiosqlite>=0.22.1",
+    "boto3>=1.43.9",
     "deepagents>=0.6.1",
+    "google-genai>=1.75.0",
+    "langgraph-checkpoint-sqlite>=3.1.0",
+    "pillow>=12.2.0",
     "python-dotenv>=1.2.2",
     "websockets>=16.0",
 ]
