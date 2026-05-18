@@ -20,6 +20,7 @@ from agent.config import (
     IMAGE_GEN_API_KEY,
     IMAGE_GEN_BASE_URL,
     IMAGE_GEN_MODEL,
+    IMAGE_GEN_GOOGLE_MODEL,
     IMAGE_GEN_PROVIDER,
     GOOGLE_API_KEY,
 )
@@ -151,7 +152,7 @@ class GoogleProvider:
         contents = [prompt] + (refs or [])
 
         response = await self._client.aio.models.generate_content(
-            model="gemini-3.1-flash-image-preview",
+            model=IMAGE_GEN_GOOGLE_MODEL,
             contents=contents,
             config={"response_modalities": ["TEXT", "IMAGE"]},
         )

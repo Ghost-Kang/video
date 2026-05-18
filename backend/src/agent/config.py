@@ -21,6 +21,7 @@ IMAGE_GEN_PROVIDER = os.getenv("IMAGE_GEN_PROVIDER", "apimart")  # "apimart" | "
 IMAGE_GEN_API_KEY = os.getenv("IMAGE_GEN_API_KEY")
 IMAGE_GEN_BASE_URL = os.getenv("IMAGE_GEN_BASE_URL", "https://api.apimart.ai")
 IMAGE_GEN_MODEL = os.getenv("IMAGE_GEN_MODEL", "gpt-image-2")
+IMAGE_GEN_GOOGLE_MODEL = os.getenv("IMAGE_GEN_GOOGLE_MODEL", "gemini-3.1-flash-image-preview")
 
 # -------- 视频生成 --------
 VIDEO_GEN_API_KEY = os.getenv("VIDEO_GEN_API_KEY")

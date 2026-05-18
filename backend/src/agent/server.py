@@ -11,7 +11,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosedOK
 
-from agent.config import LLM_MODEL
+from agent.config import LLM_MODEL, IMAGE_GEN_PROVIDER
 from agent.pool import AgentPool
 from agent.store import get_messages, save_message
 from agent.tools import canvas as canvas_tools
@@ -206,7 +206,7 @@ async def _poll_image_tasks(thread_id: str):
         if node["type"] == "image" and node.get("asset_status") == "generating":
             tid = (node.get("result") or {}).get("task_id")
             if tid:
-                p = (node.get("result") or {}).get("image_gen_provider", "apimart")
+                p = (node.get("result") or {}).get("image_gen_provider") or IMAGE_GEN_PROVIDER
                 groups.setdefault(p, {})[nid] = tid
 
     if not groups:
@@ -325,7 +325,7 @@ async def handle(websocket):
                 nid = msg.get("node_id", "")
                 node_type = msg.get("node_type", "")
                 description = msg.get("description", "")
-                provider = msg.get("image_gen_provider", "apimart")
+                provider = msg.get("image_gen_provider") or IMAGE_GEN_PROVIDER
                 print(f"[执行] execute_node node={nid} type={node_type} provider={provider} prompt={description[:50]}...")
                 canvas_tools.set_thread_id(thread_id)
                 canvas_tools.execute_node(nid, node_type, description, provider)
