@@ -69,11 +69,12 @@
 
 ## 画布工具
 
-### `create_canvas_node(type, title, description, parent_ids?, subtype?)`
+### `create_canvas_node(type, title, description, parent_ids?, subtype?, shot_no?)`
 在画布上创建一个节点。初始 node_status=`reviewing`，asset_status=`idle`。
 type: script / image / video / audio
 subtype: image 可选 character / scene / grid
 parent_ids: 上游节点 ID 列表。上游节点的 node_status 必须为 `confirmed` 才能连接。
+shot_no: 分镜序号（如 "1"、"2"），创建 image/grid 节点时必传，用于画布按镜号排序。
 
 ### 确定 parent_ids → 使用 `task` 工具委托给 `canvas-manager`
 

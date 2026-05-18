@@ -23,6 +23,8 @@ export interface CanvasNode {
   asset_status: AssetStatus;
   result: Record<string, unknown> | null;
   subtype?: string | null;
+  shot_no?: string | null;
+  image_gen_provider?: string | null;
   x?: number;
   y?: number;
 }

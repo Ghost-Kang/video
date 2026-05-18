@@ -57,7 +57,8 @@ def _db() -> sqlite3.Connection:
         )"""
     )
     # 兼容旧数据库：添加新列（如果不存在）
-    for col, defn in [("node_status", "TEXT NOT NULL DEFAULT 'reviewing'"), ("asset_status", "TEXT NOT NULL DEFAULT 'idle'")]:
+    for col, defn in [("node_status", "TEXT NOT NULL DEFAULT 'reviewing'"), ("asset_status", "TEXT NOT NULL DEFAULT 'idle'"),
+                       ("shot_no", "TEXT"), ("image_gen_provider", "TEXT")]:
         try:
             db.execute(f"ALTER TABLE canvas_nodes ADD COLUMN {col} {defn}")
         except sqlite3.OperationalError:
@@ -86,6 +87,8 @@ def _row_to_node(row: sqlite3.Row) -> dict:
         "asset_status": row["asset_status"] or "idle",
         "result": None,
         "subtype": row["subtype"],
+        "shot_no": row["shot_no"],
+        "image_gen_provider": row["image_gen_provider"],
         "x": row["x"],
         "y": row["y"],
     }
@@ -131,18 +134,20 @@ def _upsert_node(node: dict):
     r = node.get("result")
     result_json = json.dumps(r, ensure_ascii=False) if r is not None else None
     db.execute(
-        """INSERT INTO canvas_nodes (thread_id, node_id, type, title, description, status, node_status, asset_status, result, subtype, x, y)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """INSERT INTO canvas_nodes (thread_id, node_id, type, title, description, status, node_status, asset_status, result, subtype, shot_no, image_gen_provider, x, y)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(thread_id, node_id) DO UPDATE SET
            type=excluded.type, title=excluded.title, description=excluded.description,
            status=excluded.status, node_status=excluded.node_status, asset_status=excluded.asset_status,
            result=excluded.result, subtype=excluded.subtype,
+           shot_no=excluded.shot_no, image_gen_provider=excluded.image_gen_provider,
            x=excluded.x, y=excluded.y""",
         (
             _current_thread_id, node["id"], node["type"], node["title"],
             node.get("description", ""), node.get("status", "pending"),
             node.get("node_status", "reviewing"), node.get("asset_status", "idle"),
             result_json, node.get("subtype"),
+            node.get("shot_no"), node.get("image_gen_provider"),
             node.get("x"), node.get("y"),
         ),
     )
@@ -257,10 +262,12 @@ def create_canvas_node(
     description: str = "",
     parent_ids: list[str] | None = None,
     subtype: str | None = None,
+    shot_no: str | None = None,
 ) -> dict:
     """在画布上创建一个节点。type: script/image/video/audio。
 
     parent_ids: 上游节点 ID 列表，支持多个父节点。
+    shot_no: 分镜序号（如 "1", "2"），用于自动排版时按镜号排序。
     """
     nid = _node_id(type)
     # script 节点创建时自动处理：解析分镜表 + 写入 result
@@ -276,6 +283,7 @@ def create_canvas_node(
         "id": nid, "type": type, "title": title, "description": description,
         "status": "pending", "node_status": "reviewing", "asset_status": "idle",
         "result": result, "subtype": subtype,
+        "shot_no": shot_no,
         "x": x, "y": y,
     }
 
@@ -421,9 +429,10 @@ def execute_node(node_id: str, node_type: NodeType, description: str, image_gen_
     subtype = node.get("subtype")
 
     if node_type == "image":
-        # 立即标记 submitting 状态，后台提交生图
+        # 立即标记 generating 状态，后台提交生图
         node["asset_status"] = "generating"
-        node["result"] = {"prompt": description, "resolution": "1920x1080", "subtype": subtype, "image_gen_provider": image_gen_provider}
+        node["image_gen_provider"] = image_gen_provider
+        node["result"] = {"prompt": description, "resolution": "1920x1080", "subtype": subtype}
         _upsert_node(node)
         # 返回临时状态，实际 task_id 由后台任务写入
         return {"id": node_id, "asset_status": "generating", "result": node["result"], "_pending_submit": True}
@@ -474,6 +483,8 @@ def get_canvas_state(node_id: str = "") -> dict:
             "asset_status": n.get("asset_status", "idle"), "subtype": n.get("subtype"),
             "description": n.get("description", ""),
             "result": n.get("result"),
+            "shot_no": n.get("shot_no"),
+            "image_gen_provider": n.get("image_gen_provider"),
         })
     return {"nodes": summary, "edges": edges}
 

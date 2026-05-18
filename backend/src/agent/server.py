@@ -206,7 +206,7 @@ async def _poll_image_tasks(thread_id: str):
         if node["type"] == "image" and node.get("asset_status") == "generating":
             tid = (node.get("result") or {}).get("task_id")
             if tid:
-                p = (node.get("result") or {}).get("image_gen_provider") or IMAGE_GEN_PROVIDER
+                p = node.get("image_gen_provider") or IMAGE_GEN_PROVIDER
                 groups.setdefault(p, {})[nid] = tid
 
     if not groups:
