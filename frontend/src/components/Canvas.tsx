@@ -8,11 +8,11 @@ import {
   type Node,
   type OnNodesChange,
 } from "@xyflow/react";
+import dagre from "dagre";
 import "@xyflow/react/dist/style.css";
 
 import { useCanvasStore } from "../store/canvasStore";
 import { ScriptNode } from "./nodes/ScriptNode";
-import { StoryboardNode } from "./nodes/StoryboardNode";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { AudioNode } from "./nodes/AudioNode";
@@ -20,21 +20,41 @@ import type { CanvasNode, WSPositionUpdate } from "../types";
 
 const nodeTypes = {
   script: ScriptNode,
-  storyboard: StoryboardNode,
   image: ImageNode,
   video: VideoNode,
   audio: AudioNode,
 };
 
+const NODE_W = 200;
+const NODE_H = 120;
+
 function defaultLayout(nodes: CanvasNode[]): Node[] {
-  const order = ["script", "storyboard", "image", "video", "audio"];
-  const gap = 200;
-  return nodes.map((n, i) => {
-    const col = order.indexOf(n.type);
-    const x = n.x ?? 100 + (col >= 0 ? col : 0) * 320;
-    const y = n.y ?? (i + 1) * gap;
-    return { id: n.id, type: n.type, position: { x, y }, data: { node: n } };
-  });
+  return nodes.map((n) => ({
+    id: n.id, type: n.type,
+    position: { x: n.x ?? 100, y: n.y ?? 100 },
+    data: { node: n },
+  }));
+}
+
+function dagreLayout(nodes: CanvasNode[], edges: { source: string; target: string }[]): Map<string, { x: number; y: number }> {
+  const g = new dagre.graphlib.Graph();
+  g.setDefaultEdgeLabel(() => ({}));
+  g.setGraph({ rankdir: "LR", nodesep: 60, ranksep: 200, marginx: 40, marginy: 40 });
+
+  for (const n of nodes) {
+    g.setNode(n.id, { width: NODE_W, height: NODE_H });
+  }
+  for (const e of edges) {
+    g.setEdge(e.source, e.target);
+  }
+  dagre.layout(g);
+
+  const positions = new Map<string, { x: number; y: number }>();
+  for (const n of nodes) {
+    const pos = g.node(n.id);
+    if (pos) positions.set(n.id, { x: pos.x - NODE_W / 2, y: pos.y - NODE_H / 2 });
+  }
+  return positions;
 }
 
 interface Props {
@@ -47,10 +67,8 @@ export function Canvas({ onPositionChange }: Props) {
   const updateNodePosition = useCanvasStore((s) => s.updateNodePosition);
   const selectNode = useCanvasStore((s) => s.selectNode);
 
-  // 内部节点状态（包含 React Flow 管理的尺寸信息，MiniMap 需要）
   const [rfNodes, setRfNodes] = useState<Node[]>(() => defaultLayout(canvasNodes));
 
-  // 当 store 中的节点数据变化时，同步位置（保留已有尺寸）
   useEffect(() => {
     setRfNodes((prev) => {
       const prevMap = new Map(prev.map((n) => [n.id, n]));
@@ -70,7 +88,6 @@ export function Canvas({ onPositionChange }: Props) {
     (changes) => {
       setRfNodes((nds) => {
         const updated = applyNodeChanges(changes, nds);
-        // 持久化位置变更
         for (const c of changes) {
           if (c.type === "position" && c.position) {
             const x = Math.round(c.position.x);
@@ -89,8 +106,22 @@ export function Canvas({ onPositionChange }: Props) {
     [updateNodePosition, onPositionChange]
   );
 
+  const handleAutoLayout = useCallback(() => {
+    const positions = dagreLayout(canvasNodes, edges);
+    for (const [id, pos] of positions) {
+      updateNodePosition(id, pos.x, pos.y);
+      onPositionChange({ type: "update_position", thread_id: "", node_id: id, x: pos.x, y: pos.y });
+    }
+    setRfNodes((prev) =>
+      prev.map((n) => {
+        const pos = positions.get(n.id);
+        return pos ? { ...n, position: pos } : n;
+      })
+    );
+  }, [canvasNodes, edges, updateNodePosition, onPositionChange]);
+
   return (
-    <div style={{ flex: 1, height: "100%" }}>
+    <div style={{ flex: 1, height: "100%", position: "relative" }}>
       <ReactFlow
         nodes={rfNodes}
         edges={edges}
@@ -106,10 +137,38 @@ export function Canvas({ onPositionChange }: Props) {
           style={{ background: "#fafafa", border: "1px solid #e4e4e7", borderRadius: 8 }}
           nodeColor={(n) => {
             const t = (n.data?.node as { type?: string })?.type;
-            return t === "script" ? "#c4b5fd" : t === "storyboard" ? "#fcd34d" : t === "image" ? "#86efac" : t === "video" ? "#c084fc" : t === "audio" ? "#fda4af" : "#d4d4d8";
+            return t === "script" ? "#18181b" : t === "image" ? "#52525b" : t === "video" ? "#a1a1aa" : t === "audio" ? "#d4d4d8" : "#e4e4e7";
           }}
         />
       </ReactFlow>
+      <button onClick={handleAutoLayout} style={S.layoutBtn} title="自动排版">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+        </svg>
+      </button>
     </div>
   );
 }
+
+const S = {
+  layoutBtn: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#fff",
+    border: "1px solid #e4e4e7",
+    borderRadius: 8,
+    cursor: "pointer",
+    color: "#71717a",
+    zIndex: 10,
+    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+  } as React.CSSProperties,
+};

@@ -1,5 +1,5 @@
 import { useRef, useCallback, useState } from "react";
-import type { WSIncoming, WSPositionUpdate, WSReviewNode } from "../types";
+import type { WSIncoming, WSPositionUpdate, WSReviewNode, WSExecuteNode, WSOptimizePrompt, NodeStatus } from "../types";
 
 type Handler = (res: WSIncoming) => void;
 
@@ -92,5 +92,20 @@ export function useWebSocket(onMessage: Handler) {
     _send(review);
   }, [_send]);
 
-  return { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, connected, connecting };
+  const sendExecuteNode = useCallback((payload: WSExecuteNode) => {
+    console.log(`[WS] 发送 execute_node node=${payload.node_id}`);
+    _send(payload);
+  }, [_send]);
+
+  const sendUpdateNodeStatus = useCallback((threadId: string, nodeId: string, nodeStatus: NodeStatus) => {
+    console.log(`[WS] 发送 update_node_status node=${nodeId} ${nodeStatus}`);
+    _send({ type: "update_node_status", thread_id: threadId, node_id: nodeId, node_status: nodeStatus });
+  }, [_send]);
+
+  const sendOptimizePrompt = useCallback((payload: WSOptimizePrompt) => {
+    console.log(`[WS] 发送 optimize_prompt node=${payload.node_id}`);
+    _send(payload);
+  }, [_send]);
+
+  return { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, connected, connecting };
 }

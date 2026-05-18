@@ -7,8 +7,8 @@ export function StoryboardNode({ data }: NodeProps) {
 
   return (
     <div style={S.wrapper}>
-      <Handle type="source" position={Position.Bottom} />
-      <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Right} />
+      <Handle type="target" position={Position.Left} />
       <strong style={S.title}>{node.title}</strong>
       {shots && shots.length > 0 ? (
         <div style={S.shots}>

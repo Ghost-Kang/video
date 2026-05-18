@@ -5,12 +5,12 @@ export function AudioNode({ data }: NodeProps) {
   const node = data.node as CanvasNode;
   return (
     <div style={styles.wrapper}>
-      <Handle type="source" position={Position.Bottom} />
-      <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Right} />
+      <Handle type="target" position={Position.Left} />
       <strong>🎵 {node.title}</strong>
       {node.description && <p style={styles.desc}>{node.description.slice(0, 80)}</p>}
-      {node.status === "executing" && <div style={styles.loading}>生成中...</div>}
-      <span style={styles.badge(node.status)} className={node.status === "executing" ? "badge-pulse" : ""}>{node.status}</span>
+      {node.asset_status === "generating" && <div style={styles.loading}>生成中...</div>}
+      <span style={styles.badge(node.node_status)}>{node.node_status}</span>
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         .badge-pulse { animation: pulse 2s ease-in-out infinite; }
@@ -21,8 +21,8 @@ export function AudioNode({ data }: NodeProps) {
 
 const styles = {
   wrapper: {
-    background: "#fff0f6",
-    border: "1px solid #ff85c0",
+    background: "#fff",
+    border: "1px solid #d4d4d8",
     borderRadius: 8,
     padding: 12,
     minWidth: 180,
@@ -35,7 +35,7 @@ const styles = {
     padding: "2px 6px",
     borderRadius: 4,
     fontSize: 11,
-    background: s === "done" ? "#52c41a" : s === "executing" ? "#1890ff" : "#d9d9d9",
-    color: s === "done" || s === "executing" ? "#fff" : "#666",
+    background: s === "confirmed" ? "#18181b" : "#f4f4f5",
+    color: s === "confirmed" ? "#fff" : "#71717a",
   }),
 };

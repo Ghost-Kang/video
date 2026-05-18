@@ -26,7 +26,7 @@ export function Header({ sessionName, connected, connecting, sidebarOpen, onTogg
         +
       </button>
 
-      <span style={S.hint}>script → storyboard → image → video → audio</span>
+      <span style={S.hint}>策划书 → image → video → audio</span>
     </div>
   );
 }

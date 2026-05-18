@@ -5,17 +5,17 @@ export function VideoNode({ data }: NodeProps) {
   const node = data.node as CanvasNode;
   return (
     <div style={styles.wrapper}>
-      <Handle type="source" position={Position.Bottom} />
-      <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Right} />
+      <Handle type="target" position={Position.Left} />
       <strong>{node.title}</strong>
       {node.result?.url ? (
         <video src={node.result.url as string} controls style={styles.video} />
-      ) : node.status === "executing" ? (
+      ) : node.asset_status === "generating" ? (
         <div style={styles.loading}><span className="img-spinner" />生成中...</div>
       ) : (
         <div style={styles.placeholder}>🎬 等待生成</div>
       )}
-      <span style={styles.badge(node.status)} className={node.status === "executing" ? "badge-pulse" : ""}>{node.status}</span>
+      <span style={styles.badge(node.node_status)}>{node.node_status}</span>
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -28,8 +28,8 @@ export function VideoNode({ data }: NodeProps) {
 
 const styles = {
   wrapper: {
-    background: "#f9f0ff",
-    border: "1px solid #b37feb",
+    background: "#fff",
+    border: "1px solid #a1a1aa",
     borderRadius: 8,
     padding: 12,
     minWidth: 220,
@@ -43,7 +43,7 @@ const styles = {
     padding: "2px 6px",
     borderRadius: 4,
     fontSize: 11,
-    background: s === "done" ? "#52c41a" : s === "executing" ? "#1890ff" : "#d9d9d9",
-    color: s === "done" || s === "executing" ? "#fff" : "#666",
+    background: s === "confirmed" ? "#18181b" : "#f4f4f5",
+    color: s === "confirmed" ? "#fff" : "#71717a",
   }),
 };

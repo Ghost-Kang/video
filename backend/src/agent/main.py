@@ -8,13 +8,15 @@
     uv run python -m agent.main --single  # 单轮测试
 """
 
+import asyncio
+import aiosqlite
 import sys
 from pathlib import Path
 
 from deepagents import create_deep_agent
 from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from agent import config
 from agent.tools import canvas as canvas_tools
@@ -46,6 +48,7 @@ def create_director_agent(checkpointer=None):
     """创建导演 agent，单 agent 承担全部创作角色。"""
     model = ChatGoogleGenerativeAI(model=config.LLM_MODEL)
     system_prompt = (_prompts_dir / "director.md").read_text(encoding="utf-8")
+    canvas_prompt = (_prompts_dir / "canvas-manager.md").read_text(encoding="utf-8")
 
     return create_deep_agent(
         model=model,
@@ -54,8 +57,15 @@ def create_director_agent(checkpointer=None):
             create_canvas_node,
             update_canvas_node,
             delete_canvas_node,
-            execute_node,
-            get_canvas_state,
+        ],
+        subagents=[
+            {
+                "name": "canvas-manager",
+                "description": "画布拓扑专家。查看画布现状，根据节点类型和层级规则确定父子连线关系，返回正确的 parent_id。",
+                "system_prompt": canvas_prompt,
+                "model": model,
+                "tools": [get_canvas_state],
+            },
         ],
         backend=_make_backend(),
         name="director",
@@ -63,36 +73,38 @@ def create_director_agent(checkpointer=None):
     )
 
 
-def run_chat_loop():
-    """多轮对话循环，InMemorySaver 保持上下文。"""
-    checkpointer = InMemorySaver()
-    agent = create_director_agent(checkpointer=checkpointer)
-    config_ = {"configurable": {"thread_id": "demo-1"}}
-    canvas_tools.set_thread_id("demo-1")
+async def run_chat_loop():
+    """多轮对话循环，AsyncSqliteSaver 持久化上下文。"""
+    async with aiosqlite.connect(str(_DATA_DIR / "checkpoints.db")) as conn:
+        checkpointer = AsyncSqliteSaver(conn)
+        await checkpointer.setup()
+        agent = create_director_agent(checkpointer=checkpointer)
+        config_ = {"configurable": {"thread_id": "demo-1"}}
+        canvas_tools.set_thread_id("demo-1")
 
-    print("=" * 50)
-    print("OpenRHTV 导演 - 多轮对话")
-    print("输入 quit 退出")
-    print("=" * 50)
+        print("=" * 50)
+        print("OpenRHTV 导演 - 多轮对话")
+        print("输入 quit 退出")
+        print("=" * 50)
 
-    while True:
-        try:
-            user_input = input("\n你: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\n退出")
-            break
+        while True:
+            try:
+                user_input = input("\n你: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print("\n退出")
+                break
 
-        if user_input.lower() in ("quit", "exit", "q"):
-            break
-        if not user_input:
-            continue
+            if user_input.lower() in ("quit", "exit", "q"):
+                break
+            if not user_input:
+                continue
 
-        result = agent.invoke(
-            {"messages": [{"role": "user", "content": user_input}]},
-            config=config_,
-        )
-        last_msg = result["messages"][-1]
-        print(f"\n导演: {last_msg.content}")
+            result = agent.invoke(
+                {"messages": [{"role": "user", "content": user_input}]},
+                config=config_,
+            )
+            last_msg = result["messages"][-1]
+            print(f"\n导演: {last_msg.content}")
 
 
 if __name__ == "__main__":
@@ -103,4 +115,4 @@ if __name__ == "__main__":
         })
         print(result["messages"][-1].content)
     else:
-        run_chat_loop()
+        asyncio.run(run_chat_loop())
