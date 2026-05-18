@@ -36,12 +36,12 @@ ASR_API_KEY = os.getenv("ASR_API_KEY")
 ASR_BASE_URL = os.getenv("ASR_BASE_URL")
 
 # -------- S3 --------
-S3_AK = os.getenv("S3_AK", "Z6fJrAq1NvSw5blhil3pF9jpIB3eQkyWoz2yAu7P")
-S3_SK = os.getenv("S3_SK", "uItwo5VmcERdFwtZYWHLxd__U7e_0RYjk7pzmndE")
-S3_ENDPOINT = os.getenv("S3_ENDPOINT", "http://dg-test-south.wanyol.com")
-S3_REGION = os.getenv("S3_REGION", "cn-south-2")
-S3_BUCKET = os.getenv("S3_BUCKET", "redink")
-S3_BASE_URL = os.getenv("S3_BASE_URL", "https://storage.wanyol.com/redink")
+S3_AK = os.getenv("S3_AK", "")
+S3_SK = os.getenv("S3_SK", "")
+S3_ENDPOINT = os.getenv("S3_ENDPOINT", "")
+S3_REGION = os.getenv("S3_REGION", "")
+S3_BUCKET = os.getenv("S3_BUCKET", "")
+S3_BASE_URL = os.getenv("S3_BASE_URL", "")
 
 # -------- 分镜定义 --------
 STORYBOARD_COLUMNS = [
