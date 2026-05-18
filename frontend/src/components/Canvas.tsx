@@ -29,9 +29,13 @@ const NODE_W = 200;
 const NODE_H = 120;
 
 function defaultLayout(nodes: CanvasNode[]): Node[] {
-  return nodes.map((n) => ({
+  const typeX: Record<string, number> = { script: 0, image: 300, video: 600, audio: 900 };
+  return nodes.map((n, i) => ({
     id: n.id, type: n.type,
-    position: { x: n.x ?? 100, y: n.y ?? 100 },
+    position: {
+      x: n.x ?? (typeX[n.type] ?? 100),
+      y: n.y ?? (100 + i * 180),
+    },
     data: { node: n },
   }));
 }
@@ -39,7 +43,7 @@ function defaultLayout(nodes: CanvasNode[]): Node[] {
 function dagreLayout(nodes: CanvasNode[], edges: { source: string; target: string }[]): Map<string, { x: number; y: number }> {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "LR", nodesep: 60, ranksep: 200, marginx: 40, marginy: 40 });
+  g.setGraph({ rankdir: "TB", nodesep: 120, ranksep: 150, marginx: 60, marginy: 60 });
 
   for (const n of nodes) {
     g.setNode(n.id, { width: NODE_W, height: NODE_H });

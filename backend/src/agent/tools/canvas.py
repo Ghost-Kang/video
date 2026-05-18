@@ -217,6 +217,40 @@ def _upsert_edge(edge: dict):
 # ---------- 节点 CRUD ----------
 
 
+def _default_position(node_type: str, parent_ids: list[str] | None) -> tuple[float, float]:
+    """为新节点计算默认位置，避免全部堆在同一个坐标。
+
+    有父节点时排在父节点下方；无父节点时排在画布最下方。
+    同类型节点横向错开。
+    """
+    # 类型 → x 偏移
+    x_offset = {"script": 0, "image": 300, "video": 600, "audio": 900}
+    base_x = x_offset.get(node_type, 0)
+
+    # 从父节点获取参考位置
+    ref_y = 0
+    if parent_ids:
+        for pid in parent_ids:
+            parent = _load_node(pid)
+            if parent and parent.get("y") is not None:
+                ref_y = max(ref_y, parent["y"] + 200)
+
+    # 无父节点：排在所有已有节点下方
+    if ref_y == 0:
+        nodes = _load_all_nodes()
+        if nodes:
+            max_y = max((n.get("y") or 0 for n in nodes.values()), default=0)
+            ref_y = max_y + 200 if max_y > 0 else 100
+
+    # 同列中已有同类型节点时再向下错开
+    nodes = _load_all_nodes()
+    same_col = [n for n in nodes.values() if n.get("x") == base_x and n.get("y", 0) >= ref_y - 50]
+    if same_col:
+        ref_y = max((n.get("y") or 0 for n in same_col)) + 200
+
+    return (float(base_x), float(ref_y or 100))
+
+
 def create_canvas_node(
     type: NodeType,
     title: str,
@@ -235,10 +269,14 @@ def create_canvas_node(
         shots = _parse_storyboard(description)
         result = {"content": description, "word_count": len(description), "shots": shots}
 
+    # 计算默认位置：基于已有节点做增量偏移，避免全部堆在 (100,100)
+    x, y = _default_position(type, parent_ids)
+
     node = {
         "id": nid, "type": type, "title": title, "description": description,
         "status": "pending", "node_status": "reviewing", "asset_status": "idle",
         "result": result, "subtype": subtype,
+        "x": x, "y": y,
     }
 
     ids = parent_ids or []
