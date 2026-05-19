@@ -148,7 +148,7 @@ function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
   useEffect(() => {
     const rp = (node.result as Record<string, unknown> | null)?.prompt as string | undefined;
     setPrompt(rp || node.description || "");
-    setProvider(node.image_gen_provider || "apimart");
+    setProvider(node.image_gen_provider || "google");
   }, [node.id, node.description, node.asset_status]);
   const [showPolish, setShowPolish] = useState(false);
   const [feedback, setFeedback] = useState("");
