@@ -1,6 +1,5 @@
 """画布工具 — SQLite 持久化"""
 
-import asyncio
 import json
 import sqlite3
 import uuid
@@ -8,8 +7,6 @@ from pathlib import Path
 from typing import Literal
 
 from agent.config import STORYBOARD_COLUMNS
-from agent.tools.compose import compose_videos as _compose_videos
-from agent.tools.s3_upload import upload_bytes as _s3_upload
 
 
 NodeType = Literal["script", "image", "video", "composite"]
@@ -549,44 +546,7 @@ def execute_node(node_id: str, node_type: NodeType, description: str, image_gen_
     elif node_type == "composite":
         node["asset_status"] = "generating"
         _upsert_node(node)
-
-        # 从边收集上游 video 节点，边的顺序 = 拼接顺序
-        edges = _load_all_edges()
-        parent_ids = [e["source"] for e in edges if e["target"] == node_id]
-        urls: list[str] = []
-        for pid in parent_ids:
-            parent = _load_node(pid)
-            if parent and parent["type"] == "video":
-                p_url = (parent.get("result") or {}).get("url")
-                if p_url:
-                    urls.append(str(p_url))
-
-        if len(urls) < 1:
-            node["asset_status"] = "failed"
-            node["result"] = {"error": "没有可拼接的视频（需连接已完成的 video 节点）"}
-            _upsert_node(node)
-            return {"id": node_id, "asset_status": "failed", "error": "没有可拼接的视频"}
-
-        print(f"[合成] 开始合并 {len(urls)} 个视频...")
-        result_bytes = asyncio.run(_compose_videos(urls))
-        if not result_bytes:
-            node["asset_status"] = "failed"
-            node["result"] = {"error": "ffmpeg 合成失败"}
-            _upsert_node(node)
-            return {"id": node_id, "asset_status": "failed", "error": "ffmpeg 合成失败"}
-
-        s3_url = _s3_upload(result_bytes, "composite.mp4")
-        if not s3_url:
-            node["asset_status"] = "failed"
-            node["result"] = {"error": "S3 上传失败"}
-            _upsert_node(node)
-            return {"id": node_id, "asset_status": "failed", "error": "S3 上传失败"}
-
-        node["asset_status"] = "done"
-        node["result"] = {"url": s3_url, "clips": len(urls)}
-        _upsert_node(node)
-        print(f"[合成] 完成 node={node_id}")
-        return {"id": node_id, "asset_status": "done", "result": node["result"]}
+        return {"id": node_id, "asset_status": "generating", "_pending_submit": True}
 
     elif node_type == "video":
         node["asset_status"] = "generating"

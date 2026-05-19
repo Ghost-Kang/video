@@ -22,7 +22,7 @@ export function NodeDetail({ onReview, onExecuteNode, onUpdateNodeStatus, onOpti
 
   if (!node) return null;
 
-  // 找上游图片节点作为参考图
+  // 找上游节点作为参考图 / 待合成视频
   const parentIds = edges
     .filter((e) => e.target === node.id)
     .map((e) => e.source);
@@ -30,9 +30,9 @@ export function NodeDetail({ onReview, onExecuteNode, onUpdateNodeStatus, onOpti
   const refImages = parentIds
     .map((pid) => nodeMap.get(pid))
     .filter((n): n is CanvasNode => !!n && (n.type === "image" || n.type === "video") && !!n.result?.url)
-    .map((n) => ({ id: n.id, title: n.title, url: n.result!.url as string }));
+    .map((n) => ({ id: n.id, title: n.title, url: n.result!.url as string, type: n.type }));
 
-  const isMedia = node.type === "image" || node.type === "video";
+  const isMedia = node.type === "image" || node.type === "video" || node.type === "composite";
 
   return (
     <div style={S.panel}>
@@ -53,7 +53,7 @@ export function NodeDetail({ onReview, onExecuteNode, onUpdateNodeStatus, onOpti
         {/* 参考图（仅媒体节点） */}
         {isMedia && refImages.length > 0 && (
           <section style={S.section}>
-            <div style={S.label}>参考图</div>
+            <div style={S.label}>{node.type === "composite" ? "待合成视频" : "参考图"}</div>
             <div style={S.refGrid}>
               {refImages.map((img, idx) => {
                 const edge = edges.find((e) => e.source === img.id && e.target === node.id);
@@ -62,7 +62,11 @@ export function NodeDetail({ onReview, onExecuteNode, onUpdateNodeStatus, onOpti
                   <div key={img.id} style={S.refItem}>
                     <span style={S.refTitle}>{img.title}</span>
                     <div style={{ position: "relative" }}>
-                      <img src={img.url} alt={img.title} style={S.refImg} />
+                      {img.type === "video" ? (
+                        <video src={img.url} style={S.refImg} preload="metadata" />
+                      ) : (
+                        <img src={img.url} alt={img.title} style={S.refImg} />
+                      )}
                       <button
                         onClick={() => edge && onDeleteEdge(edge.id)}
                         style={S.refDelete}
@@ -150,7 +154,8 @@ function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
   const [feedback, setFeedback] = useState("");
 
   const handleGenerate = () => {
-    onExecuteNode(node.id, node.type, prompt, provider, duration, resolution, generateAudio);
+    const isComposite = node.type === "composite";
+    onExecuteNode(node.id, node.type, prompt, isComposite ? undefined : provider, isComposite ? undefined : duration, isComposite ? undefined : resolution, isComposite ? undefined : generateAudio);
   };
 
   const handlePolish = () => {
@@ -160,13 +165,14 @@ function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
   };
 
   const isGenerating = node.asset_status === "generating";
-  const btnLabel = isGenerating ? "生成中..." : "生成";
-  const btnDisabled = isGenerating;
   const isVideo = node.type === "video";
+  const isComposite = node.type === "composite";
+  const btnLabel = isComposite ? (isGenerating ? "合成中..." : "合成") : isGenerating ? "生成中..." : "生成";
+  const btnDisabled = isGenerating;
 
   return (
     <section style={S.section}>
-      {!isVideo && (
+      {!isVideo && !isComposite && (
         <>
           <div style={S.label}>Provider</div>
           <select value={provider} onChange={(e) => setProvider(e.target.value)} style={S.providerSelect}>
@@ -206,13 +212,18 @@ function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
         </div>
       )}
 
-      <div style={S.label}>Prompt</div>
-      <textarea
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        rows={4}
-        style={S.promptInput}
-      />
+      {!isComposite && (
+        <>
+          <div style={S.label}>Prompt</div>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            rows={4}
+            style={S.promptInput}
+          />
+        </>
+      )}
+
       <div style={S.actions}>
         <button
           onClick={handleGenerate}
@@ -221,14 +232,16 @@ function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
         >
           {btnLabel}
         </button>
-        <button
-          onClick={() => setShowPolish(!showPolish)}
-          style={S.agentBtn}
-        >
-          润色
-        </button>
+        {!isComposite && (
+          <button
+            onClick={() => setShowPolish(!showPolish)}
+            style={S.agentBtn}
+          >
+            润色
+          </button>
+        )}
       </div>
-      {showPolish && (
+      {showPolish && !isComposite && (
         <div style={S.polishBox}>
           <textarea
             value={feedback}
@@ -361,7 +374,9 @@ function ResultView({ node }: { node: CanvasNode }) {
                   }}
                 />
           ) : (
-            <div style={S.muted}>{node.asset_status === "generating" ? "生成中..." : node.asset_status === "failed" ? "生成失败" : "等待生成"}</div>
+            <div style={S.muted}>
+              {node.asset_status === "generating" ? "生成中..." : node.asset_status === "failed" ? (r.error ? `失败: ${String(r.error)}` : "生成失败") : node.asset_status === "timeout" ? (r.error ? `超时: ${String(r.error)}` : "超时") : "等待生成"}
+            </div>
           )}
         </section>
       );

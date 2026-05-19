@@ -249,6 +249,62 @@ async def _submit_and_poll_video(thread_id: str, node_id: str, prompt: str, dura
         print(f"[后台视频] 异常 node={node_id}: {e}")
 
 
+async def _submit_composite(thread_id: str, node_id: str, ws):
+    """后台：收集上游 video → ffmpeg 拼接 → 上传 S3。"""
+    from agent.tools.compose import compose_videos as _compose
+    from agent.tools.s3_upload import upload_bytes as _s3_upload
+
+    try:
+        canvas_tools.set_thread_id(thread_id)
+
+        edges = canvas_tools._load_all_edges()
+        parent_ids = [e["source"] for e in edges if e["target"] == node_id]
+        urls: list[str] = []
+        for pid in parent_ids:
+            parent = canvas_tools._load_node(pid)
+            if parent and parent["type"] == "video":
+                p_url = (parent.get("result") or {}).get("url")
+                if p_url:
+                    urls.append(str(p_url))
+
+        if len(urls) < 1:
+            canvas_tools.update_canvas_node(node_id, asset_status="failed")
+            canvas_tools._update_node_result(node_id, {"error": "没有可拼接的视频"})
+            print(f"[合成失败] node={node_id} 没有视频")
+            await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
+            return
+
+        print(f"[合成] node={node_id} 开始合并 {len(urls)} 个视频...")
+        result_bytes = await _compose(urls)
+        if not result_bytes:
+            canvas_tools.update_canvas_node(node_id, asset_status="failed")
+            canvas_tools._update_node_result(node_id, {"error": "ffmpeg 合成失败"})
+            print(f"[合成失败] node={node_id} ffmpeg 失败")
+            await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
+            return
+
+        s3_url = _s3_upload(result_bytes, "composite.mp4")
+        if not s3_url:
+            canvas_tools.update_canvas_node(node_id, asset_status="failed")
+            canvas_tools._update_node_result(node_id, {"error": "S3 上传失败"})
+            print(f"[合成失败] node={node_id} S3 失败")
+            await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
+            return
+
+        canvas_tools.update_canvas_node(node_id, asset_status="done")
+        canvas_tools._update_node_result(node_id, {"url": s3_url, "clips": len(urls)})
+        print(f"[合成完成] node={node_id} url={s3_url[:60]}...")
+        await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
+    except Exception as e:
+        print(f"[合成异常] node={node_id}: {e}")
+        canvas_tools.update_canvas_node(node_id, asset_status="failed")
+        canvas_tools._update_node_result(node_id, {"error": str(e)})
+        try:
+            await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
+        except (ConnectionClosedOK, Exception):
+            pass
+
+
 async def _poll_and_notify(thread_id: str, ws=None):
     try:
         await asyncio.gather(
@@ -482,12 +538,7 @@ async def handle(websocket):
                     canvas=_canvas_data(thread_id),
                 )
                 if node_type == "composite":
-                    await _send(
-                        ws=websocket,
-                        type="canvas_updated",
-                        thread_id=thread_id,
-                        canvas=_canvas_data(thread_id),
-                    )
+                    asyncio.create_task(_submit_composite(thread_id, nid, websocket))
                     continue
 
                 if node_type == "video":
