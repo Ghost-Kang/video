@@ -22,11 +22,17 @@ LegacyStatus = Literal["pending", "approved", "executing", "awaiting_review", "d
 _DB_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data"
 _DB_PATH = _DB_DIR / "canvas.db"
 _current_thread_id = "default"
+_current_user_id = "default"
 
 
 def set_thread_id(thread_id: str):
     global _current_thread_id
     _current_thread_id = thread_id
+
+
+def set_user_id(user_id: str):
+    global _current_user_id
+    _current_user_id = user_id
 
 
 def _node_id(type: str) -> str:
@@ -43,6 +49,7 @@ def _db() -> sqlite3.Connection:
     db.execute("PRAGMA journal_mode=WAL")
     db.execute(
         """CREATE TABLE IF NOT EXISTS canvas_nodes (
+            user_id TEXT NOT NULL DEFAULT 'default',
             thread_id TEXT NOT NULL,
             node_id TEXT NOT NULL,
             type TEXT NOT NULL,
@@ -55,11 +62,11 @@ def _db() -> sqlite3.Connection:
             subtype TEXT,
             feedback TEXT,
             x REAL, y REAL,
-            PRIMARY KEY (thread_id, node_id)
+            PRIMARY KEY (user_id, thread_id, node_id)
         )"""
     )
     # 兼容旧数据库：添加新列（如果不存在）
-    for col, defn in [("node_status", "TEXT NOT NULL DEFAULT 'reviewing'"), ("asset_status", "TEXT NOT NULL DEFAULT 'idle'"),
+    for col, defn in [("user_id", "TEXT NOT NULL DEFAULT 'default'"), ("node_status", "TEXT NOT NULL DEFAULT 'reviewing'"), ("asset_status", "TEXT NOT NULL DEFAULT 'idle'"),
                        ("shot_no", "TEXT"), ("image_gen_provider", "TEXT")]:
         try:
             db.execute(f"ALTER TABLE canvas_nodes ADD COLUMN {col} {defn}")
@@ -67,18 +74,23 @@ def _db() -> sqlite3.Connection:
             pass  # 列已存在
     db.execute(
         """CREATE TABLE IF NOT EXISTS canvas_edges (
+            user_id TEXT NOT NULL DEFAULT 'default',
             thread_id TEXT NOT NULL,
             edge_id TEXT NOT NULL,
             source TEXT NOT NULL,
             target TEXT NOT NULL,
             position INTEGER NOT NULL DEFAULT 0,
-            PRIMARY KEY (thread_id, edge_id)
+            PRIMARY KEY (user_id, thread_id, edge_id)
         )"""
     )
     try:
         db.execute("ALTER TABLE canvas_edges ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
     except sqlite3.OperationalError:
         pass  # 列已存在
+    try:
+        db.execute("ALTER TABLE canvas_edges ADD COLUMN user_id TEXT NOT NULL DEFAULT 'default'")
+    except sqlite3.OperationalError:
+        pass
     return db
 
 
@@ -110,8 +122,8 @@ def _row_to_node(row: sqlite3.Row) -> dict:
 def _load_node(node_id: str) -> dict | None:
     db = _db()
     row = db.execute(
-        "SELECT * FROM canvas_nodes WHERE thread_id=? AND node_id=?",
-        (_current_thread_id, node_id),
+        "SELECT * FROM canvas_nodes WHERE user_id=? AND thread_id=? AND node_id=?",
+        (_current_user_id, _current_thread_id, node_id),
     ).fetchone()
     db.close()
     return _row_to_node(row) if row else None
@@ -120,7 +132,7 @@ def _load_node(node_id: str) -> dict | None:
 def _load_all_nodes() -> dict[str, dict]:
     db = _db()
     rows = db.execute(
-        "SELECT * FROM canvas_nodes WHERE thread_id=?", (_current_thread_id,)
+        "SELECT * FROM canvas_nodes WHERE user_id=? AND thread_id=?", (_current_user_id, _current_thread_id,)
     ).fetchall()
     db.close()
     return {r["node_id"]: _row_to_node(r) for r in rows}
@@ -129,8 +141,8 @@ def _load_all_nodes() -> dict[str, dict]:
 def _load_all_edges() -> list[dict]:
     db = _db()
     rows = db.execute(
-        "SELECT edge_id, source, target, position FROM canvas_edges WHERE thread_id=? ORDER BY position",
-        (_current_thread_id,),
+        "SELECT edge_id, source, target, position FROM canvas_edges WHERE user_id=? AND thread_id=? ORDER BY position",
+        (_current_user_id, _current_thread_id),
     ).fetchall()
     db.close()
     return [{"id": r["edge_id"], "source": r["source"], "target": r["target"], "position": r["position"]} for r in rows]
@@ -141,16 +153,16 @@ def _upsert_node(node: dict):
     r = node.get("result")
     result_json = json.dumps(r, ensure_ascii=False) if r is not None else None
     db.execute(
-        """INSERT INTO canvas_nodes (thread_id, node_id, type, title, description, status, node_status, asset_status, result, subtype, shot_no, image_gen_provider, x, y)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(thread_id, node_id) DO UPDATE SET
+        """INSERT INTO canvas_nodes (user_id, thread_id, node_id, type, title, description, status, node_status, asset_status, result, subtype, shot_no, image_gen_provider, x, y)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(user_id, thread_id, node_id) DO UPDATE SET
            type=excluded.type, title=excluded.title, description=excluded.description,
            status=excluded.status, node_status=excluded.node_status, asset_status=excluded.asset_status,
            result=excluded.result, subtype=excluded.subtype,
            shot_no=excluded.shot_no, image_gen_provider=excluded.image_gen_provider,
            x=excluded.x, y=excluded.y""",
         (
-            _current_thread_id, node["id"], node["type"], node["title"],
+            _current_user_id, _current_thread_id, node["id"], node["type"], node["title"],
             node.get("description", ""), node.get("status", "pending"),
             node.get("node_status", "reviewing"), node.get("asset_status", "idle"),
             result_json, node.get("subtype"),
@@ -221,13 +233,13 @@ def _upsert_edge(edge: dict):
     # 自动分配 position：该 target 已有边数 + 1
     if edge.get("position") is None:
         existing = db.execute(
-            "SELECT COALESCE(MAX(position), 0) + 1 FROM canvas_edges WHERE thread_id=? AND target=?",
-            (_current_thread_id, edge["target"]),
+            "SELECT COALESCE(MAX(position), 0) + 1 FROM canvas_edges WHERE user_id=? AND thread_id=? AND target=?",
+            (_current_user_id, _current_thread_id, edge["target"]),
         ).fetchone()
         edge["position"] = existing[0] if existing else 1
     db.execute(
-        "INSERT INTO canvas_edges (thread_id, edge_id, source, target, position) VALUES (?, ?, ?, ?, ?)",
-        (_current_thread_id, edge["id"], edge["source"], edge["target"], edge["position"]),
+        "INSERT INTO canvas_edges (user_id, thread_id, edge_id, source, target, position) VALUES (?, ?, ?, ?, ?, ?)",
+        (_current_user_id, _current_thread_id, edge["id"], edge["source"], edge["target"], edge["position"]),
     )
     db.commit()
     db.close()
@@ -257,13 +269,13 @@ def _renormalize_positions(target_id: str):
     """重整 position，确保同一 target 下的边位置连续（1,2,3...）"""
     db = _db()
     rows = db.execute(
-        "SELECT edge_id FROM canvas_edges WHERE thread_id=? AND target=? ORDER BY position",
-        (_current_thread_id, target_id),
+        "SELECT edge_id FROM canvas_edges WHERE user_id=? AND thread_id=? AND target=? ORDER BY position",
+        (_current_user_id, _current_thread_id, target_id),
     ).fetchall()
     for i, row in enumerate(rows):
         db.execute(
-            "UPDATE canvas_edges SET position=? WHERE thread_id=? AND edge_id=?",
-            (i + 1, _current_thread_id, row["edge_id"]),
+            "UPDATE canvas_edges SET position=? WHERE user_id=? AND thread_id=? AND edge_id=?",
+            (i + 1, _current_user_id, _current_thread_id, row["edge_id"]),
         )
     db.commit()
     db.close()
@@ -293,8 +305,8 @@ def reorder_edge(edge_id: str, direction: str) -> dict:
     a, b = siblings[idx], siblings[swap_idx]
     pos_a, pos_b = a["position"], b["position"]
     db = _db()
-    db.execute("UPDATE canvas_edges SET position=? WHERE thread_id=? AND edge_id=?", (pos_b, _current_thread_id, a["id"]))
-    db.execute("UPDATE canvas_edges SET position=? WHERE thread_id=? AND edge_id=?", (pos_a, _current_thread_id, b["id"]))
+    db.execute("UPDATE canvas_edges SET position=? WHERE user_id=? AND thread_id=? AND edge_id=?", (pos_b, _current_user_id, _current_thread_id, a["id"]))
+    db.execute("UPDATE canvas_edges SET position=? WHERE user_id=? AND thread_id=? AND edge_id=?", (pos_a, _current_user_id, _current_thread_id, b["id"]))
     db.commit()
     db.close()
     _renormalize_positions(edge["target"])
@@ -311,7 +323,7 @@ def delete_canvas_edge(edge_id: str) -> dict:
     target_id = edge["target"]
 
     db = _db()
-    db.execute("DELETE FROM canvas_edges WHERE thread_id=? AND edge_id=?", (_current_thread_id, edge_id))
+    db.execute("DELETE FROM canvas_edges WHERE user_id=? AND thread_id=? AND edge_id=?", (_current_user_id, _current_thread_id, edge_id))
     db.commit()
     db.close()
     _renormalize_positions(target_id)
@@ -462,6 +474,10 @@ def update_canvas_node(
         node["title"] = title
     if description is not None:
         node["description"] = description
+        if node["type"] == "script":
+            shots = _parse_storyboard(description)
+            node["result"] = {"content": description, "word_count": len(description), "shots": shots}
+            node["node_status"] = "reviewing"
     if node_status is not None:
         node["node_status"] = node_status
     if asset_status is not None:
@@ -473,8 +489,8 @@ def update_canvas_node(
 def delete_canvas_node(node_id: str) -> dict:
     """删除画布上的一个节点。"""
     db = _db()
-    db.execute("DELETE FROM canvas_nodes WHERE thread_id=? AND node_id=?", (_current_thread_id, node_id))
-    db.execute("DELETE FROM canvas_edges WHERE thread_id=? AND source=? OR target=?", (_current_thread_id, node_id, node_id))
+    db.execute("DELETE FROM canvas_nodes WHERE user_id=? AND thread_id=? AND node_id=?", (_current_user_id, _current_thread_id, node_id))
+    db.execute("DELETE FROM canvas_edges WHERE user_id=? AND thread_id=? AND (source=? OR target=?)", (_current_user_id, _current_thread_id, node_id, node_id))
     db.commit()
     db.close()
     return {"id": node_id, "deleted": True}

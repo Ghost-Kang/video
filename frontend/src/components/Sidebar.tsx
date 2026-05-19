@@ -23,7 +23,7 @@ export function Sidebar({ sessions, current, names, onSwitch, onRename, onDelete
     setEditing(null);
   };
 
-  const displayName = (id: string) => names[id] || id;
+  const displayName = (id: string) => names[id] || "新会话";
 
   return (
     <div style={S.panel}>

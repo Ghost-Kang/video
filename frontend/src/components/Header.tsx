@@ -1,13 +1,15 @@
 interface Props {
+  userId: string;
   sessionName: string;
   connected: boolean;
   connecting: boolean;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   onNewSession: () => void;
+  onLogout: () => void;
 }
 
-export function Header({ sessionName, connected, connecting, sidebarOpen, onToggleSidebar, onNewSession }: Props) {
+export function Header({ userId, sessionName, connected, connecting, sidebarOpen, onToggleSidebar, onNewSession, onLogout }: Props) {
   return (
     <div style={S.bar}>
       <button onClick={onToggleSidebar} style={S.toggle} title={sidebarOpen ? "收起侧栏" : "展开侧栏"}>
@@ -26,7 +28,12 @@ export function Header({ sessionName, connected, connecting, sidebarOpen, onTogg
         +
       </button>
 
-      <span style={S.hint}>策划书 → image → video → audio</span>
+      <span style={S.hint}>策划书 → image → video → composite</span>
+
+      <span style={S.userId}>{userId}</span>
+      <button onClick={onLogout} style={S.logoutBtn} title="退出登录">
+        退出
+      </button>
     </div>
   );
 }
@@ -115,5 +122,22 @@ const S = {
     fontSize: 11,
     color: "#d4d4d8",
     letterSpacing: "0.02em",
+  } as React.CSSProperties,
+
+  userId: {
+    fontSize: 11,
+    color: "#a1a1aa",
+    fontWeight: 500,
+  } as React.CSSProperties,
+
+  logoutBtn: {
+    fontSize: 11,
+    color: "#71717a",
+    border: "1px solid #e4e4e7",
+    borderRadius: 4,
+    background: "#f4f4f5",
+    cursor: "pointer",
+    padding: "2px 8px",
+    fontFamily: "inherit",
   } as React.CSSProperties,
 };

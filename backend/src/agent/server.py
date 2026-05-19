@@ -1,6 +1,7 @@
 """WebSocket 服务
 
 单 WS 连接承载多个会话，agent 实例走 LRU 池管理。
+首条消息 auth → 绑定 user_id → 后续消息隔离。
 """
 
 import asyncio
@@ -13,7 +14,7 @@ from websockets.exceptions import ConnectionClosedOK
 
 from agent.config import LLM_MODEL, IMAGE_GEN_PROVIDER
 from agent.pool import AgentPool
-from agent.store import get_messages, save_message
+from agent.store import get_messages, save_message, set_user_id as store_set_user_id
 from agent.tools import canvas as canvas_tools
 from agent.tools.video_generation import get_video_provider
 
@@ -62,7 +63,6 @@ async def _optimize_prompt(node_id: str, prompt: str, feedback: str) -> str:
     result = model.invoke([{"role": "system", "content": system}, {"role": "user", "content": user}])
     optimized = result.content if hasattr(result, "content") else str(result)
 
-    # 更新节点 description
     node = canvas_tools._load_node(node_id)
     if node:
         node["description"] = optimized
@@ -85,19 +85,15 @@ async def _run_agent(pool: AgentPool, thread_id: str, user_content: str, ws):
             stream_mode="messages",
             version="v2",
         ):
-            # V2 返回 StreamPart 字典: {"type": "messages", "data": (msg, metadata)}
             msg, meta = chunk["data"]
 
-            # 工具调用事件
             if isinstance(msg, AIMessageChunk) and msg.tool_calls:
                 for tc in msg.tool_calls:
                     await _send(ws, type="agent_stream", thread_id=thread_id,
                                 event="tool_call", name=tc.get("name", ""), args=str(tc.get("args", {})))
 
-            # token 文本（跳过 tool 消息和空内容）
             elif isinstance(msg, AIMessageChunk) and msg.content and not isinstance(msg, ToolMessage):
                 token = _extract_text(msg.content)
-                # 去重：只取新 token（避免某些 provider 的累积 chunk）
                 if token and not full_reply.endswith(token):
                     full_reply += token
                     await _send(ws, type="agent_stream", thread_id=thread_id, event="text", content=token)
@@ -109,9 +105,7 @@ async def _run_agent(pool: AgentPool, thread_id: str, user_content: str, ws):
         save_message(thread_id, "agent", reply)
         print(f"[错误] thread={thread_id} {e}")
 
-    # 自动执行已审核通过的图片节点
     await _auto_execute_pending(thread_id)
-    # 轮询正在执行的图片任务
     await _poll_image_tasks(thread_id)
 
     try:
@@ -127,12 +121,10 @@ async def _run_agent(pool: AgentPool, thread_id: str, user_content: str, ws):
 
 
 async def _auto_execute_pending(thread_id: str):
-    """不再需要——用户在前端手动触发图片生成。保留空函数兼容调用。"""
     pass
 
 
 def _make_provider(name: str):
-    """按名称创建 provider 实例。"""
     from agent.tools.generation import ApimartProvider, GoogleProvider
     if name == "google":
         return GoogleProvider()
@@ -148,7 +140,6 @@ async def _submit_and_poll(thread_id: str, node_id: str, prompt: str, provider_n
     try:
         canvas_tools.set_thread_id(thread_id)
 
-        # 1. 收集上游已完成的参考图 URL
         ref_urls: list[str] = []
         all_edges = canvas_tools._load_all_edges()
         parent_ids = [e["source"] for e in all_edges if e["target"] == node_id]
@@ -158,7 +149,6 @@ async def _submit_and_poll(thread_id: str, node_id: str, prompt: str, provider_n
             if p_url:
                 ref_urls.append(str(p_url))
 
-        # 2. 提交生图
         print(f"[生图提交] node={node_id} prompt={prompt[:50]}... ref_urls={len(ref_urls)}个")
         t0 = time.time()
         submitted = await provider.submit(prompt, "16:9", "2k", ref_urls if ref_urls else None)
@@ -172,7 +162,6 @@ async def _submit_and_poll(thread_id: str, node_id: str, prompt: str, provider_n
             print(f"[生图提交失败] node={node_id} 耗时={elapsed:.0f}ms error={submitted.get('error')}")
             return
 
-        # 3. 只轮询自己的任务 → 上传 S3
         result = await provider.poll(submitted["task_id"])
         canvas_tools.set_thread_id(thread_id)
         if result.get("url"):
@@ -213,7 +202,6 @@ async def _submit_and_poll_video(thread_id: str, node_id: str, prompt: str, dura
     try:
         canvas_tools.set_thread_id(thread_id)
 
-        # 1. 收集上游参考图 URL（宫格图 + 视觉锚点）
         ref_urls: list[str] = []
         all_edges = canvas_tools._load_all_edges()
         parent_ids = [e["source"] for e in all_edges if e["target"] == node_id]
@@ -223,7 +211,6 @@ async def _submit_and_poll_video(thread_id: str, node_id: str, prompt: str, dura
             if p_url:
                 ref_urls.append(str(p_url))
 
-        # 2. 提交
         print(f"[视频提交] node={node_id} duration={duration}s res={resolution} audio={generate_audio} prompt={prompt[:50]}... ref_urls={len(ref_urls)}个")
         t0 = time.time()
         submitted = await provider.submit(prompt, duration=duration, resolution=resolution, ratio="16:9", generate_audio=generate_audio, image_urls=ref_urls if ref_urls else None)
@@ -237,7 +224,6 @@ async def _submit_and_poll_video(thread_id: str, node_id: str, prompt: str, dura
             print(f"[视频提交失败] node={node_id} 耗时={elapsed:.0f}ms error={submitted.get('error')}")
             return
 
-        # 3. 轮询 → 上传 S3
         result = await provider.poll(submitted["task_id"])
         canvas_tools.set_thread_id(thread_id)
         if result.get("video_url"):
@@ -264,7 +250,6 @@ async def _submit_and_poll_video(thread_id: str, node_id: str, prompt: str, dura
 
 
 async def _poll_and_notify(thread_id: str, ws=None):
-    """后台并行轮询该 thread 所有 generating 节点（image + video），完成后推送画布更新。"""
     try:
         await asyncio.gather(
             _poll_image_tasks(thread_id),
@@ -280,12 +265,10 @@ async def _poll_and_notify(thread_id: str, ws=None):
 
 
 async def _poll_image_tasks(thread_id: str):
-    """并行轮询当前 thread 下所有 generating 状态的 image 节点，按 provider 分组处理。"""
     canvas = _canvas_data(thread_id)
     if not canvas:
         return
 
-    # 按 provider 分组
     groups: dict[str, dict[str, str]] = {}
     for nid, node in canvas["nodes"].items():
         if node["type"] == "image" and node.get("asset_status") == "generating":
@@ -327,7 +310,6 @@ async def _poll_image_tasks(thread_id: str):
 
 
 def _upload_bytes_to_s3(data: bytes, filename: str) -> str | None:
-    """上传 bytes 到 S3，返回 URL。"""
     from agent.tools.s3_upload import upload_bytes as _upload_bytes
     try:
         return _upload_bytes(data, filename)
@@ -337,7 +319,6 @@ def _upload_bytes_to_s3(data: bytes, filename: str) -> str | None:
 
 
 async def _upload_to_s3(image_url: str, node_id: str, ext: str = "png") -> str | None:
-    """下载文件并上传到 S3，返回 S3 URL。失败返回 None。"""
     import httpx
     from agent.tools.s3_upload import upload_bytes
 
@@ -360,7 +341,6 @@ async def _upload_to_s3(image_url: str, node_id: str, ext: str = "png") -> str |
 
 
 async def _poll_video_tasks(thread_id: str):
-    """轮询当前 thread 下所有 generating 状态的 video 节点。"""
     canvas = _canvas_data(thread_id)
     if not canvas:
         return
@@ -396,7 +376,6 @@ async def _poll_video_tasks(thread_id: str):
 
 
 async def _recover_polling(ws):
-    """服务启动后恢复所有 generating 节点的轮询。"""
     import sqlite3
     db = sqlite3.connect(str(canvas_tools._DB_PATH))
     rows = db.execute(
@@ -410,15 +389,32 @@ async def _recover_polling(ws):
 
 async def handle(websocket):
     pool = AgentPool(max_size=POOL_SIZE)
-    print(f"[连接] 单 WS 连接已建立，pool 上限 {POOL_SIZE}")
-    asyncio.create_task(_recover_polling(websocket))
+    user_id: str | None = None
+    print(f"[连接] 新连接，等待 auth...")
 
     try:
         async for raw in websocket:
             msg = json.loads(raw)
             msg_type = msg.get("type")
-            thread_id = msg.get("thread_id", "")
+            print(f"[MSG] type={msg_type} thread={msg.get('thread_id','?')} user={user_id or '(未认证)'}")
 
+            # 首条消息必须是 auth
+            if msg_type == "auth":
+                user_id = msg.get("user_id", "").strip()
+                if not user_id:
+                    await websocket.close(4001, "user_id required")
+                    return
+                canvas_tools.set_user_id(user_id)
+                store_set_user_id(user_id)
+                print(f"[连接] user={user_id} pool 上限 {POOL_SIZE}")
+                asyncio.create_task(_recover_polling(websocket))
+                continue
+
+            if not user_id:
+                await websocket.close(4001, "未认证")
+                return
+
+            thread_id = msg.get("thread_id", "")
             if not thread_id:
                 continue
 
@@ -486,7 +482,6 @@ async def handle(websocket):
                     canvas=_canvas_data(thread_id),
                 )
                 if node_type == "composite":
-                    # composite 在 execute_node 内同步完成，只需推送结果
                     await _send(
                         ws=websocket,
                         type="canvas_updated",
@@ -566,7 +561,7 @@ async def handle(websocket):
 
 
 async def main(host="0.0.0.0", port=8765):
-    print(f"OpenRHTV WebSocket 服务: ws://{host}:{port}")
+    print(f"OpenRHTV WS 服务: ws://{host}:{port}")
     async with serve(handle, host, port):
         await asyncio.get_running_loop().create_future()
 

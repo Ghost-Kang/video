@@ -9,8 +9,7 @@ import { useWebSocket } from "./hooks/useWebSocket";
 import { useCanvasStore } from "./store/canvasStore";
 import type { WSIncoming } from "./types";
 
-const LS_SESSIONS = "openrhtv_sessions";
-const LS_NAMES = "openrhtv_session_names";
+function lsKey(key: string, userId: string) { return `openrhtv_${userId}_${key}`; }
 
 function loadJSON<T>(key: string, fallback: T): T {
   try {
@@ -27,13 +26,18 @@ function newSessionId() {
   return `session-${Date.now().toString(36)}`;
 }
 
-export default function App() {
+interface AppProps {
+  userId: string;
+  onLogout: () => void;
+}
+
+export default function App({ userId, onLogout }: AppProps) {
   const { threadId } = useParams<{ threadId: string }>();
   const navigate = useNavigate();
   const tid = threadId!;
 
-  const [sessions, setSessions] = useState<string[]>(() => loadJSON<string[]>(LS_SESSIONS, []));
-  const [names, setNames] = useState<Record<string, string>>(() => loadJSON<Record<string, string>>(LS_NAMES, {}));
+  const [sessions, setSessions] = useState<string[]>(() => loadJSON<string[]>(lsKey("sessions", userId), []));
+  const [names, setNames] = useState<Record<string, string>>(() => loadJSON<Record<string, string>>(lsKey("names", userId), {}));
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [chatOpen, setChatOpen] = useState(true);
   const [thinking, setThinking] = useState<string[]>([]);
@@ -103,7 +107,7 @@ export default function App() {
   );
 
   const { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, sendCreateEdge, sendDeleteEdge, sendReorderEdge, connected, connecting } =
-    useWebSocket(onMessage);
+    useWebSocket(userId, onMessage);
   const didInit = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentThreadIdRef = useRef(tid);
@@ -113,7 +117,7 @@ export default function App() {
     setSessions((prev) => {
       if (prev.includes(id)) return prev;
       const next = [id, ...prev];
-      saveJSON(LS_SESSIONS, next);
+      saveJSON(lsKey("sessions", userId), next);
       return next;
     });
   }, []);
@@ -121,7 +125,7 @@ export default function App() {
   const handleRename = useCallback((id: string, name: string) => {
     setNames((prev) => {
       const next = { ...prev, [id]: name };
-      saveJSON(LS_NAMES, next);
+      saveJSON(lsKey("names", userId), next);
       return next;
     });
   }, []);
@@ -145,12 +149,12 @@ export default function App() {
     (id: string) => {
       setSessions((prev) => {
         const next = prev.filter((s) => s !== id);
-        saveJSON(LS_SESSIONS, next);
+        saveJSON(lsKey("sessions", userId), next);
         return next;
       });
       setNames((prev) => {
         const { [id]: _, ...rest } = prev;
-        saveJSON(LS_NAMES, rest);
+        saveJSON(lsKey("names", userId), rest);
         return rest;
       });
     },
@@ -267,12 +271,14 @@ export default function App() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <Header
-        sessionName={names[tid] || tid}
+        userId={userId}
+        sessionName={names[tid] || "新会话"}
         connected={connected}
         connecting={connecting}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
         onNewSession={handleNewSession}
+        onLogout={onLogout}
       />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {sidebarOpen && (

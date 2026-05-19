@@ -3,9 +3,9 @@ import type { WSIncoming, WSPositionUpdate, WSReviewNode, WSExecuteNode, WSOptim
 
 type Handler = (res: WSIncoming) => void;
 
-const WS_URL = "ws://localhost:8765";
+const WS_URL = `ws://${location.hostname}:8765`;
 
-export function useWebSocket(onMessage: Handler) {
+export function useWebSocket(userId: string, onMessage: Handler) {
   const wsRef = useRef<WebSocket | null>(null);
   const pendingRef = useRef<string[]>([]);
   const [connected, setConnected] = useState(false);
@@ -25,10 +25,11 @@ export function useWebSocket(onMessage: Handler) {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log("[WS] 已连接");
+      console.log("[WS] 已连接, 发送 auth");
+      // 首条消息：鉴权
+      ws.send(JSON.stringify({ type: "auth", user_id: userId }));
       setConnecting(false);
       setConnected(true);
-      // 发送排队消息
       if (pendingRef.current.length) {
         console.log(`[WS] onopen 发送排队消息 x${pendingRef.current.length}`);
         for (const msg of pendingRef.current) {
