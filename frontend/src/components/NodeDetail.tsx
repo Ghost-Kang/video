@@ -261,49 +261,6 @@ function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
   );
 }
 
-function ReviewSection({ nodeId, onReview }: { nodeId: string; onReview: Props["onReview"] }) {
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [feedback, setFeedback] = useState("");
-
-  return (
-    <section style={S.reviewSection}>
-      {showFeedback ? (
-        <>
-          <textarea
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            placeholder="告诉 agent 哪里需要改..."
-            rows={2}
-            style={S.feedbackInput}
-            autoFocus
-          />
-          <div style={S.reviewBtns}>
-            <button
-              onClick={() => {
-                onReview(nodeId, "reject", feedback);
-                setShowFeedback(false);
-                setFeedback("");
-              }}
-              style={S.rejectBtn}
-            >
-              驳回并反馈
-            </button>
-            <button onClick={() => setShowFeedback(false)} style={S.cancelBtn}>取消</button>
-          </div>
-        </>
-      ) : (
-        <div style={S.reviewBtns}>
-          <button onClick={() => onReview(nodeId, "approve")} style={S.approveBtn}>
-            通过
-          </button>
-          <button onClick={() => setShowFeedback(true)} style={S.rejectBtn}>
-            驳回
-          </button>
-        </div>
-      )}
-    </section>
-  );
-}
 
 function ResultView({ node }: { node: CanvasNode }) {
   const r = node.result! as Record<string, unknown>;
