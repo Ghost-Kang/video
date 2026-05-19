@@ -175,7 +175,13 @@ function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
       {!isVideo && !isComposite && (
         <>
           <div style={S.label}>Provider</div>
-          <select value={provider} onChange={(e) => setProvider(e.target.value)} style={S.providerSelect}>
+          <select value={provider} onChange={(e) => {
+            const v = e.target.value;
+            setProvider(v);
+            useCanvasStore.setState((s) => ({
+              nodes: s.nodes.map((n) => n.id === node.id ? { ...n, image_gen_provider: v } : n),
+            }));
+          }} style={S.providerSelect}>
             <option value="apimart">Apimart</option>
             <option value="google">Google Gemini</option>
           </select>
