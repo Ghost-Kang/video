@@ -141,8 +141,86 @@ Background: 公园，傍晚暖光，樱花树，石径.
 Consistent art style throughout all panels, sequential manga/comic layout, semi-realistic anime style.
 ```
 
-### 6. 剪辑输出
-串联镜头，添加转场、字幕、特效，输出最终成片。
+### 6. 视频生成
+
+宫格图全部确认后，为每个分镜创建视频节点（**只创建，不 execute**）：先问 `canvas-manager` 拿 parent_ids（应包含对应的宫格图节点），再 `create_canvas_node` video。
+
+**参考图**：视频节点的 parent 是宫格图节点，宫格图又会自动带上它的角色和场景参考图，所以 video 节点自然拿到完整参考链。
+
+#### 视频 description 规范
+
+视频 prompt 需要四层信息，缺一不可：
+
+**1. 时序约束** — 如何将宫格图串联：
+
+```
+N-panel storyboard to video, top-to-bottom left-to-right sequence.
+```
+
+**2. 动作描述** — 每格之间的过渡，角色/物体的连续动作、表情变化：
+
+```
+Motion flow between panels:
+1→2: [第一格到第二格之间发生了什么动作]
+2→3: [第二格到第三格之间发生了什么动作]
+...
+```
+
+**3. 运镜语言** — 景别切换、镜头运动、焦点转移，参考分镜表 `运镜` 列：
+
+```
+Cinematography: [开场的景别和运动], [中间的变化], [结尾的处理].
+Camera: [推拉摇移的具体描述], [焦点转移时机].
+```
+
+**4. 场景氛围** — 光线、色调、情绪、节奏，参考剧本对应段落：
+
+```
+Atmosphere: [光线条件], [色调倾向], [情绪基调], [叙事节奏].
+Style: [统一的画面风格].
+```
+
+参考分镜表中的 `时长` 列指定视频时长。
+
+**完整模板**：
+
+```
+Video generation from storyboard panels for shot [镜号]: "[镜头标题]".
+Reference grid: [N] panels arranged top-to-bottom.
+
+Motion flow between panels:
+1→2: [过渡动作]
+2→3: [过渡动作]
+...
+
+Cinematography: [运镜描述].
+Camera: [镜头语言].
+
+Atmosphere: [氛围描述].
+Style: [统一风格], consistent with [角色/场景参考图].
+Duration: [时长]s.
+```
+
+**示例**：
+
+```
+Video generation from storyboard panels for shot 1: "小明在公园发现神秘信件".
+Reference grid: 6 panels arranged top-to-bottom.
+
+Motion flow between panels:
+1→2: 小明从漫步到突然停步，身体从放松转为警觉，视线下移
+2→3: 镜头跟随视线下移，特写地面上的泛黄信封，阳光在信封上形成光斑
+3→4: 小明缓缓蹲下，右手伸出，手指接近信封，动作充满迟疑
+4→5: 拿起信封后站起，快速左右张望，表现警惕和不安
+5→6: 拆开信封，镜头推近面部，表情从疑惑渐变为震惊，瞳孔微缩
+
+Cinematography: 开场从全景推至中景跟拍小明漫步，停步时切近景强调表情变化，信封出现时下摇至地面特写，拆信时缓推至面部大特写。
+Camera: 手持感微晃增加临场感，焦点从小明转移到信封再回到面部，关键情绪点用慢推强化。
+
+Atmosphere: 傍晚暖金色阳光透过树叶形成斑驳光影，紧张悬疑的情绪递进，节奏由舒缓渐快。
+Style: semi-realistic anime style, consistent with 小明角色形象图和公园场景图.
+Duration: 8s.
+```
 
 ## 画布工具
 
