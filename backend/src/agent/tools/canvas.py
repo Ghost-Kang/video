@@ -517,7 +517,7 @@ def _parse_storyboard(text: str) -> list[dict]:
 # ---------- 节点执行 ----------
 
 
-def execute_node(node_id: str, node_type: NodeType, description: str, image_gen_provider: str = "apimart") -> dict:
+def execute_node(node_id: str, node_type: NodeType, description: str, image_gen_provider: str = "google") -> dict:
     """执行节点资产生成。文字节点直接结构化，媒体节点需 approved 状态。"""
     node = _load_node(node_id)
     if not node:

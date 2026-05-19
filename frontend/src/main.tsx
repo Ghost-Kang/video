@@ -9,6 +9,20 @@ function newSessionId() {
   return `session-${Date.now().toString(36)}`;
 }
 
+function getLastSession(userId: string): string | null {
+  try {
+    const sessions = JSON.parse(localStorage.getItem(`openrhtv_${userId}_sessions`) || "[]");
+    return sessions.length > 0 ? sessions[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+function getChatRedirect(userId: string): string {
+  const last = getLastSession(userId);
+  return `/chat/${last || newSessionId()}`;
+}
+
 function AuthGate() {
   const [user, setUser] = useState<string | null>(() => localStorage.getItem("rhtv_user"));
 
@@ -25,13 +39,13 @@ function AuthGate() {
     <Routes>
       <Route
         path="/login"
-        element={user ? <Navigate to={`/chat/${newSessionId()}`} replace /> : <Login onLogin={handleLogin} />}
+        element={user ? <Navigate to={getChatRedirect(user)} replace /> : <Login onLogin={handleLogin} />}
       />
       <Route
         path="/chat/:threadId"
         element={user ? <App userId={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
       />
-      <Route path="*" element={<Navigate to={user ? `/chat/${newSessionId()}` : "/login"} replace />} />
+      <Route path="*" element={<Navigate to={user ? getChatRedirect(user) : "/login"} replace />} />
     </Routes>
   );
 }
