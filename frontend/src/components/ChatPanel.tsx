@@ -84,6 +84,19 @@ export function ChatPanel({ messages, streaming, thinking, onSend, loading, onTo
       `}</style>
 
       <div style={S.inputArea}>
+        <div style={S.quickPhrases}>
+          <button
+            disabled={loading}
+            onClick={() => onSend("继续下一步")}
+            style={{
+              ...S.quickBtn,
+              opacity: loading ? 0.4 : 1,
+              cursor: loading ? "not-allowed" : "pointer",
+            }}
+          >
+            继续下一步
+          </button>
+        </div>
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -146,6 +159,17 @@ const S: Record<string, React.CSSProperties> = {
   },
   thinkLog: { padding: "0 16px 8px", display: "flex", flexDirection: "column", gap: 2 },
   thinkLine: { fontSize: 11, color: "#a1a1aa", fontFamily: "monospace" },
+  quickPhrases: { display: "flex", gap: 6, marginBottom: 8 },
+  quickBtn: {
+    padding: "4px 12px",
+    fontSize: 12,
+    color: "#3f3f46",
+    background: "#f4f4f5",
+    border: "1px solid #e4e4e7",
+    borderRadius: 14,
+    cursor: "pointer",
+    transition: "background 0.15s",
+  },
   inputArea: { padding: "12px 16px 16px", borderTop: "1px solid #e4e4e7", background: "#fff" },
   textarea: {
     width: "100%", border: "1px solid #e4e4e7", borderRadius: 10, padding: "10px 12px", fontSize: 13,
