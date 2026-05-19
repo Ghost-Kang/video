@@ -26,6 +26,9 @@ IMAGE_GEN_GOOGLE_MODEL = os.getenv("IMAGE_GEN_GOOGLE_MODEL", "gemini-3.1-flash-i
 # -------- 视频生成 --------
 VIDEO_GEN_API_KEY = os.getenv("VIDEO_GEN_API_KEY")
 VIDEO_GEN_BASE_URL = os.getenv("VIDEO_GEN_BASE_URL")
+ARK_API_KEY = os.getenv("ARK_API_KEY", "")
+ARK_BASE_URL = os.getenv("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")
+ARK_VIDEO_MODEL = os.getenv("ARK_VIDEO_MODEL", "doubao-seedance-2-0-260128")
 
 # -------- TTS --------
 TTS_API_KEY = os.getenv("TTS_API_KEY")

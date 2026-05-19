@@ -19,7 +19,7 @@ import { useCanvasStore } from "../store/canvasStore";
 import { ScriptNode } from "./nodes/ScriptNode";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
-import { AudioNode } from "./nodes/AudioNode";
+import { CompositeNode } from "./nodes/CompositeNode";
 import { DeletableEdge } from "./DeletableEdge";
 import type { CanvasNode, WSPositionUpdate } from "../types";
 
@@ -27,7 +27,7 @@ const nodeTypes = {
   script: ScriptNode,
   image: ImageNode,
   video: VideoNode,
-  audio: AudioNode,
+  composite: CompositeNode,
 };
 
 const edgeTypes = {
@@ -38,7 +38,7 @@ const NODE_W = 200;
 const NODE_H = 120;
 
 function defaultLayout(nodes: CanvasNode[]): Node[] {
-  const typeX: Record<string, number> = { script: 0, image: 400, video: 800, audio: 1200 };
+  const typeX: Record<string, number> = { script: 0, image: 400, video: 800, composite: 1200 };
   return nodes.map((n, i) => ({
     id: n.id, type: n.type,
     position: {
@@ -236,7 +236,7 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
           style={{ background: "#fafafa", border: "1px solid #e4e4e7", borderRadius: 8 }}
           nodeColor={(n) => {
             const t = (n.data?.node as { type?: string })?.type;
-            return t === "script" ? "#18181b" : t === "image" ? "#52525b" : t === "video" ? "#a1a1aa" : t === "audio" ? "#d4d4d8" : "#e4e4e7";
+            return t === "script" ? "#18181b" : t === "image" ? "#52525b" : t === "video" ? "#a1a1aa" : t === "composite" ? "#eab308" : "#e4e4e7";
           }}
         />
       </ReactFlow>

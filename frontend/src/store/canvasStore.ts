@@ -5,6 +5,7 @@ interface Edge {
   id: string;
   source: string;
   target: string;
+  position?: number;
 }
 
 interface CanvasStore {

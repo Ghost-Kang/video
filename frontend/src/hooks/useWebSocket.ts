@@ -117,5 +117,9 @@ export function useWebSocket(onMessage: Handler) {
     _send({ type: "delete_edge", thread_id: threadId, edge_id: edgeId });
   }, [_send]);
 
-  return { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, sendCreateEdge, sendDeleteEdge, connected, connecting };
+  const sendReorderEdge = useCallback((threadId: string, edgeId: string, direction: "up" | "down") => {
+    _send({ type: "reorder_edge", thread_id: threadId, edge_id: edgeId, direction });
+  }, [_send]);
+
+  return { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, sendCreateEdge, sendDeleteEdge, sendReorderEdge, connected, connecting };
 }

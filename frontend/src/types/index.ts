@@ -1,4 +1,4 @@
-export type NodeType = "script" | "image" | "video" | "audio";
+export type NodeType = "script" | "image" | "video" | "composite";
 
 export interface Shot {
   no: string;
@@ -76,6 +76,9 @@ export interface WSExecuteNode {
   node_type: NodeType;
   description: string;
   image_gen_provider?: string;  // "apimart" | "google"
+  duration?: number;            // 视频时长 4-15
+  resolution?: string;          // 视频分辨率 "480p" | "720p" | "1080p"
+  generate_audio?: boolean;     // 是否生成音频
 }
 
 export interface WSCreateEdge {
@@ -89,6 +92,13 @@ export interface WSDeleteEdge {
   type: "delete_edge";
   thread_id: string;
   edge_id: string;
+}
+
+export interface WSReorderEdge {
+  type: "reorder_edge";
+  thread_id: string;
+  edge_id: string;
+  direction: "up" | "down";
 }
 
 export interface WSOptimizePrompt {

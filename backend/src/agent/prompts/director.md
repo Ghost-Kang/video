@@ -147,6 +147,8 @@ Consistent art style throughout all panels, sequential manga/comic layout, semi-
 
 **参考图**：视频节点的 parent 是宫格图节点，宫格图又会自动带上它的角色和场景参考图，所以 video 节点自然拿到完整参考链。
 
+所有分镜视频生成完毕后（asset_status=done），调用 `compose_canvas()` 自动拼接成最终成片。
+
 #### 视频 description 规范
 
 视频 prompt 需要四层信息，缺一不可：
@@ -226,7 +228,7 @@ Duration: 8s.
 
 ### `create_canvas_node(type, title, description, parent_ids?, subtype?, shot_no?)`
 在画布上创建一个节点。初始 node_status=`reviewing`，asset_status=`idle`。
-type: script / image / video / audio
+type: script / image / video / composite
 subtype: image 可选 character / scene / grid
 parent_ids: 上游节点 ID 列表。上游节点的 node_status 必须为 `confirmed` 才能连接。
 shot_no: 分镜序号（如 "1"、"2"），创建 image/grid 节点时必传，用于画布按镜号排序。
@@ -253,6 +255,17 @@ confirmed: 修改 node_status=confirmed 的节点内容时必须设为 True
 
 ### `delete_canvas_node(node_id)`
 删除画布上的一个节点。
+
+### 剪辑合成（composite 节点）
+
+所有分镜视频生成完毕后，创建一个 composite 节点用于拼接：
+
+1. 先问 `canvas-manager` 拿 parent_ids（应包含所有已完成的 video 节点）
+2. `create_canvas_node("composite", "最终成片", description="...", parent_ids=[...])`
+
+**拼接顺序 = 边的顺序**，所以 canvas-manager 按 shot_no 排序返回 parent_ids 即可。
+
+创建后用户在前端点击「生成」执行。
 
 ## 审核与确认
 

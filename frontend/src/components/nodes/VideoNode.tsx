@@ -9,7 +9,16 @@ export function VideoNode({ data }: NodeProps) {
       <Handle type="target" position={Position.Left} />
       <strong>{node.title}</strong>
       {node.result?.url ? (
-        <video src={node.result.url as string} controls style={styles.video} />
+        <video
+          src={node.result.url as string}
+          controls
+          style={styles.video}
+          onPlay={(e) => {
+            document.querySelectorAll("video").forEach((v) => {
+              if (v !== e.currentTarget) v.pause();
+            });
+          }}
+        />
       ) : node.asset_status === "generating" ? (
         <div style={styles.loading}><span className="img-spinner" />生成中...</div>
       ) : (

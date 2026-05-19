@@ -1,5 +1,6 @@
 """画布工具 — SQLite 持久化"""
 
+import asyncio
 import json
 import sqlite3
 import uuid
@@ -7,11 +8,12 @@ from pathlib import Path
 from typing import Literal
 
 from agent.config import STORYBOARD_COLUMNS
+from agent.tools.compose import compose_videos as _compose_videos
+from agent.tools.s3_upload import upload_bytes as _s3_upload
 
 
-NodeType = Literal["script", "image", "video", "audio"]
+NodeType = Literal["script", "image", "video", "composite"]
 ImageSubtype = Literal["character", "scene", "grid"] | None
-AudioSubtype = Literal["character_voice"] | None
 NodeStatus = Literal["reviewing", "confirmed"]
 AssetStatus = Literal["idle", "generating", "done", "failed", "timeout"]
 # 旧 status 保留兼容，新代码使用 node_status + asset_status
@@ -69,9 +71,14 @@ def _db() -> sqlite3.Connection:
             edge_id TEXT NOT NULL,
             source TEXT NOT NULL,
             target TEXT NOT NULL,
+            position INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (thread_id, edge_id)
         )"""
     )
+    try:
+        db.execute("ALTER TABLE canvas_edges ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # 列已存在
     return db
 
 
@@ -122,11 +129,11 @@ def _load_all_nodes() -> dict[str, dict]:
 def _load_all_edges() -> list[dict]:
     db = _db()
     rows = db.execute(
-        "SELECT edge_id, source, target FROM canvas_edges WHERE thread_id=?",
+        "SELECT edge_id, source, target, position FROM canvas_edges WHERE thread_id=? ORDER BY position",
         (_current_thread_id,),
     ).fetchall()
     db.close()
-    return [{"id": r["edge_id"], "source": r["source"], "target": r["target"]} for r in rows]
+    return [{"id": r["edge_id"], "source": r["source"], "target": r["target"], "position": r["position"]} for r in rows]
 
 
 def _upsert_node(node: dict):
@@ -211,9 +218,16 @@ def _find_parent_by_type(type: str, subtype: str | None = None) -> str:
 
 def _upsert_edge(edge: dict):
     db = _db()
+    # 自动分配 position：该 target 已有边数 + 1
+    if edge.get("position") is None:
+        existing = db.execute(
+            "SELECT COALESCE(MAX(position), 0) + 1 FROM canvas_edges WHERE thread_id=? AND target=?",
+            (_current_thread_id, edge["target"]),
+        ).fetchone()
+        edge["position"] = existing[0] if existing else 1
     db.execute(
-        "INSERT INTO canvas_edges (thread_id, edge_id, source, target) VALUES (?, ?, ?, ?)",
-        (_current_thread_id, edge["id"], edge["source"], edge["target"]),
+        "INSERT INTO canvas_edges (thread_id, edge_id, source, target, position) VALUES (?, ?, ?, ?, ?)",
+        (_current_thread_id, edge["id"], edge["source"], edge["target"], edge["position"]),
     )
     db.commit()
     db.close()
@@ -239,16 +253,69 @@ def create_canvas_edge(source: str, target: str) -> dict:
     return edge
 
 
-def delete_canvas_edge(edge_id: str) -> dict:
-    """手动删除一条边。"""
+def _renormalize_positions(target_id: str):
+    """重整 position，确保同一 target 下的边位置连续（1,2,3...）"""
     db = _db()
-    db.execute("DELETE FROM canvas_edges WHERE thread_id=? AND edge_id=?", (_current_thread_id, edge_id))
-    deleted = db.total_changes > 0
+    rows = db.execute(
+        "SELECT edge_id FROM canvas_edges WHERE thread_id=? AND target=? ORDER BY position",
+        (_current_thread_id, target_id),
+    ).fetchall()
+    for i, row in enumerate(rows):
+        db.execute(
+            "UPDATE canvas_edges SET position=? WHERE thread_id=? AND edge_id=?",
+            (i + 1, _current_thread_id, row["edge_id"]),
+        )
     db.commit()
     db.close()
-    if deleted:
-        return {"id": edge_id, "deleted": True}
-    return {"error": f"边 {edge_id} 不存在"}
+
+
+def reorder_edge(edge_id: str, direction: str) -> dict:
+    """将边向上或向下移动一个位置。direction: 'up' | 'down'"""
+    edges = _load_all_edges()
+    edge = next((e for e in edges if e["id"] == edge_id), None)
+    if not edge:
+        return {"error": f"边 {edge_id} 不存在"}
+
+    # 找同 target 的相邻边
+    siblings = sorted(
+        [e for e in edges if e["target"] == edge["target"]],
+        key=lambda e: e["position"],
+    )
+    idx = next((i for i, e in enumerate(siblings) if e["id"] == edge_id), -1)
+    if idx < 0:
+        return {"error": "边不在同组中"}
+
+    swap_idx = idx - 1 if direction == "up" else idx + 1
+    if swap_idx < 0 or swap_idx >= len(siblings):
+        return {"error": "已是边界位置"}
+
+    # 交换 position
+    a, b = siblings[idx], siblings[swap_idx]
+    pos_a, pos_b = a["position"], b["position"]
+    db = _db()
+    db.execute("UPDATE canvas_edges SET position=? WHERE thread_id=? AND edge_id=?", (pos_b, _current_thread_id, a["id"]))
+    db.execute("UPDATE canvas_edges SET position=? WHERE thread_id=? AND edge_id=?", (pos_a, _current_thread_id, b["id"]))
+    db.commit()
+    db.close()
+    _renormalize_positions(edge["target"])
+    return {"id": edge_id, "direction": direction, "swapped_with": b["id"]}
+
+
+def delete_canvas_edge(edge_id: str) -> dict:
+    """手动删除一条边。"""
+    # 先找到 target 用于重整
+    edges = _load_all_edges()
+    edge = next((e for e in edges if e["id"] == edge_id), None)
+    if not edge:
+        return {"error": f"边 {edge_id} 不存在"}
+    target_id = edge["target"]
+
+    db = _db()
+    db.execute("DELETE FROM canvas_edges WHERE thread_id=? AND edge_id=?", (_current_thread_id, edge_id))
+    db.commit()
+    db.close()
+    _renormalize_positions(target_id)
+    return {"id": edge_id, "deleted": True}
 
 
 # ---------- 节点 CRUD ----------
@@ -261,7 +328,7 @@ def _default_position(node_type: str, parent_ids: list[str] | None) -> tuple[flo
     同类型节点横向错开。
     """
     # 类型 → x 偏移
-    x_offset = {"script": 0, "image": 400, "video": 800, "audio": 1200}
+    x_offset = {"script": 0, "image": 400, "video": 800, "composite": 1200}
     base_x = x_offset.get(node_type, 0)
 
     # 从父节点获取参考位置
@@ -327,11 +394,6 @@ def create_canvas_node(
             pid = _find_parent_by_type("script")
             if pid:
                 ids = [pid]
-        elif type == "audio" and subtype == "character_voice":
-            pid = _find_parent_by_type("image", subtype="character")
-            if pid:
-                ids = [pid]
-
     # 上游校验（每个父节点独立校验）
     for pid in ids:
         parent = _load_node(pid)
@@ -468,23 +530,57 @@ def execute_node(node_id: str, node_type: NodeType, description: str, image_gen_
         _upsert_node(node)
         # 返回临时状态，实际 task_id 由后台任务写入
         return {"id": node_id, "asset_status": "generating", "result": node["result"], "_pending_submit": True}
+    elif node_type == "composite":
+        node["asset_status"] = "generating"
+        _upsert_node(node)
+
+        # 从边收集上游 video 节点，边的顺序 = 拼接顺序
+        edges = _load_all_edges()
+        parent_ids = [e["source"] for e in edges if e["target"] == node_id]
+        urls: list[str] = []
+        for pid in parent_ids:
+            parent = _load_node(pid)
+            if parent and parent["type"] == "video":
+                p_url = (parent.get("result") or {}).get("url")
+                if p_url:
+                    urls.append(str(p_url))
+
+        if len(urls) < 1:
+            node["asset_status"] = "failed"
+            node["result"] = {"error": "没有可拼接的视频（需连接已完成的 video 节点）"}
+            _upsert_node(node)
+            return {"id": node_id, "asset_status": "failed", "error": "没有可拼接的视频"}
+
+        print(f"[合成] 开始合并 {len(urls)} 个视频...")
+        result_bytes = asyncio.run(_compose_videos(urls))
+        if not result_bytes:
+            node["asset_status"] = "failed"
+            node["result"] = {"error": "ffmpeg 合成失败"}
+            _upsert_node(node)
+            return {"id": node_id, "asset_status": "failed", "error": "ffmpeg 合成失败"}
+
+        s3_url = _s3_upload(result_bytes, "composite.mp4")
+        if not s3_url:
+            node["asset_status"] = "failed"
+            node["result"] = {"error": "S3 上传失败"}
+            _upsert_node(node)
+            return {"id": node_id, "asset_status": "failed", "error": "S3 上传失败"}
+
+        node["asset_status"] = "done"
+        node["result"] = {"url": s3_url, "clips": len(urls)}
+        _upsert_node(node)
+        print(f"[合成] 完成 node={node_id}")
+        return {"id": node_id, "asset_status": "done", "result": node["result"]}
+
     elif node_type == "video":
-        result = {"url": f"https://mock.videos/{node_id}.mp4", "prompt": description, "duration_seconds": 5, "resolution": "1920x1080"}
-        asset_status = "generating"
-    elif node_type == "audio":
-        result = {"url": f"https://mock.audio/{node_id}.mp3", "text": description, "voice": subtype or "default", "duration_seconds": 8, "subtype": subtype}
-        if subtype == "character_voice":
-            result["catchphrase"] = description[:50]
-        asset_status = "generating"
+        node["asset_status"] = "generating"
+        node["result"] = {"prompt": description, "resolution": "1920x1080"}
+        _upsert_node(node)
+        return {"id": node_id, "asset_status": "generating", "result": node["result"], "_pending_submit": True}
     else:
         node["asset_status"] = "failed"
         _upsert_node(node)
         return {"id": node_id, "asset_status": "failed", "error": f"未知节点类型: {node_type}"}
-
-    node["asset_status"] = asset_status
-    node["result"] = result
-    _upsert_node(node)
-    return {"id": node_id, "asset_status": asset_status, "result": result}
 
 
 def get_canvas_state(node_id: str = "") -> dict:

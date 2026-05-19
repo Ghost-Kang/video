@@ -102,7 +102,7 @@ export default function App() {
     [addMessage, setMessages, setCanvas, appendStreaming, finalizeStreaming]
   );
 
-  const { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, sendCreateEdge, sendDeleteEdge, connected, connecting } =
+  const { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, sendCreateEdge, sendDeleteEdge, sendReorderEdge, connected, connecting } =
     useWebSocket(onMessage);
   const didInit = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -211,8 +211,8 @@ export default function App() {
   );
 
   const handleExecuteNode = useCallback(
-    (nodeId: string, nodeType: string, description: string, provider?: string) => {
-      sendExecuteNode({ type: "execute_node", thread_id: tid, node_id: nodeId, node_type: nodeType as any, description, image_gen_provider: provider });
+    (nodeId: string, nodeType: string, description: string, provider?: string, duration?: number, resolution?: string, generateAudio?: boolean) => {
+      sendExecuteNode({ type: "execute_node", thread_id: tid, node_id: nodeId, node_type: nodeType as any, description, image_gen_provider: provider, duration, resolution, generate_audio: generateAudio });
     },
     [sendExecuteNode, tid]
   );
@@ -237,6 +237,13 @@ export default function App() {
       sendCreateEdge(tid, source, target);
     },
     [sendCreateEdge, tid]
+  );
+
+  const handleReorderEdge = useCallback(
+    (edgeId: string, direction: "up" | "down") => {
+      sendReorderEdge(tid, edgeId, direction);
+    },
+    [sendReorderEdge, tid]
   );
 
   const handleDeleteEdge = useCallback(
@@ -300,7 +307,7 @@ export default function App() {
           </button>
         )}
         <Canvas onPositionChange={(pos) => sendPosition({ ...pos, thread_id: tid })} onCreateEdge={handleCreateEdge} onDeleteEdge={handleDeleteEdge} />
-        {selectedNodeId && <NodeDetail onReview={handleReview} onExecuteNode={handleExecuteNode} onUpdateNodeStatus={handleUpdateNodeStatus} onOptimizePrompt={handleOptimizePrompt} onDeleteEdge={handleDeleteEdge} />}
+        {selectedNodeId && <NodeDetail onReview={handleReview} onExecuteNode={handleExecuteNode} onUpdateNodeStatus={handleUpdateNodeStatus} onOptimizePrompt={handleOptimizePrompt} onDeleteEdge={handleDeleteEdge} onReorderEdge={handleReorderEdge} />}
       </div>
     </div>
   );
