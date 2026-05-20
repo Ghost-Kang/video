@@ -66,6 +66,8 @@ def _notify_user(user_id: str, thread_id: str):
     ws = _ws_registry.get(user_id)
     if ws:
         asyncio.create_task(_safe_notify(ws, thread_id))
+    else:
+        print(f"[通知] user={user_id} 未连接，跳过推送 thread={thread_id}")
 
 
 async def _safe_notify(ws, thread_id: str):
@@ -354,11 +356,18 @@ async def _process_composite_task(node: dict):
 async def _generation_worker():
     """全局 worker：轮询 SQLite 队列，处理生成任务。"""
     print("[Worker] 启动生成任务调度器")
+    tick = 0
     while True:
+        tick += 1
+        t_tick = time.time()
         try:
             # 处理新提交的 pending 任务
             tasks = canvas_tools.claim_pending_tasks()
+            if tasks:
+                print(f"[Worker] tick={tick} 认领 {len(tasks)} 个任务: {[(t['id'][:12], t['type']) for t in tasks]}")
             for task in tasks:
+                t_task = time.time()
+                print(f"[Worker] 开始处理 node={task['id'][:16]} type={task['type']} user={task['user_id']}")
                 try:
                     _setup_canvas_context(task)
                     if task["type"] == "composite":
@@ -367,22 +376,29 @@ async def _generation_worker():
                         await _process_video_task(task)
                     else:
                         await _process_image_task(task)
+                    dt = (time.time() - t_task) * 1000
+                    print(f"[Worker] 完成处理 node={task['id'][:16]} 耗时={dt:.0f}ms")
                 except Exception as e:
-                    print(f"[Worker] 任务异常 node={task.get('id')}: {e}")
+                    dt = (time.time() - t_task) * 1000
+                    print(f"[Worker] 任务异常 node={task.get('id','?')[:16]} 耗时={dt:.0f}ms error={e}")
                     canvas_tools.update_generation_state(task["id"], "failed", error=str(e))
                     _notify_user(task.get("user_id", ""), task.get("thread_id", ""))
 
             # 恢复中断的任务（submitted/polling 状态）
             # Google provider 的 in-memory task 在重启后丢失，需重新提交
             recovered = canvas_tools.recover_generation_tasks()
+            if recovered:
+                print(f"[Worker] tick={tick} 恢复 {len(recovered)} 个已中断任务")
             for task in recovered:
                 provider_name = task.get("image_gen_provider") or IMAGE_GEN_PROVIDER
                 if task["type"] == "image" and provider_name == "google":
                     # Google 用内存 task，重启丢失 → 重新入队
+                    print(f"[Worker] 恢复 Google 任务 → 重新入队 node={task['id'][:16]}")
                     canvas_tools.update_generation_state(task["id"], "pending",
                         error="服务重启，重新提交")
                 else:
                     # 外部 task_id 仍在，继续轮询
+                    print(f"[Worker] 恢复轮询 node={task['id'][:16]} provider={provider_name} task_id={task.get('generation_task_id', '?')[:16]}")
                     try:
                         _setup_canvas_context(task)
                         if task["type"] == "video":
@@ -397,7 +413,11 @@ async def _generation_worker():
                         _setup_canvas_context(task)
                         _apply_poll_result(task, result)
                     except Exception as e:
-                        print(f"[Worker] 恢复任务异常 node={task.get('id')}: {e}")
+                        print(f"[Worker] 恢复任务异常 node={task.get('id','?')[:16]}: {e}")
+
+            dt_tick = (time.time() - t_tick) * 1000
+            if tasks or recovered:
+                print(f"[Worker] tick={tick} 完成 耗时={dt_tick:.0f}ms")
 
         except Exception as e:
             print(f"[Worker] 调度异常: {e}")
