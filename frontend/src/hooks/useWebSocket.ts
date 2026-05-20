@@ -138,5 +138,10 @@ export function useWebSocket(userId: string, onMessage: Handler) {
     _send({ type: "reorder_edge", thread_id: threadId, edge_id: edgeId, direction });
   }, [_send]);
 
-  return { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, sendCreateEdge, sendDeleteEdge, sendReorderEdge, connected, connecting };
+  const sendDeleteSession = useCallback((threadId: string) => {
+    console.log(`[WS] 发送 delete_session thread=${threadId}`);
+    _send({ type: "delete_session", thread_id: threadId });
+  }, [_send]);
+
+  return { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, sendCreateEdge, sendDeleteEdge, sendReorderEdge, sendDeleteSession, connected, connecting };
 }
