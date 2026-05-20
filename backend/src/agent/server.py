@@ -16,7 +16,7 @@ from websockets.exceptions import ConnectionClosedOK
 
 from agent.config import LLM_MODEL, IMAGE_GEN_PROVIDER
 from agent.pool import AgentPool
-from agent.store import get_messages, save_message, list_sessions, delete_session as store_delete_session
+from agent.store import get_messages, save_message, list_sessions, ensure_session_exists, delete_session as store_delete_session
 from agent.tools import canvas as canvas_tools
 from agent.tools.video_generation import get_video_provider
 
@@ -620,6 +620,7 @@ async def handle(websocket):
                 continue
 
             if msg_type == "get_session_state":
+                ensure_session_exists(user_id, thread_id)
                 print(f"[请求] get_session_state thread={thread_id}")
                 msgs = get_messages(user_id, thread_id)
                 print(f"[请求] 返回 msgs={len(msgs)} canvas={_canvas_data(thread_id) is not None}")

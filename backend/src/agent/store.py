@@ -86,7 +86,7 @@ def list_sessions(user_id: str) -> list[dict]:
             "last_active": r[1] or "",
         })
 
-    # 合并仅有画布数据但无消息的会话（如刚创建未发消息的 session）
+    # 合并仅有画布数据但无消息的会话
     try:
         from agent.tools.canvas import _DB_PATH as _CANVAS_DB
         cdb = sqlite3.connect(str(_CANVAS_DB))
@@ -102,6 +102,7 @@ def list_sessions(user_id: str) -> list[dict]:
         for cr in crows:
             tid = cr[0]
             if tid not in seen:
+                seen.add(tid)
                 sessions.append({
                     "thread_id": tid,
                     "last_active": "",
@@ -109,8 +110,35 @@ def list_sessions(user_id: str) -> list[dict]:
     except Exception:
         pass
 
+    # 合并仅有 session_meta 记录的空会话（新建但未发消息也未创建画布节点）
+    meta_rows = db.execute(
+        """SELECT thread_id FROM session_meta
+           WHERE user_id=? AND is_deleted=0
+           ORDER BY rowid DESC""",
+        (user_id,),
+    ).fetchall()
+    for mr in meta_rows:
+        tid = mr[0]
+        if tid not in seen:
+            sessions.append({
+                "thread_id": tid,
+                "last_active": "",
+            })
+
     db.close()
     return sessions
+
+
+def ensure_session_exists(user_id: str, thread_id: str):
+    """确保会话在 session_meta 中有记录（首次访问时落盘）。"""
+    db = _conn()
+    db.execute(
+        """INSERT OR IGNORE INTO session_meta (user_id, thread_id, is_deleted)
+           VALUES (?, ?, 0)""",
+        (user_id, thread_id),
+    )
+    db.commit()
+    db.close()
 
 
 def delete_session(user_id: str, thread_id: str):
