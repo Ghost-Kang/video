@@ -55,20 +55,19 @@ export default function App({ userId, onLogout }: AppProps) {
   const onMessage = useCallback(
     (res: WSIncoming) => {
       // session_list 是用户级别消息，不经过 thread_id 过滤
-      // 数据库是真相源头，直接替换本地缓存
+      // 数据库是真相源头，本地只保留用户自定义的名称
       if (res.type === "session_list") {
         console.log(`[WS] session_list 收到 ${res.sessions.length} 个会话`);
         const ids = res.sessions.map(s => s.thread_id);
-        const newNames: Record<string, string> = {};
-        for (const s of res.sessions) {
-          if (s.name && s.name !== "新会话") {
-            newNames[s.thread_id] = s.name;
-          }
+        const localNames = loadJSON<Record<string, string>>(lsKey("names", userId), {});
+        const mergedNames: Record<string, string> = {};
+        for (const id of ids) {
+          if (localNames[id]) mergedNames[id] = localNames[id];
         }
         setSessions(ids);
-        setNames(newNames);
+        setNames(mergedNames);
         saveJSON(lsKey("sessions", userId), ids);
-        saveJSON(lsKey("names", userId), newNames);
+        saveJSON(lsKey("names", userId), mergedNames);
         return;
       }
 

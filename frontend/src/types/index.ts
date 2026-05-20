@@ -153,7 +153,6 @@ export interface WSCanvasUpdated {
 
 export interface WSSessionInfo {
   thread_id: string;
-  name: string;
   last_active: string;
 }
 

@@ -67,7 +67,6 @@ def list_sessions(user_id: str) -> list[dict]:
     db = _conn()
     rows = db.execute(
         """SELECT m.thread_id,
-                  (SELECT content FROM messages m2 WHERE m2.user_id=m.user_id AND m2.thread_id=m.thread_id AND m2.role='user' ORDER BY m2.id LIMIT 1) AS first_msg,
                   MAX(m.created_at) AS last_active
            FROM messages m
            LEFT JOIN session_meta sm ON sm.user_id=m.user_id AND sm.thread_id=m.thread_id
@@ -82,11 +81,9 @@ def list_sessions(user_id: str) -> list[dict]:
     for r in rows:
         tid = r[0]
         seen.add(tid)
-        first = (r[1] or "")[:80]
         sessions.append({
             "thread_id": tid,
-            "name": first if first else "新会话",
-            "last_active": r[2] or "",
+            "last_active": r[1] or "",
         })
 
     # 合并仅有画布数据但无消息的会话（如刚创建未发消息的 session）
@@ -107,7 +104,6 @@ def list_sessions(user_id: str) -> list[dict]:
             if tid not in seen:
                 sessions.append({
                     "thread_id": tid,
-                    "name": "新会话",
                     "last_active": "",
                 })
     except Exception:
