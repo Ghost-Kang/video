@@ -637,6 +637,7 @@ async def handle(websocket):
 
 async def main(host="0.0.0.0", port=8765):
     print(f"OpenRHTV WS 服务: ws://{host}:{port}")
+    _start_worker()
     async with serve(handle, host, port):
         await asyncio.get_running_loop().create_future()
 
