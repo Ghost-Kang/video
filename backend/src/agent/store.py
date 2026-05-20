@@ -50,3 +50,55 @@ def get_messages(user_id: str, thread_id: str, limit: int = 100) -> list[dict]:
     ).fetchall()
     db.close()
     return [{"role": r[0], "content": r[1], "created_at": r[2]} for r in rows]
+
+
+def list_sessions(user_id: str) -> list[dict]:
+    """返回用户的所有会话，含首条消息摘要和最近活跃时间。"""
+    db = _conn()
+    rows = db.execute(
+        """SELECT thread_id,
+                  (SELECT content FROM messages m2 WHERE m2.user_id=m.user_id AND m2.thread_id=m.thread_id AND m2.role='user' ORDER BY m2.id LIMIT 1) AS first_msg,
+                  MAX(created_at) AS last_active
+           FROM messages m
+           WHERE user_id=?
+           GROUP BY thread_id
+           ORDER BY last_active DESC""",
+        (user_id,),
+    ).fetchall()
+
+    sessions = []
+    seen: set[str] = set()
+    for r in rows:
+        tid = r[0]
+        seen.add(tid)
+        first = (r[1] or "")[:80]
+        sessions.append({
+            "thread_id": tid,
+            "name": first if first else "新会话",
+            "last_active": r[2] or "",
+        })
+
+    # 合并仅有画布数据但无消息的会话（如刚创建未发消息的 session）
+    try:
+        from agent.tools.canvas import _DB_PATH as _CANVAS_DB
+        import sqlite3
+        cdb = sqlite3.connect(str(_CANVAS_DB))
+        cdb.row_factory = sqlite3.Row
+        crows = cdb.execute(
+            "SELECT DISTINCT thread_id FROM canvas_nodes WHERE user_id=?",
+            (user_id,),
+        ).fetchall()
+        cdb.close()
+        for cr in crows:
+            tid = cr[0]
+            if tid not in seen:
+                sessions.append({
+                    "thread_id": tid,
+                    "name": "新会话",
+                    "last_active": "",
+                })
+    except Exception:
+        pass
+
+    db.close()
+    return sessions

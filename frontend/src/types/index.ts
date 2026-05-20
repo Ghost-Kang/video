@@ -151,4 +151,15 @@ export interface WSCanvasUpdated {
   canvas: CanvasData | null;
 }
 
-export type WSIncoming = WSAgentResponse | WSProcessing | WSSessionState | WSAgentStream | WSCanvasUpdated | WSPromptOptimized;
+export interface WSSessionInfo {
+  thread_id: string;
+  name: string;
+  last_active: string;
+}
+
+export interface WSSessionList {
+  type: "session_list";
+  sessions: WSSessionInfo[];
+}
+
+export type WSIncoming = WSAgentResponse | WSProcessing | WSSessionState | WSAgentStream | WSCanvasUpdated | WSPromptOptimized | WSSessionList;

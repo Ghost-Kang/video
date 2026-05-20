@@ -16,7 +16,7 @@ from websockets.exceptions import ConnectionClosedOK
 
 from agent.config import LLM_MODEL, IMAGE_GEN_PROVIDER
 from agent.pool import AgentPool
-from agent.store import get_messages, save_message
+from agent.store import get_messages, save_message, list_sessions
 from agent.tools import canvas as canvas_tools
 from agent.tools.video_generation import get_video_provider
 
@@ -483,6 +483,9 @@ async def handle(websocket):
                 _ws_registry[user_id] = websocket
                 _start_worker()
                 print(f"[连接] user={user_id} pool 上限 {POOL_SIZE}")
+                # auth 后自动下发会话列表
+                sessions = list_sessions(user_id)
+                await _send(ws=websocket, type="session_list", sessions=sessions)
                 continue
 
             if not user_id:
@@ -603,6 +606,11 @@ async def handle(websocket):
                     node_id=nid,
                     optimized_prompt=optimized,
                 )
+                continue
+
+            if msg_type == "list_sessions":
+                sessions = list_sessions(user_id)
+                await _send(ws=websocket, type="session_list", sessions=sessions)
                 continue
 
             if msg_type == "get_session_state":

@@ -54,6 +54,36 @@ export default function App({ userId, onLogout }: AppProps) {
 
   const onMessage = useCallback(
     (res: WSIncoming) => {
+      // session_list 是用户级别消息，不经过 thread_id 过滤
+      if (res.type === "session_list") {
+        console.log(`[WS] session_list 收到 ${res.sessions.length} 个会话`);
+        const localSessions = loadJSON<string[]>(lsKey("sessions", userId), []);
+        const localNames = loadJSON<Record<string, string>>(lsKey("names", userId), {});
+        const mergedIds: string[] = [];
+        const mergedNames: Record<string, string> = { ...localNames };
+
+        for (const s of res.sessions) {
+          if (!mergedIds.includes(s.thread_id)) {
+            mergedIds.push(s.thread_id);
+          }
+          if (s.name && s.name !== "新会话") {
+            mergedNames[s.thread_id] = s.name;
+          }
+        }
+        // 追加本地独有的会话
+        for (const id of localSessions) {
+          if (!mergedIds.includes(id)) {
+            mergedIds.push(id);
+          }
+        }
+
+        setSessions(mergedIds);
+        setNames(mergedNames);
+        saveJSON(lsKey("sessions", userId), mergedIds);
+        saveJSON(lsKey("names", userId), mergedNames);
+        return;
+      }
+
       const rid = "thread_id" in res ? res.thread_id : undefined;
       if (rid && rid !== currentThreadIdRef.current) {
         console.log(`[WS] 忽略消息 thread=${rid} (当前=${currentThreadIdRef.current}) type=${res.type}`);
@@ -103,7 +133,7 @@ export default function App({ userId, onLogout }: AppProps) {
           break;
       }
     },
-    [addMessage, setMessages, setCanvas, appendStreaming, finalizeStreaming]
+    [addMessage, setMessages, setCanvas, appendStreaming, finalizeStreaming, userId]
   );
 
   const { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, sendCreateEdge, sendDeleteEdge, sendReorderEdge, connected, connecting } =
