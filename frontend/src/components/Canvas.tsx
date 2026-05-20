@@ -127,6 +127,7 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
   const selectNode = useCanvasStore((s) => s.selectNode);
 
   const [rfNodes, setRfNodes] = useState<Node[]>(() => defaultLayout(canvasNodes));
+  const structureRef = useRef({ nodes: 0, edges: 0 });
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -138,18 +139,31 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
     return () => window.removeEventListener("delete_edge", handler);
   }, [removeEdge, onDeleteEdge]);
 
+  // 节点/边数量变化时自动排版
   useEffect(() => {
+    const nodeCount = canvasNodes.length;
+    const edgeCount = edges.length;
+    if (nodeCount !== structureRef.current.nodes || edgeCount !== structureRef.current.edges) {
+      structureRef.current = { nodes: nodeCount, edges: edgeCount };
+      if (canvasNodes.length > 0) {
+        const positions = dagreLayout(canvasNodes, edges);
+        for (const [id, pos] of positions) {
+          updateNodePosition(id, pos.x, pos.y);
+          onPositionChange({ type: "update_position", thread_id: "", node_id: id, x: pos.x, y: pos.y });
+        }
+      }
+    }
     setRfNodes((prev) => {
       const prevMap = new Map(prev.map((n) => [n.id, n]));
       return defaultLayout(canvasNodes).map((n) => {
         const existing = prevMap.get(n.id);
         if (existing) {
-          return { ...n, position: n.position, width: existing.width, height: existing.height };
+          return { ...n, position: existing.position, width: existing.width, height: existing.height };
         }
         return n;
       });
     });
-  }, [canvasNodes]);
+  }, [canvasNodes, edges]);
 
   const persistRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
