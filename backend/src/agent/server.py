@@ -2,10 +2,12 @@
 
 单 WS 连接承载多个会话，agent 实例走 LRU 池管理。
 首条消息 auth → 绑定 user_id → 后续消息隔离。
+生成任务走 SQLite 队列 → 全局 worker 统一调度。
 """
 
 import asyncio
 import json
+import time
 
 from langchain_core.messages import AIMessageChunk, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -20,6 +22,10 @@ from agent.tools.video_generation import get_video_provider
 
 
 POOL_SIZE = 5
+
+# WS 注册表：user_id → websocket（worker 用来推送 canvas_updated）
+_ws_registry: dict[str, object] = {}
+_worker_started = False
 
 
 def _extract_text(content) -> str:
@@ -53,6 +59,20 @@ def _update_position(thread_id: str, msg: dict):
 
 async def _send(ws, **kwargs):
     await ws.send(json.dumps(kwargs, ensure_ascii=False))
+
+
+def _notify_user(user_id: str, thread_id: str):
+    """向指定用户推送 canvas_updated。无连接则跳过。"""
+    ws = _ws_registry.get(user_id)
+    if ws:
+        asyncio.create_task(_safe_notify(ws, thread_id))
+
+
+async def _safe_notify(ws, thread_id: str):
+    try:
+        await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
+    except (ConnectionClosedOK, Exception):
+        pass
 
 
 async def _optimize_prompt(node_id: str, prompt: str, feedback: str) -> str:
@@ -105,9 +125,6 @@ async def _run_agent(user_id: str, pool: AgentPool, thread_id: str, user_content
         save_message(user_id, thread_id, "agent", reply)
         print(f"[错误] thread={thread_id} {e}")
 
-    await _auto_execute_pending(thread_id)
-    await _poll_image_tasks(thread_id)
-
     try:
         await _send(
             ws,
@@ -120,249 +137,7 @@ async def _run_agent(user_id: str, pool: AgentPool, thread_id: str, user_content
         pass
 
 
-async def _auto_execute_pending(thread_id: str):
-    pass
-
-
-def _make_provider(name: str):
-    from agent.tools.generation import ApimartProvider, GoogleProvider
-    if name == "google":
-        return GoogleProvider()
-    return ApimartProvider()
-
-
-async def _submit_and_poll(thread_id: str, node_id: str, prompt: str, provider_name: str, ws):
-    """后台：找参考图 → 提交生图 → 轮询 → 结果上传 S3。"""
-    import time
-
-    provider = _make_provider(provider_name)
-
-    try:
-        canvas_tools.set_thread_id(thread_id)
-
-        ref_urls: list[str] = []
-        all_edges = canvas_tools._load_all_edges()
-        parent_ids = [e["source"] for e in all_edges if e["target"] == node_id]
-        for pid in parent_ids:
-            parent = canvas_tools._load_node(pid)
-            p_url = (parent.get("result") or {}).get("url") if parent else None
-            if p_url:
-                ref_urls.append(str(p_url))
-
-        print(f"[生图提交] node={node_id} prompt={prompt[:50]}... ref_urls={len(ref_urls)}个")
-        t0 = time.time()
-        submitted = await provider.submit(prompt, "16:9", "2k", ref_urls if ref_urls else None)
-        elapsed = (time.time() - t0) * 1000
-        if submitted.get("task_id"):
-            canvas_tools._update_node_result(node_id, {"task_id": submitted["task_id"], "ref_urls": ref_urls})
-            print(f"[生图提交] 完成 node={node_id} task_id={submitted['task_id']} 耗时={elapsed:.0f}ms")
-        else:
-            canvas_tools.update_canvas_node(node_id, asset_status="failed")
-            canvas_tools._update_node_result(node_id, {"error": submitted.get("error", "submit failed")})
-            print(f"[生图提交失败] node={node_id} 耗时={elapsed:.0f}ms error={submitted.get('error')}")
-            return
-
-        result = await provider.poll(submitted["task_id"])
-        canvas_tools.set_thread_id(thread_id)
-        if result.get("url"):
-            canvas_tools.update_canvas_node(node_id, asset_status="done")
-            s3_url = await _upload_to_s3(result["url"], node_id)
-            final_url = s3_url or result["url"]
-            canvas_tools._update_node_result(node_id, {"url": final_url, "actual_time": result.get("actual_time", 0)})
-            print(f"[生图完成] node={node_id} url={final_url[:60]}...")
-        elif result.get("image_data"):
-            s3_url = _upload_bytes_to_s3(result["image_data"], f"{node_id}.png")
-            if s3_url:
-                canvas_tools.update_canvas_node(node_id, asset_status="done")
-                canvas_tools._update_node_result(node_id, {"url": s3_url, "actual_time": result.get("actual_time", 0)})
-                print(f"[生图完成] node={node_id} url={s3_url[:60]}...")
-            else:
-                canvas_tools.update_canvas_node(node_id, asset_status="failed")
-                print(f"[生图失败] node={node_id} S3上传失败")
-        else:
-            is_timeout = result.get("error") == "timeout"
-            status = "timeout" if is_timeout else "failed"
-            canvas_tools.update_canvas_node(node_id, asset_status=status)
-            canvas_tools._update_node_result(node_id, {"error": result.get("error", "")})
-            print(f"[生图{'超时' if is_timeout else '失败'}] node={node_id} {result.get('error')}")
-        try:
-            await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
-        except (ConnectionClosedOK, Exception):
-            pass
-    except Exception as e:
-        print(f"[后台生图] 异常 node={node_id}: {e}")
-
-
-async def _submit_and_poll_video(thread_id: str, node_id: str, prompt: str, duration: int, resolution: str, generate_audio: bool, ws):
-    """后台：找参考图 → 提交 Seedance → 轮询 → 结果上传 S3。"""
-    import time
-
-    provider = get_video_provider()
-
-    try:
-        canvas_tools.set_thread_id(thread_id)
-
-        ref_urls: list[str] = []
-        all_edges = canvas_tools._load_all_edges()
-        parent_ids = [e["source"] for e in all_edges if e["target"] == node_id]
-        for pid in parent_ids:
-            parent = canvas_tools._load_node(pid)
-            p_url = (parent.get("result") or {}).get("url") if parent else None
-            if p_url:
-                ref_urls.append(str(p_url))
-
-        print(f"[视频提交] node={node_id} duration={duration}s res={resolution} audio={generate_audio} prompt={prompt[:50]}... ref_urls={len(ref_urls)}个")
-        t0 = time.time()
-        submitted = await provider.submit(prompt, duration=duration, resolution=resolution, ratio="16:9", generate_audio=generate_audio, image_urls=ref_urls if ref_urls else None)
-        elapsed = (time.time() - t0) * 1000
-        if submitted.get("task_id"):
-            canvas_tools._update_node_result(node_id, {"task_id": submitted["task_id"], "ref_urls": ref_urls})
-            print(f"[视频提交] 完成 node={node_id} task_id={submitted['task_id']} 耗时={elapsed:.0f}ms")
-        else:
-            canvas_tools.update_canvas_node(node_id, asset_status="failed")
-            canvas_tools._update_node_result(node_id, {"error": submitted.get("error", "submit failed")})
-            print(f"[视频提交失败] node={node_id} 耗时={elapsed:.0f}ms error={submitted.get('error')}")
-            return
-
-        result = await provider.poll(submitted["task_id"])
-        canvas_tools.set_thread_id(thread_id)
-        if result.get("video_url"):
-            s3_url = await _upload_to_s3(result["video_url"], node_id, ext="mp4")
-            if s3_url:
-                canvas_tools.update_canvas_node(node_id, asset_status="done")
-                canvas_tools._update_node_result(node_id, {"url": s3_url, "actual_time": result.get("actual_time", 0)})
-                print(f"[视频完成] node={node_id} url={s3_url[:60]}...")
-            else:
-                canvas_tools.update_canvas_node(node_id, asset_status="failed")
-                print(f"[视频失败] node={node_id} S3上传失败")
-        else:
-            is_timeout = result.get("error") == "timeout"
-            status = "timeout" if is_timeout else "failed"
-            canvas_tools.update_canvas_node(node_id, asset_status=status)
-            canvas_tools._update_node_result(node_id, {"error": result.get("error", "")})
-            print(f"[视频{'超时' if is_timeout else '失败'}] node={node_id} {result.get('error')}")
-        try:
-            await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
-        except (ConnectionClosedOK, Exception):
-            pass
-    except Exception as e:
-        print(f"[后台视频] 异常 node={node_id}: {e}")
-
-
-async def _submit_composite(thread_id: str, node_id: str, ws):
-    """后台：收集上游 video → ffmpeg 拼接 → 上传 S3。"""
-    from agent.tools.compose import compose_videos as _compose
-    from agent.tools.s3_upload import upload_bytes as _s3_upload
-
-    try:
-        canvas_tools.set_thread_id(thread_id)
-
-        edges = canvas_tools._load_all_edges()
-        parent_ids = [e["source"] for e in edges if e["target"] == node_id]
-        urls: list[str] = []
-        for pid in parent_ids:
-            parent = canvas_tools._load_node(pid)
-            if parent and parent["type"] == "video":
-                p_url = (parent.get("result") or {}).get("url")
-                if p_url:
-                    urls.append(str(p_url))
-
-        if len(urls) < 1:
-            canvas_tools.update_canvas_node(node_id, asset_status="failed")
-            canvas_tools._update_node_result(node_id, {"error": "没有可拼接的视频"})
-            print(f"[合成失败] node={node_id} 没有视频")
-            await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
-            return
-
-        print(f"[合成] node={node_id} 开始合并 {len(urls)} 个视频...")
-        result_bytes = await _compose(urls)
-        if not result_bytes:
-            canvas_tools.update_canvas_node(node_id, asset_status="failed")
-            canvas_tools._update_node_result(node_id, {"error": "ffmpeg 合成失败"})
-            print(f"[合成失败] node={node_id} ffmpeg 失败")
-            await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
-            return
-
-        s3_url = _s3_upload(result_bytes, "composite.mp4")
-        if not s3_url:
-            canvas_tools.update_canvas_node(node_id, asset_status="failed")
-            canvas_tools._update_node_result(node_id, {"error": "S3 上传失败"})
-            print(f"[合成失败] node={node_id} S3 失败")
-            await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
-            return
-
-        canvas_tools.update_canvas_node(node_id, asset_status="done")
-        canvas_tools._update_node_result(node_id, {"url": s3_url, "clips": len(urls)})
-        print(f"[合成完成] node={node_id} url={s3_url[:60]}...")
-        await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
-    except Exception as e:
-        print(f"[合成异常] node={node_id}: {e}")
-        canvas_tools.update_canvas_node(node_id, asset_status="failed")
-        canvas_tools._update_node_result(node_id, {"error": str(e)})
-        try:
-            await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
-        except (ConnectionClosedOK, Exception):
-            pass
-
-
-async def _poll_and_notify(thread_id: str, ws=None):
-    try:
-        await asyncio.gather(
-            _poll_image_tasks(thread_id),
-            _poll_video_tasks(thread_id),
-        )
-        if ws:
-            try:
-                await _send(ws, type="canvas_updated", thread_id=thread_id, canvas=_canvas_data(thread_id))
-            except (ConnectionClosedOK, Exception):
-                pass
-    except Exception as e:
-        print(f"[轮询] 异常: {e}")
-
-
-async def _poll_image_tasks(thread_id: str):
-    canvas = _canvas_data(thread_id)
-    if not canvas:
-        return
-
-    groups: dict[str, dict[str, str]] = {}
-    for nid, node in canvas["nodes"].items():
-        if node["type"] == "image" and node.get("asset_status") == "generating":
-            tid = (node.get("result") or {}).get("task_id")
-            if tid:
-                p = node.get("image_gen_provider") or IMAGE_GEN_PROVIDER
-                groups.setdefault(p, {})[nid] = tid
-
-    if not groups:
-        return
-
-    canvas_tools.set_thread_id(thread_id)
-    for provider_name, task_map in groups.items():
-        print(f"[生图轮询] {provider_name}: {len(task_map)} 个节点并行轮询...")
-        provider = _make_provider(provider_name)
-        results = await provider.poll_all(task_map)
-        for nid, result in results.items():
-            if result.get("url"):
-                canvas_tools.update_canvas_node(nid, asset_status="done")
-                s3_url = await _upload_to_s3(result["url"], nid)
-                final_url = s3_url or result["url"]
-                canvas_tools._update_node_result(nid, {"url": final_url, "actual_time": result.get("actual_time", 0)})
-                print(f"[生图完成] {provider_name} node={nid} url={final_url[:60]}...")
-            elif result.get("image_data"):
-                s3_url = _upload_bytes_to_s3(result["image_data"], f"{nid}.png")
-                if s3_url:
-                    canvas_tools.update_canvas_node(nid, asset_status="done")
-                    canvas_tools._update_node_result(nid, {"url": s3_url, "actual_time": result.get("actual_time", 0)})
-                    print(f"[生图完成] {provider_name} node={nid} url={s3_url[:60]}...")
-                else:
-                    canvas_tools.update_canvas_node(nid, asset_status="failed")
-                    print(f"[生图失败] {provider_name} node={nid} S3上传失败")
-            else:
-                is_timeout = result.get("error") == "timeout"
-                status = "timeout" if is_timeout else "failed"
-                canvas_tools.update_canvas_node(nid, asset_status=status)
-                canvas_tools._update_node_result(nid, {"error": result.get("error", "")})
-                print(f"[生图{'超时' if is_timeout else '失败'}] {provider_name} node={nid} {result.get('error')}")
+# ---------- 上传工具 ----------
 
 
 def _upload_bytes_to_s3(data: bytes, filename: str) -> str | None:
@@ -378,16 +153,16 @@ async def _upload_to_s3(image_url: str, node_id: str, ext: str = "png") -> str |
     import httpx
     from agent.tools.s3_upload import upload_bytes
 
-    t0 = __import__("time").time()
+    t0 = time.time()
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(image_url)
             resp.raise_for_status()
-        dl_ms = (__import__("time").time() - t0) * 1000
+        dl_ms = (time.time() - t0) * 1000
         print(f"[S3] 下载完成 node={node_id} size={len(resp.content)} 耗时={dl_ms:.0f}ms")
 
         s3_url = upload_bytes(resp.content, f"{node_id}.{ext}")
-        total_ms = (__import__("time").time() - t0) * 1000
+        total_ms = (time.time() - t0) * 1000
         if s3_url:
             print(f"[S3] 上传完成 node={node_id} 总耗时={total_ms:.0f}ms")
         return s3_url
@@ -396,55 +171,278 @@ async def _upload_to_s3(image_url: str, node_id: str, ext: str = "png") -> str |
         return None
 
 
-async def _poll_video_tasks(thread_id: str):
-    canvas = _canvas_data(thread_id)
-    if not canvas:
+# ---------- 生成任务 worker ----------
+
+
+def _make_image_provider(name: str):
+    from agent.tools.generation import ApimartProvider, GoogleProvider
+    if name == "google":
+        return GoogleProvider()
+    return ApimartProvider()
+
+
+def _get_ref_urls(node: dict) -> list[str]:
+    """获取节点的上游参考图 URL 列表。"""
+    canvas_tools.set_thread_id(node["thread_id"])
+    canvas_tools.set_user_id(node["user_id"])
+    all_edges = canvas_tools._load_all_edges()
+    parent_ids = [e["source"] for e in all_edges if e["target"] == node["id"]]
+    refs: list[str] = []
+    for pid in parent_ids:
+        parent = canvas_tools._load_node(pid)
+        p_url = (parent.get("result") or {}).get("url") if parent else None
+        if p_url:
+            refs.append(str(p_url))
+    return refs
+
+
+def _setup_canvas_context(node: dict):
+    """为 worker 任务设置正确的 canvas 上下文。"""
+    canvas_tools.set_user_id(node["user_id"])
+    canvas_tools.set_thread_id(node["thread_id"])
+
+
+async def _process_image_task(node: dict):
+    """处理单个图片生成任务。"""
+    nid = node["id"]
+    provider_name = node.get("image_gen_provider") or IMAGE_GEN_PROVIDER
+    prompt = (node.get("result") or {}).get("prompt") or node.get("description", "")
+    _setup_canvas_context(node)
+
+    # 查找上游参考图
+    ref_urls = _get_ref_urls(node)
+
+    provider = _make_image_provider(provider_name)
+    print(f"[Worker] 图片生成 node={nid} provider={provider_name} prompt={prompt[:50]}... refs={len(ref_urls)}")
+
+    # 提交
+    t0 = time.time()
+    submitted = await provider.submit(prompt, "16:9", "2k", ref_urls if ref_urls else None)
+    elapsed = (time.time() - t0) * 1000
+    if not submitted.get("task_id"):
+        canvas_tools.update_generation_state(nid, "failed", error=submitted.get("error", "submit failed"))
+        print(f"[Worker] 提交失败 node={nid} 耗时={elapsed:.0f}ms")
+        _notify_user(node["user_id"], node["thread_id"])
         return
 
-    provider = get_video_provider()
-    task_map: dict[str, str] = {}
-    for nid, node in canvas["nodes"].items():
-        if node["type"] == "video" and node.get("asset_status") == "generating":
-            tid = (node.get("result") or {}).get("task_id")
-            if tid:
-                task_map[nid] = tid
+    canvas_tools.update_generation_state(nid, "polling", task_id=submitted["task_id"])
+    print(f"[Worker] 已提交 node={nid} task_id={submitted['task_id']} 耗时={elapsed:.0f}ms")
 
-    if not task_map:
-        return
+    # 轮询结果
+    result = await provider.poll(submitted["task_id"])
+    _setup_canvas_context(node)
 
-    print(f"[视频轮询] {len(task_map)} 个节点并行轮询...")
-    results = await provider.poll_all(task_map)
-    canvas_tools.set_thread_id(thread_id)
-    for nid, result in results.items():
-        if result.get("video_url"):
-            s3_url = await _upload_to_s3(result["video_url"], nid, ext="mp4")
-            if s3_url:
-                canvas_tools.update_canvas_node(nid, asset_status="done")
-                canvas_tools._update_node_result(nid, {"url": s3_url, "actual_time": result.get("actual_time", 0)})
-                print(f"[视频完成] node={nid} url={s3_url[:60]}...")
-            else:
-                canvas_tools.update_canvas_node(nid, asset_status="failed")
-                print(f"[视频失败] node={nid} S3上传失败")
+    if result.get("url"):
+        s3_url = await _upload_to_s3(result["url"], nid)
+        final_url = s3_url or result["url"]
+        canvas_tools.update_generation_state(nid, "done")
+        canvas_tools._update_node_result(nid, {"url": final_url, "actual_time": result.get("actual_time", 0)})
+        print(f"[Worker] 生图完成 node={nid} url={final_url[:60]}...")
+    elif result.get("image_data"):
+        s3_url = _upload_bytes_to_s3(result["image_data"], f"{nid}.png")
+        if s3_url:
+            canvas_tools.update_generation_state(nid, "done")
+            canvas_tools._update_node_result(nid, {"url": s3_url, "actual_time": result.get("actual_time", 0)})
+            print(f"[Worker] 生图完成 node={nid} url={s3_url[:60]}...")
         else:
-            is_timeout = result.get("error") == "timeout"
-            canvas_tools.update_canvas_node(nid, asset_status="timeout" if is_timeout else "failed")
-            print(f"[视频{'超时' if is_timeout else '失败'}] node={nid} {result.get('error')}")
+            canvas_tools.update_generation_state(nid, "failed", error="S3 上传失败")
+    else:
+        is_timeout = result.get("error") == "timeout"
+        status = "failed"
+        err = result.get("error", "")
+        if is_timeout:
+            status = "failed"
+            err = "timeout"
+        canvas_tools.update_generation_state(nid, status, error=err)
+        print(f"[Worker] 生图{'超时' if is_timeout else '失败'} node={nid} {err}")
+
+    _notify_user(node["user_id"], node["thread_id"])
 
 
-async def _recover_polling(user_id: str, ws):
-    import sqlite3
-    db = sqlite3.connect(str(canvas_tools._DB_PATH))
-    rows = db.execute(
-        "SELECT DISTINCT thread_id FROM canvas_nodes WHERE user_id=? AND asset_status='generating'",
-        (user_id,),
-    ).fetchall()
-    db.close()
-    for (tid,) in rows:
-        print(f"[恢复轮询] user={user_id} thread={tid}")
-        asyncio.create_task(_poll_and_notify(tid, ws))
+async def _process_video_task(node: dict):
+    """处理单个视频生成任务。"""
+    nid = node["id"]
+    prompt = (node.get("result") or {}).get("prompt") or node.get("description", "")
+    params = node.get("result") or {}
+    duration = params.get("duration", 5)
+    resolution = params.get("resolution", "720p")
+    generate_audio = params.get("generate_audio", True)
+    _setup_canvas_context(node)
+
+    ref_urls = _get_ref_urls(node)
+    provider = get_video_provider()
+
+    print(f"[Worker] 视频生成 node={nid} duration={duration}s res={resolution} audio={generate_audio} refs={len(ref_urls)}")
+
+    t0 = time.time()
+    submitted = await provider.submit(prompt, duration=duration, resolution=resolution, ratio="16:9",
+                                       generate_audio=generate_audio, image_urls=ref_urls if ref_urls else None)
+    elapsed = (time.time() - t0) * 1000
+    if not submitted.get("task_id"):
+        canvas_tools.update_generation_state(nid, "failed", error=submitted.get("error", "submit failed"))
+        print(f"[Worker] 视频提交失败 node={nid} 耗时={elapsed:.0f}ms")
+        _notify_user(node["user_id"], node["thread_id"])
+        return
+
+    canvas_tools.update_generation_state(nid, "polling", task_id=submitted["task_id"])
+    print(f"[Worker] 视频已提交 node={nid} task_id={submitted['task_id']} 耗时={elapsed:.0f}ms")
+
+    result = await provider.poll(submitted["task_id"])
+    _setup_canvas_context(node)
+
+    if result.get("video_url"):
+        s3_url = await _upload_to_s3(result["video_url"], nid, ext="mp4")
+        if s3_url:
+            canvas_tools.update_generation_state(nid, "done")
+            canvas_tools._update_node_result(nid, {"url": s3_url, "actual_time": result.get("actual_time", 0)})
+            print(f"[Worker] 视频完成 node={nid} url={s3_url[:60]}...")
+        else:
+            canvas_tools.update_generation_state(nid, "failed", error="S3 上传失败")
+    else:
+        is_timeout = result.get("error") == "timeout"
+        canvas_tools.update_generation_state(nid, "failed", error=result.get("error", ""))
+        print(f"[Worker] 视频{'超时' if is_timeout else '失败'} node={nid} {result.get('error')}")
+
+    _notify_user(node["user_id"], node["thread_id"])
+
+
+async def _process_composite_task(node: dict):
+    """处理单个合成任务：收集上游 video → ffmpeg 拼接 → 上传 S3。"""
+    from agent.tools.compose import compose_videos as _compose
+    from agent.tools.s3_upload import upload_bytes
+
+    nid = node["id"]
+    _setup_canvas_context(node)
+
+    edges = canvas_tools._load_all_edges()
+    parent_ids = [e["source"] for e in edges if e["target"] == nid]
+    urls: list[str] = []
+    for pid in parent_ids:
+        parent = canvas_tools._load_node(pid)
+        if parent and parent["type"] == "video":
+            p_url = (parent.get("result") or {}).get("url")
+            if p_url:
+                urls.append(str(p_url))
+
+    if len(urls) < 1:
+        canvas_tools.update_generation_state(nid, "failed", error="没有可拼接的视频")
+        print(f"[Worker] 合成失败 node={nid} 没有视频")
+        _notify_user(node["user_id"], node["thread_id"])
+        return
+
+    print(f"[Worker] 合成 node={nid} 合并 {len(urls)} 个视频...")
+    result_bytes = await _compose(urls)
+    if not result_bytes:
+        canvas_tools.update_generation_state(nid, "failed", error="ffmpeg 合成失败")
+        print(f"[Worker] 合成失败 node={nid} ffmpeg 失败")
+        _notify_user(node["user_id"], node["thread_id"])
+        return
+
+    s3_url = upload_bytes(result_bytes, "composite.mp4")
+    if not s3_url:
+        canvas_tools.update_generation_state(nid, "failed", error="S3 上传失败")
+        print(f"[Worker] 合成失败 node={nid} S3 失败")
+        _notify_user(node["user_id"], node["thread_id"])
+        return
+
+    canvas_tools.update_generation_state(nid, "done")
+    canvas_tools._update_node_result(nid, {"url": s3_url, "clips": len(urls)})
+    print(f"[Worker] 合成完成 node={nid} url={s3_url[:60]}...")
+    _notify_user(node["user_id"], node["thread_id"])
+
+
+async def _generation_worker():
+    """全局 worker：轮询 SQLite 队列，处理生成任务。"""
+    print("[Worker] 启动生成任务调度器")
+    while True:
+        try:
+            # 处理新提交的 pending 任务
+            tasks = canvas_tools.claim_pending_tasks()
+            for task in tasks:
+                try:
+                    _setup_canvas_context(task)
+                    if task["type"] == "composite":
+                        await _process_composite_task(task)
+                    elif task["type"] == "video":
+                        await _process_video_task(task)
+                    else:
+                        await _process_image_task(task)
+                except Exception as e:
+                    print(f"[Worker] 任务异常 node={task.get('id')}: {e}")
+                    canvas_tools.update_generation_state(task["id"], "failed", error=str(e))
+                    _notify_user(task.get("user_id", ""), task.get("thread_id", ""))
+
+            # 恢复中断的任务（submitted/polling 状态）
+            # Google provider 的 in-memory task 在重启后丢失，需重新提交
+            recovered = canvas_tools.recover_generation_tasks()
+            for task in recovered:
+                provider_name = task.get("image_gen_provider") or IMAGE_GEN_PROVIDER
+                if task["type"] == "image" and provider_name == "google":
+                    # Google 用内存 task，重启丢失 → 重新入队
+                    canvas_tools.update_generation_state(task["id"], "pending",
+                        error="服务重启，重新提交")
+                else:
+                    # 外部 task_id 仍在，继续轮询
+                    try:
+                        _setup_canvas_context(task)
+                        if task["type"] == "video":
+                            provider = get_video_provider()
+                        else:
+                            provider = _make_image_provider(provider_name)
+                        tid = task.get("generation_task_id")
+                        if not tid:
+                            canvas_tools.update_generation_state(task["id"], "failed", error="缺少 task_id")
+                            continue
+                        result = await provider.poll(tid)
+                        _setup_canvas_context(task)
+                        _apply_poll_result(task, result)
+                    except Exception as e:
+                        print(f"[Worker] 恢复任务异常 node={task.get('id')}: {e}")
+
+        except Exception as e:
+            print(f"[Worker] 调度异常: {e}")
+
+        await asyncio.sleep(2)
+
+
+def _apply_poll_result(task: dict, result: dict):
+    """将轮询结果写入节点。"""
+    nid = task["id"]
+    if result.get("url"):
+        canvas_tools.update_generation_state(nid, "done")
+        canvas_tools._update_node_result(nid, {"url": result["url"], "actual_time": result.get("actual_time", 0)})
+        print(f"[Worker] 恢复完成 node={nid} url={result['url'][:60]}...")
+    elif result.get("video_url"):
+        canvas_tools.update_generation_state(nid, "done")
+        if not result.get("url"):
+            canvas_tools._update_node_result(nid, {"url": result["video_url"], "actual_time": result.get("actual_time", 0)})
+        print(f"[Worker] 恢复完成 node={nid}")
+    elif result.get("image_data"):
+        s3_url = _upload_bytes_to_s3(result["image_data"], f"{nid}.png")
+        if s3_url:
+            canvas_tools.update_generation_state(nid, "done")
+            canvas_tools._update_node_result(nid, {"url": s3_url})
+    else:
+        is_timeout = result.get("error") == "timeout"
+        canvas_tools.update_generation_state(nid, "failed", error=result.get("error", ""))
+        print(f"[Worker] 恢复{'超时' if is_timeout else '失败'} node={nid}")
+    _notify_user(task["user_id"], task["thread_id"])
+
+
+def _start_worker():
+    global _worker_started
+    if _worker_started:
+        return
+    _worker_started = True
+    asyncio.create_task(_generation_worker())
+
+
+# ---------- WebSocket handler ----------
 
 
 async def handle(websocket):
+    global _ws_registry
+
     pool = AgentPool(max_size=POOL_SIZE)
     user_id: str | None = None
     print(f"[连接] 新连接，等待 auth...")
@@ -462,8 +460,9 @@ async def handle(websocket):
                     await websocket.close(4001, "user_id required")
                     return
                 canvas_tools.set_user_id(user_id)
+                _ws_registry[user_id] = websocket
+                _start_worker()
                 print(f"[连接] user={user_id} pool 上限 {POOL_SIZE}")
-                asyncio.create_task(_recover_polling(user_id, websocket))
                 continue
 
             if not user_id:
@@ -530,24 +529,27 @@ async def handle(websocket):
                 provider = msg.get("image_gen_provider") or IMAGE_GEN_PROVIDER
                 print(f"[执行] execute_node node={nid} type={node_type} provider={provider} prompt={description[:50]}...")
                 canvas_tools.set_thread_id(thread_id)
-                canvas_tools.execute_node(nid, node_type, description, provider)
+
+                # execute_node 设置基础状态 + result
+                result = canvas_tools.execute_node(nid, node_type, description, provider)
+                if "_pending_submit" in result:
+                    # 媒体节点：入队让 worker 处理
+                    canvas_tools.enqueue_generation(nid)
+                    # 视频/合成额外参数存入 result
+                    if node_type == "video":
+                        canvas_tools._update_node_result(nid, {
+                            "prompt": description,
+                            "duration": msg.get("duration", 5),
+                            "resolution": msg.get("resolution", "720p"),
+                            "generate_audio": msg.get("generate_audio", True),
+                        })
+
                 await _send(
                     ws=websocket,
                     type="canvas_updated",
                     thread_id=thread_id,
                     canvas=_canvas_data(thread_id),
                 )
-                if node_type == "composite":
-                    asyncio.create_task(_submit_composite(thread_id, nid, websocket))
-                    continue
-
-                if node_type == "video":
-                    duration = msg.get("duration", 5)
-                    resolution = msg.get("resolution", "720p")
-                    generate_audio = msg.get("generate_audio", True)
-                    asyncio.create_task(_submit_and_poll_video(thread_id, nid, description, duration, resolution, generate_audio, websocket))
-                else:
-                    asyncio.create_task(_submit_and_poll(thread_id, nid, description, provider, websocket))
                 continue
 
             if msg_type == "update_node_status":
@@ -607,8 +609,10 @@ async def handle(websocket):
 
     except ConnectionClosedOK:
         pass
-
-    print("[断开] WS 连接已关闭")
+    finally:
+        if user_id:
+            _ws_registry.pop(user_id, None)
+        print("[断开] WS 连接已关闭")
 
 
 async def main(host="0.0.0.0", port=8765):

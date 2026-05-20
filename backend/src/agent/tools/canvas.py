@@ -63,7 +63,10 @@ def _db() -> sqlite3.Connection:
     )
     # 兼容旧数据库：添加新列（如果不存在）
     for col, defn in [("user_id", "TEXT NOT NULL DEFAULT 'default'"), ("node_status", "TEXT NOT NULL DEFAULT 'reviewing'"), ("asset_status", "TEXT NOT NULL DEFAULT 'idle'"),
-                       ("shot_no", "TEXT"), ("image_gen_provider", "TEXT")]:
+                       ("shot_no", "TEXT"), ("image_gen_provider", "TEXT"),
+                       ("generation_status", "TEXT NOT NULL DEFAULT 'idle'"),
+                       ("generation_task_id", "TEXT"),
+                       ("generation_error", "TEXT")]:
         try:
             db.execute(f"ALTER TABLE canvas_nodes ADD COLUMN {col} {defn}")
         except sqlite3.OperationalError:
@@ -104,6 +107,11 @@ def _row_to_node(row: sqlite3.Row) -> dict:
         "subtype": row["subtype"],
         "shot_no": row["shot_no"],
         "image_gen_provider": row["image_gen_provider"],
+        "generation_status": row["generation_status"] or "idle",
+        "generation_task_id": row["generation_task_id"],
+        "generation_error": row["generation_error"],
+        "user_id": row["user_id"],
+        "thread_id": row["thread_id"],
         "x": row["x"],
         "y": row["y"],
     }
@@ -149,13 +157,16 @@ def _upsert_node(node: dict):
     r = node.get("result")
     result_json = json.dumps(r, ensure_ascii=False) if r is not None else None
     db.execute(
-        """INSERT INTO canvas_nodes (user_id, thread_id, node_id, type, title, description, status, node_status, asset_status, result, subtype, shot_no, image_gen_provider, x, y)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """INSERT INTO canvas_nodes (user_id, thread_id, node_id, type, title, description, status, node_status, asset_status, result, subtype, shot_no, image_gen_provider, generation_status, generation_task_id, generation_error, x, y)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(user_id, thread_id, node_id) DO UPDATE SET
            type=excluded.type, title=excluded.title, description=excluded.description,
            status=excluded.status, node_status=excluded.node_status, asset_status=excluded.asset_status,
            result=excluded.result, subtype=excluded.subtype,
            shot_no=excluded.shot_no, image_gen_provider=excluded.image_gen_provider,
+           generation_status=excluded.generation_status,
+           generation_task_id=excluded.generation_task_id,
+           generation_error=excluded.generation_error,
            x=excluded.x, y=excluded.y""",
         (
             _current_user_id.get(), _current_thread_id.get(), node["id"], node["type"], node["title"],
@@ -163,6 +174,9 @@ def _upsert_node(node: dict):
             node.get("node_status", "reviewing"), node.get("asset_status", "idle"),
             result_json, node.get("subtype"),
             node.get("shot_no"), node.get("image_gen_provider"),
+            node.get("generation_status", "idle"),
+            node.get("generation_task_id"),
+            node.get("generation_error"),
             node.get("x"), node.get("y"),
         ),
     )
@@ -616,3 +630,70 @@ def reject_node(node_id: str, feedback: str = "") -> dict:
         node["feedback"] = feedback
     _upsert_node(node)
     return node
+
+
+# ---------- 生成任务队列 ----------
+
+
+def enqueue_generation(node_id: str) -> dict | None:
+    """将节点加入生成队列（generation_status: pending）。"""
+    node = _load_node(node_id)
+    if not node:
+        return None
+    node["generation_status"] = "pending"
+    node["asset_status"] = "generating"
+    _upsert_node(node)
+    return node
+
+
+def claim_pending_tasks() -> list[dict]:
+    """跨用户查询：获取所有 generation_status='pending' 的节点并原子认领。
+    仅在单 worker 场景下安全（asyncio 单线程）。"""
+    db = _db()
+    rows = db.execute(
+        "SELECT * FROM canvas_nodes WHERE generation_status='pending' ORDER BY rowid"
+    ).fetchall()
+    tasks = [_row_to_node(r) for r in rows]
+    # 批量标记为 submitted（中间态，避免被重复捡起）
+    for t in tasks:
+        db.execute(
+            "UPDATE canvas_nodes SET generation_status='submitted' WHERE user_id=? AND thread_id=? AND node_id=?",
+            (t["user_id"], t["thread_id"], t["id"]),
+        )
+    db.commit()
+    db.close()
+    if tasks:
+        print(f"[队列] claim {len(tasks)} 个待生成任务")
+    return tasks
+
+
+def recover_generation_tasks() -> list[dict]:
+    """跨用户查询：获取所有未完成的生成任务（用于服务重启恢复）。
+    包括 submitted（已认领但未完成提交）和 polling（正在轮询）状态。"""
+    db = _db()
+    rows = db.execute(
+        "SELECT * FROM canvas_nodes WHERE generation_status IN ('submitted', 'polling') ORDER BY rowid"
+    ).fetchall()
+    tasks = [_row_to_node(r) for r in rows]
+    db.close()
+    if tasks:
+        print(f"[队列] 恢复 {len(tasks)} 个未完成任务")
+    return tasks
+
+
+def update_generation_state(node_id: str, status: str, task_id: str | None = None, error: str | None = None):
+    """更新节点的生成队列状态。"""
+    node = _load_node(node_id)
+    if not node:
+        return
+    node["generation_status"] = status
+    if task_id is not None:
+        node["generation_task_id"] = task_id
+    if error is not None:
+        node["generation_error"] = error
+    if status == "done":
+        node["asset_status"] = "done"
+    elif status == "failed":
+        node["asset_status"] = "failed"
+        node["generation_error"] = error
+    _upsert_node(node)
