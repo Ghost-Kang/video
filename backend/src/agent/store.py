@@ -28,6 +28,16 @@ def _conn() -> sqlite3.Connection:
         c.execute("ALTER TABLE messages ADD COLUMN user_id TEXT NOT NULL DEFAULT 'default'")
     except sqlite3.OperationalError:
         pass
+
+    # 软删除表
+    c.execute(
+        """CREATE TABLE IF NOT EXISTS deleted_sessions (
+            user_id TEXT NOT NULL,
+            thread_id TEXT NOT NULL,
+            deleted_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, thread_id)
+        )"""
+    )
     c.commit()
     return c
 
@@ -53,17 +63,19 @@ def get_messages(user_id: str, thread_id: str, limit: int = 100) -> list[dict]:
 
 
 def list_sessions(user_id: str) -> list[dict]:
-    """返回用户的所有会话，含首条消息摘要和最近活跃时间。"""
+    """返回用户所有未删除的会话，含首条消息摘要和最近活跃时间。"""
     db = _conn()
     rows = db.execute(
         """SELECT thread_id,
                   (SELECT content FROM messages m2 WHERE m2.user_id=m.user_id AND m2.thread_id=m.thread_id AND m2.role='user' ORDER BY m2.id LIMIT 1) AS first_msg,
                   MAX(created_at) AS last_active
            FROM messages m
-           WHERE user_id=?
+           WHERE user_id=? AND thread_id NOT IN (
+               SELECT thread_id FROM deleted_sessions WHERE user_id=?
+           )
            GROUP BY thread_id
            ORDER BY last_active DESC""",
-        (user_id,),
+        (user_id, user_id),
     ).fetchall()
 
     sessions = []
@@ -81,7 +93,6 @@ def list_sessions(user_id: str) -> list[dict]:
     # 合并仅有画布数据但无消息的会话（如刚创建未发消息的 session）
     try:
         from agent.tools.canvas import _DB_PATH as _CANVAS_DB
-        import sqlite3
         cdb = sqlite3.connect(str(_CANVAS_DB))
         cdb.row_factory = sqlite3.Row
         crows = cdb.execute(
@@ -102,3 +113,15 @@ def list_sessions(user_id: str) -> list[dict]:
 
     db.close()
     return sessions
+
+
+def delete_session(user_id: str, thread_id: str):
+    """软删除：标记会话为已删除，不删除数据。"""
+    db = _conn()
+    db.execute(
+        "INSERT OR REPLACE INTO deleted_sessions (user_id, thread_id, deleted_at) VALUES (?, ?, ?)",
+        (user_id, thread_id, datetime.now(timezone.utc).isoformat()),
+    )
+    db.commit()
+    db.close()
+    print(f"[存储] 软删除 user={user_id} thread={thread_id}")

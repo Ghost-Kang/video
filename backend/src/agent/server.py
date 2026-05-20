@@ -16,7 +16,7 @@ from websockets.exceptions import ConnectionClosedOK
 
 from agent.config import LLM_MODEL, IMAGE_GEN_PROVIDER
 from agent.pool import AgentPool
-from agent.store import get_messages, save_message, list_sessions
+from agent.store import get_messages, save_message, list_sessions, delete_session as store_delete_session
 from agent.tools import canvas as canvas_tools
 from agent.tools.video_generation import get_video_provider
 
@@ -606,6 +606,12 @@ async def handle(websocket):
                     node_id=nid,
                     optimized_prompt=optimized,
                 )
+                continue
+
+            if msg_type == "delete_session":
+                target_thread = msg.get("thread_id", "")
+                if target_thread:
+                    store_delete_session(user_id, target_thread)
                 continue
 
             if msg_type == "list_sessions":
