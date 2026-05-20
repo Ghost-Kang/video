@@ -3,6 +3,7 @@
 import json
 import sqlite3
 import uuid
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Literal
 
@@ -18,18 +19,16 @@ LegacyStatus = Literal["pending", "approved", "executing", "awaiting_review", "d
 
 _DB_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data"
 _DB_PATH = _DB_DIR / "canvas.db"
-_current_thread_id = "default"
-_current_user_id = "default"
+_current_thread_id: ContextVar[str] = ContextVar("canvas_thread_id", default="default")
+_current_user_id: ContextVar[str] = ContextVar("canvas_user_id", default="default")
 
 
 def set_thread_id(thread_id: str):
-    global _current_thread_id
-    _current_thread_id = thread_id
+    _current_thread_id.set(thread_id)
 
 
 def set_user_id(user_id: str):
-    global _current_user_id
-    _current_user_id = user_id
+    _current_user_id.set(user_id)
 
 
 def _node_id(type: str) -> str:
@@ -120,7 +119,7 @@ def _load_node(node_id: str) -> dict | None:
     db = _db()
     row = db.execute(
         "SELECT * FROM canvas_nodes WHERE user_id=? AND thread_id=? AND node_id=?",
-        (_current_user_id, _current_thread_id, node_id),
+        (_current_user_id.get(), _current_thread_id.get(), node_id),
     ).fetchone()
     db.close()
     return _row_to_node(row) if row else None
@@ -129,7 +128,7 @@ def _load_node(node_id: str) -> dict | None:
 def _load_all_nodes() -> dict[str, dict]:
     db = _db()
     rows = db.execute(
-        "SELECT * FROM canvas_nodes WHERE user_id=? AND thread_id=?", (_current_user_id, _current_thread_id,)
+        "SELECT * FROM canvas_nodes WHERE user_id=? AND thread_id=?", (_current_user_id.get(), _current_thread_id.get(),)
     ).fetchall()
     db.close()
     return {r["node_id"]: _row_to_node(r) for r in rows}
@@ -139,7 +138,7 @@ def _load_all_edges() -> list[dict]:
     db = _db()
     rows = db.execute(
         "SELECT edge_id, source, target, position FROM canvas_edges WHERE user_id=? AND thread_id=? ORDER BY position",
-        (_current_user_id, _current_thread_id),
+        (_current_user_id.get(), _current_thread_id.get()),
     ).fetchall()
     db.close()
     return [{"id": r["edge_id"], "source": r["source"], "target": r["target"], "position": r["position"]} for r in rows]
@@ -159,7 +158,7 @@ def _upsert_node(node: dict):
            shot_no=excluded.shot_no, image_gen_provider=excluded.image_gen_provider,
            x=excluded.x, y=excluded.y""",
         (
-            _current_user_id, _current_thread_id, node["id"], node["type"], node["title"],
+            _current_user_id.get(), _current_thread_id.get(), node["id"], node["type"], node["title"],
             node.get("description", ""), node.get("status", "pending"),
             node.get("node_status", "reviewing"), node.get("asset_status", "idle"),
             result_json, node.get("subtype"),
@@ -231,12 +230,12 @@ def _upsert_edge(edge: dict):
     if edge.get("position") is None:
         existing = db.execute(
             "SELECT COALESCE(MAX(position), 0) + 1 FROM canvas_edges WHERE user_id=? AND thread_id=? AND target=?",
-            (_current_user_id, _current_thread_id, edge["target"]),
+            (_current_user_id.get(), _current_thread_id.get(), edge["target"]),
         ).fetchone()
         edge["position"] = existing[0] if existing else 1
     db.execute(
         "INSERT INTO canvas_edges (user_id, thread_id, edge_id, source, target, position) VALUES (?, ?, ?, ?, ?, ?)",
-        (_current_user_id, _current_thread_id, edge["id"], edge["source"], edge["target"], edge["position"]),
+        (_current_user_id.get(), _current_thread_id.get(), edge["id"], edge["source"], edge["target"], edge["position"]),
     )
     db.commit()
     db.close()
@@ -267,12 +266,12 @@ def _renormalize_positions(target_id: str):
     db = _db()
     rows = db.execute(
         "SELECT edge_id FROM canvas_edges WHERE user_id=? AND thread_id=? AND target=? ORDER BY position",
-        (_current_user_id, _current_thread_id, target_id),
+        (_current_user_id.get(), _current_thread_id.get(), target_id),
     ).fetchall()
     for i, row in enumerate(rows):
         db.execute(
             "UPDATE canvas_edges SET position=? WHERE user_id=? AND thread_id=? AND edge_id=?",
-            (i + 1, _current_user_id, _current_thread_id, row["edge_id"]),
+            (i + 1, _current_user_id.get(), _current_thread_id.get(), row["edge_id"]),
         )
     db.commit()
     db.close()
@@ -302,8 +301,8 @@ def reorder_edge(edge_id: str, direction: str) -> dict:
     a, b = siblings[idx], siblings[swap_idx]
     pos_a, pos_b = a["position"], b["position"]
     db = _db()
-    db.execute("UPDATE canvas_edges SET position=? WHERE user_id=? AND thread_id=? AND edge_id=?", (pos_b, _current_user_id, _current_thread_id, a["id"]))
-    db.execute("UPDATE canvas_edges SET position=? WHERE user_id=? AND thread_id=? AND edge_id=?", (pos_a, _current_user_id, _current_thread_id, b["id"]))
+    db.execute("UPDATE canvas_edges SET position=? WHERE user_id=? AND thread_id=? AND edge_id=?", (pos_b, _current_user_id.get(), _current_thread_id.get(), a["id"]))
+    db.execute("UPDATE canvas_edges SET position=? WHERE user_id=? AND thread_id=? AND edge_id=?", (pos_a, _current_user_id.get(), _current_thread_id.get(), b["id"]))
     db.commit()
     db.close()
     _renormalize_positions(edge["target"])
@@ -320,7 +319,7 @@ def delete_canvas_edge(edge_id: str) -> dict:
     target_id = edge["target"]
 
     db = _db()
-    db.execute("DELETE FROM canvas_edges WHERE user_id=? AND thread_id=? AND edge_id=?", (_current_user_id, _current_thread_id, edge_id))
+    db.execute("DELETE FROM canvas_edges WHERE user_id=? AND thread_id=? AND edge_id=?", (_current_user_id.get(), _current_thread_id.get(), edge_id))
     db.commit()
     db.close()
     _renormalize_positions(target_id)
@@ -486,8 +485,8 @@ def update_canvas_node(
 def delete_canvas_node(node_id: str) -> dict:
     """删除画布上的一个节点。"""
     db = _db()
-    db.execute("DELETE FROM canvas_nodes WHERE user_id=? AND thread_id=? AND node_id=?", (_current_user_id, _current_thread_id, node_id))
-    db.execute("DELETE FROM canvas_edges WHERE user_id=? AND thread_id=? AND (source=? OR target=?)", (_current_user_id, _current_thread_id, node_id, node_id))
+    db.execute("DELETE FROM canvas_nodes WHERE user_id=? AND thread_id=? AND node_id=?", (_current_user_id.get(), _current_thread_id.get(), node_id))
+    db.execute("DELETE FROM canvas_edges WHERE user_id=? AND thread_id=? AND (source=? OR target=?)", (_current_user_id.get(), _current_thread_id.get(), node_id, node_id))
     db.commit()
     db.close()
     return {"id": node_id, "deleted": True}

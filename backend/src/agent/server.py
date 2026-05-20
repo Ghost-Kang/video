@@ -14,7 +14,7 @@ from websockets.exceptions import ConnectionClosedOK
 
 from agent.config import LLM_MODEL, IMAGE_GEN_PROVIDER
 from agent.pool import AgentPool
-from agent.store import get_messages, save_message, set_user_id as store_set_user_id
+from agent.store import get_messages, save_message
 from agent.tools import canvas as canvas_tools
 from agent.tools.video_generation import get_video_provider
 
@@ -72,10 +72,10 @@ async def _optimize_prompt(node_id: str, prompt: str, feedback: str) -> str:
     return optimized
 
 
-async def _run_agent(pool: AgentPool, thread_id: str, user_content: str, ws):
+async def _run_agent(user_id: str, pool: AgentPool, thread_id: str, user_content: str, ws):
     """后台执行 agent。"""
     try:
-        save_message(thread_id, "user", user_content)
+        save_message(user_id, thread_id, "user", user_content)
         entry = await pool.get(thread_id)
 
         full_reply = ""
@@ -99,10 +99,10 @@ async def _run_agent(pool: AgentPool, thread_id: str, user_content: str, ws):
                     await _send(ws, type="agent_stream", thread_id=thread_id, event="text", content=token)
 
         reply = full_reply or "（未生成回复）"
-        save_message(thread_id, "agent", reply)
+        save_message(user_id, thread_id, "agent", reply)
     except Exception as e:
         reply = f"处理出错: {e}"
-        save_message(thread_id, "agent", reply)
+        save_message(user_id, thread_id, "agent", reply)
         print(f"[错误] thread={thread_id} {e}")
 
     await _auto_execute_pending(thread_id)
@@ -431,15 +431,16 @@ async def _poll_video_tasks(thread_id: str):
             print(f"[视频{'超时' if is_timeout else '失败'}] node={nid} {result.get('error')}")
 
 
-async def _recover_polling(ws):
+async def _recover_polling(user_id: str, ws):
     import sqlite3
     db = sqlite3.connect(str(canvas_tools._DB_PATH))
     rows = db.execute(
-        "SELECT DISTINCT thread_id FROM canvas_nodes WHERE asset_status='generating'"
+        "SELECT DISTINCT thread_id FROM canvas_nodes WHERE user_id=? AND asset_status='generating'",
+        (user_id,),
     ).fetchall()
     db.close()
     for (tid,) in rows:
-        print(f"[恢复轮询] thread={tid}")
+        print(f"[恢复轮询] user={user_id} thread={tid}")
         asyncio.create_task(_poll_and_notify(tid, ws))
 
 
@@ -461,9 +462,8 @@ async def handle(websocket):
                     await websocket.close(4001, "user_id required")
                     return
                 canvas_tools.set_user_id(user_id)
-                store_set_user_id(user_id)
                 print(f"[连接] user={user_id} pool 上限 {POOL_SIZE}")
-                asyncio.create_task(_recover_polling(websocket))
+                asyncio.create_task(_recover_polling(user_id, websocket))
                 continue
 
             if not user_id:
@@ -585,7 +585,7 @@ async def handle(websocket):
 
             if msg_type == "get_session_state":
                 print(f"[请求] get_session_state thread={thread_id}")
-                msgs = get_messages(thread_id)
+                msgs = get_messages(user_id, thread_id)
                 print(f"[请求] 返回 msgs={len(msgs)} canvas={_canvas_data(thread_id) is not None}")
                 await _send(
                     ws=websocket,
@@ -601,7 +601,7 @@ async def handle(websocket):
                 if not content:
                     continue
                 print(f"[用户] thread={thread_id} {content[:80]}...")
-                asyncio.create_task(_run_agent(pool, thread_id, content, websocket))
+                asyncio.create_task(_run_agent(user_id, pool, thread_id, content, websocket))
                 await _send(ws=websocket, type="processing", thread_id=thread_id)
                 continue
 
