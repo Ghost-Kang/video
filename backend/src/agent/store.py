@@ -29,12 +29,12 @@ def _conn() -> sqlite3.Connection:
     except sqlite3.OperationalError:
         pass
 
-    # 软删除表
+    # 会话元信息（is_deleted 软删除标志）
     c.execute(
-        """CREATE TABLE IF NOT EXISTS deleted_sessions (
+        """CREATE TABLE IF NOT EXISTS session_meta (
             user_id TEXT NOT NULL,
             thread_id TEXT NOT NULL,
-            deleted_at TEXT NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (user_id, thread_id)
         )"""
     )
@@ -63,19 +63,18 @@ def get_messages(user_id: str, thread_id: str, limit: int = 100) -> list[dict]:
 
 
 def list_sessions(user_id: str) -> list[dict]:
-    """返回用户所有未删除的会话，含首条消息摘要和最近活跃时间。"""
+    """返回用户所有未删除的会话（is_deleted=0 或无记录）。"""
     db = _conn()
     rows = db.execute(
-        """SELECT thread_id,
+        """SELECT m.thread_id,
                   (SELECT content FROM messages m2 WHERE m2.user_id=m.user_id AND m2.thread_id=m.thread_id AND m2.role='user' ORDER BY m2.id LIMIT 1) AS first_msg,
-                  MAX(created_at) AS last_active
+                  MAX(m.created_at) AS last_active
            FROM messages m
-           WHERE user_id=? AND thread_id NOT IN (
-               SELECT thread_id FROM deleted_sessions WHERE user_id=?
-           )
-           GROUP BY thread_id
+           LEFT JOIN session_meta sm ON sm.user_id=m.user_id AND sm.thread_id=m.thread_id
+           WHERE m.user_id=? AND COALESCE(sm.is_deleted, 0) = 0
+           GROUP BY m.thread_id
            ORDER BY last_active DESC""",
-        (user_id, user_id),
+        (user_id,),
     ).fetchall()
 
     sessions = []
@@ -96,7 +95,10 @@ def list_sessions(user_id: str) -> list[dict]:
         cdb = sqlite3.connect(str(_CANVAS_DB))
         cdb.row_factory = sqlite3.Row
         crows = cdb.execute(
-            "SELECT DISTINCT thread_id FROM canvas_nodes WHERE user_id=?",
+            """SELECT DISTINCT cn.thread_id
+               FROM canvas_nodes cn
+               LEFT JOIN session_meta sm ON sm.user_id=cn.user_id AND sm.thread_id=cn.thread_id
+               WHERE cn.user_id=? AND COALESCE(sm.is_deleted, 0) = 0""",
             (user_id,),
         ).fetchall()
         cdb.close()
@@ -116,11 +118,13 @@ def list_sessions(user_id: str) -> list[dict]:
 
 
 def delete_session(user_id: str, thread_id: str):
-    """软删除：标记会话为已删除，不删除数据。"""
+    """软删除：设置 is_deleted=1，数据完整保留。"""
     db = _conn()
     db.execute(
-        "INSERT OR REPLACE INTO deleted_sessions (user_id, thread_id, deleted_at) VALUES (?, ?, ?)",
-        (user_id, thread_id, datetime.now(timezone.utc).isoformat()),
+        """INSERT INTO session_meta (user_id, thread_id, is_deleted)
+           VALUES (?, ?, 1)
+           ON CONFLICT(user_id, thread_id) DO UPDATE SET is_deleted=1""",
+        (user_id, thread_id),
     )
     db.commit()
     db.close()
