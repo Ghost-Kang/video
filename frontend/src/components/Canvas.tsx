@@ -127,8 +127,6 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
   const selectNode = useCanvasStore((s) => s.selectNode);
 
   const [rfNodes, setRfNodes] = useState<Node[]>(() => defaultLayout(canvasNodes));
-  const structureRef = useRef({ nodes: 0, edges: 0 });
-  const manuallyMoved = useRef(new Set<string>());
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -140,26 +138,7 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
     return () => window.removeEventListener("delete_edge", handler);
   }, [removeEdge, onDeleteEdge]);
 
-  // 节点/边数量变化时自动排版（只排新节点，不碰手动拖过的）
   useEffect(() => {
-    const nodeCount = canvasNodes.length;
-    const edgeCount = edges.length;
-    if (nodeCount !== structureRef.current.nodes || edgeCount !== structureRef.current.edges) {
-      structureRef.current = { nodes: nodeCount, edges: edgeCount };
-      if (canvasNodes.length > 0) {
-        const newIds = canvasNodes.filter((n) => !manuallyMoved.current.has(n.id)).map((n) => n.id);
-        if (newIds.length > 0) {
-          const positions = dagreLayout(canvasNodes, edges);
-          for (const id of newIds) {
-            const pos = positions.get(id);
-            if (pos) {
-              updateNodePosition(id, pos.x, pos.y);
-              onPositionChange({ type: "update_position", thread_id: "", node_id: id, x: pos.x, y: pos.y });
-            }
-          }
-        }
-      }
-    }
     setRfNodes((prev) => {
       const prevMap = new Map(prev.map((n) => [n.id, n]));
       return defaultLayout(canvasNodes).map((n) => {
@@ -170,11 +149,10 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
         return n;
       });
     });
-  }, [canvasNodes, edges]);
+  }, [canvasNodes]);
 
   const persistRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  // 用户拖拽时标记为手动移动
   const handleNodesChange: OnNodesChange = useCallback(
     (changes) => {
       setRfNodes((nds) => {
@@ -183,7 +161,6 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
           if (c.type === "position" && c.position) {
             const x = Math.round(c.position.x);
             const y = Math.round(c.position.y);
-            manuallyMoved.current.add(c.id);
             updateNodePosition(c.id, x, y);
             if (persistRef.current[c.id]) clearTimeout(persistRef.current[c.id]);
             persistRef.current[c.id] = setTimeout(() => {
@@ -223,7 +200,6 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
   );
 
   const handleAutoLayout = useCallback(() => {
-    manuallyMoved.current.clear();
     const positions = dagreLayout(canvasNodes, edges);
     for (const [id, pos] of positions) {
       updateNodePosition(id, pos.x, pos.y);

@@ -344,37 +344,50 @@ def delete_canvas_edge(edge_id: str) -> dict:
 
 
 def _default_position(node_type: str, parent_ids: list[str] | None) -> tuple[float, float]:
-    """为新节点计算默认位置，避免全部堆在同一个坐标。
+    """为新节点计算默认位置。
 
-    有父节点时排在父节点下方；无父节点时排在画布最下方。
-    同类型节点横向错开。
+    X: 有父节点 → 父节点右侧 400px；无父节点 → 已有节点最右侧 + 400，或 100
+    Y: 有父节点 → 父节点下方 280px；无父节点 → 已有节点最下方 + 200，或 100
+    同一 X 列内已有其他节点时向下错开。
     """
-    # 类型 → x 偏移
-    x_offset = {"script": 0, "image": 400, "video": 800, "composite": 1200}
-    base_x = x_offset.get(node_type, 0)
-
-    # 从父节点获取参考位置
-    ref_y = 0
-    if parent_ids:
-        for pid in parent_ids:
-            parent = _load_node(pid)
-            if parent and parent.get("y") is not None:
-                ref_y = max(ref_y, parent["y"] + 280)
-
-    # 无父节点：排在所有已有节点下方
-    if ref_y == 0:
-        nodes = _load_all_nodes()
-        if nodes:
-            max_y = max((n.get("y") or 0 for n in nodes.values()), default=0)
-            ref_y = max_y + 200 if max_y > 0 else 100
-
-    # 同列中已有同类型节点时再向下错开
     nodes = _load_all_nodes()
-    same_col = [n for n in nodes.values() if n.get("x") == base_x and n.get("y", 0) >= ref_y - 50]
-    if same_col:
-        ref_y = max((n.get("y") or 0 for n in same_col)) + 200
+    x_gap = 400
+    y_gap = 280
 
-    return (float(base_x), float(ref_y or 100))
+    # X 坐标
+    base_x: float = 100
+    if parent_ids:
+        parent_xs = []
+        for pid in parent_ids:
+            p = _load_node(pid)
+            if p and p.get("x") is not None:
+                parent_xs.append(p["x"])
+        if parent_xs:
+            base_x = max(parent_xs) + x_gap
+    elif nodes:
+        max_x = max((n.get("x") or 100 for n in nodes.values()), default=100)
+        base_x = float(max_x + x_gap)
+
+    # Y 坐标
+    ref_y: float = 100
+    if parent_ids:
+        parent_ys = []
+        for pid in parent_ids:
+            p = _load_node(pid)
+            if p and p.get("y") is not None:
+                parent_ys.append(p["y"] + y_gap)
+        if parent_ys:
+            ref_y = max(parent_ys)
+    elif nodes:
+        max_y = max((n.get("y") or 100 for n in nodes.values()), default=100)
+        ref_y = float(max_y + 200)
+
+    # 同列中已有节点 → 继续向下错开
+    same_col = [n for n in nodes.values() if n.get("x") == base_x and n.get("y", 0) >= ref_y - 20]
+    if same_col:
+        ref_y = max((n.get("y") or 0 for n in same_col)) + y_gap
+
+    return (base_x, float(ref_y))
 
 
 def create_canvas_node(
