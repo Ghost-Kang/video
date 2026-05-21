@@ -16,7 +16,7 @@ from websockets.exceptions import ConnectionClosedOK
 
 from agent.config import LLM_MODEL, IMAGE_GEN_PROVIDER
 from agent.pool import AgentPool
-from agent.store import get_messages, save_message, list_sessions, ensure_session_exists, delete_session as store_delete_session
+from agent.store import get_messages, save_message, list_sessions, ensure_session_exists, rename_session, delete_session as store_delete_session
 from agent.tools import canvas as canvas_tools
 from agent.tools.video_generation import get_video_provider
 
@@ -97,6 +97,9 @@ async def _optimize_prompt(node_id: str, prompt: str, feedback: str) -> str:
 async def _run_agent(user_id: str, pool: AgentPool, thread_id: str, user_content: str, ws):
     """后台执行 agent。"""
     try:
+        # agent 的 tool call 需要通过 contextvars 读写正确的用户/会话数据
+        canvas_tools.set_user_id(user_id)
+        canvas_tools.set_thread_id(thread_id)
         save_message(user_id, thread_id, "user", user_content)
         entry = await pool.get(thread_id)
 
@@ -606,6 +609,13 @@ async def handle(websocket):
                     node_id=nid,
                     optimized_prompt=optimized,
                 )
+                continue
+
+            if msg_type == "rename_session":
+                target_thread = msg.get("thread_id", "")
+                new_title = msg.get("title", "").strip()
+                if target_thread and new_title:
+                    rename_session(user_id, target_thread, new_title)
                 continue
 
             if msg_type == "delete_session":
