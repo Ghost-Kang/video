@@ -35,6 +35,10 @@ TTS_BASE_URL = os.getenv("TTS_BASE_URL")
 ASR_API_KEY = os.getenv("ASR_API_KEY")
 ASR_BASE_URL = os.getenv("ASR_BASE_URL")
 
+# -------- Toprador analysis upstream --------
+TOPRADOR_ENDPOINT = os.getenv("TOPRADOR_ENDPOINT", "")
+TOPRADOR_API_KEY = os.getenv("TOPRADOR_API_KEY", "")
+
 # -------- S3 --------
 S3_AK = os.getenv("S3_AK", "")
 S3_SK = os.getenv("S3_SK", "")

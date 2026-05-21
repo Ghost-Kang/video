@@ -9,6 +9,7 @@ dependencies = [
     "boto3>=1.43.9",
     "deepagents>=0.6.1",
     "google-genai>=1.75.0",
+    "httpx>=0.28.1",
     "langgraph-checkpoint-sqlite>=3.1.0",
     "pillow>=12.2.0",
     "pydantic>=2.0",

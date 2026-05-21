@@ -9,11 +9,15 @@ import os
 from pathlib import Path
 from typing import Any
 
+import httpx
+
+from agent import config
 from agent.cascade.adapter import normalize_analysis_result
 from agent.cascade.contract import CascadeAnalysisContract
 from agent.cascade.events import emit
-from agent.cascade.failures import HardFailure, WarningCode
+from agent.cascade.failures import FailureCode, HardFailure, WarningCode
 from agent.cascade.storage import (
+    load_analysis,
     load_analysis_for_source,
     save_analysis,
     set_analysis_context,
@@ -39,12 +43,11 @@ async def request_shallow_analysis(
     if existing is not None:
         return existing
 
-    raw = await _load_upstream_payload(source_url)
-    raw = copy.deepcopy(raw)
-    raw["source_url"] = source_url
-    raw["analysis_id"] = _analysis_id(user_id, source_url)
-
     try:
+        raw = await _load_upstream_payload(source_url)
+        raw = copy.deepcopy(raw)
+        raw["source_url"] = source_url
+        raw["analysis_id"] = _analysis_id(user_id, source_url)
         contract = normalize_analysis_result(raw)
     except HardFailure as exc:
         await emit(
@@ -60,13 +63,17 @@ async def request_shallow_analysis(
         raise
 
     set_analysis_context(user_id, run_id)
-    await save_analysis(contract)
-    await emit(
-        "analysis_returned",
-        user_id=user_id,
-        run_id=run_id,
-        payload=_analysis_returned_payload(contract),
-    )
+    inserted = await save_analysis(contract)
+    if inserted:
+        await emit("analysis_returned",
+            user_id=user_id,
+            run_id=run_id,
+            payload=_analysis_returned_payload(contract),
+        )
+    else:
+        stored = await load_analysis(contract.analysis_id)
+        if stored is not None:
+            return stored
     return contract
 
 
@@ -86,7 +93,30 @@ def _load_fixture(source_url: str) -> dict[str, Any]:
 
 
 async def _call_toprador(source_url: str) -> dict[str, Any]:
-    raise NotImplementedError("CASCADE_UPSTREAM=toprador is not wired yet")
+    endpoint = os.getenv("TOPRADOR_ENDPOINT") or config.TOPRADOR_ENDPOINT
+    api_key = os.getenv("TOPRADOR_API_KEY") or config.TOPRADOR_API_KEY
+    if not endpoint:
+        raise HardFailure(FailureCode.S8_UPSTREAM_REFUSED, "toprador_endpoint_missing")
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            resp = await client.post(endpoint, json={"url": source_url}, headers=headers)
+        except httpx.TimeoutException as exc:
+            raise HardFailure(FailureCode.S7_UPSTREAM_TIMEOUT, str(exc)) from exc
+    if resp.status_code == 429:
+        raise HardFailure(FailureCode.S8_UPSTREAM_REFUSED, "rate_limit")
+    if resp.status_code in (401, 403):
+        raise HardFailure(FailureCode.S8_UPSTREAM_REFUSED, "auth_refused")
+    if resp.status_code >= 500:
+        raise HardFailure(FailureCode.S8_UPSTREAM_REFUSED, f"upstream_5xx_{resp.status_code}")
+    try:
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise HardFailure(FailureCode.S8_UPSTREAM_REFUSED, f"upstream_http_{resp.status_code}") from exc
+    try:
+        return resp.json()
+    except ValueError as exc:
+        raise HardFailure(FailureCode.S5_INVALID_PAYLOAD, "toprador_json_invalid") from exc
 
 
 def _analysis_id(user_id: str, source_url: str) -> str:

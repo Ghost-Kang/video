@@ -87,26 +87,17 @@ def utc_now_rfc3339() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-async def save_analysis(contract: CascadeAnalysisContract) -> None:
+async def save_analysis(contract: CascadeAnalysisContract) -> bool:
+    """Persist an analysis. Returns True only when a new row was inserted."""
     user_id = _analysis_user_id.get()
     run_id = _analysis_run_id.get()
     db = await _connect()
     try:
-        await db.execute(
-            """INSERT INTO analyses (
+        cursor = await db.execute(
+            """INSERT OR IGNORE INTO analyses (
               analysis_id, user_id, run_id, source_url, platform, cost_cny,
               confidence, contract_json, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(analysis_id) DO UPDATE SET
-              user_id=excluded.user_id,
-              run_id=excluded.run_id,
-              source_url=excluded.source_url,
-              platform=excluded.platform,
-              cost_cny=excluded.cost_cny,
-              confidence=excluded.confidence,
-              contract_json=excluded.contract_json,
-              created_at=excluded.created_at
-            """,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 contract.analysis_id,
                 user_id,
@@ -120,6 +111,7 @@ async def save_analysis(contract: CascadeAnalysisContract) -> None:
             ),
         )
         await db.commit()
+        return cursor.rowcount == 1
     finally:
         await db.close()
 
