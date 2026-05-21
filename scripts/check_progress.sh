@@ -107,11 +107,14 @@ for t in "$p2_1" "$p2_2" "$p2_4" "$p2_5" "$p2_6"; do
   [ "$t" = "done" ] && w2_eng_done=$((w2_eng_done + 1))
 done
 
-# Phase indicator — which W is "active". W1 active until eng_done=9, then W2.
+# Phase indicator — newest active allocation doc wins.
 w2_allocation_exists="NO"
 [ -f docs/nexus/PM_W2_allocation.md ] && w2_allocation_exists="YES"
+w3_allocation_exists="NO"
+[ -f docs/nexus/PM_W3_allocation.md ] && w3_allocation_exists="YES"
 active_phase="W1"
 [ "$w2_allocation_exists" = "YES" ] && active_phase="W2"
+[ "$w3_allocation_exists" = "YES" ] && active_phase="W3"
 
 # ---------- Recruitment + marketing (read from founder log if exists) ----------
 recruit_log="docs/nexus/founder_log/recruitment.md"
