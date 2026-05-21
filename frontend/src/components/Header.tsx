@@ -1,3 +1,5 @@
+import { ProViewToggle } from "./ProViewToggle";
+
 interface Props {
   sessionName: string;
   connected: boolean;
@@ -5,9 +7,22 @@ interface Props {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   onNewSession: () => void;
+  isProView?: boolean;
+  onToggleProView?: () => void;
+  hideProToggle?: boolean;
 }
 
-export function Header({ sessionName, connected, connecting, sidebarOpen, onToggleSidebar, onNewSession }: Props) {
+export function Header({
+  sessionName,
+  connected,
+  connecting,
+  sidebarOpen,
+  onToggleSidebar,
+  onNewSession,
+  isProView = false,
+  onToggleProView,
+  hideProToggle = false,
+}: Props) {
   return (
     <div style={S.bar}>
       <button onClick={onToggleSidebar} style={S.toggle} title={sidebarOpen ? "收起侧栏" : "展开侧栏"}>
@@ -25,6 +40,14 @@ export function Header({ sessionName, connected, connecting, sidebarOpen, onTogg
       <button onClick={onNewSession} style={S.plusBtn} title="新建会话">
         +
       </button>
+
+      {onToggleProView && (
+        <ProViewToggle
+          isProView={isProView}
+          onToggle={onToggleProView}
+          hidden={hideProToggle}
+        />
+      )}
 
       <span style={S.hint}>策划书 → image → video → audio</span>
     </div>

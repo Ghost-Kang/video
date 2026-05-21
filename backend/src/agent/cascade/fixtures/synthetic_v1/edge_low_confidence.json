@@ -1,0 +1,55 @@
+{
+  "_provenance": "synthetic_v1",
+  "_purpose": "EDGE — RECOVERABLE: confidence 0.32. Most viral_analysis dimensions absent → fallback used. UI shows low-confidence banner.",
+  "schema_version": "1.0",
+  "analysis_id": "ana_syn_edge_lowconf",
+  "source_url": "https://www.douyin.com/video/syn_lowconf",
+  "platform": "douyin",
+  "created_at": "2026-05-19T08:19:00+00:00",
+  "model": "doubao-seed-2-0-pro",
+  "cost_cny": 0.22,
+  "duration_s": 20,
+  "confidence": 0.32,
+  "viral_analysis": {
+    "hook": "",
+    "pacing": "",
+    "climax": "",
+    "visual_style": "暗调",
+    "emotional_arc": "",
+    "target_audience": "",
+    "engagement_levers": "",
+    "replicable_formula": "低光夜景 + 单一长镜头 + 旁白叙事"
+  },
+  "scenes": [
+    {
+      "scene_index": 1,
+      "timestamp_start": 0.0,
+      "timestamp_end": 6.0,
+      "scene": "夜景街道全景",
+      "dialogue_and_narration": "今天聊一聊我们都熟悉的那种夜晚",
+      "visual_content": "夜景街道，路灯，行人模糊",
+      "shot_type": "wide",
+      "camera_movement": "static"
+    },
+    {
+      "scene_index": 2,
+      "timestamp_start": 6.0,
+      "timestamp_end": 14.0,
+      "scene": "近处长椅特写",
+      "dialogue_and_narration": "",
+      "visual_content": "长椅，落叶，暗调",
+      "shot_type": "close_up",
+      "camera_movement": "static"
+    },
+    {
+      "scene_index": 3,
+      "timestamp_start": 14.0,
+      "timestamp_end": 20.0,
+      "scene": "镜头拉远，城市夜景全景",
+      "dialogue_and_narration": "晚安。",
+      "visual_content": "城市夜景拉远，光斑",
+      "shot_type": "aerial",
+      "camera_movement": "pull"
+    }
+  ]
+}

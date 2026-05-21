@@ -1,0 +1,23 @@
+[
+  {
+    "id": "card_001",
+    "niche": "baomam_fushi",
+    "thumbnail_url": "",
+    "title_three_lines": ["这条 5 万赞辅食视频", "开头 1.2 秒抛痛点", "结尾反差"],
+    "fixture_analysis_id": "ana_syn_baomam_001"
+  },
+  {
+    "id": "card_002",
+    "niche": "yuer_richang",
+    "thumbnail_url": "",
+    "title_three_lines": ["新手妈妈日常", "先给共鸣", "最后给做法"],
+    "fixture_analysis_id": "ana_syn_yuer_001"
+  },
+  {
+    "id": "card_003",
+    "niche": "jiating_chufang",
+    "thumbnail_url": "",
+    "title_three_lines": ["普通厨房晚餐", "三步讲清楚", "出锅有记忆点"],
+    "fixture_analysis_id": "ana_syn_chufang_001"
+  }
+]

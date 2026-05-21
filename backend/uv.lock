@@ -13,6 +13,7 @@ dependencies = [
     { name = "google-genai" },
     { name = "langgraph-checkpoint-sqlite" },
     { name = "pillow" },
+    { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "websockets" },
 ]
@@ -30,6 +31,7 @@ requires-dist = [
     { name = "google-genai", specifier = ">=1.75.0" },
     { name = "langgraph-checkpoint-sqlite", specifier = ">=3.1.0" },
     { name = "pillow", specifier = ">=12.2.0" },
+    { name = "pydantic", specifier = ">=2.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "websockets", specifier = ">=16.0" },
 ]

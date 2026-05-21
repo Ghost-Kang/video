@@ -1,13 +1,15 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { Canvas } from "./components/Canvas";
+import { CardStack } from "./components/CardStack";
 import { ChatPanel } from "./components/ChatPanel";
 import { NodeDetail } from "./components/NodeDetail";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useCanvasStore } from "./store/canvasStore";
-import type { WSIncoming } from "./types";
+import { shouldHideProToggle } from "./lib/proViewAccess";
+import type { NodeType, WSIncoming } from "./types";
 
 const LS_SESSIONS = "openrhtv_sessions";
 const LS_NAMES = "openrhtv_session_names";
@@ -30,7 +32,21 @@ function newSessionId() {
 export default function App() {
   const { threadId } = useParams<{ threadId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const tid = threadId!;
+  const isProView = searchParams.get("view") === "pro";
+
+  const toggleProView = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (next.get("view") === "pro") {
+        next.delete("view");
+      } else {
+        next.set("view", "pro");
+      }
+      return next;
+    });
+  }, [setSearchParams]);
 
   const [sessions, setSessions] = useState<string[]>(() => loadJSON<string[]>(LS_SESSIONS, []));
   const [names, setNames] = useState<Record<string, string>>(() => loadJSON<Record<string, string>>(LS_NAMES, {}));
@@ -47,6 +63,9 @@ export default function App() {
   const finalizeStreaming = useCanvasStore((s) => s.finalizeStreaming);
   const clearMessages = useCanvasStore((s) => s.clear);
   const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
+  const didInit = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentThreadIdRef = useRef(tid);
 
   const onMessage = useCallback(
     (res: WSIncoming) => {
@@ -99,15 +118,11 @@ export default function App() {
           break;
       }
     },
-    [addMessage, setMessages, setCanvas, appendStreaming, finalizeStreaming]
+    [setMessages, setCanvas, appendStreaming, finalizeStreaming]
   );
 
   const { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, connected, connecting } =
     useWebSocket(onMessage);
-  const didInit = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const currentThreadIdRef = useRef(tid);
-  currentThreadIdRef.current = tid;
 
   const addSession = useCallback((id: string) => {
     setSessions((prev) => {
@@ -130,7 +145,6 @@ export default function App() {
     (id: string) => {
       if (id === tid) return;
       console.log(`[会话] 切换到 ${id}`);
-      currentThreadIdRef.current = id;
       clearTimeout(timerRef.current ?? undefined);
       setLoading(false);
       setThinking([]);
@@ -149,9 +163,10 @@ export default function App() {
         return next;
       });
       setNames((prev) => {
-        const { [id]: _, ...rest } = prev;
-        saveJSON(LS_NAMES, rest);
-        return rest;
+        const next = { ...prev };
+        delete next[id];
+        saveJSON(LS_NAMES, next);
+        return next;
       });
     },
     []
@@ -167,12 +182,14 @@ export default function App() {
 
   // URL 变化时：同步会话列表 + 拉取状态
   useEffect(() => {
-    addSession(tid);
-    clearMessages();
-    setCanvas({ nodes: {}, edges: [] });
-    sendGetSessionState(tid);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tid]);
+    currentThreadIdRef.current = tid;
+    queueMicrotask(() => {
+      addSession(tid);
+      clearMessages();
+      setCanvas({ nodes: {}, edges: [] });
+      sendGetSessionState(tid);
+    });
+  }, [tid, addSession, clearMessages, setCanvas, sendGetSessionState]);
 
   // 当前会话被删时跳转
   useEffect(() => {
@@ -211,8 +228,8 @@ export default function App() {
   );
 
   const handleExecuteNode = useCallback(
-    (nodeId: string, nodeType: string, description: string, provider?: string) => {
-      sendExecuteNode({ type: "execute_node", thread_id: tid, node_id: nodeId, node_type: nodeType as any, description, image_gen_provider: provider });
+    (nodeId: string, nodeType: NodeType, description: string, provider?: string) => {
+      sendExecuteNode({ type: "execute_node", thread_id: tid, node_id: nodeId, node_type: nodeType, description, image_gen_provider: provider });
     },
     [sendExecuteNode, tid]
   );
@@ -252,6 +269,9 @@ export default function App() {
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
         onNewSession={handleNewSession}
+        isProView={isProView}
+        onToggleProView={toggleProView}
+        hideProToggle={shouldHideProToggle(tid)}
       />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {sidebarOpen && (
@@ -285,8 +305,21 @@ export default function App() {
             </svg>
           </button>
         )}
-        <Canvas onPositionChange={(pos) => sendPosition({ ...pos, thread_id: tid })} />
-        {selectedNodeId && <NodeDetail onReview={handleReview} onExecuteNode={handleExecuteNode} onUpdateNodeStatus={handleUpdateNodeStatus} onOptimizePrompt={handleOptimizePrompt} />}
+        {isProView ? (
+          <>
+            <Canvas onPositionChange={(pos) => sendPosition({ ...pos, thread_id: tid })} />
+            {selectedNodeId && (
+              <NodeDetail
+                onReview={handleReview}
+                onExecuteNode={handleExecuteNode}
+                onUpdateNodeStatus={handleUpdateNodeStatus}
+                onOptimizePrompt={handleOptimizePrompt}
+              />
+            )}
+          </>
+        ) : (
+          <CardStack />
+        )}
       </div>
     </div>
   );

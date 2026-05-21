@@ -70,6 +70,7 @@ export function Canvas({ onPositionChange }: Props) {
   const [rfNodes, setRfNodes] = useState<Node[]>(() => defaultLayout(canvasNodes));
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRfNodes((prev) => {
       const prevMap = new Map(prev.map((n) => [n.id, n]));
       return defaultLayout(canvasNodes).map((n) => {

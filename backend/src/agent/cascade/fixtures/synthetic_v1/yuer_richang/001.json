@@ -1,0 +1,66 @@
+{
+  "_provenance": "synthetic_v1",
+  "_niche": "yuer_richang",
+  "_purpose": "3 scenes · subject missing in 2 · shot_type mixed · 育儿日常 niche",
+  "schema_version": "1.0",
+  "analysis_id": "ana_syn_yuer_001",
+  "source_url": "https://www.xiaohongshu.com/explore/synthetic_yuer_001",
+  "platform": "xiaohongshu",
+  "created_at": "2026-05-19T08:05:00+00:00",
+  "model": "doubao-seed-2-0-pro",
+  "cost_cny": 0.31,
+  "duration_s": 22,
+  "confidence": 0.74,
+  "viral_analysis": {
+    "hook": "母亲视角口播：「你以为终于哄睡了，结果……」",
+    "pacing": "中等节奏，3 镜头平均时长 7 秒",
+    "climax": "宝宝在小床里突然睁眼笑的反差表情",
+    "visual_style": "夜灯橙黄低饱和，手持轻晃，居家真实感",
+    "emotional_arc": "疲惫 → 期待 → 哭笑不得",
+    "target_audience": "1-3 岁宝宝的新手妈妈，深夜刷视频时间段",
+    "engagement_levers": "字幕里用「+1」诱导评论扣 1 自报家门",
+    "replicable_formula": "母亲第一人称叙述 + 哄睡常见痛点 + 反差幽默结尾 + 字幕求互动"
+  },
+  "scenes": [
+    {
+      "scene_index": 1,
+      "timestamp_start": 0.0,
+      "timestamp_end": 7.5,
+      "scene": "母亲手持镜头自拍，背景是夜灯橙黄色的卧室",
+      "dialogue_and_narration": "终于把这小祖宗哄睡了，今天 11 点半，比昨天还晚",
+      "visual_content": "前置摄像头自拍，暖色夜灯，母亲面部疲惫微笑",
+      "subject": "妈妈",
+      "shot_type": "close_up",
+      "camera_movement": "handheld",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 2,
+      "timestamp_start": 7.5,
+      "timestamp_end": 15.0,
+      "scene": "夜灯下的小床，宝宝闭眼安睡画面",
+      "dialogue_and_narration": "你看这睡得多香，我都不舍得呼吸",
+      "visual_content": "俯拍小床，宝宝侧脸特写，胸口起伏，柔光",
+      "subject": null,
+      "shot_type": "close_up",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 3,
+      "timestamp_start": 15.0,
+      "timestamp_end": 22.0,
+      "scene": "宝宝突然睁眼笑出声，母亲镜头外崩溃语气",
+      "dialogue_and_narration": "啊？？你怎么醒了？？哪个妈妈也这样的扣个 1",
+      "visual_content": "宝宝面部特写，眼睛突然睁开，露齿笑，光线不变",
+      "subject": null,
+      "shot_type": "close_up",
+      "camera_movement": "handheld",
+      "first_frame_url": null,
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}

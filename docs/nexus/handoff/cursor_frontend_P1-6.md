@@ -1,0 +1,114 @@
+# Cursor handoff — P1-6 anchor sidebar
+
+**Source of truth**: `claude_backend_P1-6.md` (the endpoints) · `02_brand_guardrails.md` term table
+**Time budget**: 2 days
+
+---
+
+## 0. What you build
+
+The "你之前用过的" sidebar inside the canvas. Renders a list of the user's anchors (characters + scenes), supports drag-onto-ShotCard to record a reuse.
+
+The term `锚点` MUST NOT appear anywhere in the UI. Always "你之前用过的" or "你的角色" / "你的场景".
+
+---
+
+## 1. Files
+
+| Path | Purpose |
+|---|---|
+| `frontend/src/components/anchors/AnchorSidebar.tsx` | The collapsible right-side panel |
+| `frontend/src/components/anchors/AnchorCard.tsx` | One anchor (image + label) |
+| `frontend/src/components/anchors/AnchorPickerModal.tsx` | Modal for picking when ShotCard's "换个角色" / "用我之前的场景" clicked |
+| `frontend/src/hooks/useAnchors.ts` | `useAnchors(kind)` → `{anchors, isLoading, refresh}` |
+| `frontend/src/lib/anchorApi.ts` | Typed fetch wrappers around `/api/anchors/*` |
+
+Modify `Sidebar.tsx` and `Canvas.tsx` to mount `AnchorSidebar` on the right (toggleable). Default open for desktop, closed for mobile.
+
+---
+
+## 2. UX
+
+```
+┌─────────────────────────────────────┐
+│  Canvas (card stack)        [Pro ⮂] │
+│  ┌──────────────┐  ┌──────────────┐  │
+│  │ Script Card  │  │ 你之前用过的    │  │
+│  │              │  │              │  │
+│  │  ...         │  │  你的角色      │  │
+│  │              │  │  ┌──┐┌──┐┌──┐  │  │
+│  │ Shot 1       │  │  │👶││👩││👶│  │  │
+│  │ [换个角色]   ─┼──>│  └──┘└──┘└──┘  │  │
+│  │ [用我场景]   │  │  小张  妈妈  乖宝  │  │
+│  │              │  │              │  │
+│  │ Shot 2       │  │  你的场景      │  │
+│  │              │  │  ┌──┐┌──┐    │  │
+│  └──────────────┘  │  │🍳││🛏️│    │  │
+│                    │  └──┘└──┘    │  │
+│                    │  厨房  夜灯   │  │
+│                    └──────────────┘  │
+└─────────────────────────────────────┘
+```
+
+**No "Drag me!" tutorials.** Drag-and-drop works because of standard browser cues (`cursor-grab`, `cursor-grabbing`). If 3 internal testers don't figure out drag in 10s, add a one-line hint AFTER user testing — not preemptively.
+
+Alternative path: clicking "换个角色" on a ShotCard opens `AnchorPickerModal` showing the user's characters. Click one → fills the ShotCard + calls `/api/anchors/<id>/reuse`.
+
+---
+
+## 3. Critical: `anchor_reused` event firing
+
+The event is the H8 signal. The frontend MUST trigger `POST /api/anchors/<id>/reuse` precisely once per actual reuse. Wrong behavior:
+- ❌ Calling reuse on hover or modal open
+- ❌ Calling reuse twice if user re-confirms
+- ❌ NOT calling reuse if user picks the same anchor twice in a row in same run
+
+Right behavior:
+- ✓ Call reuse exactly when user confirms a pick (click-to-fill OR drag-drop completion)
+- ✓ Call reuse again if user picks the SAME anchor for a DIFFERENT shot in same run
+- ✓ Show optimistic UI (anchor fills the ShotCard) but don't block on API; queue the reuse call
+
+---
+
+## 4. Hooks API
+
+```ts
+const { anchors, isLoading, refresh } = useAnchors('character');
+// anchors: Anchor[] sorted by reuse_count DESC, then created_at DESC
+// refresh() invalidates the cache; call after any reuse
+
+const { createAnchor } = useCreateAnchor();
+await createAnchor({
+  user_id, kind: 'character', label: '小张妈妈', image_url,
+  source_run_id, source_shot_index
+});
+
+const { reuseAnchor } = useReuseAnchor();
+await reuseAnchor(anchorId, { user_id, reused_in_run_id, reused_in_shot_index });
+```
+
+---
+
+## 5. Tests
+
+- `__tests__/AnchorSidebar.test.tsx`: renders empty state (0 anchors); renders 3 anchors; clicking one logs reuse intent
+- `__tests__/anchorApi.test.ts`: list/create/reuse hit the right URLs with the right bodies
+- Manual: open canvas with mocked 3-anchor state; drag → ShotCard fills; check network tab for ONE POST to /reuse
+
+---
+
+## 6. Done-signal
+
+- `npm run build` clean
+- `find frontend/src/components/anchors -type f \| wc -l` ≥ 3
+- `grep -rn "锚点" frontend/src/components/anchors/` returns 0 hits
+- Manual: in dev mode with mocked anchors, drag-to-ShotCard fires exactly one `/api/anchors/.../reuse` POST
+
+---
+
+## 7. NOT in this ticket
+
+- Backend endpoints (Claude P1-6 backend brief)
+- Auto-detection of anchor-worthy images (Phase 2)
+- 三视图 (Phase 2)
+- Anchor labels generated by LLM (Phase 2)

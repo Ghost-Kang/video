@@ -1,17 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { CanvasNode, Shot, NodeStatus } from "../types";
+import type { CanvasNode, Shot, NodeStatus, NodeType } from "../types";
 import { useCanvasStore } from "../store/canvasStore";
 
 interface Props {
   onReview: (nodeId: string, action: "approve" | "reject", feedback?: string) => void;
-  onExecuteNode: (nodeId: string, nodeType: string, description: string, provider?: string) => void;
+  onExecuteNode: (nodeId: string, nodeType: NodeType, description: string, provider?: string) => void;
   onUpdateNodeStatus: (nodeId: string, nodeStatus: NodeStatus) => void;
   onOptimizePrompt: (nodeId: string, prompt: string, feedback: string) => void;
 }
 
-export function NodeDetail({ onReview, onExecuteNode, onUpdateNodeStatus, onOptimizePrompt }: Props) {
+export function NodeDetail({ onExecuteNode, onUpdateNodeStatus, onOptimizePrompt }: Props) {
   const selectedId = useCanvasStore((s) => s.selectedNodeId);
   const node = useCanvasStore((s) => s.nodes.find((n) => n.id === selectedId));
   const allNodes = useCanvasStore((s) => s.nodes);
@@ -64,7 +64,7 @@ export function NodeDetail({ onReview, onExecuteNode, onUpdateNodeStatus, onOpti
 
         {/* 提示词（仅媒体节点） */}
         {isMedia && (
-          <MediaPanel node={node} onExecuteNode={onExecuteNode} onReview={onReview} onOptimizePrompt={onOptimizePrompt} />
+          <MediaPanel key={node.id} node={node} onExecuteNode={onExecuteNode} onOptimizePrompt={onOptimizePrompt} />
         )}
 
         {/* 生成结果 */}
@@ -98,15 +98,10 @@ function NodeStatusToggle({ node, onUpdate }: { node: CanvasNode; onUpdate: Prop
 function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
   node: CanvasNode;
   onExecuteNode: Props["onExecuteNode"];
-  onReview: Props["onReview"];
   onOptimizePrompt: Props["onOptimizePrompt"];
 }) {
   const [prompt, setPrompt] = useState(node.description || "");
   const [provider, setProvider] = useState((node.result as Record<string, unknown> | null)?.image_gen_provider as string || "apimart");
-  useEffect(() => {
-    setPrompt(node.description || "");
-    setProvider((node.result as Record<string, unknown> | null)?.image_gen_provider as string || "apimart");
-  }, [node.id, node.description, node.asset_status]);
   const [showPolish, setShowPolish] = useState(false);
   const [feedback, setFeedback] = useState("");
 
@@ -172,50 +167,6 @@ function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
             <button onClick={handlePolish} style={S.polishSubmit}>提交</button>
             <button onClick={() => setShowPolish(false)} style={S.polishCancel}>取消</button>
           </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function ReviewSection({ nodeId, onReview }: { nodeId: string; onReview: Props["onReview"] }) {
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [feedback, setFeedback] = useState("");
-
-  return (
-    <section style={S.reviewSection}>
-      {showFeedback ? (
-        <>
-          <textarea
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            placeholder="告诉 agent 哪里需要改..."
-            rows={2}
-            style={S.feedbackInput}
-            autoFocus
-          />
-          <div style={S.reviewBtns}>
-            <button
-              onClick={() => {
-                onReview(nodeId, "reject", feedback);
-                setShowFeedback(false);
-                setFeedback("");
-              }}
-              style={S.rejectBtn}
-            >
-              驳回并反馈
-            </button>
-            <button onClick={() => setShowFeedback(false)} style={S.cancelBtn}>取消</button>
-          </div>
-        </>
-      ) : (
-        <div style={S.reviewBtns}>
-          <button onClick={() => onReview(nodeId, "approve")} style={S.approveBtn}>
-            通过
-          </button>
-          <button onClick={() => setShowFeedback(true)} style={S.rejectBtn}>
-            驳回
-          </button>
         </div>
       )}
     </section>

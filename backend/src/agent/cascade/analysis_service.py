@@ -1,0 +1,114 @@
+"""Service layer for Phase 1 shallow analysis."""
+
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+import os
+from pathlib import Path
+from typing import Any
+
+from agent.cascade.adapter import normalize_analysis_result
+from agent.cascade.contract import CascadeAnalysisContract
+from agent.cascade.events import emit
+from agent.cascade.failures import HardFailure, WarningCode
+from agent.cascade.storage import (
+    load_analysis_for_source,
+    save_analysis,
+    set_analysis_context,
+)
+
+
+_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "synthetic_v1"
+_HAPPY_FIXTURES = (
+    _FIXTURES_ROOT / "baomam_fushi" / "001.json",
+    _FIXTURES_ROOT / "yuer_richang" / "001.json",
+    _FIXTURES_ROOT / "jiating_chufang" / "001.json",
+)
+
+
+async def request_shallow_analysis(
+    source_url: str,
+    *,
+    user_id: str,
+    run_id: str | None = None,
+) -> CascadeAnalysisContract:
+    """Entry point. Calls upstream or fixture, normalizes, persists, emits event."""
+    existing = await load_analysis_for_source(user_id, source_url)
+    if existing is not None:
+        return existing
+
+    raw = await _load_upstream_payload(source_url)
+    raw = copy.deepcopy(raw)
+    raw["source_url"] = source_url
+    raw["analysis_id"] = _analysis_id(user_id, source_url)
+
+    try:
+        contract = normalize_analysis_result(raw)
+    except HardFailure as exc:
+        await emit(
+            "failure_emitted",
+            user_id=user_id,
+            run_id=run_id,
+            payload={
+                "failure_code": exc.code.value,
+                "stage": "analysis",
+                "recovery_path_id": _recovery_path_id(exc),
+            },
+        )
+        raise
+
+    set_analysis_context(user_id, run_id)
+    await save_analysis(contract)
+    await emit(
+        "analysis_returned",
+        user_id=user_id,
+        run_id=run_id,
+        payload=_analysis_returned_payload(contract),
+    )
+    return contract
+
+
+async def _load_upstream_payload(source_url: str) -> dict[str, Any]:
+    upstream = os.getenv("CASCADE_UPSTREAM", "fixture").strip().lower() or "fixture"
+    if upstream == "fixture":
+        return _load_fixture(source_url)
+    if upstream == "toprador":
+        return await _call_toprador(source_url)
+    raise ValueError(f"unsupported CASCADE_UPSTREAM: {upstream}")
+
+
+def _load_fixture(source_url: str) -> dict[str, Any]:
+    digest = hashlib.sha256(source_url.encode("utf-8")).digest()
+    path = _HAPPY_FIXTURES[digest[0] % len(_HAPPY_FIXTURES)]
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+async def _call_toprador(source_url: str) -> dict[str, Any]:
+    raise NotImplementedError("CASCADE_UPSTREAM=toprador is not wired yet")
+
+
+def _analysis_id(user_id: str, source_url: str) -> str:
+    digest = hashlib.sha256(f"{user_id}\0{source_url}".encode("utf-8")).hexdigest()[:24]
+    return f"ana_{digest}"
+
+
+def _analysis_returned_payload(contract: CascadeAnalysisContract) -> dict[str, Any]:
+    return {
+        "analysis_id": contract.analysis_id,
+        "source_url": str(contract.source_url),
+        "platform": contract.platform.value,
+        "cost_cny": contract.cost_cny,
+        "duration_s": contract.duration_s,
+        "scenes_count": len(contract.scenes),
+        "warnings_count": len(contract.warnings),
+        "confidence": contract.confidence,
+        "had_fallback": any(w.code == WarningCode.W2_FALLBACK_USED.value for w in contract.warnings),
+        "model": contract.model,
+    }
+
+
+def _recovery_path_id(exc: HardFailure) -> str:
+    actions = exc.actions
+    return actions[0] if actions else "REPORT"

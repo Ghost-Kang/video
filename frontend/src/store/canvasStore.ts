@@ -1,5 +1,10 @@
 import { create } from "zustand";
 import type { CanvasNode } from "../types";
+import type { CascadeAnalysisContract, FailurePayload, Scene } from "../types/cascade";
+import {
+  MOCK_BAOMAM_ANALYSIS,
+  buildDefaultScript,
+} from "../fixtures/baomamFushi001";
 
 interface Edge {
   id: string;
@@ -13,6 +18,10 @@ interface CanvasStore {
   messages: { role: "user" | "agent"; content: string }[];
   selectedNodeId: string | null;
   streamingContent: string;
+  analysis: CascadeAnalysisContract | null;
+  script: string;
+  shots: Scene[];
+  failure: FailurePayload | null;
   setCanvas: (data: { nodes: Record<string, CanvasNode>; edges?: unknown[] }) => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
   addMessage: (role: "user" | "agent", content: string) => void;
@@ -20,6 +29,11 @@ interface CanvasStore {
   selectNode: (id: string | null) => void;
   appendStreaming: (text: string) => void;
   finalizeStreaming: (content: string) => void;
+  setAnalysis: (analysis: CascadeAnalysisContract | null) => void;
+  setScript: (script: string) => void;
+  setShots: (shots: Scene[]) => void;
+  setFailure: (failure: FailurePayload | null) => void;
+  loadFromAnalysis: (analysis: CascadeAnalysisContract) => void;
   clear: () => void;
 }
 
@@ -29,6 +43,10 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
   messages: [],
   selectedNodeId: null,
   streamingContent: "",
+  analysis: MOCK_BAOMAM_ANALYSIS,
+  script: buildDefaultScript(MOCK_BAOMAM_ANALYSIS),
+  shots: MOCK_BAOMAM_ANALYSIS.scenes,
+  failure: null,
 
   setCanvas: (data) =>
     set({
@@ -57,5 +75,32 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
       streamingContent: "",
     })),
 
-  clear: () => set({ nodes: [], edges: [], messages: [], selectedNodeId: null, streamingContent: "" }),
+  setAnalysis: (analysis) => set({ analysis }),
+
+  setScript: (script) => set({ script }),
+
+  setShots: (shots) => set({ shots }),
+
+  setFailure: (failure) => set({ failure }),
+
+  loadFromAnalysis: (analysis) =>
+    set({
+      analysis,
+      script: buildDefaultScript(analysis),
+      shots: analysis.scenes,
+      failure: null,
+    }),
+
+  clear: () =>
+    set({
+      nodes: [],
+      edges: [],
+      messages: [],
+      selectedNodeId: null,
+      streamingContent: "",
+      analysis: MOCK_BAOMAM_ANALYSIS,
+      script: buildDefaultScript(MOCK_BAOMAM_ANALYSIS),
+      shots: MOCK_BAOMAM_ANALYSIS.scenes,
+      failure: null,
+    }),
 }));

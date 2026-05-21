@@ -1,0 +1,45 @@
+{
+  "_provenance": "synthetic_v1",
+  "_purpose": "EDGE — HARD FAIL: only 2 scenes (< 3). Expect HardFailure(S4_SCENES_LEN_OUT_OF_RANGE).",
+  "schema_version": "1.0",
+  "analysis_id": "ana_syn_edge_short",
+  "source_url": "https://www.douyin.com/video/syn_short",
+  "platform": "douyin",
+  "created_at": "2026-05-19T08:16:00+00:00",
+  "model": "doubao-seed-2-0-pro",
+  "cost_cny": 0.10,
+  "duration_s": 12,
+  "confidence": 0.50,
+  "viral_analysis": {
+    "hook": "短",
+    "pacing": "短",
+    "climax": "短",
+    "visual_style": "短",
+    "emotional_arc": "短",
+    "target_audience": "短",
+    "engagement_levers": "短",
+    "replicable_formula": "短视频公式：开场 + 结尾"
+  },
+  "scenes": [
+    {
+      "scene_index": 1,
+      "timestamp_start": 0.0,
+      "timestamp_end": 6.0,
+      "scene": "开场",
+      "dialogue_and_narration": "",
+      "visual_content": "开场",
+      "shot_type": "close_up",
+      "camera_movement": "static"
+    },
+    {
+      "scene_index": 2,
+      "timestamp_start": 6.0,
+      "timestamp_end": 12.0,
+      "scene": "结尾",
+      "dialogue_and_narration": "",
+      "visual_content": "结尾",
+      "shot_type": "close_up",
+      "camera_movement": "static"
+    }
+  ]
+}
