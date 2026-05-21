@@ -81,6 +81,16 @@ elif [ -f scripts/p2-4_run_real_urls.py ]; then
 else
   p2_4="open"
 fi
+# P2-5 anchor sidebar polish: reuse pill text + sort toggle text both present
+p2_5_card=$(status_probe "frontend/src/components/anchors/AnchorCard.tsx" "已用|reuse_count > 0")
+p2_5_sidebar=$(status_probe "frontend/src/components/anchors/AnchorSidebar.tsx" "按使用次数|按时间|AnchorSort")
+if [ "$p2_5_card" = "done" ] && [ "$p2_5_sidebar" = "done" ]; then
+  p2_5="done"
+elif [ "$p2_5_card" != "open" ] || [ "$p2_5_sidebar" != "open" ]; then
+  p2_5="partial"
+else
+  p2_5="open"
+fi
 # P2-6 eval harness: runner.py existence + CLI script
 p2_6_runner=$(status_probe "backend/src/agent/cascade/eval/runner.py" "run_eval|class EvalReport|def run_eval")
 if [ "$p2_6_runner" = "done" ] && [ -f scripts/p2-6_eval.py ]; then
@@ -93,7 +103,7 @@ fi
 
 # Count W2 engineering tickets done
 w2_eng_done=0
-for t in "$p2_1" "$p2_2" "$p2_4" "$p2_6"; do
+for t in "$p2_1" "$p2_2" "$p2_4" "$p2_5" "$p2_6"; do
   [ "$t" = "done" ] && w2_eng_done=$((w2_eng_done + 1))
 done
 
@@ -156,8 +166,8 @@ if [ "$JSON" = "1" ]; then
     "$ts" "$phase0_closed" "$real_fixtures" "$test_count" "$test_skipped" "$compliance_done" "$algo_filing" "$prereg"
   printf '{"ts":"%s","scope":"pm_w1","briefs":%d,"eng_done":%d,"P1_2":"%s","P1_1":"%s","P1_3_prompts":"%s","P1_3_chain":"%s","P1_4":"%s","P1_6_back":"%s","P1_6_sb":"%s","P1_7":"%s","P1_8":"%s","P1_9":"%s"}\n' \
     "$ts" "$brief_count" "$eng_done" "$p1_2" "$p1_1" "$p1_3_prompts" "$p1_3_chain" "$p1_4" "$p1_6_back" "$p1_6_sb" "$p1_7" "$p1_8" "$p1_9"
-  printf '{"ts":"%s","scope":"pm_w2","active":"%s","w2_eng_done":%d,"P2_1":"%s","P2_2":"%s","P2_4":"%s","P2_6":"%s"}\n' \
-    "$ts" "$active_phase" "$w2_eng_done" "$p2_1" "$p2_2" "$p2_4" "$p2_6"
+  printf '{"ts":"%s","scope":"pm_w2","active":"%s","w2_eng_done":%d,"P2_1":"%s","P2_2":"%s","P2_4":"%s","P2_5":"%s","P2_6":"%s"}\n' \
+    "$ts" "$active_phase" "$w2_eng_done" "$p2_1" "$p2_2" "$p2_4" "$p2_5" "$p2_6"
   printf '{"ts":"%s","scope":"recruit","dms":%d,"calls":%d,"commits":%d,"runs":%d,"returns":%d}\n' \
     "$ts" "$dms" "$calls" "$commits" "$runs_count" "$returns_count"
   printf '{"ts":"%s","scope":"marketing","seed":"%s","xhs":%d,"douyin":%d,"wechat":%d,"jike":%d}\n' \
@@ -169,8 +179,8 @@ else
     "$phase0_closed" "$real_fixtures" "$test_count" "$test_skipped" "$compliance_done" "$algo_filing" "$prereg"
   printf 'PM_W1    briefs=%d  eng_done=%d/9  P1-2=%s  P1-1=%s  P1-3pr=%s  P1-3ch=%s  P1-4=%s  P1-6bk=%s  P1-6sb=%s  P1-7=%s  P1-8=%s  P1-9=%s\n' \
     "$brief_count" "$eng_done" "$p1_2" "$p1_1" "$p1_3_prompts" "$p1_3_chain" "$p1_4" "$p1_6_back" "$p1_6_sb" "$p1_7" "$p1_8" "$p1_9"
-  printf 'PM_W2    active=%s  w2_eng_done=%d/4  P2-1=%s  P2-2=%s  P2-4=%s  P2-6=%s\n' \
-    "$active_phase" "$w2_eng_done" "$p2_1" "$p2_2" "$p2_4" "$p2_6"
+  printf 'PM_W2    active=%s  w2_eng_done=%d/5  P2-1=%s  P2-2=%s  P2-4=%s  P2-5=%s  P2-6=%s\n' \
+    "$active_phase" "$w2_eng_done" "$p2_1" "$p2_2" "$p2_4" "$p2_5" "$p2_6"
   printf 'Recruit  dms=%d  calls=%d  commits=%d  runs=%d  returns=%d\n' \
     "$dms" "$calls" "$commits" "$runs_count" "$returns_count"
   printf 'Marketing seed=%s  xhs=%d/10  douyin=%d/5  wechat=%d/1  jike=%d/1\n' \
