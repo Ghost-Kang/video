@@ -1,12 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { COPY } from "../../lib/cardCopy";
-import { useAnchors } from "../../hooks/useAnchors";
+import { useAnchors, type AnchorSort } from "../../hooks/useAnchors";
 import { AnchorCard } from "./AnchorCard";
+
+const SORT_STORAGE_KEY = "anchor_sort_preference";
+
+function readStoredSort(): AnchorSort {
+  if (typeof window === "undefined") return "reuse";
+  const stored = window.localStorage.getItem(SORT_STORAGE_KEY);
+  return stored === "recency" ? "recency" : "reuse";
+}
 
 export function AnchorSidebar() {
   const [open, setOpen] = useState(true);
-  const characters = useAnchors("character");
-  const scenes = useAnchors("scene");
+  const [sortBy, setSortBy] = useState<AnchorSort>(() => readStoredSort());
+  const characters = useAnchors("character", sortBy);
+  const scenes = useAnchors("scene", sortBy);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SORT_STORAGE_KEY, sortBy);
+    }
+  }, [sortBy]);
 
   if (!open) {
     return (
@@ -16,12 +31,36 @@ export function AnchorSidebar() {
     );
   }
 
+  const pillBase = "rounded-full px-3 py-1 text-xs transition-colors";
+  const active = "bg-stone-900 text-white";
+  const inactive = "bg-stone-100 text-stone-600 hover:bg-stone-200";
+
   return (
     <aside className="hidden md:block w-[240px] shrink-0 rounded-2xl bg-white shadow-sm border border-stone-200 p-4 h-fit">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-medium text-stone-900">{COPY.anchor_picker_title}</h2>
         <button type="button" className="text-stone-400 hover:text-stone-700" onClick={() => setOpen(false)} aria-label="收起">
           x
+        </button>
+      </div>
+      <div className="flex gap-2 mb-4" role="radiogroup" aria-label="排序方式">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={sortBy === "reuse"}
+          className={`${pillBase} ${sortBy === "reuse" ? active : inactive}`}
+          onClick={() => setSortBy("reuse")}
+        >
+          按使用次数
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={sortBy === "recency"}
+          className={`${pillBase} ${sortBy === "recency" ? active : inactive}`}
+          onClick={() => setSortBy("recency")}
+        >
+          按时间
         </button>
       </div>
       <section className="mb-5">
