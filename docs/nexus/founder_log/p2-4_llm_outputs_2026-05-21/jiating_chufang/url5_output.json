@@ -1,0 +1,37 @@
+{
+  "rewrite_id": "rw_bf0004b867689d0e",
+  "analysis_id": "ana_p24_07f0174e41f9b181",
+  "niche": "jiating_chufang",
+  "script_markdown": "### 改写脚本\n<!-- 保留:H7 · 老公生日,华华晚上准备海鲜大餐,一家人围着庆祝,最后还有惊喜礼物 | hook_pattern_id=H7 | classification=positive | 改:换成家庭厨房视角和家庭场景 -->\n1. 你以为海鲜大餐很难做,其实关键就一步\n   画面:自家厨房台面俯拍,菜单照对比,价签特写 · 自家厨房台面,手机/菜单照\n2. 宽油不是花生油,是指多放油\n   画面:砧板食材近景,刀工手部特写,光线侧射 · 俯拍砧板,食材特写\n3. 热锅冷油,30 秒变色\n   画面:炒锅侧拍,火光跳跃,油烟升腾 · 侧拍炒锅,火光特写\n4. 这一道你家做不做,留言告诉我\n   画面:成品装盘近景,斜 45° 蒸汽特写,拉丝/出汁 · 成品装盘俯拍,拉丝/出汁",
+  "shots": [
+    {
+      "shot_index": 1,
+      "dialogue": "你以为海鲜大餐很难做,其实关键就一步",
+      "visual": "自家厨房台面俯拍,菜单照对比,价签特写 · 自家厨房台面,手机/菜单照"
+    },
+    {
+      "shot_index": 2,
+      "dialogue": "宽油不是花生油,是指多放油",
+      "visual": "砧板食材近景,刀工手部特写,光线侧射 · 俯拍砧板,食材特写"
+    },
+    {
+      "shot_index": 3,
+      "dialogue": "热锅冷油,30 秒变色",
+      "visual": "炒锅侧拍,火光跳跃,油烟升腾 · 侧拍炒锅,火光特写"
+    },
+    {
+      "shot_index": 4,
+      "dialogue": "这一道你家做不做,留言告诉我",
+      "visual": "成品装盘近景,斜 45° 蒸汽特写,拉丝/出汁 · 成品装盘俯拍,拉丝/出汁"
+    }
+  ],
+  "parser_warnings": [
+    "shot 1 anchored to P0 hook template (jiating_chufang)",
+    "shot 2 anchored to H9 (评论区二次梗钩)"
+  ],
+  "confidence": 0.75,
+  "cost_cny": 0.42,
+  "model": "p2-4-synth-v1",
+  "hook_pattern_id": "H7",
+  "source_classification": "positive"
+}

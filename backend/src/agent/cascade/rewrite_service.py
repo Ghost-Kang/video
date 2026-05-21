@@ -46,6 +46,11 @@ class RewriteResult(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0)
     cost_cny: float = Field(..., ge=0.0)
     model: str
+    # Founder's H1-H8 taxonomy preserved from source. Empty when the source
+    # is unannotated (legacy synthetic_v1 fixture or auto-derived analysis).
+    hook_pattern_id: str = ""
+    # positive | negative_ref | edge_case — default positive for legacy callers.
+    source_classification: str = "positive"
 
 
 async def request_rewrite(

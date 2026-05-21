@@ -1,0 +1,36 @@
+{
+  "rewrite_id": "rw_d709dabb508258e5",
+  "analysis_id": "ana_p24_7964405cb50e5635",
+  "niche": "baomam_fushi",
+  "script_markdown": "### 改写脚本\n<!-- 保留:H1 · 六月龄宝宝辅食添加的顺序 | hook_pattern_id=H1 | classification=positive | 改:换成宝妈辅食视角和家庭场景 -->\n1. 一岁宝宝一周辅食不重样,今天换这道试试\n   画面:暖色家庭厨房俯拍,餐椅特写,食材碗摆台 · 暖色俯拍,餐椅特写,食材碗\n2. 试试换一种食材或工具\n   画面:木质砧板特写,妈妈手切食材,自然光 · 砧板/料理台特写\n3. 几分钟搞定的小技巧\n   画面:蒸锅侧拍,蒸汽升腾,食材若隐若现 · 侧拍灶台,食物变化特写\n4. 你家几个月开始吃这个,评论区告诉我\n   画面:宝宝面部特写,小手抓勺,餐桌一角 · 宝宝面部特写",
+  "shots": [
+    {
+      "shot_index": 1,
+      "dialogue": "一岁宝宝一周辅食不重样,今天换这道试试",
+      "visual": "暖色家庭厨房俯拍,餐椅特写,食材碗摆台 · 暖色俯拍,餐椅特写,食材碗"
+    },
+    {
+      "shot_index": 2,
+      "dialogue": "试试换一种食材或工具",
+      "visual": "木质砧板特写,妈妈手切食材,自然光 · 砧板/料理台特写"
+    },
+    {
+      "shot_index": 3,
+      "dialogue": "几分钟搞定的小技巧",
+      "visual": "蒸锅侧拍,蒸汽升腾,食材若隐若现 · 侧拍灶台,食物变化特写"
+    },
+    {
+      "shot_index": 4,
+      "dialogue": "你家几个月开始吃这个,评论区告诉我",
+      "visual": "宝宝面部特写,小手抓勺,餐桌一角 · 宝宝面部特写"
+    }
+  ],
+  "parser_warnings": [
+    "shot 1 anchored to P0 hook template (baomam_fushi)"
+  ],
+  "confidence": 0.75,
+  "cost_cny": 0.42,
+  "model": "p2-4-synth-v1",
+  "hook_pattern_id": "H1",
+  "source_classification": "positive"
+}

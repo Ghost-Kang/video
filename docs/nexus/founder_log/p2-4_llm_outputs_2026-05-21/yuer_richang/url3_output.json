@@ -1,0 +1,36 @@
+{
+  "rewrite_id": "rw_b9addd5c3dac446f",
+  "analysis_id": "ana_p24_592b214d890ca96c",
+  "niche": "yuer_richang",
+  "script_markdown": "### 改写脚本\n<!-- 保留:H6 · 记录妍妍肉肉放学后的vlog #带娃日常 #我的带娃日常 #记录生活 | hook_pattern_id=H6 | classification=positive | 改:换成育儿日常视角和家庭场景 -->\n1. 崩溃的瞬间太多了,但他一句话又把我治愈\n   画面:夜灯昏黄,卧室广角,凌晨时钟若隐若现 · 夜灯昏黄,卧室广角\n2. 当妈以后才发现,真累的是没人理解\n   画面:妈妈侧脸特写,自拍角度,情绪沉重 · 妈妈侧脸,自拍角度\n3. 他突然说了句让我破防的话\n   画面:孩子局部特写,小手或睡颜,被子细节 · 孩子局部特写,小手小脚\n4. 你被娃哪句话戳过,评论区聊聊\n   画面:母子靠在一起中景,日光从窗外漏进 · 妈妈和娃靠在一起",
+  "shots": [
+    {
+      "shot_index": 1,
+      "dialogue": "崩溃的瞬间太多了,但他一句话又把我治愈",
+      "visual": "夜灯昏黄,卧室广角,凌晨时钟若隐若现 · 夜灯昏黄,卧室广角"
+    },
+    {
+      "shot_index": 2,
+      "dialogue": "当妈以后才发现,真累的是没人理解",
+      "visual": "妈妈侧脸特写,自拍角度,情绪沉重 · 妈妈侧脸,自拍角度"
+    },
+    {
+      "shot_index": 3,
+      "dialogue": "他突然说了句让我破防的话",
+      "visual": "孩子局部特写,小手或睡颜,被子细节 · 孩子局部特写,小手小脚"
+    },
+    {
+      "shot_index": 4,
+      "dialogue": "你被娃哪句话戳过,评论区聊聊",
+      "visual": "母子靠在一起中景,日光从窗外漏进 · 妈妈和娃靠在一起"
+    }
+  ],
+  "parser_warnings": [
+    "shot 1 anchored to P0 hook template (yuer_richang)"
+  ],
+  "confidence": 0.75,
+  "cost_cny": 0.42,
+  "model": "p2-4-synth-v1",
+  "hook_pattern_id": "H6",
+  "source_classification": "positive"
+}

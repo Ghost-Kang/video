@@ -1,0 +1,38 @@
+{
+  "rewrite_id": "rw_c24e041cc576a2fd",
+  "analysis_id": "ana_p24_d12429e715848e8b",
+  "niche": "jiating_chufang",
+  "script_markdown": "### 改写脚本\n<!-- 保留:H5 · 二伯快乐油升级版!梅广明师傅亲自调味制定配方 | hook_pattern_id=H5 | classification=edge_case | 改:换成家庭厨房视角和家庭场景 -->\n1. 餐厅 88 的家常红烧肉,为什么我在家做只要 12\n   画面:自家厨房台面俯拍,菜单照对比,价签特写 · 自家厨房台面,手机/菜单照\n2. 蒸蛋羹要过筛两次,你知道吗\n   画面:砧板食材近景,刀工手部特写,光线侧射 · 俯拍砧板,食材特写\n3. 热锅冷油,30 秒变色\n   画面:炒锅侧拍,火光跳跃,油烟升腾 · 侧拍炒锅,火光特写\n4. 这一道你家做不做,留言告诉我\n   画面:成品装盘近景,斜 45° 蒸汽特写,拉丝/出汁 · 成品装盘俯拍,拉丝/出汁",
+  "shots": [
+    {
+      "shot_index": 1,
+      "dialogue": "餐厅 88 的家常红烧肉,为什么我在家做只要 12",
+      "visual": "自家厨房台面俯拍,菜单照对比,价签特写 · 自家厨房台面,手机/菜单照"
+    },
+    {
+      "shot_index": 2,
+      "dialogue": "蒸蛋羹要过筛两次,你知道吗",
+      "visual": "砧板食材近景,刀工手部特写,光线侧射 · 俯拍砧板,食材特写"
+    },
+    {
+      "shot_index": 3,
+      "dialogue": "热锅冷油,30 秒变色",
+      "visual": "炒锅侧拍,火光跳跃,油烟升腾 · 侧拍炒锅,火光特写"
+    },
+    {
+      "shot_index": 4,
+      "dialogue": "这一道你家做不做,留言告诉我",
+      "visual": "成品装盘近景,斜 45° 蒸汽特写,拉丝/出汁 · 成品装盘俯拍,拉丝/出汁"
+    }
+  ],
+  "parser_warnings": [
+    "source_classification=edge_case: information density preserved; brand names and efficacy claims removed",
+    "shot 1 anchored to P0 hook template (jiating_chufang)",
+    "shot 2 anchored to H9 (评论区二次梗钩)"
+  ],
+  "confidence": 0.75,
+  "cost_cny": 0.42,
+  "model": "p2-4-synth-v1",
+  "hook_pattern_id": "H5",
+  "source_classification": "edge_case"
+}

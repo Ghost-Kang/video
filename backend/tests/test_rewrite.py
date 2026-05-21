@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from agent.cascade import hook_taxonomy
 from agent.cascade.contract import CascadeAnalysisContract
 from agent.cascade.rewrite import FORBIDDEN_TERMS, load_prompt, rewrite_for_niche
 
@@ -72,7 +73,10 @@ def _all_text(result: dict) -> str:
 
 @pytest.mark.parametrize("niche", NICHES)
 def test_mechanical_acceptance_per_niche(niche):
-    """For each of the 5 fixtures in a niche, count passes — require ≥4/5."""
+    """For each of the 5 fixtures in a niche, count passes — require ≥4/5.
+
+    Original 5 checks from claude_prompts_P1-3.md §3.
+    """
     paths = _fixture_paths(niche)
     passes = 0
     failures: list[str] = []
@@ -109,6 +113,123 @@ def test_mechanical_acceptance_per_niche(niche):
         f"{niche}: only {passes}/{len(paths)} fixtures passed mechanical checks. "
         f"Failures:\n" + "\n".join(failures)
     )
+
+
+# --- Founder-curated checks (p2-4_hooks_taxonomy.md §4) ---------------------
+
+
+@pytest.mark.parametrize("niche", NICHES)
+def test_visual_diversity_per_niche(niche):
+    """#6: pairwise token overlap between shot visuals ≤ 50% — require ≥4/5."""
+    paths = _fixture_paths(niche)
+    passes = 0
+    failures: list[str] = []
+    for path in paths:
+        contract = _load_contract(path)
+        result = asyncio.run(
+            rewrite_for_niche(
+                contract,
+                niche,
+                extras={"source_title": "", "source_classification": "positive"},
+            )
+        )
+        ok, detail = hook_taxonomy.visual_diversity(result)
+        if ok:
+            passes += 1
+        else:
+            failures.append(f"{path.name}: {detail}")
+    assert passes >= 4, f"{niche} visual_diversity: {passes}/{len(paths)}. Fails:\n" + "\n".join(failures)
+
+
+@pytest.mark.parametrize("niche", NICHES)
+def test_hook_p0_compliance_per_niche(niche):
+    """#8 (mandatory): shot 1 hits at least one P0 hook for this niche — require ≥4/5."""
+    paths = _fixture_paths(niche)
+    passes = 0
+    failures: list[str] = []
+    for path in paths:
+        contract = _load_contract(path)
+        result = asyncio.run(
+            rewrite_for_niche(
+                contract,
+                niche,
+                extras={"source_title": "", "source_classification": "positive"},
+            )
+        )
+        ok, detail = hook_taxonomy.hook_p0_compliance(result, niche)
+        if ok:
+            passes += 1
+        else:
+            failures.append(f"{path.name}: {detail}")
+    assert passes >= 4, f"{niche} hook_p0_compliance: {passes}/{len(paths)}. Fails:\n" + "\n".join(failures)
+
+
+@pytest.mark.parametrize("niche", NICHES)
+def test_negative_hook_absence_per_niche(niche):
+    """#10: niche's negative hooks must not fire — require ≥4/5."""
+    paths = _fixture_paths(niche)
+    passes = 0
+    failures: list[str] = []
+    for path in paths:
+        contract = _load_contract(path)
+        result = asyncio.run(rewrite_for_niche(contract, niche))
+        ok, detail = hook_taxonomy.negative_hook_absence(result, niche)
+        if ok:
+            passes += 1
+        else:
+            failures.append(f"{path.name}: {detail}")
+    assert passes >= 4, f"{niche} negative_hook_absence: {passes}/{len(paths)}. Fails:\n" + "\n".join(failures)
+
+
+def test_dish_anchor_for_jiating():
+    """F-3-a: jiating shot 1 must include a 菜名 — require ≥4/5."""
+    paths = _fixture_paths("jiating_chufang")
+    passes = 0
+    failures: list[str] = []
+    for path in paths:
+        contract = _load_contract(path)
+        result = asyncio.run(rewrite_for_niche(contract, "jiating_chufang"))
+        ok, detail = hook_taxonomy.dish_anchor_present(result, "jiating_chufang")
+        if ok:
+            passes += 1
+        else:
+            failures.append(f"{path.name}: {detail}")
+    assert passes >= 4, f"jiating dish_anchor: {passes}/{len(paths)}. Fails:\n" + "\n".join(failures)
+
+
+def test_nutrient_category_for_baomam():
+    """#7 (mandatory): baomam rewrite must not introduce out-of-category foods."""
+    paths = _fixture_paths("baomam_fushi")
+    passes = 0
+    failures: list[str] = []
+    # Use source titles that hint at one nutrient category
+    title_hints = ["一岁宝宝一周辅食蔬菜不重样", "六月龄宝宝肉泥添加", "宝宝一周米糊不重样"]
+    for i, path in enumerate(paths):
+        contract = _load_contract(path)
+        title = title_hints[i % len(title_hints)]
+        result = asyncio.run(
+            rewrite_for_niche(
+                contract,
+                "baomam_fushi",
+                extras={"source_title": title, "source_classification": "positive"},
+            )
+        )
+        ok, detail = hook_taxonomy.nutrient_category_consistency(result, "baomam_fushi", title)
+        if ok:
+            passes += 1
+        else:
+            failures.append(f"{path.name} (source={title!r}): {detail}")
+    assert passes >= 4, f"baomam nutrient_category: {passes}/{len(paths)}. Fails:\n" + "\n".join(failures)
+
+
+def test_hook_taxonomy_detects_known_examples():
+    """Unit test for hook_taxonomy detectors."""
+    assert "H1" in hook_taxonomy.detect_hooks_in_text("六月龄宝宝辅食添加的顺序")
+    assert "H2" in hook_taxonomy.detect_hooks_in_text("一周辅食不重样")
+    assert "H4" in hook_taxonomy.detect_hooks_in_text("餐厅 88 我做 12")
+    assert "H8" in hook_taxonomy.detect_hooks_in_text("当妈以后才发现")
+    assert "H9" in hook_taxonomy.detect_hooks_in_text("为什么牛肉要逆纹切")
+    assert "H1" not in hook_taxonomy.detect_hooks_in_text("新手妈妈带娃日记")
 
 
 # --- API surface checks ---
