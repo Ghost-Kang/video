@@ -68,6 +68,41 @@ for t in "$p1_2" "$p1_1" "$p1_3_chain" "$p1_4" "$p1_6_back" "$p1_6_sb" "$p1_7" "
   [ "$t" = "done" ] && eng_done=$((eng_done + 1))
 done
 
+# ---------- PM W2 — ticket status (probes added per PM_W2_allocation.md §7) ----------
+# P2-1 double-emit fix: Codex adds a concurrency test in test_analysis_service.py
+p2_1=$(status_probe "backend/tests/test_analysis_service.py" "test_concurrent_same_url|test_double_emit|once_per_analysis_id")
+# P2-2 S7/S8 upstream wiring: analysis_service.py raises S7/S8 from real upstream
+p2_2=$(status_probe "backend/src/agent/cascade/analysis_service.py" "S7_UPSTREAM_TIMEOUT|S8_UPSTREAM_REFUSED")
+# P2-4 LLM mode real-URL signoff: presence of the qualitative signoff file is the bar
+if ls docs/nexus/founder_log/p2-4_qualitative_signoff_*.md >/dev/null 2>&1; then
+  p2_4="done"
+elif [ -f scripts/p2-4_run_real_urls.py ]; then
+  p2_4="partial"
+else
+  p2_4="open"
+fi
+# P2-6 eval harness: runner.py existence + CLI script
+p2_6_runner=$(status_probe "backend/src/agent/cascade/eval/runner.py" "run_eval|class EvalReport|def run_eval")
+if [ "$p2_6_runner" = "done" ] && [ -f scripts/p2-6_eval.py ]; then
+  p2_6="done"
+elif [ "$p2_6_runner" = "done" ] || [ -f scripts/p2-6_eval.py ]; then
+  p2_6="partial"
+else
+  p2_6="open"
+fi
+
+# Count W2 engineering tickets done
+w2_eng_done=0
+for t in "$p2_1" "$p2_2" "$p2_4" "$p2_6"; do
+  [ "$t" = "done" ] && w2_eng_done=$((w2_eng_done + 1))
+done
+
+# Phase indicator — which W is "active". W1 active until eng_done=9, then W2.
+w2_allocation_exists="NO"
+[ -f docs/nexus/PM_W2_allocation.md ] && w2_allocation_exists="YES"
+active_phase="W1"
+[ "$w2_allocation_exists" = "YES" ] && active_phase="W2"
+
 # ---------- Recruitment + marketing (read from founder log if exists) ----------
 recruit_log="docs/nexus/founder_log/recruitment.md"
 if [ -e "$recruit_log" ]; then
@@ -121,6 +156,8 @@ if [ "$JSON" = "1" ]; then
     "$ts" "$phase0_closed" "$real_fixtures" "$test_count" "$test_skipped" "$compliance_done" "$algo_filing" "$prereg"
   printf '{"ts":"%s","scope":"pm_w1","briefs":%d,"eng_done":%d,"P1_2":"%s","P1_1":"%s","P1_3_prompts":"%s","P1_3_chain":"%s","P1_4":"%s","P1_6_back":"%s","P1_6_sb":"%s","P1_7":"%s","P1_8":"%s","P1_9":"%s"}\n' \
     "$ts" "$brief_count" "$eng_done" "$p1_2" "$p1_1" "$p1_3_prompts" "$p1_3_chain" "$p1_4" "$p1_6_back" "$p1_6_sb" "$p1_7" "$p1_8" "$p1_9"
+  printf '{"ts":"%s","scope":"pm_w2","active":"%s","w2_eng_done":%d,"P2_1":"%s","P2_2":"%s","P2_4":"%s","P2_6":"%s"}\n' \
+    "$ts" "$active_phase" "$w2_eng_done" "$p2_1" "$p2_2" "$p2_4" "$p2_6"
   printf '{"ts":"%s","scope":"recruit","dms":%d,"calls":%d,"commits":%d,"runs":%d,"returns":%d}\n' \
     "$ts" "$dms" "$calls" "$commits" "$runs_count" "$returns_count"
   printf '{"ts":"%s","scope":"marketing","seed":"%s","xhs":%d,"douyin":%d,"wechat":%d,"jike":%d}\n' \
@@ -132,6 +169,8 @@ else
     "$phase0_closed" "$real_fixtures" "$test_count" "$test_skipped" "$compliance_done" "$algo_filing" "$prereg"
   printf 'PM_W1    briefs=%d  eng_done=%d/9  P1-2=%s  P1-1=%s  P1-3pr=%s  P1-3ch=%s  P1-4=%s  P1-6bk=%s  P1-6sb=%s  P1-7=%s  P1-8=%s  P1-9=%s\n' \
     "$brief_count" "$eng_done" "$p1_2" "$p1_1" "$p1_3_prompts" "$p1_3_chain" "$p1_4" "$p1_6_back" "$p1_6_sb" "$p1_7" "$p1_8" "$p1_9"
+  printf 'PM_W2    active=%s  w2_eng_done=%d/4  P2-1=%s  P2-2=%s  P2-4=%s  P2-6=%s\n' \
+    "$active_phase" "$w2_eng_done" "$p2_1" "$p2_2" "$p2_4" "$p2_6"
   printf 'Recruit  dms=%d  calls=%d  commits=%d  runs=%d  returns=%d\n' \
     "$dms" "$calls" "$commits" "$runs_count" "$returns_count"
   printf 'Marketing seed=%s  xhs=%d/10  douyin=%d/5  wechat=%d/1  jike=%d/1\n' \
