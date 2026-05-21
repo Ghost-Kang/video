@@ -17,6 +17,7 @@ from agent.store import get_messages, save_message
 from agent.tools import canvas as canvas_tools
 from agent.cascade.analysis_service import request_shallow_analysis
 from agent.cascade.anchors import create_anchor, list_anchors, reuse_anchor
+from agent.cascade.storage import list_creators
 from agent.cascade.cost_guard import PREDICT_ANALYSIS_CNY, PREDICT_REWRITE_CNY, cost_guard, cost_status
 from agent.cascade.events import emit
 from agent.cascade.failures import HardFailure
@@ -438,6 +439,9 @@ async def _handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
             qs = parse_qs(urlparse(path).query)
             payload = await cost_status(qs.get("user_id", ["default"])[0], qs.get("run_id", ["default"])[0])
             writer.write(_http_response(200, payload))
+        elif method == "GET" and path == "/api/creators":
+            creators = await list_creators()
+            writer.write(_http_response(200, {"creators": creators}))
         elif method == "GET" and path.startswith("/api/anchors"):
             from urllib.parse import parse_qs, urlparse
             qs = parse_qs(urlparse(path).query)

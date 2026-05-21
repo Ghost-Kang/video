@@ -5,6 +5,7 @@ import "./index.css";
 import App from "./App";
 import { Landing } from "./pages/Landing";
 import { AnchorAnalytics } from "./pages/AnchorAnalytics";
+import { AdminCreators } from "./pages/AdminCreators";
 
 function newSessionId() {
   return `session-${Date.now().toString(36)}`;
@@ -16,6 +17,7 @@ createRoot(document.getElementById("root")!).render(
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/analytics/anchors" element={<AnchorAnalytics />} />
+        <Route path="/admin/creators" element={<AdminCreators />} />
         <Route path="/chat/:threadId" element={<App />} />
         <Route path="/canvas" element={<Navigate to={`/chat/${newSessionId()}?view=pro`} replace />} />
         <Route path="*" element={<Navigate to={`/chat/${newSessionId()}`} replace />} />
