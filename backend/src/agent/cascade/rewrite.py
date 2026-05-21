@@ -162,33 +162,129 @@ def _default_dialogue(niche: str, shot_index: int) -> str:
     return "在家也能做出餐厅的味道,这次你试试看"
 
 
-async def _llm_rewrite(contract: CascadeAnalysisContract, niche: str) -> dict[str, Any]:
-    """Live LLM path. Loads the niche prompt and parses the model's JSON response."""
+_JSON_RETRY_NUDGE = (
+    "\n\n你刚才的输出不是合法 JSON。请只输出合法 JSON 对象,不要任何 markdown 围栏、"
+    "解释或前缀。仅返回 schema 中描述的字段。"
+)
+
+
+def _invoke_llm(prompt: str) -> str:
+    """Call the LLM and return raw text. Separated for testability (mockable)."""
     try:
         from langchain_google_genai import ChatGoogleGenerativeAI
 
         from agent.config import LLM_MODEL
-    except ImportError as exc:  # pragma: no cover - import guard for env without deps
+    except ImportError as exc:  # pragma: no cover - import guard
         raise RuntimeError("LLM dependencies unavailable; set CASCADE_REWRITE_UPSTREAM=fixture") from exc
-
-    template = load_prompt(niche)
-    contract_json = json.dumps(contract.model_dump(mode="json"), ensure_ascii=False, indent=2)
-    prompt = template.replace("{CONTRACT_JSON}", contract_json)
 
     model = ChatGoogleGenerativeAI(model=LLM_MODEL)
     result = model.invoke([{"role": "user", "content": prompt}])
     raw = result.content if hasattr(result, "content") else str(result)
-    raw_text = raw if isinstance(raw, str) else _join_content_parts(raw)
-    data = _extract_json(raw_text)
-    # Ensure required identity fields agree with the input — the model can hallucinate.
+    return raw if isinstance(raw, str) else _join_content_parts(raw)
+
+
+async def _llm_rewrite(contract: CascadeAnalysisContract, niche: str) -> dict[str, Any]:
+    """Live LLM path. Loads the niche prompt and parses the model's JSON response.
+
+    Hardening (per claude_llm_P2-4.md):
+    - Largest-object JSON extraction (model may embed example JSON in commentary)
+    - 1-shot retry on malformed output with a clarifying nudge
+    - Post-hoc forbidden-term scrub via _clean(), with parser_warnings recording
+    - Confidence ceiling: any hard-constraint violation forces confidence ≤ 0.4
+    - cost_cny estimate from prompt + response length
+    """
+    template = load_prompt(niche)
+    contract_json = json.dumps(contract.model_dump(mode="json"), ensure_ascii=False, indent=2)
+    prompt = template.replace("{CONTRACT_JSON}", contract_json)
+
+    raw_text = _invoke_llm(prompt)
+    try:
+        data = _extract_json(raw_text)
+    except (ValueError, json.JSONDecodeError):
+        # One retry with explicit nudge
+        retry_text = _invoke_llm(prompt + _JSON_RETRY_NUDGE)
+        try:
+            data = _extract_json(retry_text)
+        except (ValueError, json.JSONDecodeError) as exc:
+            from agent.cascade.failures import FailureCode, HardFailure
+            raise HardFailure(FailureCode.S5_INVALID_PAYLOAD, "LLM rewrite output not parseable") from exc
+        raw_text = retry_text
+
+    data = _normalize_llm_output(data, contract, niche, raw_text, prompt)
+    return data
+
+
+def _normalize_llm_output(
+    data: dict[str, Any],
+    contract: CascadeAnalysisContract,
+    niche: str,
+    raw_text: str,
+    prompt: str,
+) -> dict[str, Any]:
+    """Coerce + harden raw LLM dict before returning."""
+    warnings: list[str] = list(data.get("parser_warnings") or [])
+
+    # Identity fields — model can hallucinate; force agreement with the input contract.
     data["analysis_id"] = contract.analysis_id
-    data.setdefault("niche", niche)
+    data["niche"] = niche
     data.setdefault("model", contract.model)
-    data.setdefault("parser_warnings", [])
-    data.setdefault("cost_cny", 0.0)
-    if "rewrite_id" not in data:
+
+    if "rewrite_id" not in data or not str(data.get("rewrite_id", "")).startswith("rw_"):
         digest = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()[:16]
         data["rewrite_id"] = f"rw_{digest}"
+
+    # Shot count clamp.
+    shots = data.get("shots") or []
+    if len(shots) > 5:
+        shots = shots[:5]
+        warnings.append(f"shots truncated from {len(data.get('shots') or [])} to 5")
+    if len(shots) < 3:
+        warnings.append(f"shots count {len(shots)} below niche minimum 3 — caller will reject")
+    data["shots"] = shots
+
+    # Forbidden-term scrub on script and shot text. _clean already does substitution;
+    # we just track if anything changed so the founder sees it.
+    original_script = data.get("script_markdown", "")
+    cleaned_script = _clean(original_script)
+    if cleaned_script != original_script:
+        warnings.append("forbidden terms scrubbed from script_markdown")
+    data["script_markdown"] = cleaned_script
+
+    for shot in shots:
+        orig_dialogue = shot.get("dialogue", "")
+        orig_visual = shot.get("visual", "")
+        new_dialogue = _clean(orig_dialogue)
+        new_visual = _clean(orig_visual)
+        if new_dialogue != orig_dialogue or new_visual != orig_visual:
+            warnings.append(f"forbidden terms scrubbed from shot {shot.get('shot_index', '?')}")
+        shot["dialogue"] = new_dialogue
+        shot["visual"] = new_visual
+
+    # Confidence calibration.
+    confidence = float(data.get("confidence", 0.0) or 0.0)
+    confidence = max(0.0, min(1.0, confidence))
+    hard_violation = (
+        len(shots) < 3
+        or len(shots) > 5
+        or any(w.startswith("forbidden terms scrubbed") for w in warnings)
+        or not (80 <= len(data["script_markdown"]) <= 600)
+    )
+    if hard_violation:
+        confidence = min(confidence, 0.4)
+        warnings.append("confidence capped at 0.4 (hard constraint violated)")
+    data["confidence"] = confidence
+
+    # Cost estimate. Defaults reflect Gemini Flash pricing in CNY per 1K tokens;
+    # config can override.
+    in_price = float(os.getenv("LLM_INPUT_PRICE_CNY_PER_1K", "0.005"))
+    out_price = float(os.getenv("LLM_OUTPUT_PRICE_CNY_PER_1K", "0.020"))
+    tokens_in = max(1, len(prompt) // 4)
+    tokens_out = max(1, len(raw_text) // 4)
+    estimated_cost = (tokens_in / 1000.0) * in_price + (tokens_out / 1000.0) * out_price
+    # Round up to 4 decimal places; ensure positive.
+    data["cost_cny"] = max(0.0001, round(estimated_cost, 4))
+
+    data["parser_warnings"] = warnings
     return data
 
 
@@ -202,8 +298,44 @@ _JSON_PATTERN = re.compile(r"\{[\s\S]*\}")
 
 
 def _extract_json(text: str) -> dict[str, Any]:
-    """Pull the first JSON object out of the model output, even if wrapped in fences."""
-    match = _JSON_PATTERN.search(text)
-    if not match:
-        raise ValueError("rewrite LLM returned no JSON object")
-    return json.loads(match.group(0))
+    """Pull the largest valid JSON object out of the model output.
+
+    Model may embed example JSON in commentary before the real answer. Iterate
+    candidate matches and pick the longest that parses cleanly. Falls back to
+    the first matching greedy object if none parse — caller handles the raise.
+    """
+    candidates: list[str] = []
+    # Greedy match (might span multiple objects)
+    greedy = _JSON_PATTERN.search(text)
+    if greedy:
+        candidates.append(greedy.group(0))
+
+    # Bracket-balance scan for individual JSON objects
+    depth = 0
+    start = -1
+    for i, ch in enumerate(text):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and start >= 0:
+                candidates.append(text[start : i + 1])
+                start = -1
+
+    # Try parsing each candidate; keep the largest that succeeds.
+    best: dict[str, Any] | None = None
+    best_len = -1
+    for cand in candidates:
+        try:
+            parsed = json.loads(cand)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict) and len(cand) > best_len:
+            best = parsed
+            best_len = len(cand)
+
+    if best is None:
+        raise ValueError("rewrite LLM returned no valid JSON object")
+    return best
