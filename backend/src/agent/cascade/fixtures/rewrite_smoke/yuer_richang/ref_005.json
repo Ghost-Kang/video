@@ -1,0 +1,91 @@
+{
+  "_provenance": "rewrite_smoke_v1",
+  "_niche": "yuer_richang",
+  "schema_version": "1.0",
+  "analysis_id": "ana_smk_yuer_richang_005",
+  "source_url": "https://www.douyin.com/video/smoke_yuer_richang_005",
+  "platform": "douyin",
+  "created_at": "2026-05-21T10:22:15.636566+00:00",
+  "model": "doubao-seed-2-0-pro",
+  "cost_cny": 0.42,
+  "duration_s": 31,
+  "confidence": 0.86,
+  "viral_analysis": {
+    "hook": "开场 1.8 秒:娃在幼儿园门口不撒手",
+    "pacing": "4-3-2 秒压缩,临近结尾镜头变短",
+    "climax": "倒数第二镜情绪反转",
+    "visual_style": "暖色调,家庭场景,自然光",
+    "emotional_arc": "挣扎 → 心疼 → 转折 → 成长",
+    "target_audience": "目标人群明确,场景代入感强",
+    "engagement_levers": "结尾抛问题诱导评论",
+    "replicable_formula": "入园分离焦虑 + 一个细节 + 妈妈反思"
+  },
+  "scenes": [
+    {
+      "scene_index": 1,
+      "timestamp_start": 0.0,
+      "timestamp_end": 4.0,
+      "scene": "幼儿园门口娃拽妈妈衣角",
+      "dialogue_and_narration": "他第一天不肯进去",
+      "visual_content": "幼儿园门口广角",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 2,
+      "timestamp_start": 4.0,
+      "timestamp_end": 10.0,
+      "scene": "妈妈蹲下来",
+      "dialogue_and_narration": "我说'妈妈下午第一个来接你'",
+      "visual_content": "妈妈蹲下中景",
+      "subject": "妈妈",
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 3,
+      "timestamp_start": 10.0,
+      "timestamp_end": 17.0,
+      "scene": "娃慢慢松手",
+      "dialogue_and_narration": "他看了我三秒",
+      "visual_content": "娃手部松开特写",
+      "subject": "孩子",
+      "shot_type": "close_up",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 4,
+      "timestamp_start": 17.0,
+      "timestamp_end": 25.0,
+      "scene": "妈妈躲到墙后哭",
+      "dialogue_and_narration": "我躲到墙后才敢哭",
+      "visual_content": "妈妈侧影暗光",
+      "subject": "妈妈",
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 5,
+      "timestamp_start": 25.0,
+      "timestamp_end": 31.0,
+      "scene": "下午接娃笑跑",
+      "dialogue_and_narration": "你家娃第一天入园是什么样",
+      "visual_content": "幼儿园门口中景",
+      "subject": "妈妈",
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}

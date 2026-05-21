@@ -1,0 +1,91 @@
+{
+  "_provenance": "rewrite_smoke_v1",
+  "_niche": "jiating_chufang",
+  "schema_version": "1.0",
+  "analysis_id": "ana_smk_jiating_chufang_003",
+  "source_url": "https://www.douyin.com/video/smoke_jiating_chufang_003",
+  "platform": "douyin",
+  "created_at": "2026-05-21T10:22:15.636885+00:00",
+  "model": "doubao-seed-2-0-pro",
+  "cost_cny": 0.42,
+  "duration_s": 30,
+  "confidence": 0.86,
+  "viral_analysis": {
+    "hook": "开场 1.5 秒:厨房小白也能做的法式吐司",
+    "pacing": "4-3-2 秒压缩,临近结尾镜头变短",
+    "climax": "倒数第二镜情绪反转",
+    "visual_style": "暖色调,家庭场景,自然光",
+    "emotional_arc": "紧张 → 上手 → 满足 → 自信",
+    "target_audience": "目标人群明确,场景代入感强",
+    "engagement_levers": "结尾抛问题诱导评论",
+    "replicable_formula": "新手友好定位 + 5 分钟操作 + 早餐场景"
+  },
+  "scenes": [
+    {
+      "scene_index": 1,
+      "timestamp_start": 0.0,
+      "timestamp_end": 3.5,
+      "scene": "鸡蛋牛奶打散",
+      "dialogue_and_narration": "厨房小白也能做",
+      "visual_content": "搅拌碗俯拍",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 2,
+      "timestamp_start": 3.5,
+      "timestamp_end": 10.0,
+      "scene": "面包浸蛋液",
+      "dialogue_and_narration": "面包两面浸 10 秒",
+      "visual_content": "面包浸入特写",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 3,
+      "timestamp_start": 10.0,
+      "timestamp_end": 16.0,
+      "scene": "小火煎",
+      "dialogue_and_narration": "小火慢煎,别开大火",
+      "visual_content": "平底锅侧拍",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 4,
+      "timestamp_start": 16.0,
+      "timestamp_end": 23.0,
+      "scene": "撒糖粉",
+      "dialogue_and_narration": "出锅撒糖粉,挤蜂蜜",
+      "visual_content": "撒糖动作特写",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 5,
+      "timestamp_start": 23.0,
+      "timestamp_end": 30.0,
+      "scene": "餐桌切开",
+      "dialogue_and_narration": "周末早餐你做不做,评论区聊聊",
+      "visual_content": "餐桌切开特写",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}

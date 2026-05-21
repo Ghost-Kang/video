@@ -1,0 +1,91 @@
+{
+  "_provenance": "rewrite_smoke_v1",
+  "_niche": "baomam_fushi",
+  "schema_version": "1.0",
+  "analysis_id": "ana_smk_baomam_fushi_001",
+  "source_url": "https://www.douyin.com/video/smoke_baomam_fushi_001",
+  "platform": "douyin",
+  "created_at": "2026-05-21T10:22:15.635531+00:00",
+  "model": "doubao-seed-2-0-pro",
+  "cost_cny": 0.42,
+  "duration_s": 38,
+  "confidence": 0.86,
+  "viral_analysis": {
+    "hook": "开场 1.2 秒:宝宝撇头拒食 + 妈妈无奈表情",
+    "pacing": "4-3-2 秒压缩,临近结尾镜头变短",
+    "climax": "倒数第二镜情绪反转",
+    "visual_style": "暖色调,家庭场景,自然光",
+    "emotional_arc": "焦虑 → 尝试 → 惊喜 → 成就",
+    "target_audience": "目标人群明确,场景代入感强",
+    "engagement_levers": "结尾抛问题诱导评论",
+    "replicable_formula": "悬念开场(拒食痛点) + 3 步解决(换花样) + 反差结尾(主动吃)"
+  },
+  "scenes": [
+    {
+      "scene_index": 1,
+      "timestamp_start": 0.0,
+      "timestamp_end": 4.5,
+      "scene": "宝宝在餐椅上撇头不吃胡萝卜泥",
+      "dialogue_and_narration": "你家宝宝是不是也这样,怎么喂都不吃?",
+      "visual_content": "暖色俯拍,餐椅特写,橙色胡萝卜泥",
+      "subject": "宝宝",
+      "shot_type": "close_up",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 2,
+      "timestamp_start": 4.5,
+      "timestamp_end": 11.0,
+      "scene": "妈妈在木砧板切苹果块",
+      "dialogue_and_narration": "试试换成苹果,颜色更亮宝宝更感兴趣",
+      "visual_content": "暖色俯拍砧板,红苹果块",
+      "subject": "妈妈",
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 3,
+      "timestamp_start": 11.0,
+      "timestamp_end": 18.0,
+      "scene": "蒸锅蒸苹果",
+      "dialogue_and_narration": "蒸 8 分钟,又软又香",
+      "visual_content": "侧拍蒸锅,蒸汽中红苹果",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 4,
+      "timestamp_start": 18.0,
+      "timestamp_end": 28.0,
+      "scene": "妈妈喂宝宝,宝宝张嘴",
+      "dialogue_and_narration": "看,张嘴了!这一勺下去我眼泪都要出来",
+      "visual_content": "中景,妈妈手持勺子,宝宝张嘴接住",
+      "subject": "妈妈",
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 5,
+      "timestamp_start": 28.0,
+      "timestamp_end": 38.0,
+      "scene": "宝宝抢勺子自己吃",
+      "dialogue_and_narration": "我哭了。你家宝宝几个月开始抢勺子,评论区告诉我",
+      "visual_content": "宝宝面部特写,手抓勺子",
+      "subject": "宝宝",
+      "shot_type": "close_up",
+      "camera_movement": "handheld",
+      "first_frame_url": null,
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}

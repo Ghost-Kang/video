@@ -15,6 +15,13 @@ from agent.config import LLM_MODEL, IMAGE_GEN_PROVIDER
 from agent.pool import AgentPool
 from agent.store import get_messages, save_message
 from agent.tools import canvas as canvas_tools
+from agent.cascade.analysis_service import request_shallow_analysis
+from agent.cascade.anchors import create_anchor, list_anchors, reuse_anchor
+from agent.cascade.cost_guard import PREDICT_ANALYSIS_CNY, PREDICT_REWRITE_CNY, cost_guard, cost_status
+from agent.cascade.events import emit
+from agent.cascade.failures import HardFailure
+from agent.cascade.rewrite_service import error_payload, request_rewrite
+from pydantic import ValidationError
 
 
 POOL_SIZE = 5
@@ -400,10 +407,171 @@ async def handle(websocket):
     print("[断开] WS 连接已关闭")
 
 
-async def main(host="0.0.0.0", port=8765):
+def _http_response(status: int, body: dict, reason: str = "OK") -> bytes:
+    payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
+    return (
+        f"HTTP/1.1 {status} {reason}\r\n"
+        "Content-Type: application/json; charset=utf-8\r\n"
+        f"Content-Length: {len(payload)}\r\n"
+        "Connection: close\r\n"
+        "\r\n"
+    ).encode("ascii") + payload
+
+
+async def _handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    try:
+        header_bytes = await reader.readuntil(b"\r\n\r\n")
+        header_text = header_bytes.decode("iso-8859-1")
+        first_line, *header_lines = header_text.split("\r\n")
+        method, path, _ = first_line.split(" ", 2)
+        headers = {}
+        for line in header_lines:
+            if ":" in line:
+                k, v = line.split(":", 1)
+                headers[k.strip().lower()] = v.strip()
+        content_length = int(headers.get("content-length", "0") or "0")
+        body_bytes = await reader.readexactly(content_length) if content_length else b"{}"
+
+        body = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
+        if method == "GET" and path.startswith("/api/cost/status"):
+            from urllib.parse import parse_qs, urlparse
+            qs = parse_qs(urlparse(path).query)
+            payload = await cost_status(qs.get("user_id", ["default"])[0], qs.get("run_id", ["default"])[0])
+            writer.write(_http_response(200, payload))
+        elif method == "GET" and path.startswith("/api/anchors"):
+            from urllib.parse import parse_qs, urlparse
+            qs = parse_qs(urlparse(path).query)
+            user_id = qs.get("user_id", ["default"])[0]
+            kind = qs.get("kind", [None])[0]
+            try:
+                anchors = await list_anchors(user_id=user_id, kind=kind)
+            except ValueError as exc:
+                writer.write(_http_response(400, {"error": str(exc)}, "Bad Request"))
+                await writer.drain()
+                return
+            writer.write(_http_response(200, {"anchors": [a.model_dump(mode="json") for a in anchors]}))
+        elif method == "POST" and path == "/api/anchors":
+            try:
+                anchor = await create_anchor(
+                    user_id=str(body.get("user_id") or "default"),
+                    kind=str(body.get("kind") or ""),
+                    label=str(body.get("label") or ""),
+                    image_url=str(body.get("image_url") or ""),
+                    source_run_id=body.get("source_run_id"),
+                    source_shot_index=body.get("source_shot_index"),
+                )
+            except (ValidationError, ValueError) as exc:
+                writer.write(_http_response(400, {"error": str(exc)}, "Bad Request"))
+                await writer.drain()
+                return
+            writer.write(_http_response(200, anchor.model_dump(mode="json")))
+        elif method == "POST" and path.startswith("/api/anchors/") and path.endswith("/reuse"):
+            anchor_id = path[len("/api/anchors/"):-len("/reuse")]
+            try:
+                anchor = await reuse_anchor(
+                    anchor_id=anchor_id,
+                    user_id=str(body.get("user_id") or "default"),
+                    reused_in_run_id=str(body.get("reused_in_run_id") or ""),
+                    reused_in_shot_index=body.get("reused_in_shot_index"),
+                )
+            except LookupError as exc:
+                writer.write(_http_response(404, {"error": str(exc)}, "Not Found"))
+                await writer.drain()
+                return
+            except PermissionError as exc:
+                writer.write(_http_response(403, {"error": str(exc)}, "Forbidden"))
+                await writer.drain()
+                return
+            writer.write(_http_response(200, anchor.model_dump(mode="json")))
+        elif method == "POST" and path == "/api/events":
+            await emit(
+                str(body["event_name"]),
+                user_id=str(body.get("user_id") or "default"),
+                run_id=body.get("run_id"),
+                payload=body.get("payload") or {},
+            )
+            writer.write(_http_response(200, {"ok": True}))
+        elif method == "POST" and path == "/api/rewrite":
+            user_id = str(body.get("user_id") or "default")
+            run_id = str(body.get("run_id") or "default")
+            await cost_guard(user_id, run_id, PREDICT_REWRITE_CNY)
+            result = await request_rewrite(
+                analysis_id=str(body.get("analysis_id") or ""),
+                niche=body.get("niche"),
+                user_id=user_id,
+                run_id=run_id,
+            )
+            await emit(
+                "generation_cost",
+                user_id=user_id,
+                run_id=run_id,
+                payload={
+                    "run_id": run_id,
+                    "call_kind": "rewrite",
+                    "provider": "local",
+                    "model": result.model,
+                    "cost_fen": int(round(result.cost_cny * 100)),
+                    "latency_ms": 0,
+                    "tokens_in": None,
+                    "tokens_out": None,
+                    "outcome": "done",
+                },
+            )
+            writer.write(_http_response(200, result.model_dump(mode="json")))
+        elif method == "POST" and path == "/api/analysis/shallow":
+            source_url = str(body.get("source_url") or "").strip()
+            if not source_url:
+                writer.write(_http_response(400, {"error": "source_url_required"}, "Bad Request"))
+                await writer.drain()
+                return
+            user_id = str(body.get("user_id") or "default")
+            run_id = str(body.get("run_id") or "default")
+            await cost_guard(user_id, run_id, PREDICT_ANALYSIS_CNY)
+            contract = await request_shallow_analysis(source_url, user_id=user_id, run_id=run_id)
+            await emit(
+                "generation_cost",
+                user_id=user_id,
+                run_id=run_id,
+                payload={
+                    "run_id": run_id,
+                    "call_kind": "analysis",
+                    "provider": "fixture",
+                    "model": contract.model,
+                    "cost_fen": int(round(contract.cost_cny * 100)),
+                    "latency_ms": 0,
+                    "tokens_in": None,
+                    "tokens_out": None,
+                    "outcome": "done",
+                },
+            )
+            writer.write(_http_response(200, contract.model_dump(mode="json")))
+        else:
+            writer.write(_http_response(404, {"error": "not_found"}, "Not Found"))
+        await writer.drain()
+    except HardFailure as exc:
+        status = 503 if exc.code.value == "S8_UPSTREAM_REFUSED" else 422
+        writer.write(_http_response(status, error_payload(exc), "Unprocessable Entity"))
+        await writer.drain()
+    except LookupError as exc:
+        writer.write(_http_response(404, error_payload(exc), "Not Found"))
+        await writer.drain()
+    except Exception as exc:
+        writer.write(_http_response(500, {"error": str(exc)}, "Internal Server Error"))
+        await writer.drain()
+    finally:
+        writer.close()
+        await writer.wait_closed()
+
+
+async def main(host="0.0.0.0", port=8765, http_port=8766):
     print(f"OpenRHTV WebSocket 服务: ws://{host}:{port}")
-    async with serve(handle, host, port):
-        await asyncio.get_running_loop().create_future()
+    print(f"OpenRHTV HTTP API: http://{host}:{http_port}/api/analysis/shallow")
+    http_server = await asyncio.start_server(_handle_http, host, http_port)
+    async with serve(handle, host, port), http_server:
+        await asyncio.gather(
+            http_server.serve_forever(),
+            asyncio.get_running_loop().create_future(),
+        )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,91 @@
+{
+  "_provenance": "rewrite_smoke_v1",
+  "_niche": "jiating_chufang",
+  "schema_version": "1.0",
+  "analysis_id": "ana_smk_jiating_chufang_001",
+  "source_url": "https://www.douyin.com/video/smoke_jiating_chufang_001",
+  "platform": "douyin",
+  "created_at": "2026-05-21T10:22:15.636657+00:00",
+  "model": "doubao-seed-2-0-pro",
+  "cost_cny": 0.42,
+  "duration_s": 32,
+  "confidence": 0.86,
+  "viral_analysis": {
+    "hook": "开场 1.2 秒:餐厅 88 元的菜,在家做花了 12",
+    "pacing": "4-3-2 秒压缩,临近结尾镜头变短",
+    "climax": "倒数第二镜情绪反转",
+    "visual_style": "暖色调,家庭场景,自然光",
+    "emotional_arc": "好奇 → 上手 → 满足 → 小骄傲",
+    "target_audience": "目标人群明确,场景代入感强",
+    "engagement_levers": "结尾抛问题诱导评论",
+    "replicable_formula": "餐厅 vs 家庭对比 + 3 步操作 + 成品反差"
+  },
+  "scenes": [
+    {
+      "scene_index": 1,
+      "timestamp_start": 0.0,
+      "timestamp_end": 3.5,
+      "scene": "对比餐厅菜单照",
+      "dialogue_and_narration": "餐厅卖 88,我猜成本不到 15",
+      "visual_content": "手机屏幕照特写",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 2,
+      "timestamp_start": 3.5,
+      "timestamp_end": 10.0,
+      "scene": "切牛肉腌料",
+      "dialogue_and_narration": "牛肉切片,生抽糖淀粉抓匀",
+      "visual_content": "俯拍砧板,牛肉特写",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 3,
+      "timestamp_start": 10.0,
+      "timestamp_end": 17.0,
+      "scene": "热锅快炒",
+      "dialogue_and_narration": "热锅冷油,30 秒变色",
+      "visual_content": "侧拍炒锅,火光特写",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 4,
+      "timestamp_start": 17.0,
+      "timestamp_end": 25.0,
+      "scene": "装盘撒葱",
+      "dialogue_and_narration": "出锅撒葱花,这卖相",
+      "visual_content": "成品装盘俯拍",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 5,
+      "timestamp_start": 25.0,
+      "timestamp_end": 32.0,
+      "scene": "对镜头吃",
+      "dialogue_and_narration": "餐厅 88 你猜成本多少,评论区告诉我",
+      "visual_content": "对镜头吃中景",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}

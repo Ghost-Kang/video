@@ -1,0 +1,91 @@
+{
+  "_provenance": "rewrite_smoke_v1",
+  "_niche": "baomam_fushi",
+  "schema_version": "1.0",
+  "analysis_id": "ana_smk_baomam_fushi_003",
+  "source_url": "https://www.douyin.com/video/smoke_baomam_fushi_003",
+  "platform": "douyin",
+  "created_at": "2026-05-21T10:22:15.635941+00:00",
+  "model": "doubao-seed-2-0-pro",
+  "cost_cny": 0.42,
+  "duration_s": 32,
+  "confidence": 0.86,
+  "viral_analysis": {
+    "hook": "开场 1 秒:妈妈疲惫旁白—又一次没吃完",
+    "pacing": "4-3-2 秒压缩,临近结尾镜头变短",
+    "climax": "倒数第二镜情绪反转",
+    "visual_style": "暖色调,家庭场景,自然光",
+    "emotional_arc": "挫败 → 尝试 → 转折 → 解脱",
+    "target_audience": "目标人群明确,场景代入感强",
+    "engagement_levers": "结尾抛问题诱导评论",
+    "replicable_formula": "妈妈视角自述(我也不会) + 一个家常解法 + 一段独白"
+  },
+  "scenes": [
+    {
+      "scene_index": 1,
+      "timestamp_start": 0.0,
+      "timestamp_end": 4.0,
+      "scene": "厨房一片狼藉",
+      "dialogue_and_narration": "做了一上午,还是没吃完",
+      "visual_content": "广角厨房,台面散乱",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 2,
+      "timestamp_start": 4.0,
+      "timestamp_end": 11.0,
+      "scene": "妈妈坐下喘气",
+      "dialogue_and_narration": "我也不是营养师,就想让他多吃一口",
+      "visual_content": "中景妈妈侧脸",
+      "subject": "妈妈",
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 3,
+      "timestamp_start": 11.0,
+      "timestamp_end": 17.0,
+      "scene": "翻冰箱找剩饭",
+      "dialogue_and_narration": "剩米饭加蛋,捏成饭团",
+      "visual_content": "俯拍砧板,饭团手部动作",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 4,
+      "timestamp_start": 17.0,
+      "timestamp_end": 24.0,
+      "scene": "宝宝啃饭团",
+      "dialogue_and_narration": "他居然吃完了,我都没敢相信",
+      "visual_content": "宝宝小手抓饭团特写",
+      "subject": "宝宝",
+      "shot_type": "close_up",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 5,
+      "timestamp_start": 24.0,
+      "timestamp_end": 32.0,
+      "scene": "妈妈对镜头",
+      "dialogue_and_narration": "有时候简单的反而好,你家也这样吗",
+      "visual_content": "妈妈对镜头中景",
+      "subject": "妈妈",
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}

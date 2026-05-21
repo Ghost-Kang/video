@@ -1,0 +1,91 @@
+{
+  "_provenance": "rewrite_smoke_v1",
+  "_niche": "baomam_fushi",
+  "schema_version": "1.0",
+  "analysis_id": "ana_smk_baomam_fushi_002",
+  "source_url": "https://www.douyin.com/video/smoke_baomam_fushi_002",
+  "platform": "douyin",
+  "created_at": "2026-05-21T10:22:15.635828+00:00",
+  "model": "doubao-seed-2-0-pro",
+  "cost_cny": 0.42,
+  "duration_s": 30,
+  "confidence": 0.86,
+  "viral_analysis": {
+    "hook": "开场 1.5 秒:妈妈打开冰箱皱眉,这周宝宝又不爱吃了",
+    "pacing": "4-3-2 秒压缩,临近结尾镜头变短",
+    "climax": "倒数第二镜情绪反转",
+    "visual_style": "暖色调,家庭场景,自然光",
+    "emotional_arc": "迷茫 → 灵感 → 期待 → 满足",
+    "target_audience": "目标人群明确,场景代入感强",
+    "engagement_levers": "结尾抛问题诱导评论",
+    "replicable_formula": "痛点反复(总是不吃) + 1 个意外解法(把食材做成卡通形状) + 宝宝反应"
+  },
+  "scenes": [
+    {
+      "scene_index": 1,
+      "timestamp_start": 0.0,
+      "timestamp_end": 3.5,
+      "scene": "妈妈打开冰箱,菜没动",
+      "dialogue_and_narration": "这周第三次了,做啥都不吃",
+      "visual_content": "中景,冰箱内景,妈妈背影",
+      "subject": "妈妈",
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 2,
+      "timestamp_start": 3.5,
+      "timestamp_end": 9.0,
+      "scene": "把南瓜削成小熊形状",
+      "dialogue_and_narration": "小熊南瓜,小朋友哪有不爱的",
+      "visual_content": "俯拍砧板,南瓜削皮特写",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 3,
+      "timestamp_start": 9.0,
+      "timestamp_end": 15.0,
+      "scene": "蒸熟摆盘",
+      "dialogue_and_narration": "8 分钟蒸熟,摆个笑脸",
+      "visual_content": "侧拍蒸笼,出锅特写",
+      "subject": null,
+      "shot_type": "medium",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 4,
+      "timestamp_start": 15.0,
+      "timestamp_end": 22.0,
+      "scene": "宝宝盯着盘子",
+      "dialogue_and_narration": "看见小熊了吗?",
+      "visual_content": "宝宝眼神特写",
+      "subject": "宝宝",
+      "shot_type": "close_up",
+      "camera_movement": "static",
+      "first_frame_url": null,
+      "warnings": []
+    },
+    {
+      "scene_index": 5,
+      "timestamp_start": 22.0,
+      "timestamp_end": 30.0,
+      "scene": "宝宝主动伸手抓",
+      "dialogue_and_narration": "你家有没有这种'换个造型就吃'的瞬间",
+      "visual_content": "宝宝小手伸向盘子",
+      "subject": "宝宝",
+      "shot_type": "medium",
+      "camera_movement": "handheld",
+      "first_frame_url": null,
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}
