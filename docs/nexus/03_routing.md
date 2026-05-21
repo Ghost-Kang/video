@@ -13,14 +13,32 @@ Each tool's strength dictates ownership:
 
 | Tool | Strength | Owns |
 |---|---|---|
-| **Claude** (this session) | Long-horizon spec, contract design, code where correctness > velocity | Phase 0 entirely; Phase 1 contract code, prompt engineering, learning-loop instrumentation |
-| **Codex** (offline) | Test-heavy, refactor-focused, structured backend changes with full context | P1-2 浅分析 endpoint, P1-9 cost guard middleware, P1-3 prompt-chain backend |
-| **Cursor** (interactive) | UI components, fast visual iteration, frontend wiring with hot reload | P1-1 landing page, P1-4 card-stack UI, P1-7 publish-pack copy UI, P1-8 warnings banners |
+| **Claude** (this session) | Long-horizon spec, contract design, code where correctness > velocity; **and frontend** as of 2026-05-21 | Phase 0 entirely; Phase 1+ contract code, prompt engineering, learning-loop instrumentation, **AND all frontend** (re-routed from Cursor — see §0.1) |
+| **Codex** (offline) | Test-heavy, refactor-focused, structured backend changes with full context | P1-2 浅分析 endpoint, P1-9 cost guard middleware, P1-3 prompt-chain backend, P2-1 double-emit fix, P2-2 S7/S8 upstream wiring |
+| **Cursor** (interactive) | (Deprecated for new tickets as of 2026-05-21.) Past Phase 1 frontend deliverables (P1-1 / P1-4 / P1-6 sidebar / P1-7 / P1-8) remain Cursor history | Maintenance-only for Cursor's W1 deliverables if regressions surface |
 | **Founder** (manual) | Real-creator interviews, hand-labeling fixtures, niche prompt-tuning iteration | P0-1 real fixture upgrade, P1-10 creator interviews, recruitment, brand voice spot-check |
 
 **Rule**: any ticket touching Cascade contract types (`contract.py` / `cascade.ts` / `topic_intelligence.py` / `topic_intelligence.ts`) routes through Claude to prevent type drift.
 
 **Canvas-entry contract**: When users enter the canvas from a /topics card, the payload is a `TopicBrief` (per `topic_intelligence.py`), NOT a raw topic string. The Cursor P1-4 brief assumes this — frontend reads `TopicBrief.deep_intelligence.explain` to render the 3 one-liners on the card; the canvas reads `TopicBrief.viral_mechanism` + `replication_blueprint` to seed the script + shot cards.
+
+## 0.1. Frontend re-routing (2026-05-21)
+
+**Founder decision**: All new frontend tickets route to Claude going forward. Cursor's W1 deliverables stay as-is; the change applies to W2+ scope.
+
+**Why**: Mode-switching between Claude (backend / spec / prompts) and Cursor (frontend) was higher-friction than expected. Consolidating frontend to Claude trades slightly slower visual iteration cycles for fewer handoffs and one cohesive coding voice across the stack.
+
+**Implications for handoff briefs**:
+- New frontend briefs in `handoff/` use the prefix `claude_frontend_*.md` instead of `cursor_frontend_*.md`
+- Existing `cursor_frontend_*.md` briefs remain historical — they describe what Cursor shipped in W1
+- Allocation docs (`PM_W{N}_allocation.md`) list "Claude" as owner for frontend tickets from W2 onward
+
+**Implications for the skill stack**:
+- Claude must run frontend smoke tests (`npm run build`, `npm run test:unit` if present, `tsc -b`) before declaring a frontend ticket done — same bar as backend `uv run pytest`
+- Visual / UX iteration that previously benefited from Cursor's hot-reload now happens via running `npm run dev` and manual browser spot-check; founder must spot-check before merge if a flow involves user interaction
+- For pure visual polish (CSS-only diffs), Claude uses screenshots/diffs rather than guessing at hex values
+
+**P2-5 anchor sidebar polish** (the only W2 frontend ticket) is re-owned by Claude per this rule. PM updates `PM_W2_allocation.md §3.3` to reflect this.
 
 ---
 

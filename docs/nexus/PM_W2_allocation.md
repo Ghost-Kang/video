@@ -62,9 +62,9 @@ Per `PM_W1_allocation.md §5`:
 
 | Ticket | Owner | Brief | Done-signal | Upstream dep |
 |---|---|---|---|---|
-| P2-4 LLM-mode rewrite end-to-end | Claude | `handoff/claude_llm_P2-4.md` (TBD) | `CASCADE_REWRITE_UPSTREAM=llm` path returns valid `RewriteResult` against 3 real founder-curated URLs per niche; cost ≤ ¥3/run | P1-3 chain + cost guard |
-| P2-5 anchor sidebar visual polish | Cursor | `handoff/cursor_frontend_P2-5.md` (TBD) | drag-drop UX latency < 200 ms; reuse_count visible per anchor; sort-by-recency toggle | P1-6 sidebar |
-| P2-6 LLM eval harness for rewrite | Claude | `handoff/claude_eval_P2-6.md` (TBD) | Per-niche dashboard: 4/5 mechanical + 4/5 founder qualitative on 5 real-URL inputs per niche | P2-4 |
+| P2-4 LLM-mode rewrite end-to-end | Claude | `handoff/claude_llm_P2-4.md` | `CASCADE_REWRITE_UPSTREAM=llm` path returns valid `RewriteResult` against 3 real founder-curated URLs per niche; cost ≤ ¥3/run | P1-3 chain + cost guard |
+| P2-5 anchor sidebar visual polish | **Claude** (re-routed 2026-05-21 — see `03_routing.md §0.1`) | `handoff/claude_frontend_P2-5.md` | drag-drop UX latency < 200 ms; reuse_count visible per anchor; sort-by-recency toggle; `npm run build` + `tsc -b` clean | P1-6 sidebar |
+| P2-6 LLM eval harness for rewrite | Claude | `handoff/claude_eval_P2-6.md` | Per-niche dashboard: 4/5 mechanical + 4/5 founder qualitative on 5 real-URL inputs per niche | P2-4 |
 
 ---
 
