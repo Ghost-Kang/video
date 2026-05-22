@@ -31,3 +31,9 @@ backend/data/
 # Frontend
 frontend/node_modules/
 frontend/dist/
+
+# Founder-only sensitive material (身份证号、营业执照扫描件等 — PIPL §28 敏感个人信息)
+# 也覆盖任何 .local.md 副本(算法备案提交时临时填身份证号)
+docs/nexus/founder_log/algo_filing_attachments/
+docs/nexus/founder_log/*.local.md
+docs/nexus/founder_log/**/*.local.md
