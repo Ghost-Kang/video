@@ -58,17 +58,42 @@ Same as W1/W2 (see `PM_W1_allocation.md §0`). One owner, one done-signal, one u
 | P3-1 LLM eval baseline | Claude | (extends `claude_eval_P2-6.md` §3) | `p2-6_baseline_<UTC>.json` exists with `mode=llm` and `judge_realism_avg > 0` (non-skipped) | `GOOGLE_API_KEY` configured by founder |
 | P3-2 prompt iteration from `p1-3_qualitative_signoff` F-1-b / F-3-a regression | Claude | (TBD) | re-run `p2-6_eval.py --mode llm` shows delta_from_baseline mechanical_pass_rate ≥ 0 AND realism_avg delta ≥ 0 | P3-1 |
 
-### 3.2 W2 carry-over (none — W2 closed clean)
+### 3.2 Codex backend tickets
 
-(Nothing to carry. If LLM mode reveals prompt regressions, file P3-2 properly.)
+(Added 2026-05-21 post-W3-D0 PM review per the 4-owner allocation rule —
+PM must explicitly route work to all four owners every cycle.)
+
+| Ticket | Owner | Brief | Done-signal | Upstream dep |
+|---|---|---|---|---|
+| P3-6 `/api/anchors/<id>/reuses` endpoint | Codex | `handoff/codex_backend_P3-6.md` | endpoint returns array of reuse rows; `test_anchor_reuses_endpoint.py` passes; unlocks frontend `days_since_last_reuse` | P1-6 backend (done) |
+| P3-7 Toprador production hardening | Codex | `handoff/codex_backend_P3-7.md` (STUB) | retry policy (exponential backoff), circuit breaker, timeout metrics on `analysis_returned` events, in-memory cache layer | P2-2 (done) |
+| P3-8 Reality Checker remaining hazards #3+ | Codex | `handoff/codex_backend_P3-8.md` (STUB — depends on founder triage of `03_evidence_audit.md`) | each remaining hazard either fixed with a new test OR explicitly punted to W4 with rationale | founder triage |
 
 ### 3.3 New surface area (mostly UI polish + creator onboarding tooling)
 
 | Ticket | Owner | Brief | Done-signal | Upstream dep |
 |---|---|---|---|---|
-| P3-3 creator onboarding admin view | Claude (frontend) | `handoff/claude_frontend_P3-3.md` (TBD) | `/admin/creators` page lists creators with status (invited / onboarded / posted / 多条) + simple state machine; protected by login | P1-1 landing + P0 closure |
-| P3-4 PR template auto-applied to upstream-sync PRs | Claude / Codex | (TBD) | `.github/PULL_REQUEST_TEMPLATE.md` exists; upstream-sync-watch routine PRs auto-include checklist | none |
-| P3-5 anchor reuse analytics page | Claude (frontend) | `handoff/claude_frontend_P3-5.md` (TBD) | `/analytics/anchors` shows per-user reuse_count distribution + days_since_created scatter | P1-6 + p2-6 baseline |
+| P3-3 creator onboarding admin view | Claude (frontend) | `handoff/claude_frontend_P3-3.md` ✅ | `/admin/creators` lists creators with status (invited / registered / rewritten / published / looping); backend `/api/creators` aggregation endpoint | P1-1 landing + P0 closure for real-creator load |
+| P3-4 PR template | Claude ✅ | `.github/PULL_REQUEST_TEMPLATE.md` (shipped) | template auto-applies on web PRs | none |
+| P3-5 anchor reuse analytics page | Claude (frontend) | `handoff/claude_frontend_P3-5.md` ✅ | `/analytics/anchors` shows reuse_count top-N + distribution histogram + by-kind | P1-6 + P2-6 baseline (both done) |
+
+### 3.4 Cursor — deprecated for new tickets (no W3 allocation)
+
+Per `03_routing.md §0.1` (founder decision 2026-05-21), Cursor is deprecated for new tickets. W3 has **zero** Cursor work by design. Cursor's W1 deliverables (P1-1 / P1-4 / P1-6 sidebar / P1-7 / P1-8) remain its historical contributions; only regression-fix maintenance would route to Cursor.
+
+If founder reverses the deprecation, W4 allocation should re-introduce Cursor with explicit ticket assignments.
+
+### 3.5 Delays carry-forward (last cycle slip → this cycle action)
+
+(Per the 4-owner allocation rule: name slipped commitments + propose recovery.)
+
+| Owner | What slipped in W2 | W3 recovery |
+|---|---|---|
+| **Founder** | DM batch (0 / 25 target), seed post (NO), 算法备案 (not filed), discovery calls (0), 5 条 compliance (not done) | All re-listed in §2 (P0 critical path) + §4 (founder tickets). Strict W3D2 18:00 escalation gate. |
+| **Founder** | P2-1 / P2-2 brief 口述 30min | Optional retrospective only — Codex shipped without 口述; existing STUB §0 in briefs remains unfilled but non-blocking. Note in §9. |
+| Codex | (none — P2-1 + P2-2 closed W2) | Picks up P3-6 / P3-7 / P3-8 in §3.2 |
+| Claude | (none — W2 work delivered + 3 W3 tickets already shipped: P3-3 / P3-4 / P3-5) | Continues P3-1 once API key wires; P3-2 once P3-1 closes |
+| Cursor | (deprecated; n/a) | No W3 work expected |
 
 ---
 

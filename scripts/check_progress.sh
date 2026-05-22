@@ -91,6 +91,41 @@ elif [ "$p2_5_card" != "open" ] || [ "$p2_5_sidebar" != "open" ]; then
 else
   p2_5="open"
 fi
+
+# ---------- W3 ticket probes (Claude already-done + Codex new + frontend Claude) ----------
+# P3-3 admin creator view: backend list_creators + frontend page
+p3_3_back=$(status_probe "backend/src/agent/cascade/storage.py" "async def list_creators")
+p3_3_front=$(status_probe "frontend/src/pages/AdminCreators.tsx" "AdminCreators")
+if [ "$p3_3_back" = "done" ] && [ "$p3_3_front" = "done" ]; then
+  p3_3="done"
+elif [ "$p3_3_back" != "open" ] || [ "$p3_3_front" != "open" ]; then
+  p3_3="partial"
+else
+  p3_3="open"
+fi
+# P3-4 PR template
+[ -f .github/PULL_REQUEST_TEMPLATE.md ] && p3_4="done" || p3_4="open"
+# P3-5 anchor analytics page
+p3_5=$(status_probe "frontend/src/pages/AnchorAnalytics.tsx" "AnchorAnalytics")
+# P3-6 anchor reuses endpoint (Codex)
+p3_6=$(status_probe "backend/src/agent/cascade/anchors.py" "list_reuses|async def list_reuses")
+# P3-7 Toprador hardening (Codex; STUB until founder approves)
+p3_7=$(status_probe "backend/src/agent/cascade/circuit_breaker.py" "circuit_breaker|CircuitBreaker")
+# P3-8 Reality Checker remaining hazards — triage marker file (founder writes
+# after reviewing 03_evidence_audit.md) is the signal. Brief STUB alone = open.
+if ls docs/nexus/founder_log/p3-8_triage_*.md >/dev/null 2>&1; then
+  p3_8="partial"  # founder triage happened
+elif [ -f docs/nexus/handoff/codex_backend_P3-8.md ]; then
+  p3_8="open"  # STUB only — awaiting founder triage
+else
+  p3_8="open"
+fi
+
+# Count W3 engineering tickets done (P3-3..P3-8 minus P3-1/P3-2 which are blocked on API key)
+w3_eng_done=0
+for t in "$p3_3" "$p3_4" "$p3_5" "$p3_6" "$p3_7" "$p3_8"; do
+  [ "$t" = "done" ] && w3_eng_done=$((w3_eng_done + 1))
+done
 # P2-6 eval harness: runner.py existence + CLI script
 p2_6_runner=$(status_probe "backend/src/agent/cascade/eval/runner.py" "run_eval|class EvalReport|def run_eval")
 if [ "$p2_6_runner" = "done" ] && [ -f scripts/p2-6_eval.py ]; then
@@ -171,6 +206,8 @@ if [ "$JSON" = "1" ]; then
     "$ts" "$brief_count" "$eng_done" "$p1_2" "$p1_1" "$p1_3_prompts" "$p1_3_chain" "$p1_4" "$p1_6_back" "$p1_6_sb" "$p1_7" "$p1_8" "$p1_9"
   printf '{"ts":"%s","scope":"pm_w2","active":"%s","w2_eng_done":%d,"P2_1":"%s","P2_2":"%s","P2_4":"%s","P2_5":"%s","P2_6":"%s"}\n' \
     "$ts" "$active_phase" "$w2_eng_done" "$p2_1" "$p2_2" "$p2_4" "$p2_5" "$p2_6"
+  printf '{"ts":"%s","scope":"pm_w3","w3_eng_done":%d,"P3_3":"%s","P3_4":"%s","P3_5":"%s","P3_6":"%s","P3_7":"%s","P3_8":"%s"}\n' \
+    "$ts" "$w3_eng_done" "$p3_3" "$p3_4" "$p3_5" "$p3_6" "$p3_7" "$p3_8"
   printf '{"ts":"%s","scope":"recruit","dms":%d,"calls":%d,"commits":%d,"runs":%d,"returns":%d}\n' \
     "$ts" "$dms" "$calls" "$commits" "$runs_count" "$returns_count"
   printf '{"ts":"%s","scope":"marketing","seed":"%s","xhs":%d,"douyin":%d,"wechat":%d,"jike":%d}\n' \
@@ -184,6 +221,8 @@ else
     "$brief_count" "$eng_done" "$p1_2" "$p1_1" "$p1_3_prompts" "$p1_3_chain" "$p1_4" "$p1_6_back" "$p1_6_sb" "$p1_7" "$p1_8" "$p1_9"
   printf 'PM_W2    active=%s  w2_eng_done=%d/5  P2-1=%s  P2-2=%s  P2-4=%s  P2-5=%s  P2-6=%s\n' \
     "$active_phase" "$w2_eng_done" "$p2_1" "$p2_2" "$p2_4" "$p2_5" "$p2_6"
+  printf 'PM_W3    w3_eng_done=%d/6  P3-3=%s  P3-4=%s  P3-5=%s  P3-6=%s  P3-7=%s  P3-8=%s\n' \
+    "$w3_eng_done" "$p3_3" "$p3_4" "$p3_5" "$p3_6" "$p3_7" "$p3_8"
   printf 'Recruit  dms=%d  calls=%d  commits=%d  runs=%d  returns=%d\n' \
     "$dms" "$calls" "$commits" "$runs_count" "$returns_count"
   printf 'Marketing seed=%s  xhs=%d/10  douyin=%d/5  wechat=%d/1  jike=%d/1\n' \
