@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "copy-legal": "mkdir -p public/legal && cp ../docs/legal/*.md public/legal/",
+    "predev": "npm run copy-legal",
+    "prebuild": "npm run copy-legal",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

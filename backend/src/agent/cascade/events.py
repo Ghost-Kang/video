@@ -21,6 +21,7 @@ ALLOWED_EVENTS: frozenset[str] = frozenset({
     "failure_recovered",
     "generation_cost",
     "interview_logged",
+    "consent_accepted",
 })
 
 _REQUIRED_FIELDS: dict[str, frozenset[str]] = {
@@ -48,6 +49,7 @@ _REQUIRED_FIELDS: dict[str, frozenset[str]] = {
     "failure_recovered": frozenset({"failure_code", "recovery_action", "seconds_since_failure"}),
     "generation_cost": frozenset({"run_id", "call_kind", "provider", "model", "cost_fen", "latency_ms", "tokens_in", "tokens_out", "outcome"}),
     "interview_logged": frozenset({"value_statement_match", "would_pay_39", "notes_url", "niche"}),
+    "consent_accepted": frozenset({"version", "accepted_at", "documents"}),
 }
 
 _lock = asyncio.Lock()

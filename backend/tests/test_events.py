@@ -57,6 +57,45 @@ def test_successful_emit_persists_event(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert "S3_NO_FORMULA" in row[3]
 
 
+def test_consent_accepted_event_persists(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    db_path = _use_tmp_db(monkeypatch, tmp_path)
+
+    asyncio.run(
+        emit(
+            "consent_accepted",
+            user_id="anon-abc123",
+            run_id=None,
+            payload={
+                "version": "v0",
+                "accepted_at": "2026-05-22T14:30:00Z",
+                "documents": ["user_agreement_v0", "privacy_v0"],
+            },
+        )
+    )
+
+    db = sqlite3.connect(str(db_path))
+    row = db.execute(
+        "SELECT event_name, user_id, payload_json FROM events WHERE event_name='consent_accepted'"
+    ).fetchone()
+    db.close()
+    assert row[0] == "consent_accepted"
+    assert row[1] == "anon-abc123"
+    assert "v0" in row[2]
+    assert "user_agreement_v0" in row[2]
+
+
+def test_consent_accepted_missing_required_field_raises() -> None:
+    with pytest.raises(ValueError, match="missing required fields"):
+        asyncio.run(
+            emit(
+                "consent_accepted",
+                user_id="anon-abc123",
+                run_id=None,
+                payload={"version": "v0"},  # missing accepted_at + documents
+            )
+        )
+
+
 def test_created_at_is_strictly_monotonic_within_run(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

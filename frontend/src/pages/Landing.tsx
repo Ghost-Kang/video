@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { ConsentGate } from "../components/landing/ConsentGate";
 import { HotCardGrid } from "../components/landing/HotCardGrid";
 import { UrlFallback } from "../components/landing/UrlFallback";
 import { WaitlistCta } from "../components/landing/WaitlistCta";
@@ -20,8 +21,10 @@ export function Landing() {
         <h1 className="mb-6 text-2xl font-medium text-stone-900">
           看到刷屏的视频，想做一条自己的？挑一张开始 ↓
         </h1>
-        <HotCardGrid onPick={pick} />
-        <UrlFallback onSubmit={() => navigate(`/chat/${sessionId()}`)} />
+        <ConsentGate>
+          <HotCardGrid onPick={pick} />
+          <UrlFallback onSubmit={() => navigate(`/chat/${sessionId()}`)} />
+        </ConsentGate>
       </div>
       <WaitlistCta />
     </main>
