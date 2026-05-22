@@ -74,7 +74,7 @@ def test_analysis_returned_event_payload_shape(monkeypatch: pytest.MonkeyPatch, 
 
     assert [name for name, _ in rows] == ["analysis_returned"]
     payload = json.loads(rows[0][1])
-    assert set(payload) == {
+    required_keys = {
         "analysis_id",
         "source_url",
         "platform",
@@ -88,10 +88,27 @@ def test_analysis_returned_event_payload_shape(monkeypatch: pytest.MonkeyPatch, 
         "upstream_latency_ms",
         "upstream_attempts",
     }
+    assert required_keys <= set(payload)
+    assert set(payload) <= required_keys | {"minor_audit"}
     assert payload["analysis_id"] == contract.analysis_id
     assert payload["source_url"] == "https://example.com/event"
     assert payload["scenes_count"] == len(contract.scenes)
     assert payload["warnings_count"] == len(contract.warnings)
+
+
+def test_analysis_returned_includes_minor_audit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    db_path = _use_tmp_db(monkeypatch, tmp_path)
+    raw = json.loads((SYNTH / "jiating_chufang" / "001.json").read_text(encoding="utf-8"))
+    raw["scenes"][0]["visual_content"] = "宝宝坐在厨房地垫上看镜头"
+
+    async def loader(source_url: str) -> dict:
+        return dict(raw)
+
+    monkeypatch.setattr("agent.cascade.analysis_service._load_upstream_payload", loader)
+    asyncio.run(request_shallow_analysis("https://example.com/minor", user_id="user_1", run_id="run_1"))
+
+    payload = _event_payloads(db_path, "analysis_returned")[0]
+    assert payload["minor_audit"] == {"hit_count": 1, "scene_indices": ["1"]}
 
 
 def test_hard_failure_records_failure_event(

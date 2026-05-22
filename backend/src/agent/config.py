@@ -14,6 +14,10 @@ load_dotenv(_project_root / ".env")
 
 # -------- LLM --------
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "doubao").strip().lower()
+ARK_API_KEY = os.getenv("ARK_API_KEY", "")
+ARK_BASE_URL = os.getenv("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")
+DOUBAO_MODEL = os.getenv("DOUBAO_MODEL", "doubao-seed-2-0-pro")
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3-flash-preview")
 
 # -------- 图片生成 --------
@@ -38,6 +42,7 @@ ASR_BASE_URL = os.getenv("ASR_BASE_URL")
 # -------- Toprador analysis upstream --------
 TOPRADOR_ENDPOINT = os.getenv("TOPRADOR_ENDPOINT", "")
 TOPRADOR_API_KEY = os.getenv("TOPRADOR_API_KEY", "")
+STRICT_CROSS_BORDER_REJECT = os.getenv("STRICT_CROSS_BORDER_REJECT", "1") == "1"
 
 # -------- S3 --------
 S3_AK = os.getenv("S3_AK", "")

@@ -280,9 +280,32 @@ def test_adapter_strips_pii_silently() -> None:
     assert any(w.code == WarningCode.W10_AUTHOR_PII_STRIPPED.value for w in contract.warnings)
 
 
-def test_adapter_flags_cross_border_source() -> None:
+def test_strip_pii_ip_and_author_name() -> None:
+    raw = _load(SYNTH / "baomam_fushi" / "001.json")
+    raw["author_name"] = "张三"
+    raw["ip_address"] = "203.0.113.7"
+    raw["user_ip"] = "203.0.113.8"
+    contract = normalize_analysis_result(raw)
+    serialized = contract.model_dump()
+    assert "author_name" not in serialized
+    assert "ip_address" not in serialized
+    assert "user_ip" not in serialized
+    assert any(w.code == WarningCode.W10_AUTHOR_PII_STRIPPED.value for w in contract.warnings)
+
+
+def test_cross_border_hard_block_default_on(monkeypatch: pytest.MonkeyPatch) -> None:
     raw = _load(SYNTH / "baomam_fushi" / "001.json")
     raw["source_url"] = "https://www.youtube.com/watch?v=abc"
+    monkeypatch.setattr("agent.config.STRICT_CROSS_BORDER_REJECT", True)
+    with pytest.raises(HardFailure) as exc:
+        normalize_analysis_result(raw)
+    assert exc.value.code == FailureCode.S9_CROSS_BORDER_BLOCKED
+
+
+def test_cross_border_warning_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = _load(SYNTH / "baomam_fushi" / "001.json")
+    raw["source_url"] = "https://www.youtube.com/watch?v=abc"
+    monkeypatch.setattr("agent.config.STRICT_CROSS_BORDER_REJECT", False)
     contract = normalize_analysis_result(raw)
     assert any(w.code == WarningCode.W9_CROSS_BORDER_SOURCE.value for w in contract.warnings)
 
@@ -297,6 +320,26 @@ def test_adapter_flags_platform_source_url_mismatch() -> None:
         w.code == WarningCode.W13_PLATFORM_URL_MISMATCH.value and w.field == "platform"
         for w in contract.warnings
     )
+
+
+def test_minor_audit_keyword_hit() -> None:
+    raw = _load(SYNTH / "jiating_chufang" / "001.json")
+    raw["scenes"][0]["dialogue_and_narration"] = "宝宝在镜头前开心挥手"
+    contract = normalize_analysis_result(raw)
+    assert any(
+        w.code == WarningCode.W14_MINOR_SUBJECT_DETECTED.value and w.field == "scenes[1]"
+        for w in contract.warnings
+    )
+
+
+def test_minor_audit_no_false_positive() -> None:
+    raw = _load(SYNTH / "jiating_chufang" / "001.json")
+    for scene in raw["scenes"]:
+        scene["dialogue_and_narration"] = "今天发现一个宝藏厨房角落"
+        scene["visual_content"] = "厨房台面和餐具，没有人物"
+        scene["subject"] = "厨房"
+    contract = normalize_analysis_result(raw)
+    assert not any(w.code == WarningCode.W14_MINOR_SUBJECT_DETECTED.value for w in contract.warnings)
 
 
 def test_adapter_coerces_unknown_enum_values() -> None:

@@ -34,7 +34,7 @@ from agent.cascade.eval.report import (
     render_markdown,
 )
 from agent.cascade.rewrite import rewrite_for_niche
-from agent.config import LLM_MODEL
+from agent.llm_factory import current_model_name
 
 
 NICHES = ("baomam_fushi", "yuer_richang", "jiating_chufang")
@@ -224,7 +224,7 @@ async def run_eval(
     report = EvalReport(
         timestamp=timestamp,
         mode=upstream_mode,
-        model=LLM_MODEL,
+        model=current_model_name(),
         prompt_version_hash=prompt_hash,
         niches=per_niche_reports,
         overall_mechanical_pass_rate=mech_rate,

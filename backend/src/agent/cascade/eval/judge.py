@@ -1,6 +1,6 @@
 """LLM judge for eval harness — half-automated qualitative scoring.
 
-Asks an independent LLM (Gemini Flash by default) three structured
+Asks an independent LLM (Doubao by default, Gemini fallback) three structured
 questions per rewrite:
   1. kept_formula: yes/no/partial (does it preserve the source's
      replicable_formula?)
@@ -8,7 +8,7 @@ questions per rewrite:
   3. ad_risk: yes/no + 命中 fragment (any brand name / efficacy
      claim / regulatory red flag?)
 
-When `GOOGLE_API_KEY` is not configured, returns `{skipped: True}` so
+When the selected provider is not configured, returns `{skipped: True}` so
 the rest of the harness can still produce a baseline.
 """
 
@@ -61,8 +61,12 @@ def judge_one(
 
     `result` is a rewrite output dict (RewriteResult-shaped).
     """
-    if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")):
-        return {"skipped": True, "reason": "no GOOGLE_API_KEY in env"}
+    from agent.llm_factory import get_chat_model
+
+    try:
+        get_chat_model()
+    except RuntimeError as exc:
+        return {"skipped": True, "reason": str(exc)}
     if os.getenv("CASCADE_EVAL_JUDGE", "live").strip().lower() == "skip":
         return {"skipped": True, "reason": "CASCADE_EVAL_JUDGE=skip"}
 
@@ -84,9 +88,7 @@ def _live_judge(
     source_title: str,
     source_formula: str,
 ) -> dict[str, Any]:
-    from langchain_google_genai import ChatGoogleGenerativeAI
-
-    from agent.config import LLM_MODEL
+    from agent.llm_factory import get_chat_model
 
     shots_text = "\n".join(
         f"{s.get('shot_index', '?')}. {s.get('dialogue', '')} | 画面:{s.get('visual', '')}"
@@ -101,7 +103,7 @@ def _live_judge(
         shots=shots_text,
     )
 
-    model = ChatGoogleGenerativeAI(model=LLM_MODEL)
+    model = get_chat_model()
     response = model.invoke([{"role": "user", "content": prompt}])
     raw = response.content if hasattr(response, "content") else str(response)
     if not isinstance(raw, str):

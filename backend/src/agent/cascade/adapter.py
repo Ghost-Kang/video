@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
+from agent import config
 from agent.cascade.contract import (
     CameraMovement,
     CascadeAnalysisContract,
@@ -29,6 +30,7 @@ from agent.cascade.contract import (
     Warning_,
 )
 from agent.cascade.failures import FailureCode, HardFailure, WarningCode
+from agent.cascade.minor_audit import detect_minor_subjects
 
 
 _VIRAL_FALLBACKS: dict[str, str] = {
@@ -45,7 +47,8 @@ _VIRAL_FALLBACKS: dict[str, str] = {
 _KNOWN_PII_KEYS = frozenset({
     "author_uid", "author_handle", "author_avatar_url", "uid",
     # Added per Stage 4 compliance audit (PIPL minimization)
-    "author_id", "author_nickname", "user_phone",
+    "author_id", "author_nickname", "author_name",
+    "ip_address", "user_ip", "user_phone",
 })
 
 _CROSS_BORDER_HOSTS = frozenset({"youtube.com", "youtu.be", "tiktok.com", "instagram.com"})
@@ -81,6 +84,7 @@ def normalize_analysis_result(raw: Any) -> CascadeAnalysisContract:
 
     _normalize_viral_analysis(data, warnings)
     _normalize_scenes(data, warnings)
+    _audit_minor_subjects(data, warnings)
     _ensure_confidence(data, warnings)
 
     # Merge any pre-existing top-level warnings the upstream may have included.
@@ -175,6 +179,11 @@ def _ensure_source_url(data: dict[str, Any], warnings: list[Warning_]) -> None:
     host = parsed.netloc.lower()
     # Match either exact host or "www.X" style suffix.
     if any(host == h or host.endswith("." + h) for h in _CROSS_BORDER_HOSTS):
+        if config.STRICT_CROSS_BORDER_REJECT:
+            raise HardFailure(
+                FailureCode.S9_CROSS_BORDER_BLOCKED,
+                f"cross-border platform blocked: {host}",
+            )
         warnings.append(
             Warning_(
                 code=WarningCode.W9_CROSS_BORDER_SOURCE.value,
@@ -552,6 +561,19 @@ def _normalize_scenes(data: dict[str, Any], warnings: list[Warning_]) -> None:
             s["scene_index"] = idx
 
     data["scenes"] = normalized
+
+
+def _audit_minor_subjects(data: dict[str, Any], warnings: list[Warning_]) -> None:
+    scene_indices = detect_minor_subjects(data.get("scenes") or [])
+    for scene_index in scene_indices:
+        warnings.append(
+            Warning_(
+                code=WarningCode.W14_MINOR_SUBJECT_DETECTED.value,
+                field=f"scenes[{scene_index}]",
+                message="minor subject keyword detected",
+                severity=Severity.INFO,
+            )
+        )
 
 
 def _ensure_confidence(data: dict[str, Any], warnings: list[Warning_]) -> None:

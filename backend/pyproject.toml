@@ -10,6 +10,7 @@ dependencies = [
     "deepagents>=0.6.1",
     "google-genai>=1.75.0",
     "httpx>=0.28.1",
+    "langchain-openai>=0.2.0",
     "langgraph-checkpoint-sqlite>=3.1.0",
     "pillow>=12.2.0",
     "pydantic>=2.0",

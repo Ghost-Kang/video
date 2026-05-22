@@ -28,6 +28,7 @@ class FailureCode(str, Enum):
     S6_NEGATIVE_COST = "S6_NEGATIVE_COST"
     S7_UPSTREAM_TIMEOUT = "S7_UPSTREAM_TIMEOUT"
     S8_UPSTREAM_REFUSED = "S8_UPSTREAM_REFUSED"  # rate limit, auth, etc.
+    S9_CROSS_BORDER_BLOCKED = "S9_CROSS_BORDER_BLOCKED"
 
 
 class RecoveryAction(str, Enum):
@@ -70,6 +71,7 @@ class WarningCode(str, Enum):
     W11_CONFIDENCE_CLAMPED = "W11_CONFIDENCE_CLAMPED"
     W12_TIMESTAMP_CLAMPED = "W12_TIMESTAMP_CLAMPED"
     W13_PLATFORM_URL_MISMATCH = "W13_PLATFORM_URL_MISMATCH"
+    W14_MINOR_SUBJECT_DETECTED = "W14_MINOR_SUBJECT_DETECTED"
 
 
 # UI-facing 人话 recovery hints. Brand Guardian §4 rule: no English jargon, no
@@ -101,6 +103,9 @@ RECOVERY_HINTS: dict[str, str] = {
     FailureCode.S8_UPSTREAM_REFUSED.value: (
         "系统暂时繁忙。1 分钟后重试，或者从今日精选里挑一条（这些是已经分析好的）。"
     ),
+    FailureCode.S9_CROSS_BORDER_BLOCKED.value: (
+        "这条链接来自境外平台，Phase 1 试用期只支持境内平台（抖音/小红书/快手/B站）。换一条境内链接吧。"
+    ),
 
     # Soft warnings — inline labels on the card, not banners
     WarningCode.W1_AUTO_ID.value: "（系统已自动编号）",
@@ -116,6 +121,7 @@ RECOVERY_HINTS: dict[str, str] = {
     WarningCode.W11_CONFIDENCE_CLAMPED.value: "（系统对置信度做了取整，不影响使用）",
     WarningCode.W12_TIMESTAMP_CLAMPED.value: "（系统把镜头时间对齐到了视频时长内）",
     WarningCode.W13_PLATFORM_URL_MISMATCH.value: "（系统按链接修正了平台类型）",
+    WarningCode.W14_MINOR_SUBJECT_DETECTED.value: "系统注意到这条视频涉及未成年人。Phase 1 仅记录、不拦截。",
 }
 
 
@@ -160,6 +166,11 @@ RECOVERY_ACTIONS: dict[str, list[str]] = {
         RecoveryAction.PICK_FROM_FEATURED.value,
         RecoveryAction.REPORT.value,
     ],
+    FailureCode.S9_CROSS_BORDER_BLOCKED.value: [
+        RecoveryAction.RETRY_WITH_NEW_URL.value,
+        RecoveryAction.PICK_FROM_FEATURED.value,
+        RecoveryAction.REPORT.value,
+    ],
 }
 
 
@@ -174,6 +185,7 @@ HTTP_STATUS: dict[str, int] = {
     FailureCode.S6_NEGATIVE_COST.value: 500,        # adapter-internal bug
     FailureCode.S7_UPSTREAM_TIMEOUT.value: 504,     # gateway timeout
     FailureCode.S8_UPSTREAM_REFUSED.value: 503,     # gateway unavailable
+    FailureCode.S9_CROSS_BORDER_BLOCKED.value: 422,  # local compliance refusal
 }
 
 

@@ -56,7 +56,7 @@ class EvalReport(BaseModel):
 
     timestamp: str  # UTC ISO
     mode: str  # fixture | llm
-    model: str  # e.g. gemini-3-flash-preview
+    model: str  # e.g. doubao-seed-2-0-pro | gemini-3-flash-preview
     prompt_version_hash: str  # sha256[:16] of rewrite_*.md
     niches: list[PerNicheReport]
     overall_mechanical_pass_rate: float = 0.0

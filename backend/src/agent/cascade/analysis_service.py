@@ -199,7 +199,7 @@ def _analysis_returned_payload(
     upstream_latency_ms: int = 0,
     upstream_attempts: int = 0,
 ) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "analysis_id": contract.analysis_id,
         "source_url": str(contract.source_url),
         "platform": contract.platform.value,
@@ -213,6 +213,17 @@ def _analysis_returned_payload(
         "upstream_latency_ms": upstream_latency_ms,
         "upstream_attempts": upstream_attempts,
     }
+    minor_indices = [
+        warning.field.removeprefix("scenes[").removesuffix("]")
+        for warning in contract.warnings
+        if warning.code == WarningCode.W14_MINOR_SUBJECT_DETECTED.value
+    ]
+    if minor_indices:
+        payload["minor_audit"] = {
+            "hit_count": len(minor_indices),
+            "scene_indices": minor_indices,
+        }
+    return payload
 
 
 def _recovery_path_id(exc: HardFailure) -> str:

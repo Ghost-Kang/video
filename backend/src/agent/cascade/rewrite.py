@@ -7,7 +7,7 @@ takes care of caching, cost cap, and event emission.
 Upstream is switchable via env:
 - CASCADE_REWRITE_UPSTREAM=fixture (default for tests): deterministic
   rewrite synthesized from the source contract — no LLM call.
-- CASCADE_REWRITE_UPSTREAM=llm: call ChatGoogleGenerativeAI with the
+- CASCADE_REWRITE_UPSTREAM=llm: call the configured chat LLM with the
   niche prompt template + contract JSON, parse JSON, validate shape.
 """
 
@@ -286,13 +286,11 @@ _JSON_RETRY_NUDGE = (
 def _invoke_llm(prompt: str) -> str:
     """Call the LLM and return raw text. Separated for testability (mockable)."""
     try:
-        from langchain_google_genai import ChatGoogleGenerativeAI
-
-        from agent.config import LLM_MODEL
+        from agent.llm_factory import get_chat_model
     except ImportError as exc:  # pragma: no cover - import guard
         raise RuntimeError("LLM dependencies unavailable; set CASCADE_REWRITE_UPSTREAM=fixture") from exc
 
-    model = ChatGoogleGenerativeAI(model=LLM_MODEL)
+    model = get_chat_model()
     result = model.invoke([{"role": "user", "content": prompt}])
     raw = result.content if hasattr(result, "content") else str(result)
     return raw if isinstance(raw, str) else _join_content_parts(raw)
@@ -355,7 +353,9 @@ def _normalize_llm_output(
     # Identity fields — model can hallucinate; force agreement with the input contract.
     data["analysis_id"] = contract.analysis_id
     data["niche"] = niche
-    data.setdefault("model", contract.model)
+    from agent.llm_factory import current_model_name
+
+    data["model"] = current_model_name()
 
     # Founder-annotated source metadata — force onto output for downstream
     # signoff / eval traceability. The prompt also tells the LLM to echo

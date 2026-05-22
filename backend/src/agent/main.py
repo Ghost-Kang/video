@@ -15,10 +15,9 @@ from pathlib import Path
 
 from deepagents import create_deep_agent
 from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from agent import config
+from agent.llm_factory import get_chat_model
 from agent.tools import canvas as canvas_tools
 from agent.tools.canvas import (
     create_canvas_node,
@@ -46,7 +45,7 @@ def _make_backend() -> CompositeBackend:
 
 def create_director_agent(checkpointer=None):
     """创建导演 agent，单 agent 承担全部创作角色。"""
-    model = ChatGoogleGenerativeAI(model=config.LLM_MODEL)
+    model = get_chat_model()
     system_prompt = (_prompts_dir / "director.md").read_text(encoding="utf-8")
     canvas_prompt = (_prompts_dir / "canvas-manager.md").read_text(encoding="utf-8")
 

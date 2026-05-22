@@ -7,11 +7,11 @@ import asyncio
 import json
 
 from langchain_core.messages import AIMessageChunk, ToolMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosedOK
 
-from agent.config import LLM_MODEL, IMAGE_GEN_PROVIDER
+from agent.config import IMAGE_GEN_PROVIDER
+from agent.llm_factory import get_chat_model
 from agent.pool import AgentPool
 from agent.store import get_messages, save_message
 from agent.tools import canvas as canvas_tools
@@ -63,7 +63,7 @@ async def _send(ws, **kwargs):
 
 async def _optimize_prompt(node_id: str, prompt: str, feedback: str) -> str:
     """用 LLM 优化图片生成 prompt，不经过主 agent 流程。"""
-    model = ChatGoogleGenerativeAI(model=LLM_MODEL)
+    model = get_chat_model()
     system = "你是一位专业的 AI 绘画提示词优化师。根据用户的反馈优化提示词，只返回优化后的提示词，不要加任何解释或前缀。"
     user = f"当前提示词：\n{prompt}\n\n用户反馈：\n{feedback}\n\n请输出优化后的提示词："
     result = model.invoke([{"role": "system", "content": system}, {"role": "user", "content": user}])
