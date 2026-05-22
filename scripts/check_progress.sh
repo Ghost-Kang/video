@@ -18,11 +18,15 @@ cd "$(dirname "$0")/.."
 REPO_ROOT="$(pwd)"
 JSON=0
 [ "${1:-}" = "--json" ] && JSON=1
+export UV_CACHE_DIR="${UV_CACHE_DIR:-$REPO_ROOT/.codex-tmp/uv-cache}"
+mkdir -p "$UV_CACHE_DIR"
 
 # ---------- Phase 0 closure ----------
 real_fixtures=$(find backend/src/agent/cascade/fixtures/real_v1 -name "*.json" 2>/dev/null | wc -l | tr -d ' ')
-test_count=$(cd backend 2>/dev/null && uv run pytest tests/test_cascade_contract.py tests/test_topic_intelligence.py --collect-only -q 2>/dev/null | grep -E "test " | wc -l | tr -d ' ' || echo 0)
-test_skipped=$(cd backend 2>/dev/null && uv run pytest tests/test_cascade_contract.py tests/test_topic_intelligence.py 2>&1 | grep -oE '[0-9]+ skipped' | head -1 | grep -oE '[0-9]+' || echo "?")
+test_count=$(cd backend 2>/dev/null && uv run pytest tests/test_cascade_contract.py tests/test_topic_intelligence.py --collect-only -q 2>/dev/null | awk '/::test_/ { n++ } END { print n + 0 }' || echo 0)
+test_count=${test_count:-0}
+test_skipped=$(cd backend 2>/dev/null && uv run pytest tests/test_cascade_contract.py tests/test_topic_intelligence.py 2>&1 | grep -oE '[0-9]+ skipped' | head -1 | grep -oE '[0-9]+' || true)
+test_skipped=${test_skipped:-0}
 # compliance: count actual checked top-level items (`- [x] **Done**`) across all
 # compliance_done_*.md files. Probe flips to 1 only when ≥5 of the 5 mandated
 # items are ticked. File existence alone (template stub) does NOT count as done —

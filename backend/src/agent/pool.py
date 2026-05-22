@@ -15,6 +15,14 @@ class AgentPool:
         self._max = max_size
         self._pool: OrderedDict[str, dict] = OrderedDict()
 
+    async def close(self) -> None:
+        """Close all checkpoint connections held by the pool."""
+        while self._pool:
+            _, entry = self._pool.popitem(last=False)
+            conn = entry.get("_conn")
+            if conn:
+                await conn.close()
+
     async def get(self, thread_id: str) -> dict:
         """异步获取或创建 agent 实例，返回 {agent, checkpointer, config}。"""
         if thread_id in self._pool:

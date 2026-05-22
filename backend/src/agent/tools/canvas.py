@@ -156,30 +156,43 @@ def _upsert_node(node: dict):
     db = _db()
     r = node.get("result")
     result_json = json.dumps(r, ensure_ascii=False) if r is not None else None
-    db.execute(
-        """INSERT INTO canvas_nodes (user_id, thread_id, node_id, type, title, description, status, node_status, asset_status, result, subtype, shot_no, image_gen_provider, generation_status, generation_task_id, generation_error, x, y)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(user_id, thread_id, node_id) DO UPDATE SET
-           type=excluded.type, title=excluded.title, description=excluded.description,
-           status=excluded.status, node_status=excluded.node_status, asset_status=excluded.asset_status,
-           result=excluded.result, subtype=excluded.subtype,
-           shot_no=excluded.shot_no, image_gen_provider=excluded.image_gen_provider,
-           generation_status=excluded.generation_status,
-           generation_task_id=excluded.generation_task_id,
-           generation_error=excluded.generation_error,
-           x=excluded.x, y=excluded.y""",
-        (
-            _current_user_id.get(), _current_thread_id.get(), node["id"], node["type"], node["title"],
-            node.get("description", ""), node.get("status", "pending"),
-            node.get("node_status", "reviewing"), node.get("asset_status", "idle"),
-            result_json, node.get("subtype"),
-            node.get("shot_no"), node.get("image_gen_provider"),
-            node.get("generation_status", "idle"),
-            node.get("generation_task_id"),
-            node.get("generation_error"),
-            node.get("x"), node.get("y"),
-        ),
+    user_id = _current_user_id.get()
+    thread_id = _current_thread_id.get()
+    values = (
+        node["type"], node["title"], node.get("description", ""), node.get("status", "pending"),
+        node.get("node_status", "reviewing"), node.get("asset_status", "idle"),
+        result_json, node.get("subtype"),
+        node.get("shot_no"), node.get("image_gen_provider"),
+        node.get("generation_status", "idle"),
+        node.get("generation_task_id"),
+        node.get("generation_error"),
+        node.get("x"), node.get("y"),
+        user_id, thread_id, node["id"],
     )
+    cursor = db.execute(
+        """UPDATE canvas_nodes SET
+           type=?, title=?, description=?, status=?, node_status=?, asset_status=?,
+           result=?, subtype=?, shot_no=?, image_gen_provider=?,
+           generation_status=?, generation_task_id=?, generation_error=?, x=?, y=?
+           WHERE user_id=? AND thread_id=? AND node_id=?""",
+        values,
+    )
+    if cursor.rowcount == 0:
+        db.execute(
+            """INSERT INTO canvas_nodes (user_id, thread_id, node_id, type, title, description, status, node_status, asset_status, result, subtype, shot_no, image_gen_provider, generation_status, generation_task_id, generation_error, x, y)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                user_id, thread_id, node["id"], node["type"], node["title"],
+                node.get("description", ""), node.get("status", "pending"),
+                node.get("node_status", "reviewing"), node.get("asset_status", "idle"),
+                result_json, node.get("subtype"),
+                node.get("shot_no"), node.get("image_gen_provider"),
+                node.get("generation_status", "idle"),
+                node.get("generation_task_id"),
+                node.get("generation_error"),
+                node.get("x"), node.get("y"),
+            ),
+        )
     db.commit()
     db.close()
 

@@ -27,6 +27,7 @@ Thumbs.db
 
 # Backend data
 backend/data/
+.codex-tmp/
 
 # Frontend
 frontend/node_modules/
