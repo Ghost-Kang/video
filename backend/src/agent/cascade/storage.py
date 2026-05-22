@@ -66,6 +66,12 @@ async def _connect() -> aiosqlite.Connection:
     )
     await db.execute("CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id, created_at)")
     await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_events_thread_ts ON events(run_id, created_at DESC)"
+    )
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_events_type_ts ON events(event_name, created_at DESC)"
+    )
+    await db.execute(
         """CREATE TABLE IF NOT EXISTS rewrites (
           rewrite_id TEXT PRIMARY KEY,
           analysis_id TEXT NOT NULL,
