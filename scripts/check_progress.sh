@@ -23,9 +23,38 @@ JSON=0
 real_fixtures=$(find backend/src/agent/cascade/fixtures/real_v1 -name "*.json" 2>/dev/null | wc -l | tr -d ' ')
 test_count=$(cd backend 2>/dev/null && uv run pytest tests/test_cascade_contract.py tests/test_topic_intelligence.py --collect-only -q 2>/dev/null | grep -E "test " | wc -l | tr -d ' ' || echo 0)
 test_skipped=$(cd backend 2>/dev/null && uv run pytest tests/test_cascade_contract.py tests/test_topic_intelligence.py 2>&1 | grep -oE '[0-9]+ skipped' | head -1 | grep -oE '[0-9]+' || echo "?")
-compliance_done=$(ls docs/nexus/founder_log/compliance_done_*.md 2>/dev/null | wc -l | tr -d ' ')
-algo_filing=$(ls docs/nexus/founder_log/algo_filing_*.md 2>/dev/null | wc -l | tr -d ' ')
-prereg=$(ls docs/nexus/founder_log/pre_registration_*.md 2>/dev/null | wc -l | tr -d ' ')
+# compliance: count actual checked top-level items (`- [x] **Done**`) across all
+# compliance_done_*.md files. Probe flips to 1 only when ≥5 of the 5 mandated
+# items are ticked. File existence alone (template stub) does NOT count as done —
+# this was a real false-positive on W3D0 (file present, 0/5 ticked, probe said 1).
+compliance_done=0
+for f in docs/nexus/founder_log/compliance_done_*.md; do
+  [ -e "$f" ] || continue
+  ticks=$(grep -c '^- \[x\] \*\*Done\*\*' "$f" 2>/dev/null || true)
+  ticks=${ticks:-0}
+  [ "$ticks" -ge 5 ] && compliance_done=1
+done
+# algo_filing: file presence alone is not enough — must contain a real 受理回执号
+# (digits, not the `<FILL e.g. 京网信备...` placeholder). Detect by matching a
+# "受理回执号" line that includes ≥3 consecutive digits AND has no <FILL marker
+# on the same line.
+algo_filing=0
+for f in docs/nexus/founder_log/algo_filing_*.md; do
+  [ -e "$f" ] || continue
+  if grep -E '受理回执号' "$f" 2>/dev/null | grep -vE '<FILL' | grep -qE '[0-9]{3,}'; then
+    algo_filing=1
+  fi
+done
+# prereg: file present AND no <FILL> placeholders remaining in committed text.
+# (line 57 — the founder action checklist — uses `<FILL` literally as docs about
+# the workflow; exclude that one descriptive line.)
+prereg=0
+for f in docs/nexus/founder_log/pre_registration_*.md; do
+  [ -e "$f" ] || continue
+  unfilled=$(grep -v 'Replace each `<FILL' "$f" 2>/dev/null | grep -cE '<FILL' || true)
+  unfilled=${unfilled:-0}
+  [ "$unfilled" -eq 0 ] && prereg=1
+done
 
 phase0_closed="NO"
 if [ "$real_fixtures" -ge 20 ] && [ "$test_skipped" = "0" ] && [ "$compliance_done" -ge 1 ] && [ "$algo_filing" -ge 1 ] && [ "$prereg" -ge 1 ]; then

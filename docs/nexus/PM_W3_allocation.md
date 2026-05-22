@@ -61,13 +61,17 @@ Same as W1/W2 (see `PM_W1_allocation.md §0`). One owner, one done-signal, one u
 ### 3.2 Codex backend tickets
 
 (Added 2026-05-21 post-W3-D0 PM review per the 4-owner allocation rule —
-PM must explicitly route work to all four owners every cycle.)
+PM must explicitly route work to all four owners every cycle.
+P3-R1 added 2026-05-21 W3D0+ post compliance-file审视 — 3 of the 5 P0-R items
+are engineering tasks that Codex can absorb in parallel with founder writing
+the doc-only items #1 and #5.)
 
 | Ticket | Owner | Brief | Done-signal | Upstream dep |
 |---|---|---|---|---|
-| P3-6 `/api/anchors/<id>/reuses` endpoint | Codex | `handoff/codex_backend_P3-6.md` | endpoint returns array of reuse rows; `test_anchor_reuses_endpoint.py` passes; unlocks frontend `days_since_last_reuse` | P1-6 backend (done) |
-| P3-7 Toprador production hardening | Codex | `handoff/codex_backend_P3-7.md` (STUB) | retry policy (exponential backoff), circuit breaker, timeout metrics on `analysis_returned` events, in-memory cache layer | P2-2 (done) |
-| P3-8 Reality Checker remaining hazards #3+ | Codex | `handoff/codex_backend_P3-8.md` (STUB — depends on founder triage of `03_evidence_audit.md`) | each remaining hazard either fixed with a new test OR explicitly punted to W4 with rationale | founder triage |
+| P3-6 `/api/anchors/<id>/reuses` endpoint | Codex | `handoff/codex_backend_P3-6.md` ✅ done W3D0 | endpoint returns array of reuse rows; `test_anchor_reuses_endpoint.py` passes; unlocks frontend `days_since_last_reuse` | P1-6 backend (done) |
+| P3-7 Toprador production hardening | Codex | `handoff/codex_backend_P3-7.md` ✅ done W3D0 | retry policy (exponential backoff), circuit breaker, timeout metrics on `analysis_returned` events, in-memory cache layer | P2-2 (done) |
+| P3-8 Reality Checker remaining hazards #3+ | Codex | `handoff/codex_backend_P3-8.md` ✅ done W3D0 | each remaining hazard either fixed with a new test OR explicitly punted to W4 with rationale | founder triage |
+| **P3-R1 compliance batch** (PII keys + cross-border block + minor audit) | **Codex** | `handoff/codex_backend_P3-R1.md` (ready, no STUB) | `_KNOWN_PII_KEYS` 含 `ip_address`/`user_ip`/`author_name`; `STRICT_CROSS_BORDER_REJECT` + `S9_CROSS_BORDER_BLOCKED`; `minor_audit.py` + `W14_MINOR_SUBJECT_DETECTED`; 5 new tests pass | none (independent — no upstream dep) |
 
 ### 3.3 New surface area (mostly UI polish + creator onboarding tooling)
 
@@ -91,7 +95,7 @@ If founder reverses the deprecation, W4 allocation should re-introduce Cursor wi
 |---|---|---|
 | **Founder** | DM batch (0 / 25 target), seed post (NO), 算法备案 (not filed), discovery calls (0), 5 条 compliance (not done) | All re-listed in §2 (P0 critical path) + §4 (founder tickets). Strict W3D2 18:00 escalation gate. |
 | **Founder** | P2-1 / P2-2 brief 口述 30min | Optional retrospective only — Codex shipped without 口述; existing STUB §0 in briefs remains unfilled but non-blocking. Note in §9. |
-| Codex | (none — P2-1 + P2-2 closed W2) | Picks up P3-6 / P3-7 / P3-8 in §3.2 |
+| Codex | (none — P2-1 + P2-2 closed W2) | P3-6 / P3-7 / P3-8 closed W3D0; picks up **P3-R1 compliance batch** (§3.2) W3D1 |
 | Claude | (none — W2 work delivered + 3 W3 tickets already shipped: P3-3 / P3-4 / P3-5) | Continues P3-1 once API key wires; P3-2 once P3-1 closes |
 | Cursor | (deprecated; n/a) | No W3 work expected |
 
