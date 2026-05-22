@@ -1,8 +1,9 @@
-import { StrictMode } from "react";
+import { StrictMode, useState, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 import App from "./App";
+import { Login } from "./components/Login";
 import { Landing } from "./pages/Landing";
 import { AnchorAnalytics } from "./pages/AnchorAnalytics";
 import { AdminCreators } from "./pages/AdminCreators";
@@ -12,18 +13,64 @@ function newSessionId() {
   return `session-${Date.now().toString(36)}`;
 }
 
+function getLastSession(userId: string): string | null {
+  try {
+    const sessions = JSON.parse(localStorage.getItem(`openrhtv_${userId}_sessions`) || "[]");
+    return sessions.length > 0 ? sessions[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+function getChatRedirect(userId: string): string {
+  const last = getLastSession(userId);
+  return `/chat/${last || newSessionId()}`;
+}
+
+function AppRoutes() {
+  const [user, setUser] = useState<string | null>(() => localStorage.getItem("rhtv_user"));
+
+  const handleLogin = useCallback((uid: string) => {
+    setUser(uid);
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem("rhtv_user");
+    setUser(null);
+  }, []);
+
+  return (
+    <Routes>
+      {/* Phase 1 public routes — accessible without login (legal docs must
+          be readable pre-login per user_agreement_v0 §11.1 click-through). */}
+      <Route path="/" element={<Landing />} />
+      <Route path="/legal/:slug" element={<LegalDoc />} />
+      <Route path="/analytics/anchors" element={<AnchorAnalytics />} />
+      <Route path="/admin/creators" element={<AdminCreators />} />
+
+      {/* Authed routes (upstream 66758bd: WS auth + multi-user isolation) */}
+      <Route
+        path="/login"
+        element={user ? <Navigate to={getChatRedirect(user)} replace /> : <Login onLogin={handleLogin} />}
+      />
+      <Route
+        path="/chat/:threadId"
+        element={user ? <App userId={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+      />
+
+      {/* Legacy redirect */}
+      <Route path="/canvas" element={<Navigate to={`/chat/${newSessionId()}?view=pro`} replace />} />
+
+      {/* Catch-all: anon users land on Landing first, can opt to login */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/legal/:slug" element={<LegalDoc />} />
-        <Route path="/analytics/anchors" element={<AnchorAnalytics />} />
-        <Route path="/admin/creators" element={<AdminCreators />} />
-        <Route path="/chat/:threadId" element={<App />} />
-        <Route path="/canvas" element={<Navigate to={`/chat/${newSessionId()}?view=pro`} replace />} />
-        <Route path="*" element={<Navigate to={`/chat/${newSessionId()}`} replace />} />
-      </Routes>
+      <AppRoutes />
     </BrowserRouter>
   </StrictMode>
 );

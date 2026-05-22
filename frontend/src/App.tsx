@@ -11,8 +11,7 @@ import { useCanvasStore } from "./store/canvasStore";
 import { shouldHideProToggle } from "./lib/proViewAccess";
 import type { NodeType, WSIncoming } from "./types";
 
-const LS_SESSIONS = "openrhtv_sessions";
-const LS_NAMES = "openrhtv_session_names";
+function lsKey(key: string, userId: string) { return `openrhtv_${userId}_${key}`; }
 
 function loadJSON<T>(key: string, fallback: T): T {
   try {
@@ -29,7 +28,12 @@ function newSessionId() {
   return `session-${Date.now().toString(36)}`;
 }
 
-export default function App() {
+interface AppProps {
+  userId: string;
+  onLogout: () => void;
+}
+
+export default function App({ userId, onLogout }: AppProps) {
   const { threadId } = useParams<{ threadId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -48,8 +52,8 @@ export default function App() {
     });
   }, [setSearchParams]);
 
-  const [sessions, setSessions] = useState<string[]>(() => loadJSON<string[]>(LS_SESSIONS, []));
-  const [names, setNames] = useState<Record<string, string>>(() => loadJSON<Record<string, string>>(LS_NAMES, {}));
+  const [sessions, setSessions] = useState<string[]>(() => loadJSON<string[]>(lsKey("sessions", userId), []));
+  const [names, setNames] = useState<Record<string, string>>(() => loadJSON<Record<string, string>>(lsKey("names", userId), {}));
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [chatOpen, setChatOpen] = useState(true);
   const [thinking, setThinking] = useState<string[]>([]);
@@ -69,6 +73,23 @@ export default function App() {
 
   const onMessage = useCallback(
     (res: WSIncoming) => {
+      // session_list 是用户级别消息，不经过 thread_id 过滤
+      // 数据库是真相源头，本地只保留用户自定义的名称
+      if (res.type === "session_list") {
+        console.log(`[WS] session_list 收到 ${res.sessions.length} 个会话`);
+        const ids = res.sessions.map(s => s.thread_id);
+        const localNames = loadJSON<Record<string, string>>(lsKey("names", userId), {});
+        const mergedNames: Record<string, string> = {};
+        for (const id of ids) {
+          if (localNames[id]) mergedNames[id] = localNames[id];
+        }
+        setSessions(ids);
+        setNames(mergedNames);
+        saveJSON(lsKey("sessions", userId), ids);
+        saveJSON(lsKey("names", userId), mergedNames);
+        return;
+      }
+
       const rid = "thread_id" in res ? res.thread_id : undefined;
       if (rid && rid !== currentThreadIdRef.current) {
         console.log(`[WS] 忽略消息 thread=${rid} (当前=${currentThreadIdRef.current}) type=${res.type}`);
@@ -118,17 +139,18 @@ export default function App() {
           break;
       }
     },
-    [setMessages, setCanvas, appendStreaming, finalizeStreaming]
+    [addMessage, setMessages, setCanvas, appendStreaming, finalizeStreaming, userId]
   );
 
-  const { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, connected, connecting } =
-    useWebSocket(onMessage);
+  const { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, sendCreateEdge, sendDeleteEdge, sendReorderEdge, sendDeleteSession, connected, connecting } =
+    useWebSocket(userId, onMessage);
+  currentThreadIdRef.current = tid;
 
   const addSession = useCallback((id: string) => {
     setSessions((prev) => {
       if (prev.includes(id)) return prev;
       const next = [id, ...prev];
-      saveJSON(LS_SESSIONS, next);
+      saveJSON(lsKey("sessions", userId), next);
       return next;
     });
   }, []);
@@ -136,7 +158,7 @@ export default function App() {
   const handleRename = useCallback((id: string, name: string) => {
     setNames((prev) => {
       const next = { ...prev, [id]: name };
-      saveJSON(LS_NAMES, next);
+      saveJSON(lsKey("names", userId), next);
       return next;
     });
   }, []);
@@ -159,17 +181,17 @@ export default function App() {
     (id: string) => {
       setSessions((prev) => {
         const next = prev.filter((s) => s !== id);
-        saveJSON(LS_SESSIONS, next);
+        saveJSON(lsKey("sessions", userId), next);
         return next;
       });
       setNames((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        saveJSON(LS_NAMES, next);
-        return next;
+        const { [id]: _, ...rest } = prev;
+        saveJSON(lsKey("names", userId), rest);
+        return rest;
       });
+      sendDeleteSession(id);
     },
-    []
+    [sendDeleteSession]
   );
 
   // 初始化 WS
@@ -228,8 +250,8 @@ export default function App() {
   );
 
   const handleExecuteNode = useCallback(
-    (nodeId: string, nodeType: NodeType, description: string, provider?: string) => {
-      sendExecuteNode({ type: "execute_node", thread_id: tid, node_id: nodeId, node_type: nodeType, description, image_gen_provider: provider });
+    (nodeId: string, nodeType: NodeType, description: string, provider?: string, duration?: number, resolution?: string, generateAudio?: boolean) => {
+      sendExecuteNode({ type: "execute_node", thread_id: tid, node_id: nodeId, node_type: nodeType, description, image_gen_provider: provider, duration, resolution, generate_audio: generateAudio });
     },
     [sendExecuteNode, tid]
   );
@@ -249,6 +271,27 @@ export default function App() {
     [sendUpdateNodeStatus, tid]
   );
 
+  const handleCreateEdge = useCallback(
+    (source: string, target: string) => {
+      sendCreateEdge(tid, source, target);
+    },
+    [sendCreateEdge, tid]
+  );
+
+  const handleReorderEdge = useCallback(
+    (edgeId: string, direction: "up" | "down") => {
+      sendReorderEdge(tid, edgeId, direction);
+    },
+    [sendReorderEdge, tid]
+  );
+
+  const handleDeleteEdge = useCallback(
+    (edgeId: string) => {
+      sendDeleteEdge(tid, edgeId);
+    },
+    [sendDeleteEdge, tid]
+  );
+
   const handleOptimizePrompt = useCallback(
     (nodeId: string, prompt: string, feedback: string) => {
       sendOptimizePrompt({ type: "optimize_prompt", thread_id: tid, node_id: nodeId, prompt, feedback });
@@ -263,12 +306,14 @@ export default function App() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <Header
-        sessionName={names[tid] || tid}
+        userId={userId}
+        sessionName={names[tid] || "新会话"}
         connected={connected}
         connecting={connecting}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
         onNewSession={handleNewSession}
+        onLogout={onLogout}
         isProView={isProView}
         onToggleProView={toggleProView}
         hideProToggle={shouldHideProToggle(tid)}
@@ -307,13 +352,15 @@ export default function App() {
         )}
         {isProView ? (
           <>
-            <Canvas onPositionChange={(pos) => sendPosition({ ...pos, thread_id: tid })} />
+            <Canvas onPositionChange={(pos) => sendPosition({ ...pos, thread_id: tid })} onCreateEdge={handleCreateEdge} onDeleteEdge={handleDeleteEdge} />
             {selectedNodeId && (
               <NodeDetail
                 onReview={handleReview}
                 onExecuteNode={handleExecuteNode}
                 onUpdateNodeStatus={handleUpdateNodeStatus}
                 onOptimizePrompt={handleOptimizePrompt}
+                onDeleteEdge={handleDeleteEdge}
+                onReorderEdge={handleReorderEdge}
               />
             )}
           </>

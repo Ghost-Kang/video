@@ -17,6 +17,7 @@ dependencies = [
     { name = "pillow" },
     { name = "pydantic" },
     { name = "python-dotenv" },
+    { name = "volcengine-python-sdk" },
     { name = "websockets" },
 ]
 
@@ -37,6 +38,7 @@ requires-dist = [
     { name = "pillow", specifier = ">=12.2.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
+    { name = "volcengine-python-sdk", specifier = ">=5.0.27" },
     { name = "websockets", specifier = ">=16.0" },
 ]
 
@@ -1667,6 +1669,21 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ab/68/a0aedbf39885d7d6d3b3b419a796214fd3e92a7e6a556b336bfee2246fdc/uuid_utils-0.15.0-pp311-pypy311_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2422feb60039ce88daf02b9885665b060f0d2deb80a3debffaaedc443d9aa673", size = 327546, upload-time = "2026-05-11T12:06:21.687Z" },
     { url = "https://files.pythonhosted.org/packages/fd/1c/347970e5706f3b7fc1964227493aa98dd43c7348fe2a84a3aeb3f1b9299b/uuid_utils-0.15.0-pp311-pypy311_pp73-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:14481b7c98fbac536783d475b4d4cc7a4a21ec4f1ce794fc66557d3540b0c8b7", size = 354981, upload-time = "2026-05-11T12:07:26.505Z" },
     { url = "https://files.pythonhosted.org/packages/08/13/5e2d92fe7d7b8df48b0c7c0ec714d828863227ee099e17caaa0d6ed23203/uuid_utils-0.15.0-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:21af6cc771a769e4a8ef9ab245f7ee811a56fbcdd021e1163d845172a9c01e60", size = 176805, upload-time = "2026-05-11T12:07:09.967Z" },
+]
+
+[[package]]
+name = "volcengine-python-sdk"
+version = "5.0.27"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "python-dateutil" },
+    { name = "six" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a4/ac/53657c8d3e1fb2fbd6857c93c5d490452feec339ce146cad51c226a42239/volcengine_python_sdk-5.0.27.tar.gz", hash = "sha256:67cbe3bbb0572a69b08c7e58a8854be511264fb69eb84dbf647c199374d02647", size = 8839269, upload-time = "2026-05-14T11:17:26.909Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/20/1b/146f51fa284d0863599f8bea5f54445796730c8f34ae3bb2c8c838a72b2b/volcengine_python_sdk-5.0.27-py2.py3-none-any.whl", hash = "sha256:1fe6c7f374225eed03e8fe165cee404ad4c37cc2cec291a0eadf194e2d2832bb", size = 34940476, upload-time = "2026-05-14T11:17:19.915Z" },
 ]
 
 [[package]]

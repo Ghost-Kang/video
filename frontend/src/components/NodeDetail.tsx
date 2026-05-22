@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { CanvasNode, Shot, NodeStatus, NodeType } from "../types";
@@ -6,12 +6,14 @@ import { useCanvasStore } from "../store/canvasStore";
 
 interface Props {
   onReview: (nodeId: string, action: "approve" | "reject", feedback?: string) => void;
-  onExecuteNode: (nodeId: string, nodeType: NodeType, description: string, provider?: string) => void;
+  onExecuteNode: (nodeId: string, nodeType: NodeType, description: string, provider?: string, duration?: number, resolution?: string, generateAudio?: boolean) => void;
   onUpdateNodeStatus: (nodeId: string, nodeStatus: NodeStatus) => void;
   onOptimizePrompt: (nodeId: string, prompt: string, feedback: string) => void;
+  onDeleteEdge: (edgeId: string) => void;
+  onReorderEdge: (edgeId: string, direction: "up" | "down") => void;
 }
 
-export function NodeDetail({ onExecuteNode, onUpdateNodeStatus, onOptimizePrompt }: Props) {
+export function NodeDetail({ onExecuteNode, onUpdateNodeStatus, onOptimizePrompt, onDeleteEdge, onReorderEdge }: Props) {
   const selectedId = useCanvasStore((s) => s.selectedNodeId);
   const node = useCanvasStore((s) => s.nodes.find((n) => n.id === selectedId));
   const allNodes = useCanvasStore((s) => s.nodes);
@@ -20,16 +22,17 @@ export function NodeDetail({ onExecuteNode, onUpdateNodeStatus, onOptimizePrompt
 
   if (!node) return null;
 
-  // 找上游图片节点作为参考图
+  // 找上游节点作为参考图 / 待合成视频
   const parentIds = edges
     .filter((e) => e.target === node.id)
     .map((e) => e.source);
-  const refImages = allNodes
-    .filter((n) => parentIds.includes(n.id) && (n.type === "image" || n.type === "video"))
-    .map((n) => ({ id: n.id, title: n.title, url: n.result?.url as string | undefined }))
-    .filter((n) => n.url);
+  const nodeMap = new Map(allNodes.map((n) => [n.id, n]));
+  const refImages = parentIds
+    .map((pid) => nodeMap.get(pid))
+    .filter((n): n is CanvasNode => !!n && (n.type === "image" || n.type === "video") && !!n.result?.url)
+    .map((n) => ({ id: n.id, title: n.title, url: n.result!.url as string, type: n.type }));
 
-  const isMedia = node.type === "image" || node.type === "video";
+  const isMedia = node.type === "image" || node.type === "video" || node.type === "composite";
 
   return (
     <div style={S.panel}>
@@ -50,14 +53,49 @@ export function NodeDetail({ onExecuteNode, onUpdateNodeStatus, onOptimizePrompt
         {/* 参考图（仅媒体节点） */}
         {isMedia && refImages.length > 0 && (
           <section style={S.section}>
-            <div style={S.label}>参考图</div>
+            <div style={S.label}>{node.type === "composite" ? "待合成视频" : "参考图"}</div>
             <div style={S.refGrid}>
-              {refImages.map((img) => (
-                <div key={img.id} style={S.refItem}>
-                  <img src={img.url} alt={img.title} style={S.refImg} />
-                  <span style={S.refTitle}>{img.title}</span>
-                </div>
-              ))}
+              {refImages.map((img, idx) => {
+                const edge = edges.find((e) => e.source === img.id && e.target === node.id);
+                const total = refImages.length;
+                return (
+                  <div key={img.id} style={S.refItem}>
+                    <span style={S.refTitle}>{img.title}</span>
+                    <div style={{ position: "relative" }}>
+                      {img.type === "video" ? (
+                        <video src={img.url} style={S.refImg} preload="metadata" />
+                      ) : (
+                        <img src={img.url} alt={img.title} style={S.refImg} />
+                      )}
+                      <button
+                        onClick={() => edge && onDeleteEdge(edge.id)}
+                        style={S.refDelete}
+                        title="删除参考图"
+                      >
+                        ✕
+                      </button>
+                      {total > 1 && idx < total - 1 && (
+                        <button
+                          onClick={() => edge && onReorderEdge(edge.id, "down")}
+                          style={{ ...S.refArrow, right: -10, top: "50%", transform: "translateY(-50%)" }}
+                          title="右移"
+                        >
+                          ›
+                        </button>
+                      )}
+                      {total > 1 && idx > 0 && (
+                        <button
+                          onClick={() => edge && onReorderEdge(edge.id, "up")}
+                          style={{ ...S.refArrow, left: -10, top: "50%", transform: "translateY(-50%)" }}
+                          title="左移"
+                        >
+                          ‹
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}
@@ -100,13 +138,23 @@ function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
   onExecuteNode: Props["onExecuteNode"];
   onOptimizePrompt: Props["onOptimizePrompt"];
 }) {
-  const [prompt, setPrompt] = useState(node.description || "");
-  const [provider, setProvider] = useState((node.result as Record<string, unknown> | null)?.image_gen_provider as string || "apimart");
+  const resultPrompt = (node.result as Record<string, unknown> | null)?.prompt as string | undefined;
+  const [prompt, setPrompt] = useState(resultPrompt || node.description || "");
+  const [provider, setProvider] = useState(node.image_gen_provider || "google");
+  const [duration, setDuration] = useState(5);
+  const [resolution, setResolution] = useState("720p");
+  const [generateAudio, setGenerateAudio] = useState(true);
+  useEffect(() => {
+    const rp = (node.result as Record<string, unknown> | null)?.prompt as string | undefined;
+    setPrompt(rp || node.description || "");
+    setProvider(node.image_gen_provider || "google");
+  }, [node.id, node.description, node.asset_status]);
   const [showPolish, setShowPolish] = useState(false);
   const [feedback, setFeedback] = useState("");
 
   const handleGenerate = () => {
-    onExecuteNode(node.id, node.type, prompt, provider);
+    const isComposite = node.type === "composite";
+    onExecuteNode(node.id, node.type, prompt, isComposite ? undefined : provider, isComposite ? undefined : duration, isComposite ? undefined : resolution, isComposite ? undefined : generateAudio);
   };
 
   const handlePolish = () => {
@@ -116,28 +164,71 @@ function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
   };
 
   const isGenerating = node.asset_status === "generating";
-  const btnLabel = isGenerating ? "生成中..." : "生成";
+  const isVideo = node.type === "video";
+  const isComposite = node.type === "composite";
+  const btnLabel = isComposite ? (isGenerating ? "合成中..." : "合成") : isGenerating ? "生成中..." : "生成";
   const btnDisabled = isGenerating;
 
   return (
     <section style={S.section}>
-      <div style={S.label}>Provider</div>
-      <select
-        value={provider}
-        onChange={(e) => setProvider(e.target.value)}
-        style={S.providerSelect}
-      >
-        <option value="apimart">Apimart</option>
-        <option value="google">Google Gemini</option>
-      </select>
+      {!isVideo && !isComposite && (
+        <>
+          <div style={S.label}>Provider</div>
+          <select value={provider} onChange={(e) => {
+            const v = e.target.value;
+            setProvider(v);
+            useCanvasStore.setState((s) => ({
+              nodes: s.nodes.map((n) => n.id === node.id ? { ...n, image_gen_provider: v } : n),
+            }));
+          }} style={S.providerSelect}>
+            <option value="apimart">Apimart</option>
+            <option value="google">Google Gemini</option>
+          </select>
+        </>
+      )}
 
-      <div style={S.label}>Prompt</div>
-      <textarea
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        rows={4}
-        style={S.promptInput}
-      />
+      {isVideo && (
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <div style={S.label}>时长</div>
+            <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} style={S.providerSelect}>
+              {[4,5,6,7,8,9,10,11,12,13,14,15].map((s) => (
+                <option key={s} value={s}>{s}s</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={S.label}>分辨率</div>
+            <select value={resolution} onChange={(e) => setResolution(e.target.value)} style={S.providerSelect}>
+              <option value="480p">480p</option>
+              <option value="720p">720p</option>
+              <option value="1080p">1080p</option>
+            </select>
+          </div>
+          <div style={{ flex: 0 }}>
+            <div style={S.label}>声音</div>
+            <button
+              onClick={() => setGenerateAudio(!generateAudio)}
+              style={generateAudio ? S.toggleOn : S.toggleOff}
+            >
+              {generateAudio ? "ON" : "OFF"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!isComposite && (
+        <>
+          <div style={S.label}>Prompt</div>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            rows={4}
+            style={S.promptInput}
+          />
+        </>
+      )}
+
       <div style={S.actions}>
         <button
           onClick={handleGenerate}
@@ -146,14 +237,16 @@ function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
         >
           {btnLabel}
         </button>
-        <button
-          onClick={() => setShowPolish(!showPolish)}
-          style={S.agentBtn}
-        >
-          润色
-        </button>
+        {!isComposite && (
+          <button
+            onClick={() => setShowPolish(!showPolish)}
+            style={S.agentBtn}
+          >
+            润色
+          </button>
+        )}
       </div>
-      {showPolish && (
+      {showPolish && !isComposite && (
         <div style={S.polishBox}>
           <textarea
             value={feedback}
@@ -224,25 +317,28 @@ function ResultView({ node }: { node: CanvasNode }) {
 
     case "image":
     case "video":
+    case "composite":
       return (
         <section style={S.section}>
-          <div style={S.label}>生成结果</div>
+          <div style={S.label}>{node.type === "composite" ? "合成结果" : "生成结果"}</div>
           {r.url ? (
             node.type === "image"
               ? <img src={String(r.url)} alt={node.title} style={S.resultImg} />
-              : <video src={String(r.url)} controls style={S.resultVideo} />
+              : <video
+                  src={String(r.url)}
+                  controls
+                  style={S.resultVideo}
+                  onPlay={(e) => {
+                    document.querySelectorAll("video").forEach((v) => {
+                      if (v !== e.currentTarget) v.pause();
+                    });
+                  }}
+                />
           ) : (
-            <div style={S.muted}>{node.asset_status === "generating" ? "生成中..." : node.asset_status === "failed" ? "生成失败" : "等待生成"}</div>
+            <div style={S.muted}>
+              {node.asset_status === "generating" ? "生成中..." : node.asset_status === "failed" ? (r.error ? `失败: ${String(r.error)}` : "生成失败") : node.asset_status === "timeout" ? (r.error ? `超时: ${String(r.error)}` : "超时") : "等待生成"}
+            </div>
           )}
-        </section>
-      );
-
-    case "audio":
-      return (
-        <section style={S.section}>
-          <div style={S.label}>配音参数</div>
-          {r.text ? <div style={S.text}>{String(r.text)}</div> : null}
-          {r.voice ? <div style={S.muted}>音色: {String(r.voice)}</div> : null}
         </section>
       );
 
@@ -373,6 +469,32 @@ const S = {
     letterSpacing: "0.05em",
   },
 
+  toggleOn: {
+    padding: "3px 10px",
+    border: "none",
+    borderRadius: 4,
+    background: "#22c55e",
+    color: "#fff",
+    cursor: "pointer",
+    fontSize: 11,
+    fontWeight: 600,
+    marginTop: 4,
+    minWidth: 44,
+  } as React.CSSProperties,
+
+  toggleOff: {
+    padding: "3px 10px",
+    border: "1px solid #d4d4d8",
+    borderRadius: 4,
+    background: "#f4f4f5",
+    color: "#a1a1aa",
+    cursor: "pointer",
+    fontSize: 11,
+    fontWeight: 600,
+    marginTop: 4,
+    minWidth: 44,
+  } as React.CSSProperties,
+
   providerSelect: {
     width: "100%",
     padding: "6px 8px",
@@ -477,7 +599,7 @@ const S = {
 
   refGrid: {
     display: "flex",
-    gap: 8,
+    gap: 20,
     overflow: "auto",
   } as React.CSSProperties,
 
@@ -496,6 +618,45 @@ const S = {
     borderRadius: 4,
     border: "1px solid #e4e4e7",
   },
+
+  refArrow: {
+    position: "absolute",
+    width: 16,
+    height: 16,
+    borderRadius: "50%",
+    background: "rgba(0,0,0,0.5)",
+    color: "#fff",
+    border: "none",
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+    lineHeight: 1,
+    zIndex: 2,
+  } as React.CSSProperties,
+
+  refDelete: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 18,
+    height: 18,
+    borderRadius: "50%",
+    background: "#ef4444",
+    color: "#fff",
+    border: "none",
+    fontSize: 10,
+    fontWeight: 700,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+    lineHeight: 1,
+  } as React.CSSProperties,
 
   refTitle: {
     fontSize: 10,

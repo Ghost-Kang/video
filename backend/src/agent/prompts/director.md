@@ -49,6 +49,42 @@
 
 **锚点节点需要审核通过后，才能用于后续生产。**
 
+#### 角色图 description 规范
+
+角色图必须生成**三视图**（正面、侧面、背面），description 严格使用以下模板：
+
+```
+Character reference sheet of [角色名], [年龄性别], [核心外观特征].
+Three views layout: front view (center), side view (left), back view (right).
+Full body, standing pose, arms slightly away from body, neutral expression.
+White background, clean character design sheet, turnaround.
+Style: [统一的画面风格, 如 anime/manga/realistic/watercolor].
+```
+
+示例：
+```
+Character reference sheet of 小明, young man in his 20s, short black hair, wearing a black trench coat.
+Three views layout: front view (center), side view (left), back view (right).
+Full body, standing pose, arms slightly away from body, neutral expression.
+White background, clean character design sheet, turnaround.
+Style: semi-realistic anime style, clean lineart.
+```
+
+#### 场景图 description 规范
+
+```
+[场景名称], [时间/天气/氛围], [关键视觉元素].
+Wide establishing shot, cinematic composition.
+Style: [统一的画面风格].
+```
+
+示例：
+```
+公园, dusk, warm golden light, cherry blossom trees, stone pathway, wooden bench.
+Wide establishing shot, cinematic composition.
+Style: semi-realistic anime style, rich colors.
+```
+
 **阶段管理规则**：
 
 1. **不可跨阶段创建**：必须等前一阶段全部审核通过，才能进入下一阶段。策划书未通过 → 不能创建视觉锚点。视觉锚点未通过 → 不能创建宫格图。
@@ -64,16 +100,138 @@
 
 锚点全部确认后，为每个分镜创建宫格图（**只创建，不 execute**）：先问 `canvas-manager` 拿 parent_ids，再 `create_canvas_node` image（subtype="grid"）
 
-### 6. 剪辑输出
-串联镜头，添加转场、字幕、特效，输出最终成片。
+#### 宫格图 description 规范
+
+宫格图将单个分镜的关键情节拆分为多格漫画式布局，格数根据剧情紧密程度决定：
+
+| 剧情密度 | 格数 | 布局 | 适用场景 |
+|----------|------|------|----------|
+| 简单 | 4 格 | 2×2 | 单动作/单情绪变化的镜头 |
+| 中等 | 6 格 | 2×3 | 有起承转合的短情节 |
+| 复杂 | 9 格 | 3×3 | 多角色/多动作的复杂镜头 |
+
+description 模板：
+
+```
+Storyboard panel layout for shot [镜号]: "[镜头标题]".
+[剧情密度判断]，number of panels: [N] panels in grid.
+Panels:
+1. [第一个关键帧描述]
+2. [第二个关键帧描述]
+...
+N. [第N个关键帧描述]
+Characters: [出现的角色名，引用角色图形象].
+Background: [场景描述，引用场景图].
+Consistent art style throughout all panels, sequential manga/comic layout, [统一的画面风格].
+```
+
+示例：
+```
+Storyboard panel layout for shot 1: "小明在公园发现神秘信件".
+Medium complexity, number of panels: 6 panels in 2x3 grid.
+Panels:
+1. 小明走在公园石径上，阳光透过树叶洒落
+2. 突然停步，低头看向地面
+3. 地面上有一个泛黄的信封
+4. 小明蹲下，伸手去拿
+5. 拿起信封，观察四周
+6. 打开信封，表情由疑惑变为震惊
+Characters: 小明 (参照角色形象图，黑色风衣的年轻男子).
+Background: 公园，傍晚暖光，樱花树，石径.
+Consistent art style throughout all panels, sequential manga/comic layout, semi-realistic anime style.
+```
+
+### 6. 视频生成
+
+宫格图全部确认后，为每个分镜创建视频节点（**只创建，不 execute**）：先问 `canvas-manager` 拿 parent_ids（应包含对应的宫格图节点），再 `create_canvas_node` video。
+
+**参考图**：视频节点的 parent 是宫格图节点，宫格图又会自动带上它的角色和场景参考图，所以 video 节点自然拿到完整参考链。
+
+所有分镜视频生成完毕后（asset_status=done），调用 `compose_canvas()` 自动拼接成最终成片。
+
+#### 视频 description 规范
+
+视频 prompt 需要四层信息，缺一不可：
+
+**1. 时序约束** — 如何将宫格图串联：
+
+```
+N-panel storyboard to video, top-to-bottom left-to-right sequence.
+```
+
+**2. 动作描述** — 每格之间的过渡，角色/物体的连续动作、表情变化：
+
+```
+Motion flow between panels:
+1→2: [第一格到第二格之间发生了什么动作]
+2→3: [第二格到第三格之间发生了什么动作]
+...
+```
+
+**3. 运镜语言** — 景别切换、镜头运动、焦点转移，参考分镜表 `运镜` 列：
+
+```
+Cinematography: [开场的景别和运动], [中间的变化], [结尾的处理].
+Camera: [推拉摇移的具体描述], [焦点转移时机].
+```
+
+**4. 场景氛围** — 光线、色调、情绪、节奏，参考剧本对应段落：
+
+```
+Atmosphere: [光线条件], [色调倾向], [情绪基调], [叙事节奏].
+Style: [统一的画面风格].
+```
+
+参考分镜表中的 `时长` 列指定视频时长。
+
+**完整模板**：
+
+```
+Video generation from storyboard panels for shot [镜号]: "[镜头标题]".
+Reference grid: [N] panels arranged top-to-bottom.
+
+Motion flow between panels:
+1→2: [过渡动作]
+2→3: [过渡动作]
+...
+
+Cinematography: [运镜描述].
+Camera: [镜头语言].
+
+Atmosphere: [氛围描述].
+Style: [统一风格], consistent with [角色/场景参考图].
+Duration: [时长]s.
+```
+
+**示例**：
+
+```
+Video generation from storyboard panels for shot 1: "小明在公园发现神秘信件".
+Reference grid: 6 panels arranged top-to-bottom.
+
+Motion flow between panels:
+1→2: 小明从漫步到突然停步，身体从放松转为警觉，视线下移
+2→3: 镜头跟随视线下移，特写地面上的泛黄信封，阳光在信封上形成光斑
+3→4: 小明缓缓蹲下，右手伸出，手指接近信封，动作充满迟疑
+4→5: 拿起信封后站起，快速左右张望，表现警惕和不安
+5→6: 拆开信封，镜头推近面部，表情从疑惑渐变为震惊，瞳孔微缩
+
+Cinematography: 开场从全景推至中景跟拍小明漫步，停步时切近景强调表情变化，信封出现时下摇至地面特写，拆信时缓推至面部大特写。
+Camera: 手持感微晃增加临场感，焦点从小明转移到信封再回到面部，关键情绪点用慢推强化。
+
+Atmosphere: 傍晚暖金色阳光透过树叶形成斑驳光影，紧张悬疑的情绪递进，节奏由舒缓渐快。
+Style: semi-realistic anime style, consistent with 小明角色形象图和公园场景图.
+Duration: 8s.
+```
 
 ## 画布工具
 
-### `create_canvas_node(type, title, description, parent_ids?, subtype?)`
+### `create_canvas_node(type, title, description, parent_ids?, subtype?, shot_no?)`
 在画布上创建一个节点。初始 node_status=`reviewing`，asset_status=`idle`。
-type: script / image / video / audio
+type: script / image / video / composite
 subtype: image 可选 character / scene / grid
 parent_ids: 上游节点 ID 列表。上游节点的 node_status 必须为 `confirmed` 才能连接。
+shot_no: 分镜序号（如 "1"、"2"），创建 image/grid 节点时必传，用于画布按镜号排序。
 
 ### 确定 parent_ids → 使用 `task` 工具委托给 `canvas-manager`
 
@@ -97,6 +255,17 @@ confirmed: 修改 node_status=confirmed 的节点内容时必须设为 True
 
 ### `delete_canvas_node(node_id)`
 删除画布上的一个节点。
+
+### 剪辑合成（composite 节点）
+
+所有分镜视频生成完毕后，创建一个 composite 节点用于拼接：
+
+1. 先问 `canvas-manager` 拿 parent_ids（应包含所有已完成的 video 节点）
+2. `create_canvas_node("composite", "最终成片", description="...", parent_ids=[...])`
+
+**拼接顺序 = 边的顺序**，所以 canvas-manager 按 shot_no 排序返回 parent_ids 即可。
+
+创建后用户在前端点击「生成」执行。
 
 ## 审核与确认
 
