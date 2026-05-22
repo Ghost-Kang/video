@@ -81,6 +81,7 @@ the doc-only items #1 and #5.)
 | P3-3 creator onboarding admin view | Claude (frontend) | `handoff/claude_frontend_P3-3.md` ✅ | `/admin/creators` lists creators with status (invited / registered / rewritten / published / looping); backend `/api/creators` aggregation endpoint | P1-1 landing + P0 closure for real-creator load |
 | P3-4 PR template | Claude ✅ | `.github/PULL_REQUEST_TEMPLATE.md` (shipped) | template auto-applies on web PRs | none |
 | P3-5 anchor reuse analytics page | Claude (frontend) | `handoff/claude_frontend_P3-5.md` ✅ | `/analytics/anchors` shows reuse_count top-N + distribution histogram + by-kind | P1-6 + P2-6 baseline (both done) |
+| **P3-R3 landing consent click-through** | **Claude (frontend)** | `handoff/claude_frontend_P3-R3.md` (ready) | `ConsentGate.tsx` + `useConsent.ts` + `/legal/*` routes; consent gate disables grid until checkbox ticked; `consent_accepted` event lands in events table; legal docs served from `/public/legal/` build-copy | `docs/legal/*.md` (✅ shipped d294754) — DM Day-1 blocker |
 
 ### 3.4 Cursor — deprecated for new tickets (no W3 allocation)
 
@@ -97,7 +98,7 @@ If founder reverses the deprecation, W4 allocation should re-introduce Cursor wi
 | **Founder** | DM batch (0 / 25 target), seed post (NO), 算法备案 (not filed), discovery calls (0), 5 条 compliance (not done) | All re-listed in §2 (P0 critical path) + §4 (founder tickets). Strict W3D2 18:00 escalation gate. |
 | **Founder** | P2-1 / P2-2 brief 口述 30min | Optional retrospective only — Codex shipped without 口述; existing STUB §0 in briefs remains unfilled but non-blocking. Note in §9. |
 | Codex | (none — P2-1 + P2-2 closed W2) | P3-6 / P3-7 / P3-8 closed W3D0; picks up **P3-R1 compliance batch** + **P3-R2 LLM provider switch** (§3.2) W3D1 |
-| Claude | (none — W2 work delivered + 3 W3 tickets already shipped: P3-3 / P3-4 / P3-5) | P3-1 unblocked once Codex closes P3-R2 (Doubao replaces GOOGLE_API_KEY dependency); P3-2 once P3-1 closes |
+| Claude | (none — W2 work delivered + 3 W3 tickets already shipped: P3-3 / P3-4 / P3-5) | **P3-R3 landing consent gate** W3D1 (DM Day-1 blocker); P3-1 unblocked once Codex closes P3-R2; P3-2 once P3-1 closes |
 | Cursor | (deprecated; n/a) | No W3 work expected |
 
 ---
