@@ -140,14 +140,14 @@ function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
 }) {
   const resultPrompt = (node.result as Record<string, unknown> | null)?.prompt as string | undefined;
   const [prompt, setPrompt] = useState(resultPrompt || node.description || "");
-  const [provider, setProvider] = useState(node.image_gen_provider || "google");
+  const [provider, setProvider] = useState(node.image_gen_provider || "apimart");
   const [duration, setDuration] = useState(5);
   const [resolution, setResolution] = useState("720p");
   const [generateAudio, setGenerateAudio] = useState(true);
   useEffect(() => {
     const rp = (node.result as Record<string, unknown> | null)?.prompt as string | undefined;
     setPrompt(rp || node.description || "");
-    setProvider(node.image_gen_provider || "google");
+    setProvider(node.image_gen_provider || "apimart");
   }, [node.id, node.description, node.asset_status]);
   const [showPolish, setShowPolish] = useState(false);
   const [feedback, setFeedback] = useState("");

@@ -1,4 +1,4 @@
-import { StrictMode, useState, useCallback } from "react";
+import { StrictMode, useState, useCallback, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
@@ -29,6 +29,15 @@ function getChatRedirect(userId: string): string {
 
 function AppRoutes() {
   const [user, setUser] = useState<string | null>(() => localStorage.getItem("rhtv_user"));
+
+  // Phase 1 anon-consent bridge: useConsent.accept() writes rhtv_user
+  // then dispatches this event so /chat becomes accessible without an
+  // explicit /login round-trip.
+  useEffect(() => {
+    const refresh = () => setUser(localStorage.getItem("rhtv_user"));
+    window.addEventListener("rhtv-auth-changed", refresh);
+    return () => window.removeEventListener("rhtv-auth-changed", refresh);
+  }, []);
 
   const handleLogin = useCallback((uid: string) => {
     setUser(uid);

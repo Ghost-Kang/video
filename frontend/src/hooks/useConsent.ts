@@ -56,13 +56,25 @@ export function useConsent(): UseConsentResult {
     window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(next));
     setRecord(next);
 
+    // Phase 1 anon flow bridge: upstream's auth gate (66758bd) requires
+    // `rhtv_user` in localStorage to grant /chat access. Auto-write our
+    // stable anon ID as the user so consent acceptance doubles as anon
+    // login. No explicit /login screen needed for trial creators.
+    // Dispatch a custom event so AppRoutes' user state re-reads
+    // localStorage (same-tab storage events don't fire in browsers).
+    const uid = anonId();
+    if (!window.localStorage.getItem("rhtv_user")) {
+      window.localStorage.setItem("rhtv_user", uid);
+    }
+    window.dispatchEvent(new Event("rhtv-auth-changed"));
+
     try {
       await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_name: "consent_accepted",
-          user_id: anonId(),
+          user_id: uid,
           payload: {
             version: CONSENT_VERSION,
             accepted_at: now,
