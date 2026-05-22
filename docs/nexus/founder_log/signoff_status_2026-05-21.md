@@ -23,7 +23,9 @@
 
 **Founder 口头确认**: 2026-05-21 conversation "上面触发条件已经完成" 涵盖 P2-4 signoff。已记录在 `W2_closed_2026-05-21.md`。
 
-**当前 mismatch**: 文档里实际没勾。后续 PM session 或 routine 跑 `runner.parse_founder_qualitative()` 会读到全部 `not_reviewed` 状态。
+**当前 mismatch**: 已按 Option B 在 `p2-4_qualitative_signoff_2026-05-21.md` 顶部补 verbal approval note。原始 15 个 checkbox 保留为空,作为 fixture-baseline worksheet;P2-4 状态以 verbal note + W2 closed 记录为准。
+
+**Resolved**: Option B @ 2026-05-22.
 
 ---
 

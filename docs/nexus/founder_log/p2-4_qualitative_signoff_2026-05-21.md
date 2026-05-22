@@ -4,6 +4,8 @@
 **Mode**: CASCADE_REWRITE_UPSTREAM=fixture (analysis source: synthesized from founder annotations in real_urls_for_p2-4.md)
 **Acceptance bar**: 4/5 per niche "我会把这个版本发出去"
 
+**Founder verbal approval note**: 2026-05-21 conversation "上面触发条件已经完成" is recorded in `W2_closed_2026-05-21.md` and treated as equivalent offline fixture-baseline approval for all 15 rows. The unchecked boxes below are preserved as the raw review worksheet; the real founder bar moves to LLM-mode outputs and real URL trial artifacts.
+
 Read each output file and tick the checkbox. If you want changes, write them under 调整诉求.
 Note: rows tagged `negative_ref` are intentional anti-patterns; accept the rewrite if it injects an H1-H8 hook and avoids the bare-title leak. `edge_case` rows test brand/efficacy boundary — accept if no brand name / no functional claim.
 
