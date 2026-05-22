@@ -109,12 +109,15 @@ fi
 p3_5=$(status_probe "frontend/src/pages/AnchorAnalytics.tsx" "AnchorAnalytics")
 # P3-6 anchor reuses endpoint (Codex)
 p3_6=$(status_probe "backend/src/agent/cascade/anchors.py" "list_reuses|async def list_reuses")
-# P3-7 Toprador hardening (Codex; STUB until founder approves)
-p3_7=$(status_probe "backend/src/agent/cascade/circuit_breaker.py" "circuit_breaker|CircuitBreaker")
-# P3-8 Reality Checker remaining hazards — triage marker file (founder writes
-# after reviewing 03_evidence_audit.md) is the signal. Brief STUB alone = open.
-if ls docs/nexus/founder_log/p3-8_triage_*.md >/dev/null 2>&1; then
-  p3_8="partial"  # founder triage happened
+# P3-7 Toprador hardening (Codex) — circuit_breaker module + analysis_service
+# uses it. Match by symbols actually present (before_call / record_failure).
+p3_7=$(status_probe "backend/src/agent/cascade/circuit_breaker.py" "before_call|record_failure|FAILURE_THRESHOLD")
+# P3-8 Reality Checker remaining hazards — closure marker file is done
+# state; triage marker file is partial; brief STUB alone is open.
+if ls docs/nexus/founder_log/p3-8_closed_*.md >/dev/null 2>&1; then
+  p3_8="done"
+elif ls docs/nexus/founder_log/p3-8_triage_*.md >/dev/null 2>&1; then
+  p3_8="partial"  # founder triaged but Codex hasn't finished closure
 elif [ -f docs/nexus/handoff/codex_backend_P3-8.md ]; then
   p3_8="open"  # STUB only — awaiting founder triage
 else

@@ -20,6 +20,7 @@ from agent.cascade.anchors import (
     create_anchor,
     get_anchor,
     list_anchors,
+    list_reuses,
     reuse_anchor,
 )
 
@@ -235,3 +236,78 @@ def test_get_anchor_roundtrip(monkeypatch, tmp_path):
     assert fetched is not None
     assert fetched.id == anchor.id
     assert fetched.label == anchor.label
+
+
+def test_list_reuses_empty_history(monkeypatch, tmp_path):
+    _use_tmp_db(monkeypatch, tmp_path)
+    anchor = asyncio.run(_seed())
+
+    payload = asyncio.run(list_reuses(anchor_id=anchor.id, user_id="u1"))
+
+    assert payload["anchor_id"] == anchor.id
+    assert payload["anchor_label"] == anchor.label
+    assert payload["anchor_kind"] == "character"
+    assert payload["reuse_count"] == 0
+    assert payload["reuses"] == []
+    assert payload["days_since_created"] == 0
+    assert payload["days_since_last_reuse"] == payload["days_since_created"]
+
+
+def test_list_reuses_returns_newest_first(monkeypatch, tmp_path):
+    db_path = _use_tmp_db(monkeypatch, tmp_path)
+    anchor = asyncio.run(_seed())
+    asyncio.run(reuse_anchor(anchor_id=anchor.id, user_id="u1", reused_in_run_id="run_old"))
+    asyncio.run(reuse_anchor(anchor_id=anchor.id, user_id="u1", reused_in_run_id="run_new", reused_in_shot_index=4))
+
+    older = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+    db = sqlite3.connect(str(db_path))
+    db.execute(
+        "UPDATE anchor_reuses SET reused_at = ? WHERE anchor_id = ? AND reused_in_run_id = ?",
+        (older, anchor.id, "run_old"),
+    )
+    db.commit()
+    db.close()
+
+    payload = asyncio.run(list_reuses(anchor_id=anchor.id, user_id="u1"))
+    assert [row["reused_in_run_id"] for row in payload["reuses"]] == ["run_new", "run_old"]
+    assert payload["reuses"][0]["reused_in_shot_index"] == 4
+
+
+def test_list_reuses_days_since_last_reuse(monkeypatch, tmp_path):
+    db_path = _use_tmp_db(monkeypatch, tmp_path)
+    anchor = asyncio.run(_seed())
+    asyncio.run(reuse_anchor(anchor_id=anchor.id, user_id="u1", reused_in_run_id="run_old"))
+
+    past = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+    db = sqlite3.connect(str(db_path))
+    db.execute("UPDATE anchor_reuses SET reused_at = ? WHERE anchor_id = ?", (past, anchor.id))
+    db.commit()
+    db.close()
+
+    payload = asyncio.run(list_reuses(anchor_id=anchor.id, user_id="u1"))
+    assert payload["days_since_last_reuse"] >= 5
+
+
+def test_list_reuses_uses_anchor_reuse_count(monkeypatch, tmp_path):
+    _use_tmp_db(monkeypatch, tmp_path)
+    anchor = asyncio.run(_seed())
+    asyncio.run(reuse_anchor(anchor_id=anchor.id, user_id="u1", reused_in_run_id="run_a"))
+    asyncio.run(reuse_anchor(anchor_id=anchor.id, user_id="u1", reused_in_run_id="run_b"))
+
+    payload = asyncio.run(list_reuses(anchor_id=anchor.id, user_id="u1"))
+
+    assert payload["reuse_count"] == 2
+    assert len(payload["reuses"]) == 2
+
+
+def test_list_reuses_missing_anchor(monkeypatch, tmp_path):
+    _use_tmp_db(monkeypatch, tmp_path)
+    with pytest.raises(LookupError):
+        asyncio.run(list_reuses(anchor_id="anc_missing", user_id="u1"))
+
+
+def test_list_reuses_cross_user_forbidden(monkeypatch, tmp_path):
+    _use_tmp_db(monkeypatch, tmp_path)
+    anchor = asyncio.run(_seed(user_id="u1"))
+    with pytest.raises(PermissionError):
+        asyncio.run(list_reuses(anchor_id=anchor.id, user_id="u2"))

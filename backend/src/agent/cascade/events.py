@@ -36,6 +36,8 @@ _REQUIRED_FIELDS: dict[str, frozenset[str]] = {
         "confidence",
         "had_fallback",
         "model",
+        "upstream_latency_ms",
+        "upstream_attempts",
     }),
     "script_rewritten": frozenset({"shot_count", "script_char_len", "parser_warnings"}),
     "shot_generated": frozenset({"shot_index", "provider", "model", "outcome", "attempt", "latency_ms", "anchor_refs"}),

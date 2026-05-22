@@ -73,7 +73,7 @@ def normalize_analysis_result(raw: Any) -> CascadeAnalysisContract:
     _ensure_schema_version(data)
     _ensure_analysis_id(data, warnings)
     _ensure_source_url(data, warnings)
-    _ensure_platform(data)
+    _ensure_platform(data, warnings)
     _ensure_created_at(data)
     _ensure_model(data)
     _ensure_cost(data, warnings)
@@ -185,13 +185,44 @@ def _ensure_source_url(data: dict[str, Any], warnings: list[Warning_]) -> None:
         )
 
 
-def _ensure_platform(data: dict[str, Any]) -> None:
+def _ensure_platform(data: dict[str, Any], warnings: list[Warning_]) -> None:
     p = data.get("platform")
     if not isinstance(p, str):
         data["platform"] = Platform.OTHER.value
-        return
-    if p not in {member.value for member in Platform}:
+    elif p not in {member.value for member in Platform}:
         data["platform"] = Platform.OTHER.value
+    else:
+        data["platform"] = p
+
+    sniffed = _platform_from_url(str(data.get("source_url") or ""))
+    if sniffed and data["platform"] != sniffed:
+        original = data["platform"]
+        data["platform"] = sniffed
+        warnings.append(
+            Warning_(
+                code=WarningCode.W13_PLATFORM_URL_MISMATCH.value,
+                field="platform",
+                message=f"platform {original!r} disagrees with source_url host; using {sniffed!r}",
+                severity=Severity.WARN,
+            )
+        )
+
+
+def _platform_from_url(source_url: str) -> str | None:
+    try:
+        host = urlparse(source_url).netloc.lower()
+    except ValueError:
+        return None
+    if (
+        host == "xiaohongshu.com"
+        or host.endswith(".xiaohongshu.com")
+        or host == "xhslink.com"
+        or host.endswith(".xhslink.com")
+    ):
+        return Platform.XIAOHONGSHU.value
+    if host == "douyin.com" or host.endswith(".douyin.com"):
+        return Platform.DOUYIN.value
+    return None
 
 
 def _ensure_created_at(data: dict[str, Any]) -> None:

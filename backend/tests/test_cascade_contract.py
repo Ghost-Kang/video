@@ -287,6 +287,18 @@ def test_adapter_flags_cross_border_source() -> None:
     assert any(w.code == WarningCode.W9_CROSS_BORDER_SOURCE.value for w in contract.warnings)
 
 
+def test_adapter_flags_platform_source_url_mismatch() -> None:
+    raw = _load(SYNTH / "baomam_fushi" / "001.json")
+    raw["platform"] = "douyin"
+    raw["source_url"] = "https://www.xiaohongshu.com/explore/abc"
+    contract = normalize_analysis_result(raw)
+    assert contract.platform == Platform.XIAOHONGSHU
+    assert any(
+        w.code == WarningCode.W13_PLATFORM_URL_MISMATCH.value and w.field == "platform"
+        for w in contract.warnings
+    )
+
+
 def test_adapter_coerces_unknown_enum_values() -> None:
     raw = _load(SYNTH / "baomam_fushi" / "001.json")
     raw["scenes"][0]["shot_type"] = "bonkers"

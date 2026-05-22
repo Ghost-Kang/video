@@ -12,6 +12,20 @@ This is not the contract module shipping in its current form. It is the contract
 
 ---
 
+## W3 Codex Closure Notes (2026-05-21)
+
+This audit started as NEEDS WORK. The hazards below have now been closed or explicitly deferred in code/tests:
+
+- Hazard 1, 5, 7: closed in `backend/src/agent/cascade/adapter.py` and `backend/src/agent/cascade/failures.py`; schema version missing/blank is hard-fail, clamp/coercion paths now warn, and the dead `time` import is gone.
+- Hazard 2: closed by timestamp clamp/sort warning coverage in `backend/tests/test_cascade_contract.py`.
+- Hazard 3: closed honestly by skipping the real-corpus completeness gate until `fixtures/real_v1` exists.
+- Hazard 4: upstream S7/S8 reachability is now owned by `backend/src/agent/cascade/analysis_service.py`; P2-2 added direct Toprador HTTP mapping, and P3-7 adds retry, cache, circuit breaker, and upstream metrics.
+- Hazard 6: closed by platform/source_url host sniffing. A Douyin/Xiaohongshu mismatch now emits `W13_PLATFORM_URL_MISMATCH` and uses the platform implied by the URL host.
+
+Regression proof: `uv run pytest tests/test_cascade_contract.py tests/test_analysis_service.py tests/test_anchors.py -q` passes as of this closure note.
+
+---
+
 ## Issues found
 
 ### 1. [BUG] [BLOCKER] — Five Schema §5 fallback rows are implemented as silent fills

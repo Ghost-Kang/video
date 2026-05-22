@@ -16,7 +16,7 @@ from agent.pool import AgentPool
 from agent.store import get_messages, save_message
 from agent.tools import canvas as canvas_tools
 from agent.cascade.analysis_service import request_shallow_analysis
-from agent.cascade.anchors import create_anchor, list_anchors, reuse_anchor
+from agent.cascade.anchors import create_anchor, list_anchors, list_reuses, reuse_anchor
 from agent.cascade.storage import list_creators
 from agent.cascade.cost_guard import PREDICT_ANALYSIS_CNY, PREDICT_REWRITE_CNY, cost_guard, cost_status
 from agent.cascade.events import emit
@@ -434,17 +434,32 @@ async def _handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
         body_bytes = await reader.readexactly(content_length) if content_length else b"{}"
 
         body = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
-        if method == "GET" and path.startswith("/api/cost/status"):
-            from urllib.parse import parse_qs, urlparse
-            qs = parse_qs(urlparse(path).query)
+        from urllib.parse import parse_qs, urlparse
+        parsed = urlparse(path)
+        route_path = parsed.path
+        qs = parse_qs(parsed.query)
+
+        if method == "GET" and route_path == "/api/cost/status":
             payload = await cost_status(qs.get("user_id", ["default"])[0], qs.get("run_id", ["default"])[0])
             writer.write(_http_response(200, payload))
-        elif method == "GET" and path == "/api/creators":
+        elif method == "GET" and route_path == "/api/creators":
             creators = await list_creators()
             writer.write(_http_response(200, {"creators": creators}))
-        elif method == "GET" and path.startswith("/api/anchors"):
-            from urllib.parse import parse_qs, urlparse
-            qs = parse_qs(urlparse(path).query)
+        elif method == "GET" and route_path.startswith("/api/anchors/") and route_path.endswith("/reuses"):
+            anchor_id = route_path[len("/api/anchors/"):-len("/reuses")]
+            user_id = qs.get("user_id", ["default"])[0]
+            try:
+                payload = await list_reuses(anchor_id=anchor_id, user_id=user_id)
+            except LookupError as exc:
+                writer.write(_http_response(404, {"error": str(exc)}, "Not Found"))
+                await writer.drain()
+                return
+            except PermissionError as exc:
+                writer.write(_http_response(403, {"error": str(exc)}, "Forbidden"))
+                await writer.drain()
+                return
+            writer.write(_http_response(200, payload))
+        elif method == "GET" and route_path == "/api/anchors":
             user_id = qs.get("user_id", ["default"])[0]
             kind = qs.get("kind", [None])[0]
             try:
@@ -454,7 +469,7 @@ async def _handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
                 await writer.drain()
                 return
             writer.write(_http_response(200, {"anchors": [a.model_dump(mode="json") for a in anchors]}))
-        elif method == "POST" and path == "/api/anchors":
+        elif method == "POST" and route_path == "/api/anchors":
             try:
                 anchor = await create_anchor(
                     user_id=str(body.get("user_id") or "default"),
@@ -469,8 +484,8 @@ async def _handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
                 await writer.drain()
                 return
             writer.write(_http_response(200, anchor.model_dump(mode="json")))
-        elif method == "POST" and path.startswith("/api/anchors/") and path.endswith("/reuse"):
-            anchor_id = path[len("/api/anchors/"):-len("/reuse")]
+        elif method == "POST" and route_path.startswith("/api/anchors/") and route_path.endswith("/reuse"):
+            anchor_id = route_path[len("/api/anchors/"):-len("/reuse")]
             try:
                 anchor = await reuse_anchor(
                     anchor_id=anchor_id,
@@ -487,7 +502,7 @@ async def _handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
                 await writer.drain()
                 return
             writer.write(_http_response(200, anchor.model_dump(mode="json")))
-        elif method == "POST" and path == "/api/events":
+        elif method == "POST" and route_path == "/api/events":
             await emit(
                 str(body["event_name"]),
                 user_id=str(body.get("user_id") or "default"),
@@ -495,7 +510,7 @@ async def _handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
                 payload=body.get("payload") or {},
             )
             writer.write(_http_response(200, {"ok": True}))
-        elif method == "POST" and path == "/api/rewrite":
+        elif method == "POST" and route_path == "/api/rewrite":
             user_id = str(body.get("user_id") or "default")
             run_id = str(body.get("run_id") or "default")
             await cost_guard(user_id, run_id, PREDICT_REWRITE_CNY)
@@ -522,7 +537,7 @@ async def _handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
                 },
             )
             writer.write(_http_response(200, result.model_dump(mode="json")))
-        elif method == "POST" and path == "/api/analysis/shallow":
+        elif method == "POST" and route_path == "/api/analysis/shallow":
             source_url = str(body.get("source_url") or "").strip()
             if not source_url:
                 writer.write(_http_response(400, {"error": "source_url_required"}, "Bad Request"))

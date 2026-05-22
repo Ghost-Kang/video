@@ -69,6 +69,7 @@ class WarningCode(str, Enum):
     W10_AUTHOR_PII_STRIPPED = "W10_AUTHOR_PII_STRIPPED"  # silent; included for audit
     W11_CONFIDENCE_CLAMPED = "W11_CONFIDENCE_CLAMPED"
     W12_TIMESTAMP_CLAMPED = "W12_TIMESTAMP_CLAMPED"
+    W13_PLATFORM_URL_MISMATCH = "W13_PLATFORM_URL_MISMATCH"
 
 
 # UI-facing 人话 recovery hints. Brand Guardian §4 rule: no English jargon, no
@@ -114,6 +115,7 @@ RECOVERY_HINTS: dict[str, str] = {
     WarningCode.W10_AUTHOR_PII_STRIPPED.value: "",  # silent; never shown
     WarningCode.W11_CONFIDENCE_CLAMPED.value: "（系统对置信度做了取整，不影响使用）",
     WarningCode.W12_TIMESTAMP_CLAMPED.value: "（系统把镜头时间对齐到了视频时长内）",
+    WarningCode.W13_PLATFORM_URL_MISMATCH.value: "（系统按链接修正了平台类型）",
 }
 
 

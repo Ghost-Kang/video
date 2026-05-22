@@ -91,6 +91,17 @@ def _new_id() -> str:
     return "anc_" + uuid.uuid4().hex[:16]
 
 
+def _parse_utc(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _days_since(value: str) -> int:
+    return max(0, (datetime.now(timezone.utc) - _parse_utc(value)).days)
+
+
 async def create_anchor(
     *,
     user_id: str,
@@ -206,6 +217,55 @@ async def get_anchor(anchor_id: str) -> Anchor | None:
     if not rows:
         return None
     return _row_to_anchor(rows[0])
+
+
+async def list_reuses(*, anchor_id: str, user_id: str) -> dict[str, Any]:
+    """Return reuse history for one anchor, newest first.
+
+    Raises LookupError if the anchor doesn't exist → 404.
+    Raises PermissionError if the anchor belongs to a different user → 403.
+    """
+    db = await _connect()
+    try:
+        anchors = await db.execute_fetchall(
+            """SELECT id, user_id, kind, label, reuse_count, created_at
+               FROM anchors WHERE id = ?""",
+            (anchor_id,),
+        )
+        if not anchors:
+            raise LookupError(f"anchor not found: {anchor_id}")
+        anchor = anchors[0]
+        if anchor[1] != user_id:
+            raise PermissionError(f"anchor {anchor_id} belongs to a different user")
+
+        reuses = await db.execute_fetchall(
+            """SELECT reused_in_run_id, reused_in_shot_index, reused_at
+               FROM anchor_reuses
+               WHERE anchor_id = ?
+               ORDER BY reused_at DESC, id DESC""",
+            (anchor_id,),
+        )
+    finally:
+        await db.close()
+
+    days_since_created = _days_since(anchor[5])
+    last_reuse_at = reuses[0][2] if reuses else None
+    return {
+        "anchor_id": anchor[0],
+        "anchor_label": anchor[3],
+        "anchor_kind": anchor[2],
+        "reuse_count": anchor[4],
+        "reuses": [
+            {
+                "reused_in_run_id": row[0],
+                "reused_in_shot_index": row[1],
+                "reused_at": row[2],
+            }
+            for row in reuses
+        ],
+        "days_since_last_reuse": _days_since(last_reuse_at) if last_reuse_at else days_since_created,
+        "days_since_created": days_since_created,
+    }
 
 
 async def reuse_anchor(
