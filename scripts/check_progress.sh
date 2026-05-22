@@ -211,8 +211,17 @@ if [ -e "$events_db" ]; then
 fi
 
 # Marketing assets posted (founder log)
+# seed_posted: file presence alone is not enough — match same pattern as
+# compliance / algo_filing probes (truth-check content, not existence). The
+# template line `seed_url: <FILL ...>` must be replaced by a real URL containing
+# `http`. Without that, the founder has the template but hasn't actually posted.
 seed_posted="NO"
-ls docs/nexus/founder_log/seed_post_url_*.md >/dev/null 2>&1 && seed_posted="YES"
+for f in docs/nexus/founder_log/seed_post_url_*.md; do
+  [ -e "$f" ] || continue
+  if grep -E '^seed_url:' "$f" 2>/dev/null | grep -v '<FILL' | grep -q 'http'; then
+    seed_posted="YES"
+  fi
+done
 xhs_posts=$(ls docs/nexus/founder_log/xhs_post_*.md 2>/dev/null | wc -l | tr -d ' ')
 douyin_posts=$(ls docs/nexus/founder_log/douyin_post_*.md 2>/dev/null | wc -l | tr -d ' ')
 wechat_oa=$(ls docs/nexus/founder_log/wechat_oa_*.md 2>/dev/null | wc -l | tr -d ' ')
