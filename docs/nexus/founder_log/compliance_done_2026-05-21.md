@@ -17,7 +17,7 @@ Each item is intentionally small (≤ 0.5 day). Total budget ≤ 2 days.
 **Evidence**:
 
 - 文件路径: `docs/legal/user_agreement_v0.md` + `docs/legal/privacy_v0.md`
-- 邀请页 click-through 同意机制: **partial** — 协议措辞已在 §11 / §10 显式定义"勾选 + 进入产品 = 接受;同意时间存入 localStorage + 服务端审计日志"。Landing 页 checkbox UI 需要 frontend 实施(**P3-R3 frontend ticket — 由 Claude 处理;DM 发出前必须 ready**)
+- 邀请页 click-through 同意机制: ✅ **done** (P3-R3 shipped 2026-05-22 in commit 7bb353c) — `frontend/src/components/landing/ConsentGate.tsx` 实现 checkbox 阻挡 + localStorage 存证 + 服务端 `consent_accepted` 事件审计;legal docs 通过 `/legal/:slug` 路由可访问;7 个测试覆盖(4 hooks + 3 component)
 - 法律依据已在协议中标注: PIPL §13 / §17 / §38 / §39 / §44-§49 + 民法典 §1032-1039 + 生成式 AI 暂行办法 + 未成年人保护法 等(完整列表在两份文档的"附:法律依据引用一览")
 
 **8 项要点 checklist**(协议正文里逐项要 cover):
