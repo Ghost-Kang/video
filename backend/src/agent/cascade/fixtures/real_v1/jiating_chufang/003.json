@@ -1,0 +1,43 @@
+{
+  "_provenance": "real_v1",
+  "_niche": "jiating_chufang",
+  "_stub_status": "A_only_pending_founder_label_2026-05-22",
+  "_p0c_owner": "founder",
+  "_p0c_sop": "docs/nexus/founder_log/p0-c_real_fixture_labeling_sop.md",
+  "_source_creator": "@沈家三叔",
+  "_source_posted_at": "2020-06-27",
+  "_source_hook_ids": [
+    "H7",
+    "H4"
+  ],
+  "_source_rating": "⭐⭐⭐⭐⭐",
+  "_source_notes": "标题 '三叔盘出家常菜红烧肉,再忙也要好好吃饭'; 评论跨度 5 年; 博主已停更粉丝长期回访",
+  "_pending_for_founder": [
+    "duration_s (秒, 看完视频后填)",
+    "cost_cny (0.0 占位; 跑过 Toprador 后真实回填)",
+    "confidence (0.0 占位; 跑过 Toprador 后真实回填)",
+    "viral_analysis.* 8 项 (按 02_event_spec 钩子规范填)",
+    "scenes ≥3 (按视频实际拆 3-12 镜)"
+  ],
+  "schema_version": "1.0",
+  "analysis_id": "ana_real_jiating_chufang_003",
+  "source_url": "https://www.douyin.com/video/6843033067318185223",
+  "platform": "douyin",
+  "created_at": "2026-05-22T12:30:00+00:00",
+  "model": "doubao-seed-2-0-pro",
+  "cost_cny": 0.0,
+  "duration_s": 0,
+  "confidence": 0.0,
+  "viral_analysis": {
+    "hook": "__TODO_founder_fill__",
+    "pacing": "__TODO_founder_fill__",
+    "climax": "__TODO_founder_fill__",
+    "visual_style": "__TODO_founder_fill__",
+    "emotional_arc": "__TODO_founder_fill__",
+    "target_audience": "__TODO_founder_fill__",
+    "engagement_levers": "__TODO_founder_fill__",
+    "replicable_formula": "__TODO_founder_fill__"
+  },
+  "scenes": [],
+  "warnings": []
+}
