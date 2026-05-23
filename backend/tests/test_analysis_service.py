@@ -9,7 +9,7 @@ import httpx
 import pytest
 
 from agent.cascade import circuit_breaker
-from agent.cascade.analysis_service import _TOPRADOR_CACHE, request_shallow_analysis
+from agent.cascade.analysis_service import request_shallow_analysis
 from agent.cascade.contract import CascadeAnalysisContract
 from agent.cascade.failures import FailureCode, HardFailure
 from agent.cascade.storage import load_analysis
@@ -226,7 +226,6 @@ class _FakeAsyncClient:
 def _use_toprador(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, response: httpx.Response | None = None, exc: Exception | None = None) -> Path:
     db_path = _use_tmp_db(monkeypatch, tmp_path)
     circuit_breaker.reset()
-    _TOPRADOR_CACHE.clear()
     monkeypatch.setenv("CASCADE_UPSTREAM", "toprador")
     monkeypatch.setenv("TOPRADOR_ENDPOINT", "https://toprador.test/analyze")
     monkeypatch.setenv("TOPRADOR_API_KEY", "secret")

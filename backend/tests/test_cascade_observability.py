@@ -3,7 +3,7 @@
 Covers the four new event_types emitted from analysis_service._call_toprador:
     cascade_retry        — per-attempt retry triggered by transient failures
     cascade_circuit_open — emitted when a caller hits an open breaker
-    cascade_cache_hit    — in-memory cache served the response (P3-7 cache layer)
+    cascade_cache_hit    — SQLite cache served the response (P4-6 cache layer)
     cascade_cache_miss   — cache lookup missed, real upstream call proceeded
 
 Plus storm-prevention: cascade_circuit_open is rate-limited to ≤ 1 emit per
@@ -24,7 +24,6 @@ import pytest
 from agent.cascade import analysis_service, circuit_breaker
 from agent.cascade.analysis_service import (
     _CIRCUIT_OPEN_EMIT_WINDOW_S,
-    _TOPRADOR_CACHE,
     _last_circuit_open_emit,
     request_shallow_analysis,
 )
@@ -93,7 +92,6 @@ async def _no_sleep(attempt: int) -> None:
 def _setup_toprador(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     db_path = _use_tmp_db(monkeypatch, tmp_path)
     circuit_breaker.reset()
-    _TOPRADOR_CACHE.clear()
     _last_circuit_open_emit.clear()
     monkeypatch.setenv("CASCADE_UPSTREAM", "toprador")
     monkeypatch.setenv("TOPRADOR_ENDPOINT", "https://toprador.test/analyze")
@@ -145,6 +143,7 @@ def test_cache_hit_emits_on_warm_cache(monkeypatch, tmp_path):
     assert len(hits) == 1
     assert hits[0]["source_url_hash"] and len(hits[0]["source_url_hash"]) == 12
     assert 0 < hits[0]["ttl_remaining_s"] <= 60.0
+    assert hits[0]["cache_layer"] == "sqlite"
 
 
 # ---------- 3. cascade_retry fires for transient 5xx then succeeds ----------

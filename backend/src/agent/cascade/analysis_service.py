@@ -21,9 +21,11 @@ from agent.cascade.contract import CascadeAnalysisContract
 from agent.cascade.events import emit
 from agent.cascade.failures import FailureCode, HardFailure, WarningCode
 from agent.cascade.storage import (
+    _load_toprador_cache_entry,
     load_analysis,
     load_analysis_for_source,
     save_analysis,
+    save_toprador_cache,
     set_analysis_context,
 )
 
@@ -35,7 +37,6 @@ _HAPPY_FIXTURES = (
     _FIXTURES_ROOT / "jiating_chufang" / "001.json",
 )
 _TOPRADOR_CACHE_TTL_S = 60.0
-_TOPRADOR_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _TOPRADOR_BREAKER = "toprador"
 
 # P4-3 storm-prevention: per-endpoint last cascade_circuit_open emit timestamp.
@@ -131,19 +132,20 @@ async def _call_toprador(
         raise HardFailure(FailureCode.S8_UPSTREAM_REFUSED, "toprador_endpoint_missing")
 
     source_url_hash = _hash_source_url(source_url)
-    now = time.monotonic()
-    cached = _TOPRADOR_CACHE.get(source_url)
-    if cached and cached[0] > now:
+    cached = await _load_toprador_cache_entry(source_url_hash)
+    if cached is not None:
+        cached_payload, ttl_remaining_s = cached
         await emit(
             "cascade_cache_hit",
             user_id=user_id,
             run_id=run_id,
             payload={
                 "source_url_hash": source_url_hash,
-                "ttl_remaining_s": round(cached[0] - now, 3),
+                "ttl_remaining_s": round(ttl_remaining_s, 3),
+                "cache_layer": "sqlite",
             },
         )
-        payload = copy.deepcopy(cached[1])
+        payload = copy.deepcopy(cached_payload)
         payload["_upstream_latency_ms"] = 0
         payload["_upstream_attempts"] = 0
         return payload
@@ -221,10 +223,7 @@ async def _call_toprador(
         raise HardFailure(FailureCode.S5_INVALID_PAYLOAD, "toprador_json_not_object")
 
     circuit_breaker.record_success(_TOPRADOR_BREAKER)
-    _TOPRADOR_CACHE[source_url] = (
-        time.monotonic() + _TOPRADOR_CACHE_TTL_S,
-        copy.deepcopy(payload),
-    )
+    await save_toprador_cache(source_url_hash, copy.deepcopy(payload), _TOPRADOR_CACHE_TTL_S)
     payload = copy.deepcopy(payload)
     payload["_upstream_latency_ms"] = int((time.monotonic() - start) * 1000)
     payload["_upstream_attempts"] = attempts

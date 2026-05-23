@@ -57,7 +57,7 @@ _REQUIRED_FIELDS: dict[str, frozenset[str]] = {
     "consent_accepted": frozenset({"version", "accepted_at", "documents"}),
     "cascade_retry": frozenset({"endpoint", "attempt", "reason", "duration_ms"}),
     "cascade_circuit_open": frozenset({"endpoint", "consecutive_failures", "cooldown_s"}),
-    "cascade_cache_hit": frozenset({"source_url_hash", "ttl_remaining_s"}),
+    "cascade_cache_hit": frozenset({"source_url_hash", "ttl_remaining_s", "cache_layer"}),
     "cascade_cache_miss": frozenset({"source_url_hash"}),
 }
 
