@@ -2,7 +2,7 @@
 
 **Trigger**: founder 2026-05-23 23:55 PDT "招聘人员换成 AI 数字员工,我这里各种类型的数字员工都招齐了"
 **Founder clarification**: "AI 数字员工 = 业务职能代理(如 sales agent / 客服 agent),补 founder lane 那些染金坊职能"
-**Status**: ⛔ **BLOCKED · 待 founder 填 §1 roster + §2 每 agent 的可观察 done-signal**
+**Status**: ⚠️ **PARTIAL** · §1 roster 已 PM 填(2026-05-24 W3D4,从 `~/github/agency-agents/` 200+ agent 仓库选取 8 critical + 6 候选);**仍待 founder**:(a)确认 8 critical 映射准确;(b)填 §2 每 agent 的精确 cadence/失败信号;(c)说明 agent 如何被实际"启动"(Claude Code subagent 加载?自建 dispatch?Coze 集成?)
 **Why this matters**: 直接破解 `PM_risk_audit_2026-05-23.md §2 R1 致命风险`(Founder lane 4 周连续 0 进度)— 不靠 founder 时间,靠 AI agent 替执行。但前提是 PM 知道每 agent 能做什么、produce 什么artifact可观察。
 **Related docs**: `PM_founder_capacity_audit_2026-05-22.md` · `founder_punchlist_W4D1_2026-05-28.md` · `concierge_onboarding_script_2026-05-23.md` · `recruitment.md`
 
@@ -22,27 +22,41 @@
 
 ---
 
-## 1. AI 数字员工 roster(请 founder 填)
+## 1. AI 数字员工 roster(PM 已根据 `~/github/agency-agents/` 仓库填,2026-05-24 W3D4)
 
-每个 agent 一行,**复用 W4D1 punchlist 第 §2/§3 founder lane 工作**作为对位参考:
+**Source**: `/Users/kang/github/agency-agents/` — Mike Sitarzewski "The Agency" — ~200 个 specialized AI agent personality files,按 department 组织(marketing / sales / product / support / specialized / strategy 等)。每 agent 是一个独立 markdown文件,描述 identity + capabilities + workflows。Cascade 可作为 Claude Code subagent 调用 OR 自建 dispatch shell。
 
-| Agent 显示名 | 工作类型 | 与 Cascade founder lane 对应 | 触发方式(autonomous/on-call/scheduled) | 产物落地位置 | 真实身份 / Provider |
+Provider = "agency-agents repo MD personality + Claude Code subagent 加载",**统一在此栏标注 agency-agents:<path>**。
+
+### 1.1 Critical 8 agents(Phase 1 founder lane 直接替换)
+
+| Cascade Agent Slot | 工作类型 | 对应 founder lane | 触发 | 产物落地 | Backing agency-agents file |
 |---|---|---|---|---|---|
-| `<例:Sales-DM-Agent>` | 抖音/小红书冷启 DM 招募 | recruitment.md `- DM` 行(替代 founder W4D1 punchlist §2.2) | scheduled(每日 N 条) | append `recruitment.md` | (Coze 智能体 / 内部 RPA / 自建) |
-| `<例:UserResearch-Q&A-Agent>` | 收 creator 回复后 follow-up Q&A(替代 30min discovery call) | concierge_onboarding_script §1+§2 (shrink mode 已砍 30min call) | on-call(creator 回复后触发) | `founder_log/dm_qa_<creator_id>.md` 或 `interview_logged` event | TBD |
-| `<例:Content-Seed-Agent>` | 小红书 / 抖音 / 即刻 seed 帖发布 + 评论区互动 | founder_punchlist W4D1 §3 + W3 carry forward seed post | scheduled(节奏由 founder 拍板)| `founder_log/seed_post_url_*.md` 顶部填 URL | TBD |
-| `<例:Concierge-FirstRun-Agent>` | 1 小时 first-run together 陪跑 | concierge_onboarding_script §3 1h 陪跑 | on-call(creator 答应起) | `founder_log/concierge_run_<date>_<creator>.md` | TBD |
-| `<例:D+7-FollowUp-Agent>` | D+7 复盘 + 拉留存数据 | concierge_onboarding_script §3.6 follow-up | scheduled +7 天 | append `concierge_run_*.md` 末尾 | TBD |
-| `<例:Algo-Filing-Agent>` | 算法备案 4 项扫描件 + 自助申报 | P0-A 老 founder-only ticket | on-call(执照下来后)| `founder_log/algo_filing_*.md` 更新 受理回执号 | TBD |
-| `<例:Legal-Review-Agent>` | 协议 / 隐私 v0 复核 + 公测前重写 | founder 留的法务复核责任 | scheduled(公测前)| commit `docs/legal/*` review notes | TBD |
-| `<例:Cohort-Coordinator-Agent>` | cohort 进度跟踪 + creator churn risk 预警 | PM 角色的一部分(我目前在做这个)| daily | `founder_log/cohort_status_*.md` | TBD |
+| **Sales-DM-Agent** | 小红书/抖音 cold DM 招募 + ICP 研究 | `recruitment.md` 每日 ≥5 条 `- DM` 行;替代 founder_punchlist §2.2 | scheduled 每日 18:00 跑 5 条 | append `recruitment.md` | `marketing/marketing-xiaohongshu-specialist.md`(主,中文 native + 算法理解)+ `specialized/sales-outreach.md`(副,consultative 文案 + ICP) |
+| **Content-Seed-Agent** | 小红书 seed 帖起草 + 9 图准备 + caption 禁用词扫 + 评论区互动 | `founder_log/seed_post_url_*.md` URL 填入;founder_punchlist §3 | on-call(W4D1 第一篇)+ scheduled 每周 1 篇 | `seed_post_url_*.md` 顶部 + `founder_log/xhs_post_<date>.md` × N | `marketing/marketing-xiaohongshu-specialist.md`(主)+ `marketing/marketing-content-creator.md`(副,multi-platform 改写) |
+| **UserResearch-Q&A-Agent** | creator 回 DM 后文字 Q&A(替代 shrink mode 砍掉的 30min discovery call) | concierge_onboarding_script §1+§2 + 落 `interview_logged` event | on-call(creator 回复后 2h 内) | `founder_log/dm_qa_<creator_id>.md` + POST `/api/events` `interview_logged` | `sales/sales-discovery-coach.md`(主,SPIN + 三框架 discovery)+ `product/product-feedback-synthesizer.md`(副,文字 Q&A 整理 + 热点抽取) |
+| **Concierge-FirstRun-Agent** | 1h first-run together 陪跑 — creator 跑 Cascade 改写流水线 + 三反馈点收集 | concierge_onboarding_script §3 完整脚本 | on-call(creator commit first-run) | `founder_log/concierge_run_<date>_<creator>.md`(5 列观察表 + 3 反馈点逐字) | `specialized/customer-service.md`(temperate friendly tone + 引导用户产品体验) |
+| **D+7-FollowUp-Agent** | D+7 后跟踪 creator 真实复用次数 + churn 原因 | concierge_onboarding_script §3.6 + KPI rubric §4 | scheduled +7 天 from first-run | append `concierge_run_*.md` 末尾 + (可选)写 `founder_log/cohort_status_<week>.md` | `product/product-feedback-synthesizer.md`(主,churn pattern 分析)+ `specialized/customer-service.md`(副,re-engage tone) |
+| **Compliance-Algo-Filing-Agent** | 算法备案 4 项扫描件 + 自助申报 + 母婴/育儿 niche 健康内容合规审查 | P0-A(`algo_filing_2026-05-21.md` 受理回执);母婴 niche 健康声明触发 | on-call(执照下来后 / 每 batch creator output 前) | `founder_log/algo_filing_*.md` 受理回执号 + 每条 creator 改写 W14 minor audit | `specialized/healthcare-marketing-compliance.md`(主,中国 母婴/医疗营销 合规)+ `support/support-legal-compliance-checker.md`(副,通用 PIPL/广告法) |
+| **Legal-Review-Agent** | 协议 v0 / 隐私 v0 复核 + 公测前重写 + 合同审 | `docs/legal/*` v0 → 公测前 v1 升级承诺 | scheduled(公测前 30 天) | commit `docs/legal/*_v1.md` 替代 v0 | `specialized/legal-document-review.md`(合同/协议/版本对比审查) |
+| **Cohort-Coordinator-Agent** | cohort 节奏跟踪 + churn risk 预警 + PM 周报 input | 我(Claude PM 自己) cycle 的一部分;agent 协助提供 daily metrics 给 PM | scheduled daily | `founder_log/cohort_status_<date>.md` daily metrics dump | `specialized/specialized-chief-of-staff.md`(高层 cross-functional coordination)OR `project-management/project-manager-senior.md` |
 
-**请 founder 把 `<例:...>` 改为真实 agent 名字 / 删/加行,并填 真实身份 + provider**。
+### 1.2 Phase 2+ Cascade-relevant candidates(暂不启,W5+ 评估)
 
-PM 拿到 roster 后会:
-- 把每 agent 任务转化为 `check_progress.sh` 可探测的 artifact(events / file presence)
-- 重写 founder_punchlist 为 "AI 数字员工调度表"(founder 只需 W4D1 启动 agents,不再亲手做 DM/帖)
-- 重写 capacity audit:weekly load 5h/w → "founder 决策 + AI agent 跑" 模式,scaling 突破
+| Cascade 未来需求 | Agent file |
+|---|---|
+| WeChat 私域 creator 长留存 | `marketing/marketing-private-domain-operator.md` |
+| Douyin niche 扩展(辅食外 niche)| `marketing/marketing-douyin-strategist.md` |
+| 知乎 / B站 / 微博 跨平台分发 | `marketing/marketing-zhihu-strategist.md` + `bilibili-content-strategist.md` + `weibo-strategist.md` |
+| niche 热点感知 → Cascade prompt iteration 反向输入 | `product/product-trend-researcher.md` |
+| 跨地区文化敏感性 check(若 Cascade 扩到广东/东北/海外华人 niche)| `specialized/specialized-cultural-intelligence-strategist.md` |
+| creator retention nudges(D+14/+30 拉回)| `product/product-behavioral-nudge-engine.md` |
+
+### 1.3 已排除的 superficially-相关 agent(命名相似但实际不 fit)
+
+- `specialized/recruitment-specialist.md` — 名字 "recruitment specialist" 看似匹配,但实际是 **HR talent acquisition**(招员工进公司),不是"招 creator 加入 cohort"。**不用**。
+- `sales/sales-coach.md` / `sales-deal-strategist.md` — B2B 大客户销售;不适用 Phase 1 creator 招募(creator 不是 B2B buyer)。
+- 其他 30+ marketing agents(LinkedIn / Twitter / Instagram / Reddit / TikTok 海外平台等)— niche overlap 弱。
 
 ---
 
