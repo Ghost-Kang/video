@@ -45,7 +45,18 @@ HOOK_PATTERNS: Mapping[str, re.Pattern[str]] = {
         r"(?:一家人|好好吃饭|再忙也|家的味道|妈妈的|温馨|烟火气|再累也|家里人|围着)"
     ),
     "H8": re.compile(
-        r"(?:当妈以后|才发现|没人懂|没人理解|崩溃|委屈|心酸|都懂|都明白|心累|累了)"
+        # P5-1a expansion 2026-05-23 (per p2-6_baseline_20260523T054123Z.md
+        # yuer_richang 20% pass): original 字面 emotional words + 场景化 patterns
+        # surfaced by LLM rewrites ("凌晨三点,他又醒了 / 这是今晚第四次") that
+        # scored hooks_used=H8 in self_check but failed the original strict regex.
+        # New scene patterns are intentionally yuer-leaning so baomam/jiating
+        # false-positive rate stays near zero.
+        r"(?:"
+        r"当妈以后|才发现|没人懂|没人理解|崩溃|委屈|心酸|都懂|都明白|心累|累了"
+        r"|快崩溃|要疯了|睡不好"
+        r"|凌晨[一二三四五六七八九十两\d]+|半夜[一二三四五六七八九十两\d]+"
+        r"|又.{0,3}[醒哭闹]了|这是.{0,4}第.{0,3}次"
+        r")"
     ),
     # H9 — content-buried twist: "why X, not Y" / "many people get it wrong"
     "H9": re.compile(

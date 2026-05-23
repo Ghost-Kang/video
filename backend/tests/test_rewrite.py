@@ -232,6 +232,26 @@ def test_hook_taxonomy_detects_known_examples():
     assert "H1" not in hook_taxonomy.detect_hooks_in_text("新手妈妈带娃日记")
 
 
+def test_h8_matches_scene_based_emotional_resonance_p5_1a():
+    """P5-1a 2026-05-23: H8 should fire on scene-based emotional resonance
+    LLM rewrites (凌晨/半夜 + 哭闹/醒 + 第N次) — not just literal emotion
+    words. Sources: p2-6_baseline_20260523T054123Z.json yuer_richang
+    failing cases where LLM self_check correctly tagged H8 but the
+    original strict regex missed."""
+    # Real LLM outputs that previously failed hook_p0_compliance
+    assert "H8" in hook_taxonomy.detect_hooks_in_text("凌晨三点,这是他今晚第四次醒了")
+    assert "H8" in hook_taxonomy.detect_hooks_in_text("凌晨三点，他又哭了，这是今晚第五次")
+    # New scene patterns
+    assert "H8" in hook_taxonomy.detect_hooks_in_text("半夜两点又醒了")
+    assert "H8" in hook_taxonomy.detect_hooks_in_text("我快崩溃了")
+    assert "H8" in hook_taxonomy.detect_hooks_in_text("这是第三次哭")
+    # False-positive guards — these should NOT match H8
+    assert "H8" not in hook_taxonomy.detect_hooks_in_text("一周不重样 7 道辅食")
+    assert "H8" not in hook_taxonomy.detect_hooks_in_text("千万别用宽油")
+    assert "H8" not in hook_taxonomy.detect_hooks_in_text("我女儿今天又来厨房捣乱")
+    assert "H8" not in hook_taxonomy.detect_hooks_in_text("做了三次才成功")
+
+
 # --- API surface checks ---
 
 
