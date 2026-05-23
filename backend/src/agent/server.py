@@ -20,7 +20,7 @@ from agent.store import get_messages, save_message, list_sessions, ensure_sessio
 from agent.tools import canvas as canvas_tools
 from agent.cascade.analysis_service import request_shallow_analysis
 from agent.cascade.anchors import create_anchor, list_anchors, list_reuses, reuse_anchor
-from agent.cascade.storage import list_creators
+from agent.cascade.storage import list_creators, list_events
 from agent.cascade.cost_guard import PREDICT_ANALYSIS_CNY, PREDICT_REWRITE_CNY, cost_guard, cost_status
 from agent.cascade.events import emit
 from agent.cascade.failures import HardFailure
@@ -705,6 +705,30 @@ async def _handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
         elif method == "GET" and route_path == "/api/creators":
             creators = await list_creators()
             writer.write(_http_response(200, {"creators": creators}))
+        elif method == "GET" and route_path == "/api/events":
+            try:
+                limit = int(qs.get("limit", ["200"])[0])
+                offset = int(qs.get("offset", ["0"])[0])
+            except ValueError:
+                writer.write(_http_response(400, {"error": "limit/offset must be integers"}, "Bad Request"))
+                await writer.drain()
+                return
+            event_name = qs.get("type", [None])[0]
+            user_id_q = qs.get("user_id", [None])[0]
+            since_ts = qs.get("since_ts", [None])[0]
+            try:
+                payload = await list_events(
+                    limit=limit,
+                    offset=offset,
+                    event_name=event_name,
+                    user_id=user_id_q,
+                    since_ts=since_ts,
+                )
+            except ValueError as exc:
+                writer.write(_http_response(400, {"error": str(exc)}, "Bad Request"))
+                await writer.drain()
+                return
+            writer.write(_http_response(200, payload))
         elif method == "GET" and route_path.startswith("/api/anchors/") and route_path.endswith("/reuses"):
             anchor_id = route_path[len("/api/anchors/"):-len("/reuses")]
             user_id = qs.get("user_id", ["default"])[0]

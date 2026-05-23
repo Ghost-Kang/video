@@ -328,3 +328,82 @@ def _empty_creator(user_id: str) -> dict[str, Any]:
         "anchors_total_reuse_count": 0,
         "interview_logged": False,
     }
+
+
+_LIST_EVENTS_MAX_LIMIT = 1000
+
+
+async def list_events(
+    *,
+    limit: int = 200,
+    offset: int = 0,
+    event_name: str | None = None,
+    user_id: str | None = None,
+    since_ts: str | None = None,
+) -> dict[str, Any]:
+    """List telemetry events for the admin firehose (P4-2).
+
+    Returns:
+        {
+          "events": [{id, ts, event_name, user_id, run_id, payload}, ...],
+          "has_more": bool,
+          "next_offset": int | None,
+        }
+    Events are ordered by created_at DESC (most recent first).
+    """
+    if limit <= 0:
+        raise ValueError("limit must be positive")
+    if limit > _LIST_EVENTS_MAX_LIMIT:
+        limit = _LIST_EVENTS_MAX_LIMIT
+    if offset < 0:
+        raise ValueError("offset must be non-negative")
+
+    clauses: list[str] = []
+    params: list[Any] = []
+    if event_name is not None:
+        clauses.append("event_name = ?")
+        params.append(event_name)
+    if user_id is not None:
+        clauses.append("user_id = ?")
+        params.append(user_id)
+    if since_ts is not None:
+        clauses.append("created_at > ?")
+        params.append(since_ts)
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+
+    db = await _connect()
+    try:
+        rows = await db.execute_fetchall(
+            f"SELECT id, event_name, user_id, run_id, payload_json, created_at "
+            f"FROM events{where} ORDER BY created_at DESC, id DESC "
+            f"LIMIT ? OFFSET ?",
+            tuple([*params, limit + 1, offset]),
+        )
+    finally:
+        await db.close()
+
+    rows_list = list(rows)
+    has_more = len(rows_list) > limit
+    if has_more:
+        rows_list = rows_list[:limit]
+
+    events: list[dict[str, Any]] = []
+    for row_id, name, uid, rid, payload_json, created_at in rows_list:
+        try:
+            payload = json.loads(payload_json) if payload_json else {}
+        except json.JSONDecodeError:
+            payload = {"_raw": payload_json}
+        events.append({
+            "id": int(row_id),
+            "ts": created_at,
+            "event_name": name,
+            "user_id": uid,
+            "run_id": rid,
+            "payload": payload,
+        })
+
+    return {
+        "events": events,
+        "has_more": has_more,
+        "next_offset": (offset + limit) if has_more else None,
+    }
