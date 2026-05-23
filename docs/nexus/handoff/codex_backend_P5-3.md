@@ -293,10 +293,32 @@
 | 指标 | 目标 | 失败 → 动作 |
 |---|---|---|
 | 60s 视频端到端延迟 p95 | ≤ 8 min(MediaKit RTF 3-5)| W5 加 storyline 任务 prewarm / 并发提交 |
-| 单视频成本 | ≤ ¥0.50 | 关 enable_snapshot / 关 ARK overlay(degraded mode) |
+| 单视频成本 | **≤ ¥1.50**(2026-05-23 修正,基于 MediaKit 官方计费)| 关 enable_snapshot / 关 ARK overlay(degraded mode);见 §6.1 cost breakdown |
 | 3 niche × 5 URL adapter pass rate(不抛 S5)| ≥ 80% | 改 adapter / 加 warning 兜底 |
 | Founder qualitative("storyline 准不准") | ≥ 7/10 | 调 ARK overlay prompt / 启用 segment-scenes 精细切分 |
 | viral_analysis hook_pattern_id 与 fixture 一致率 | ≥ 70% | 重写 ARK overlay prompt + 在 in-context exemplar 加更多 hook 例 |
+
+### 6.1 Cost breakdown(per 60s 视频 = 1 分钟 input duration)
+
+| 调用 | 单价 | 60s 成本 | 必要性 |
+|---|---|---|---|
+| **MediaKit 剧情故事线分析** | ¥1.00/min input | ¥1.00 | 必要(主分析)|
+| ARK 视频理解 Chat overlay | Doubao seed-1.6 token(~3000 tokens × 0.002元/千)| ~¥0.06 | 必要(viral_analysis 8 维补维)|
+| MediaKit 场景切分(若启用)| ¥0.02/min input | ¥0.02 | 可选(P5-3 默认不启用)|
+| MediaKit ASR(若另调,Phase 2)| ¥0.03/min input | ¥0.03 | 不启用(storyline 已含 dialogue)|
+| **小计** | — | **≈ ¥1.06-1.10** | — |
+| **PREDICT_ANALYSIS_CNY** | — | **¥1.20**(¥0.14 buffer)| cost_guard `cost_guard.py` |
+
+**Phase 1 内测整 cohort 估计**:3 人 × 5 次 first-run × 1.10 = ¥16.50 — 完全可控。
+
+**长视频惩罚**:若 creator 输入 5min 视频(罕见,Phase 1 大都 ≤ 60s),storyline 成本 = ¥5.00,**超 PREDICT_ANALYSIS_CNY ¥1.20**;cost_guard 应拒绝。adapter / cascade UI 需把 "建议视频长度 ≤ 60s" 告知 creator。
+
+### 6.2 PREDICT_ANALYSIS_CNY 历史
+
+- W2 原始值:¥0.5(基于 toprador 估算,无真实数据)
+- 2026-05-23 W3D3 修正:¥1.20(MediaKit 官方计费数据后)
+- W5+ P4-8 cost 校准报告(`scripts/cost_calibration.py`)运行后,根据真实 p95 再调
+- `CASCADE_RUN_CAP_CNY` 默认 ¥3.0 不变;若 first-run 真实账单出现 ¥2-3 单 run cost,founder 通过 env 调到 ¥5.0
 
 ---
 

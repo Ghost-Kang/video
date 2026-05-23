@@ -94,7 +94,9 @@ def test_drift_marks_warning_ok_and_no_sample(
 
     report = asyncio.run(go())
 
-    assert "| analysis | 0.400 | 0.400 | 0.400 | 0.400 | 10 | 0.500 | OK |" in report
+    # PREDICT_ANALYSIS_CNY raised 2026-05-23 to 1.200 (MediaKit storyline
+    # ¥1.00/min + ARK overlay ~¥0.10). 0.400 p95 < 1.200 PREDICT → still OK.
+    assert "| analysis | 0.400 | 0.400 | 0.400 | 0.400 | 10 | 1.200 | OK |" in report
     assert "| rewrite | 1.200 | 1.200 | 1.200 | 1.200 | 1 | 1.000 | WARN p95>PREDICT |" in report
     assert "| shot | - | - | - | - | 0 | 1.500 | - |" in report
 

@@ -1,9 +1,21 @@
 """Phase 1 cost guard.
 
-Hardcoded predictions:
-- shallow analysis: ¥0.50
-- rewrite: ¥1.00
-- shot image: ¥1.50
+Hardcoded predictions (per-call upper-bound):
+- shallow analysis: ¥1.20  (MediaKit storyline ¥1.00/min × 60s + ARK Chat overlay ~¥0.10 + buffer)
+- rewrite: ¥1.00            (Doubao seed-1.6 LLM rewrite per niche)
+- shot image: ¥1.50         (Apimart / Google image gen per shot)
+
+The analysis prediction was raised 2026-05-23 from ¥0.50 → ¥1.20 after
+MediaKit official pricing doc surfaced: 剧情故事线分析 = ¥1.00/min input
+duration (not the ¥0.10-0.20 PM had estimated when writing P5-3 brief
+e3e2739). Phase 1 typical short-video = 60s = 1 min input → ¥1.00
+storyline alone, plus ARK Chat viral overlay ~¥0.10 tokens, total ≈ ¥1.10.
+¥1.20 PREDICT keeps a ~9% buffer for low-bitrate longer clips.
+
+CASCADE_RUN_CAP_CNY = ¥3.0 (env override) still accommodates a single
+analysis + rewrite + shot pass (¥1.20 + ¥1.00 + ¥1.50 = ¥3.70 ← exceeds
+¥3.0 cap; raise cap to ¥4.5 via env if first concierge first-run trips).
+Per-user-day cap ¥30 = ~25 full runs/day, ample for Phase 1.
 
 Per-user day is measured by UTC calendar day.
 """
@@ -17,7 +29,9 @@ from agent.cascade.failures import FailureCode, HardFailure
 from agent.cascade.storage import sum_generation_cost
 
 
-PREDICT_ANALYSIS_CNY = 0.5
+# Raised 2026-05-23 from 0.5 → 1.20 per MediaKit official pricing
+# (剧情故事线分析 = ¥1.00/min input duration + ARK overlay ~¥0.10)
+PREDICT_ANALYSIS_CNY = 1.2
 PREDICT_REWRITE_CNY = 1.0
 PREDICT_SHOT_IMAGE_CNY = 1.5
 
