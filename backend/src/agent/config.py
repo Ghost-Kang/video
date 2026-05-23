@@ -45,6 +45,7 @@ ASR_BASE_URL = os.getenv("ASR_BASE_URL")
 # -------- Toprador analysis upstream --------
 TOPRADOR_ENDPOINT = os.getenv("TOPRADOR_ENDPOINT", "")
 TOPRADOR_API_KEY = os.getenv("TOPRADOR_API_KEY", "")
+VOLC_MEDIAKIT_AK = os.getenv("VOLC_MEDIAKIT_AK", "")
 STRICT_CROSS_BORDER_REJECT = os.getenv("STRICT_CROSS_BORDER_REJECT", "1") == "1"
 
 # -------- S3 --------
