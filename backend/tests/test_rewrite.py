@@ -252,6 +252,30 @@ def test_h8_matches_scene_based_emotional_resonance_p5_1a():
     assert "H8" not in hook_taxonomy.detect_hooks_in_text("做了三次才成功")
 
 
+def test_p5_2_brand_restriction_present_in_all_niche_prompts():
+    """P5-2 2026-05-23: each niche prompt must mention the strengthened
+    brand/IP restriction with both ❌ category examples AND the
+    output-final-check directive. Locks the prompt structure so a future
+    refactor doesn't silently drop the广告法 safeguard.
+
+    Source: judge LLM caught brand placement (安抚海马玩具 / 《晚安月亮》绘本)
+    on 2026-05-23 yuer baseline; existing "严禁品牌名" line was too abstract.
+    """
+    import pathlib
+    prompts_dir = pathlib.Path(__file__).resolve().parent.parent / "src" / "agent" / "prompts"
+    for niche in ("baomam_fushi", "yuer_richang", "jiating_chufang"):
+        text = (prompts_dir / f"rewrite_{niche}.md").read_text(encoding="utf-8")
+        # Must explicitly reference 广告法 §10 + §16
+        assert "广告法 §10 + §16" in text, f"{niche}: missing 广告法 reference"
+        # Must contain ❌ + ✅ contrastive examples (concrete > abstract)
+        assert "❌" in text and "✅" in text, f"{niche}: missing ❌/✅ contrastive examples"
+        # Must include the pre-output self-check directive
+        assert "输出前最后一道自检" in text, f"{niche}: missing 自检 directive"
+        # Must list at least 3 ❌ categories (品牌 / 商品 / IP / 餐厅 / 作品 etc.)
+        bad_count = text.count("❌")
+        assert bad_count >= 3, f"{niche}: only {bad_count} ❌ examples; expected ≥3"
+
+
 # --- API surface checks ---
 
 
