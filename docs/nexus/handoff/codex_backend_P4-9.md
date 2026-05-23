@@ -1,8 +1,14 @@
 # Codex handoff — P4-9 Toprador 真实端到端 staging
 
+**Status**: ⛔ **SUPERSEDED by P5-3 Doubao-lite 重写** @ 2026-05-23 W3D3
+Founder 2026-05-23 W3D3 决定:toprador 上游路径全切 Doubao-lite 自建(`handoff/codex_backend_P5-3.md`)。本 brief **不再执行**,除非 P5-3 ship 失败或 founder 明示回滚到原 toprador。
+当前状态:**dormant**;`scripts/p4-9_toprador_staging.py` scaffold 保留作 historical reference。
+
+---
+
 **Owner**: Codex session (backend) — **blocked on founder providing Toprador endpoint + key**
 **Source of truth**: `backend/src/agent/cascade/analysis_service.py:_call_toprador`(P2-2 wiring + P3-7 hardening + P4-3 observability);`docs/TOPRADOR_SCHEMA.md`(上游契约)
-**Status**: DRAFT · **blocked on `TOPRADOR_ENDPOINT` + `TOPRADOR_API_KEY` 配置**
+**Status (original)**: DRAFT · blocked on `TOPRADOR_ENDPOINT` + `TOPRADOR_API_KEY` 配置
 **Time budget**: 0.5 day
 **Allocation**: PM_W4_allocation.md §3.2(W3D3 R6 mitigation)+ PM_risk_audit_2026-05-23.md §7
 
