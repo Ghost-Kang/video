@@ -30,22 +30,38 @@ PM 已代签 2 个 decision points:
 
 ---
 
-## 2. 09:15-09:30 · PM 启 Sales-DM-Agent(15 min 监督)
+## 2. 09:00-09:43 · DM batch — founder sourcing + PM 调 agent 改文案
 
-founder 在 chat 说:
-> **PM,启 Sales-DM-Agent 拉今天 5 条 baomam_fushi 候选**
+> **W3D4 dry-run 修正**:Sales-DM-Agent (Xiaohongshu Specialist) 已验证(`dm_dryrun_W3D4_2026-05-24.md`)— agent 可产高质量 DM 文案,**但不能自动抓 candidate 名单**;founder 需先手动 sourcing。
 
-PM 立刻 invoke `Xiaohongshu Specialist` + `Sales Outreach`,产出:
-- 5 个候选 creator 名单(每个含 @用户名 + 一条具体作品 URL + DM 文案 + 引用作品细节)
-- append `recruitment.md` 5 行 `- DM <date> 小红书 @<用户名> niche=baomam_fushi 状态=已发`
+### 2.1 09:00-09:30 · Founder 自己刷小红书拿 5 个真名单(30 min)
 
-founder 30 秒 review:
-- ✅ 5 条文案不重复 + 都引了具体作品 → ok 发出
-- ❌ 某条像 spam → 把那条 reject 让 PM 重 invoke 改
+按 `recruitment.md §"选人 4 条标准"`(30-40 岁女性 + 粉丝 1k-50k + 7 天有更新 + niche 纯辅食),刷小红书 30 min 拿 5 个 candidate。
 
-发出实际操作:**founder 把文案复制到小红书 / 抖音 app 实际发出**(发送动作不能自动化,平台 ToS)。30 秒/条 × 5 = 2.5 min。
+每个 candidate 在 chat 给 PM 一行:
+```
+@<用户名> | <作品 URL> | <1 句具体作品细节,例如"她结尾切开拉丝的镜头">
+```
 
-→ commit:`founder: W4D1 DM batch sent via Sales-DM-Agent`
+### 2.2 09:30-09:35 · Founder 在 chat 说
+
+> **PM,这是今天 5 个 baomam_fushi 名单,改 DM 文案。剩 <X> 个名额。**
+
+剩名额 X = founder 实际心里的真数字(per W4D1 决策点 §1.2 Risk 2)。
+
+### 2.3 09:35-09:38 · PM invoke Xiaohongshu Specialist + Sales Outreach
+
+PM 调 agent 产 5 条 DM 文案(质量基线已由 dry-run 验证,~3 min);append `recruitment.md` 5 行 `- DM`。
+
+### 2.4 09:38-09:43 · Founder review + 实际发到平台
+
+founder 看 5 条文案 < 30 秒/条 sample 1-2 条质量(其他信任 agent dry-run 验证基线);copy → 小红书/抖音 app 实际发送。
+
+### 2.5 commit
+
+→ commit:`founder: W4D1 DM batch sent — <X> candidates via Xiaohongshu Specialist`
+
+**Total time**:43 min(包括 founder sourcing 30 min — 这是不可代理的真实人力)。后续 W4D2-D7 daily DM 节奏:若 founder 累计 sourcing 一批 20-30 个,可以每天只用 5-10 min 让 PM 选 5 个改写文案。
 
 ---
 
