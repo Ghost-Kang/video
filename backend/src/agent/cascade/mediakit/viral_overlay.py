@@ -16,6 +16,7 @@ from agent.cascade.failures import WarningCode
 ARK_CHAT_COMPLETIONS_URL = "https://amk-ark.cn-beijing.volces.com/api/v1/chat/completions"
 PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "mediakit_viral_analysis_overlay.md"
 MAX_STORYLINE_CONTEXT_CHARS = 200_000
+_PROMPT_TEMPLATE_MARGIN_CHARS = 4_096
 _TIMEOUT_S = 45.0
 
 _VIRAL_KEYS = (
@@ -132,9 +133,10 @@ def _storyline_context(contract_dict: dict[str, Any]) -> str:
             )
         )
     context = "\n".join(lines)
-    if len(context) <= MAX_STORYLINE_CONTEXT_CHARS:
+    limit = max(1, MAX_STORYLINE_CONTEXT_CHARS - _PROMPT_TEMPLATE_MARGIN_CHARS)
+    if len(context) <= limit:
         return context
-    return context[: MAX_STORYLINE_CONTEXT_CHARS - 32].rstrip() + "\n[truncated]"
+    return context[: limit - 32].rstrip() + "\n[truncated]"
 
 
 def _parse_overlay_response(response_json: dict[str, Any]) -> dict[str, str]:

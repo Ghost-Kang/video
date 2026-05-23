@@ -11,7 +11,7 @@ import pytest
 from agent.cascade import circuit_breaker
 from agent.cascade.analysis_service import request_shallow_analysis
 from agent.cascade.contract import CascadeAnalysisContract
-from agent.cascade.failures import FailureCode, HardFailure
+from agent.cascade.failures import FailureCode, HardFailure, WarningCode
 from agent.cascade.storage import load_analysis
 
 
@@ -191,6 +191,152 @@ def test_different_users_same_url_emit_twice(monkeypatch: pytest.MonkeyPatch, tm
     asyncio.run(request_shallow_analysis("https://example.com/shared", user_id="user_1"))
     asyncio.run(request_shallow_analysis("https://example.com/shared", user_id="user_2"))
     assert len(_event_payloads(db_path, "analysis_returned")) == 2
+
+
+def _mediakit_storyline() -> dict:
+    return {
+        "duration": 36.0,
+        "source_video_info": [
+            {
+                "source_video_title": "宝宝辅食反差记录",
+                "source_video_summary": "宝宝从拒绝第一口到主动抢勺,中段给出苹果泥做法。",
+                "source_video_tag": ["宝宝辅食", "挑食", "家庭厨房"],
+            }
+        ],
+        "storyline_clips": [
+            {
+                "clip_start_time": 0.0,
+                "clip_end_time": 12.0,
+                "clip_title": "宝宝拒绝第一口",
+                "clip_summary": "宝宝坐在餐椅上转头拒绝。",
+                "clip_dialogue": "怎么喂都不吃?",
+                "clip_score": 4.0,
+            },
+            {
+                "clip_start_time": 12.0,
+                "clip_end_time": 24.0,
+                "clip_title": "妈妈蒸苹果泥",
+                "clip_summary": "妈妈在厨房切苹果并上锅蒸。",
+                "clip_dialogue": "蒸八分钟就很软。",
+                "clip_score": 3.8,
+            },
+            {
+                "clip_start_time": 24.0,
+                "clip_end_time": 36.0,
+                "clip_title": "宝宝主动抢勺子",
+                "clip_summary": "宝宝笑着伸手抢勺子。",
+                "clip_dialogue": "这一口妈妈放心了。",
+                "clip_score": 4.6,
+            },
+        ],
+        "storyline_highlights": [
+            {"highlight_summary": "先给拒食痛点,再给做法,最后用宝宝主动吃形成反差。"}
+        ],
+    }
+
+
+def _use_mediakit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    db_path = _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_UPSTREAM", "mediakit")
+    return db_path
+
+
+def test_mediakit_happy_path_uses_resolver_storyline_and_overlay(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db_path = _use_mediakit(monkeypatch, tmp_path)
+    calls: dict[str, str] = {}
+
+    async def resolve(source_url: str) -> str:
+        calls["resolve"] = source_url
+        return "https://cdn.test/direct.mp4"
+
+    async def storyline(video_url: str, *, user_id: str, run_id: str | None, **_kwargs) -> dict:
+        calls["storyline"] = f"{video_url}|{user_id}|{run_id}"
+        return _mediakit_storyline()
+
+    async def overlay(payload: dict, video_url: str) -> dict:
+        calls["overlay"] = video_url
+        payload = dict(payload)
+        payload["viral_analysis"] = dict(payload["viral_analysis"])
+        payload["viral_analysis"]["hook"] = "用拒食痛点三秒抓住宝妈"
+        payload["model"] = f"{payload['model']}+ark-test"
+        return payload
+
+    monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
+    monkeypatch.setattr("agent.cascade.analysis_service.analyze_storyline", storyline)
+    monkeypatch.setattr("agent.cascade.analysis_service.overlay_viral_dims", overlay)
+
+    contract = asyncio.run(
+        request_shallow_analysis(
+            "https://www.douyin.com/video/7385782607067335962",
+            user_id="user_1",
+            run_id="run_mk",
+        )
+    )
+
+    assert isinstance(contract, CascadeAnalysisContract)
+    assert contract.platform.value == "douyin"
+    assert contract.viral_analysis.hook == "用拒食痛点三秒抓住宝妈"
+    assert contract.model == "mediakit-storyline+ark-test"
+    assert calls == {
+        "resolve": "https://www.douyin.com/video/7385782607067335962",
+        "storyline": "https://cdn.test/direct.mp4|user_1|run_mk",
+        "overlay": "https://cdn.test/direct.mp4",
+    }
+    payload = _event_payloads(db_path, "analysis_returned")[0]
+    assert payload["model"] == "mediakit-storyline+ark-test"
+    assert payload["upstream_attempts"] == 1
+
+
+def test_mediakit_resolver_failure_emits_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    db_path = _use_mediakit(monkeypatch, tmp_path)
+
+    async def resolve(_source_url: str) -> str:
+        raise HardFailure(FailureCode.S8_UPSTREAM_REFUSED, "resolver unavailable")
+
+    monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
+
+    with pytest.raises(HardFailure) as exc:
+        asyncio.run(request_shallow_analysis("https://example.com/page", user_id="user_1", run_id="run_fail"))
+
+    assert exc.value.code == FailureCode.S8_UPSTREAM_REFUSED
+    assert _event_payloads(db_path, "failure_emitted")[0]["failure_code"] == "S8_UPSTREAM_REFUSED"
+
+
+def test_mediakit_overlay_degrades_but_contract_persists(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _use_mediakit(monkeypatch, tmp_path)
+
+    async def resolve(source_url: str) -> str:
+        return source_url
+
+    async def storyline(_video_url: str, **_kwargs) -> dict:
+        return _mediakit_storyline()
+
+    async def overlay(payload: dict, _video_url: str) -> dict:
+        payload = dict(payload)
+        payload["warnings"] = [
+            {
+                "code": WarningCode.W2_FALLBACK_USED.value,
+                "field": "viral_analysis",
+                "message": "overlay unavailable",
+                "severity": "warn",
+            }
+        ]
+        return payload
+
+    monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
+    monkeypatch.setattr("agent.cascade.analysis_service.analyze_storyline", storyline)
+    monkeypatch.setattr("agent.cascade.analysis_service.overlay_viral_dims", overlay)
+
+    contract = asyncio.run(request_shallow_analysis("https://example.com/video.mp4", user_id="user_1"))
+
+    assert contract.model == "mediakit-storyline"
+    assert any(w.code == WarningCode.W2_FALLBACK_USED.value and w.field == "viral_analysis" for w in contract.warnings)
 
 
 class _FakeAsyncClient:

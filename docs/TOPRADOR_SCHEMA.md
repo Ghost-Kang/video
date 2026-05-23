@@ -1,7 +1,7 @@
 # Cascade · Analysis Contract (formerly TOPRADOR_SCHEMA)
 
-**Status**: v1 (Phase 0, NEXUS-Sprint output)
-**Date**: 2026-05-19 (last touched 2026-05-20 — TIP §14.7 cross-reference added)
+**Status**: v1 (Phase 0, NEXUS-Sprint output; P5-3 MediaKit adapter keeps the same v1.0 contract)
+**Date**: 2026-05-19 (last touched 2026-05-23 — P5-3 MediaKit upstream mapping added)
 **Replaces investigation in**: `TOPRADOR_SCHEMA_INVESTIGATION.md` (kept for historical context)
 **Sibling contract**: `TOPIC_INTELLIGENCE_DEEPENING_PLAN.md` defines `TopicBrief`, `DeepTopicIntelligence`, `ViralMechanism`, `AccountFit`, `PerformanceSnapshot`. Implementation: `backend/src/agent/cascade/topic_intelligence.py`. The two contracts intentionally decouple: this one normalizes upstream video analyses; the sibling defines decision-grade topic artifacts. Cross-reference is by `analysis_id` only (no shared field types).
 **Reframing**: This is the **Cascade-required contract** that any upstream analyzer (toprador, ad-hoc, or future) must produce. Karpathy review consensus: stabilize the contract first; do not let downstream code drift to match an upstream that has not been stabilized yet.
@@ -14,6 +14,16 @@
 2. **`schema_version` is mandatory.** Every `analysis_result` carries `schema_version: "1.0"`. Mismatches are explicit failures (P0-6 failure taxonomy `S2_VERSION_MISMATCH`).
 3. **Required vs optional is binary.** No "sometimes required" fields. Optional fields, if absent, have an exact fallback semantic documented in §5.
 4. **No silent failures.** Any field missing, malformed, or fallback-substituted is recorded in `warnings[]`. UI surfaces this (PHASED_PLAN §4.4 G7).
+
+### 0.1 P5-3 MediaKit upstream mapping
+
+`CASCADE_UPSTREAM=mediakit` now produces this same contract through:
+
+1. toprador URL resolver: page URL → direct media URL for MediaKit consumption.
+2. MediaKit `analyze-video-storyline`: source duration, source summary/tags, storyline clips, dialogue, visual summaries, snapshot URLs.
+3. ARK video-understanding overlay: one degradable pass that refines `viral_analysis.*`.
+
+The adapter intentionally does **not** expand the v1.0 schema. MediaKit `clip_snapshot_url` maps to existing `scenes[].first_frame_url`; `clip_score` contributes to local `confidence`; ARK overlay failure keeps the storyline-only contract and appends `W2_FALLBACK_USED` on `viral_analysis`.
 
 ---
 

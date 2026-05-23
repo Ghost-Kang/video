@@ -20,6 +20,8 @@ from agent.cascade.adapter import normalize_analysis_result
 from agent.cascade.contract import CascadeAnalysisContract
 from agent.cascade.events import emit
 from agent.cascade.failures import FailureCode, HardFailure, WarningCode
+from agent.cascade.mediakit import analyze_storyline, overlay_viral_dims, storyline_to_payload
+from agent.cascade.mediakit.url_resolver import resolve_to_direct_media
 from agent.cascade.storage import (
     _load_toprador_cache_entry,
     load_analysis,
@@ -106,11 +108,13 @@ async def _load_upstream_payload(
     user_id: str,
     run_id: str | None,
 ) -> dict[str, Any]:
-    upstream = os.getenv("CASCADE_UPSTREAM", "fixture").strip().lower() or "fixture"
+    upstream = os.getenv("CASCADE_UPSTREAM", config.CASCADE_UPSTREAM).strip().lower() or config.CASCADE_UPSTREAM
     if upstream == "fixture":
         return _load_fixture(source_url)
     if upstream == "toprador":
         return await _call_toprador(source_url, user_id=user_id, run_id=run_id)
+    if upstream == "mediakit":
+        return await _call_mediakit(source_url, user_id=user_id, run_id=run_id)
     raise ValueError(f"unsupported CASCADE_UPSTREAM: {upstream}")
 
 
@@ -227,6 +231,30 @@ async def _call_toprador(
     payload = copy.deepcopy(payload)
     payload["_upstream_latency_ms"] = int((time.monotonic() - start) * 1000)
     payload["_upstream_attempts"] = attempts
+    return payload
+
+
+async def _call_mediakit(
+    source_url: str,
+    *,
+    user_id: str,
+    run_id: str | None,
+) -> dict[str, Any]:
+    start = time.monotonic()
+    direct_url = await resolve_to_direct_media(source_url)
+    storyline = await analyze_storyline(
+        direct_url,
+        user_id=user_id,
+        run_id=run_id,
+    )
+    payload = storyline_to_payload(
+        storyline,
+        source_url=source_url,
+        user_id=user_id,
+    )
+    payload = await overlay_viral_dims(payload, direct_url)
+    payload["_upstream_latency_ms"] = int((time.monotonic() - start) * 1000)
+    payload["_upstream_attempts"] = 1
     return payload
 
 

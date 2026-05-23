@@ -236,6 +236,16 @@ elif [ -f scripts/p4-9_toprador_staging.py ]; then
 else
   p4_9="open"
 fi
+p5_3_service=$(status_probe "backend/src/agent/cascade/analysis_service.py" "analyze_storyline|overlay_viral_dims|resolve_to_direct_media")
+p5_3_client=$(status_probe "backend/src/agent/cascade/mediakit/storyline_client.py" "analyze-video-storyline|analyze_storyline")
+p5_3_overlay=$(status_probe "backend/src/agent/cascade/mediakit/viral_overlay.py" "chat/completions|overlay_viral_dims")
+if [ "$p5_3_service" = "done" ] && [ "$p5_3_client" = "done" ] && [ "$p5_3_overlay" = "done" ]; then
+  p5_3="done"
+elif [ "$p5_3_service" != "open" ] || [ "$p5_3_client" != "open" ] || [ "$p5_3_overlay" != "open" ]; then
+  p5_3="partial"
+else
+  p5_3="open"
+fi
 w4_eng_done=0
 for t in "$p4_1" "$p4_2" "$p4_3" "$p4_4" "$p4_5" "$p4_6" "$p4_7" "$p4_8" "$p4_9"; do
   [ "$t" = "done" ] && w4_eng_done=$((w4_eng_done + 1))
@@ -321,6 +331,8 @@ if [ "$JSON" = "1" ]; then
     "$ts" "$w3_eng_done" "$p3_3" "$p3_4" "$p3_5" "$p3_6" "$p3_7" "$p3_8"
   printf '{"ts":"%s","scope":"pm_w4","active":"%s","w4_eng_done":%d,"P4_1":"%s","P4_2":"%s","P4_3":"%s","P4_4":"%s","P4_5":"%s","P4_6":"%s","P4_7":"%s","P4_8":"%s","P4_9":"%s"}\n' \
     "$ts" "$active_phase" "$w4_eng_done" "$p4_1" "$p4_2" "$p4_3" "$p4_4" "$p4_5" "$p4_6" "$p4_7" "$p4_8" "$p4_9"
+  printf '{"ts":"%s","scope":"pm_w5","active":"%s","P5_3":"%s"}\n' \
+    "$ts" "$active_phase" "$p5_3"
   printf '{"ts":"%s","scope":"recruit","dms":%d,"calls":%d,"commits":%d,"runs":%d,"returns":%d}\n' \
     "$ts" "$dms" "$calls" "$commits" "$runs_count" "$returns_count"
   printf '{"ts":"%s","scope":"marketing","seed":"%s","xhs":%d,"douyin":%d,"wechat":%d,"jike":%d}\n' \
@@ -338,6 +350,8 @@ else
     "$w3_eng_done" "$p3_3" "$p3_4" "$p3_5" "$p3_6" "$p3_7" "$p3_8"
   printf 'PM_W4    active=%s  w4_eng_done=%d/9  P4-1=%s  P4-2=%s  P4-3=%s  P4-4=%s  P4-5=%s  P4-6=%s  P4-7=%s  P4-8=%s  P4-9=%s\n' \
     "$active_phase" "$w4_eng_done" "$p4_1" "$p4_2" "$p4_3" "$p4_4" "$p4_5" "$p4_6" "$p4_7" "$p4_8" "$p4_9"
+  printf 'PM_W5    active=%s  P5-3=%s\n' \
+    "$active_phase" "$p5_3"
   printf 'Recruit  dms=%d  calls=%d  commits=%d  runs=%d  returns=%d\n' \
     "$dms" "$calls" "$commits" "$runs_count" "$returns_count"
   printf 'Marketing seed=%s  xhs=%d/10  douyin=%d/5  wechat=%d/1  jike=%d/1\n' \

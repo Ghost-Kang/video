@@ -43,6 +43,7 @@ ASR_API_KEY = os.getenv("ASR_API_KEY")
 ASR_BASE_URL = os.getenv("ASR_BASE_URL")
 
 # -------- Toprador analysis upstream --------
+CASCADE_UPSTREAM = os.getenv("CASCADE_UPSTREAM", "mediakit").strip().lower() or "mediakit"
 TOPRADOR_ENDPOINT = os.getenv("TOPRADOR_ENDPOINT", "")
 TOPRADOR_API_KEY = os.getenv("TOPRADOR_API_KEY", "")
 VOLC_MEDIAKIT_AK = os.getenv("VOLC_MEDIAKIT_AK", "")

@@ -1,7 +1,7 @@
 # Codex handoff — P4-9 Toprador 真实端到端 staging
 
-**Status**: ⛔ **SUPERSEDED by P5-3 Doubao-lite 重写** @ 2026-05-23 W3D3
-Founder 2026-05-23 W3D3 决定:toprador 上游路径全切 Doubao-lite 自建(`handoff/codex_backend_P5-3.md`)。本 brief **不再执行**,除非 P5-3 ship 失败或 founder 明示回滚到原 toprador。
+**Status**: ⛔ **SUPERSEDED by P5-3 MediaKit 重写** @ 2026-05-23 W3D3
+Founder 2026-05-23 W3D3 决定:toprador 分析层上游路径全切 MediaKit storyline + ARK viral overlay(`handoff/codex_backend_P5-3.md`)。本 brief **不再执行**,除非 P5-3 ship 失败或 founder 明示回滚到原 toprador。
 当前状态:**dormant**;`scripts/p4-9_toprador_staging.py` scaffold 保留作 historical reference。
 
 ---
