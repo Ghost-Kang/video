@@ -1,184 +1,179 @@
-# Founder W4D1 行动清单 — 2026-05-28(开工日)
+# Founder W4D1 — 2026-05-28(AI 数字员工启动日)
 
-**Date target**: W4D1 = 2026-05-28(下周一)早 09:00 开始
-**Prerequisites**: 全部已就位(协议 / 隐私 / DM 模板 / concierge 脚本 / Doubao key / 工程产品)
-**Total time budget**: 5h(对齐 capacity audit §7 PM 推 weekly load 5h/w)
-**Goal**: W4D7 收盘前 ≥ 1 个真实 creator 跑完 first-run + 给 3 个反馈点
+**Date target**: W4D1 = 2026-05-28(下周一)
+**Rewrite**: 2026-05-24 W3D4 — 原 "founder 亲手 5h/w" 模型 → "PM 调 agent + founder 仅决策" 模型(per founder 2026-05-24 标准 instruction "我只决策" + W4D1 分工 OK)
+**Founder weekly load 新目标**: **1-2 h/w**(只做决策 + sample review,不亲手做 DM/帖/Q&A)
+**Goal**: W4D7 收盘前 ≥ 1 个真实 creator 跑完 first-run + 3 反馈点 + 真实情绪记录到 cohort_status
 
 ---
 
 ## ⚡ 心法
 
-- **不需要做完所有动作** — 选 §1 + §2 + §3 即可。其他 §4-§6 是可选 boost
-- **不要再做 W3 没做完的事** — 那些已迁到 W4 内,不必负罪感
-- **每个 ☑️ 后 commit 一下** — 让 probe 看见进度,PM session 才能跟踪
-- 卡住任何一步 → 留空 + 写一句"为什么卡" → PM 下次能帮你调整
+- **AI 数字员工已加载 185 个 Claude Code subagents**(`docs/nexus/agents/catalog.md`),Cascade Phase 1 选定 8 critical + 4 supplementary(`ai_digital_employee_inventory_2026-05-23.md`)
+- W4D1 founder 只做 5 件事:**决策 / 启动 / sample-review / 亲调 first-run / 亲调 legal**。其他全 PM 代调
+- 任何时刻 founder 可以在 chat 说 "PM,启 X 做 Y" 立刻触发 invoke
+- 任何时刻 founder 可以亲自 `/agents <name>` invoke,绕过 PM
 
 ---
 
-## 1. 09:00-10:00 · 决策已 PM 代签(可推翻,默认接受)
+## 1. 09:00-09:15 · 决策签字(已默认接受,可推翻)
 
-W3D3 founder ping "签字 pm 代签" 后,PM 已双双代签:
-
-| 文档 | PM 代签内容 | 你的动作 |
-|---|---|---|
-| `PM_phase0_crisis_2026-05-22.md §5` | **A+C**:Phase 1 内测立即起 + P0-A 转公测前阻塞 + 仅 P0-C 5 条委外 | **默认接受** — 若不同意在 §5 末尾追加 `**FOUNDER OVERRIDE @ 2026-05-28**: <新路径> / ETA: <X> / 理由: <一句>` |
-| `PM_founder_capacity_audit_2026-05-22.md §6` | **(b) Shrink scope + (c) Outsource 子集**:3 人 cohort + 5h/w + 不约 30min discovery call + ¥2500-3500 一次性预算 + 6 周延 8 周 | **默认接受** — 若不同意同上格式 override |
+PM 已代签 2 个 decision points:
+- `PM_phase0_crisis_2026-05-22.md §5` = **A+C**(Phase 1 立即起 + P0-A 转公测前)
+- `PM_founder_capacity_audit_2026-05-22.md §6` = **(b' AI agents)**(原 (b) shrink + (c) outsource 子集 → AI 数字员工 替执行)
 
 **默认接受 = 什么都不用做,直接进 §2**。
 
-只在你看完决定要改时,才在对应 §5 / §6 末尾追加 OVERRIDE 行 + commit `founder: override <crisis|capacity> to <X>`。
+不同意 → 任一文档 §5/§6 末尾追加 `**FOUNDER OVERRIDE @ 2026-05-28**: <新>` 行 → commit → PM 下次 session 重排。
 
-**Override deadline:今日 W4D1 上午** — 过此点工程 + 招募线已按 A+C / (b)+(c) 启动到回退成本不低的程度。
-
----
-
-## 2. 10:00-12:00 · 招募启动(W4D1 必做)
-
-### 2.1 选 5 位真实候选 creator(35 min)
-
-打开你常用的小红书 / 抖音 / 飞瓜 / 新榜 → 按 niche 找 5 位候选(不必一次找完;首选 1-2 个 niche)。
-
-每个候选**必须满足** `recruitment.md §"选人 4 条标准"`:
-
-1. 30-40 岁女性(看头像 / 朋友圈)
-2. 粉丝 1k-50k(太大不缺工具,太小没素材)
-3. 最近 7 天 ≥ 1 条更新(活跃)
-4. 内容 niche 明确(辅食 / 育儿 / 厨房 之一,**不混**)
-
-把 5 个名单贴到 `docs/nexus/founder_log/candidate_list_W4_2026-05-28.md`(新建文件,格式自由,有 @用户名 + niche + 一条作品 URL 就够)。
-
-### 2.2 给 5 位候选发 DM(40 min,每人 8 min)
-
-用 `docs/nexus/founder_log/recruitment.md §"DM 文案模板"`(已按 3 niche 拆好)。
-
-**纪律**:
-- 每条 DM 必须**改 2 个字段**:[名字] + [具体作品标题]
-- **不要群发** — 5 条都点点改改发,15 min 不可能完成,这是设计
-- 每条 DM 引用她**真实看过的** 1 条作品细节(例如 "你那条 #七夕辅食 我注意到结尾镜头的转场")
-
-每条 DM 发出后,append `recruitment.md §"DM batch · W3 (target 25)"`:
-
-```
-- DM 2026-05-28 小红书 @<用户名> niche=baomam_fushi 状态=已发
-```
-
-(改 `· W3 (target 25)` 标题为 `· W4 (target 35)`,便于 PM 后续 grep)
-
-### 2.3 commit
-
-```bash
-git add docs/nexus/founder_log/candidate_list_W4_2026-05-28.md docs/nexus/founder_log/recruitment.md
-git commit -m "founder: W4D1 candidate list + 5 DMs sent"
-```
-
-→ `bash scripts/check_progress.sh` 应显示 `Recruit dms=5`,这是 founder lane 4 周以来第一次非 0 数字。**这一步比所有工程价值都大**。
+**Override deadline**:今天 W4D1 上午 — 过此点 agents 已启动到回退成本不低。
 
 ---
 
-## 3. 14:00-15:00 · 小红书 seed 发布(W4D1 必做)
+## 2. 09:15-09:30 · PM 启 Sales-DM-Agent(15 min 监督)
 
-打开 `docs/nexus/founder_log/seed_post_url_2026-05-22.md`。
+founder 在 chat 说:
+> **PM,启 Sales-DM-Agent 拉今天 5 条 baomam_fushi 候选**
 
-**最小路径(30 min)**:
-1. 拍 / P 1 张封面图(你家厨房 + 手机屏一张爆款截图脸打码 + 准备食材的砧板)
-2. 把 caption(下方"📋 Caption 文案速查")复制粘贴到小红书
-3. 上传 1 张封面 → 发布
-4. **复制小红书帖 URL**(从浏览器或 app 分享按钮拿)
-5. 把 URL 贴到 `seed_post_url_2026-05-22.md` 顶部:
+PM 立刻 invoke `Xiaohongshu Specialist` + `Sales Outreach`,产出:
+- 5 个候选 creator 名单(每个含 @用户名 + 一条具体作品 URL + DM 文案 + 引用作品细节)
+- append `recruitment.md` 5 行 `- DM <date> 小红书 @<用户名> niche=baomam_fushi 状态=已发`
 
-```
-seed_url: https://www.xiaohongshu.com/discovery/item/<...>
-posted_at: 2026-05-28 14:30 Asia/Shanghai
-platform: 小红书
-```
+founder 30 秒 review:
+- ✅ 5 条文案不重复 + 都引了具体作品 → ok 发出
+- ❌ 某条像 spam → 把那条 reject 让 PM 重 invoke 改
 
-→ commit:`git commit -m "founder: seed post published"`
+发出实际操作:**founder 把文案复制到小红书 / 抖音 app 实际发出**(发送动作不能自动化,平台 ToS)。30 秒/条 × 5 = 2.5 min。
 
-→ `bash scripts/check_progress.sh` 应显示 `Marketing seed=YES`。
-
-**禁用词自查**(发布前过 1 分钟):caption 中不能有 ❌ AI / 智能 / 神器 / pipeline / DAG / 节点 / 锚点 / 复刻 / 营养师 / 必爆。当前 caption 干净,如果你改写过过一遍。
+→ commit:`founder: W4D1 DM batch sent via Sales-DM-Agent`
 
 ---
 
-## 4. 15:00-15:30 · 评估工具 first-look(可选,建议做)
+## 3. 09:30-09:45 · PM 启 Content-Seed-Agent(15 min 监督)
 
-打开 `http://localhost:5173/admin/cost` 看一眼 — 本周 cost 是 0(还没真实 user)。
+founder 在 chat 说:
+> **PM,启 Content-Seed-Agent 起 baomam_fushi seed 帖 9 图 brief + caption**
 
-打开 `http://localhost:5173/admin/events` — 应该能看到你 W3D2 同意协议时的 1 条 `consent_accepted` event。
+PM invoke `Xiaohongshu Specialist` + `Content Creator`,产出:
+- 完整 caption(500 字内,禁用词扫过)
+- 9 图 brief(每图描述 + Canva / 美图秀秀模板建议)
+- 落 `founder_log/xhs_post_2026-05-28.md`
 
-这两个看板就是你后续观察 creator 的窗口,**今天先认个脸**。
+founder 30 秒 review:
+- ✅ caption 干净 → 拍 1 张封面 + 发出
+- 拍封面 = founder 唯一**亲手**做的物理动作(手机抓 1 张厨房 + 食材 + 爆款手机屏照,5 min)
+- 发出后 URL 贴 `seed_post_url_2026-05-28.md`(从原 W4D1 文件改名 / 直接覆盖 W3D2 的 .md)
 
----
-
-## 5. 15:30-16:00 · P0-T 合约测试 ✅ 已 Claude 跑过
-
-PM 在 W3D3 已替你跑过(`backend/tests/test_cascade_contract.py`):
-- **41 passed,1 skipped**(skipped 是 `test_phase0_gate_field_completeness_real` — 因为 real_v1 fixture 只有 15/20)
-- 这 1 个 skip **不阻塞 Phase 1 内测**,只是等你或外包审稿人补 5 条真实标注后会自动转 PASS
-
-**不需要 W4D1 做**;放在 W4D2-D3 补 5 条 fixture 时一起处理。
-
----
-
-## 6. (可选)P0-C 5 条委外标注 — W4D2-D3 处理
-
-**今天先列候选**:
-- 选 1 位你认识的、做内容 / 写文案 / 视频运营行业熟人(微信问问)
-- 让他/她按 `docs/nexus/founder_log/p0-c_real_fixture_labeling_sop.md` 标 5 条新真实 URL
-- 预算 ¥200-500 一次性(对方 1-2h 工作量)
-- 完成后在 `founder_log/p0-c_outsource_log_2026-05-28.md`(新建)写:对方姓名 + 5 条 URL + 预算实际 + 完成时间
-
-**今天不必启动这件**;只在 §2 DM 名单做完后剩了时间再问。
+→ commit:`founder: W4D1 seed post published`
+→ probe 验:`bash scripts/check_progress.sh` 出 `Marketing seed=YES`
 
 ---
 
-## 7. 17:00 · 收尾 commit + 给 PM 一个信号
+## 4. W4D1-W4D3 · 后台自动等回复(0 founder action)
 
-```bash
-bash scripts/check_progress.sh > /tmp/today_status.txt
-cat /tmp/today_status.txt
-git add docs/nexus/founder_log/
-git commit -m "founder: W4D1 收盘"
-```
+无 founder action。PM 设 daily 09:00 + 18:00 routine 自动:
 
-如果 `Recruit dms=5` + `Marketing seed=YES` 同时出现 → **founder lane 4 周以来第一次正向破冰**,PM 下次 session 会显著调整 W4-W6 路径。
+| Trigger | PM 代调 | 产物 |
+|---|---|---|
+| 收到 creator DM 回复(founder 转发或 PM 检测)| `Discovery Coach` + `Feedback Synthesizer` | `dm_qa_<creator_id>.md` + `interview_logged` event |
+| 每日 18:00(若昨日 DM 0 回复) | `Xiaohongshu Specialist` | 再拉 5 条 DM 候选 |
+| 每条 candidate 改写出 publish_pack 前 | `Healthcare Marketing Compliance` | 母婴 niche 合规审 → `compliance_audit` event |
 
-**不必报告 PM**;下次 PM session 会自己从 git log + probe 看到。
-
----
-
-## 8. 卡住怎么办
-
-任何 §1-§3 卡住:
-
-1. **写一行卡点**到 `founder_log/W4D1_blocker_2026-05-28.md`(新建),格式:
-
-```
-卡在: <哪一步>
-原因: <一句话>
-影响: <我今天还能 / 不能继续到哪里>
-```
-
-2. commit 这个文件
-3. 继续做下一项(不要追求 §1-§3 全 ✅)
-
-PM 下次 session 看到 blocker 文件会优先处理。
+founder 只需:**每天早上 1 min** 看 `bash scripts/check_progress.sh` 一眼。`Recruit dms=` 数字涨即正常。
 
 ---
 
-## 9. 心理预期管理
+## 5. W4D5-W4D7 · Founder 亲调 first-run(unique 不可代理)
 
-- 5 条 DM **不一定有回复** — 平均 24-72h,只有 1-2 条会回。3-5 天后才会有第一个 discovery call。这是正常,**不是失败**。
-- Seed 帖**第一天大概率没 1k 阅读** — 第 1 篇就为了"开账号" + 后续 DM 可指过去的"主页"。**不必焦虑数据**。
-- 哪怕 §1-§3 全没做完,**只要今晚 17:00 之前发出 1 条 DM + 1 条 seed**,就比 W1/W2/W3 任何一周都好。
+某位 creator 答应陪跑 → founder 在 chat 说:
+> **PM,起 Cascade Concierge 给 @<creator> 跑 first-run,源 URL = <抖音/小红书 URL>**
+
+PM invoke `Cascade Concierge`,产出 1 小时陪跑全程材料:
+- 5 列观察表(空模板,founder 现场填)
+- 3 反馈点逐字问题清单
+- `/admin/cost` 实时监控提醒(¥1.5 stop-gate)
+
+**founder 亲临 1 小时陪跑**(微信视频 / 飞书 / 现场),按 cascade-concierge 8 步脚本 + 5 列表填写。这是**不可代理**的环节 — creator 听到真人声音 + 真情绪反馈,**这 1 小时是 Phase 1 唯一真实信号源**。
+
+结束 1 小时内 founder 把 5 列表 + 3 反馈逐字给 PM:
+- PM 调 `Feedback Synthesizer` 做反馈聚类 + value/pay 判定
+- PM 落 `concierge_run_<date>_<creator>.md` 完整文件
+- POST `/api/events` `interview_logged`
+
+→ commit:`founder: first concierge first-run with @<creator> — strong/weak signals`
 
 ---
 
-## 10. 此 punchlist 来源
+## 6. W4D7(2026-06-03)· Cohort 周报 + 决策点
 
-- §1 from `PM_phase0_crisis_2026-05-22.md §5` + `PM_founder_capacity_audit_2026-05-22.md §6`
-- §2 from `recruitment.md §"DM 文案模板"` + `02_growth_plan.md §1.3` + `concierge_onboarding_script_2026-05-23.md §1`
-- §3 from `seed_post_url_2026-05-22.md` Caption 文案速查
-- §5 from `PM_W4_allocation.md §9` + PM 在 W3D3 已跑测试
-- §6 from `PM_phase0_crisis §3` Option C 子集
+PM 调 `Chief of Staff` 产出 `cohort_status_W4_2026-06-03.md`:
+- 本周 DM 总数 + 回复率 + first-run 数 + churn
+- 强信号 creator 名单(value match + would_pay_39)
+- W5 critical-path 提案(继续 cohort 扩 OR 暂停优化)
+
+founder 5 min 看,在末尾签 1 行决策(继续 / 调整 / 暂停)。
+
+→ commit:`founder: W4 周报 decision = <继续/调整/暂停>`
+
+---
+
+## 7. 不在 W4D1-D7 范围
+
+PM 代调,founder 不需要看:
+- Legal review v0→v1(`Legal Document Review`,公测前 30 天才启)
+- WeChat 私域 retention(`Private Domain Operator`,W5+ creator 沉淀后)
+- Trend research(`Trend Researcher`,W5+ weekly 节奏)
+- 跨地区文化(`Cultural Intelligence Strategist`,cohort 扩到 ≥ 5 时)
+- 算法备案(P0-A,等执照下来才能跑)
+
+---
+
+## 8. 每日 founder 最小动作清单(W4D1-W4D7)
+
+每日 5-10 min(对齐 capacity audit 重定义后的 1-2 h/w 节奏):
+
+- [ ] 早上 9:00 — chat 说 "PM,起今日 DM batch"(15 sec)
+- [ ] PM 给 5 条 → review + 实际发到平台(2.5 min)
+- [ ] (W4D1 only)拍 1 张封面图 + 发 seed 帖(5 min)
+- [ ] (W4D5-7 only)亲临 1 小时 first-run 陪跑
+- [ ] 晚 18:00 — `bash scripts/check_progress.sh` 看一眼(1 min)
+- [ ] 任何时刻 chat 跟 PM 说 "我决定 ..."(决策可零成本立刻落地)
+
+**Cumulative weekly load**:DM review × 7 × 2.5 min(17 min)+ seed × 5 min + first-run × 60 min + 周报决策 × 5 min ≈ **~90 min / week = 1.5 h/w**(达成 capacity audit (b' AI) 设计的 1-2 h/w 节奏)
+
+---
+
+## 9. 卡住怎么办
+
+任何 PM 调的 agent 产出**质量差**:
+- founder chat 说 "PM,刚才 X agent 输出不行,因为 <一句>" → PM 重 invoke 调 prompt
+- 不需要 founder debug agent;PM 负责
+
+任何 **founder 自己**卡:
+- 拍封面 5 min 拍不出来 → chat 说 "卡封面" → PM 调 `Content Creator` 给 5 个 phone-friendly 拍摄角度
+- 不会发小红书 / 抖音 → chat 说 "不会发" → PM 给 step-by-step 截图
+- 任何动作 ≥ 5 min 卡顿 → 立刻 chat 求救,不要硬抗
+
+---
+
+## 10. 心理预期(W4 实际信号场景)
+
+| 实际信号 | 应对 |
+|---|---|
+| W4D1-W4D3 0 回复 DM | 正常;Niche 平均回复率 5-15%,5-10 条 DM 拿 1 个回复 |
+| 某 creator 回复但说"不感兴趣" | PM 让 agent 自动归档 + 切下一个;不要 push |
+| 第一个 first-run creator 跑完后说 "改写不太像我" | **strongest signal** — 不是失败,是 prompt iteration 的精准方向;PM 立刻调 `Feedback Synthesizer` + 触发 W5 P5-x prompt iteration |
+| 第一个 first-run creator 跑完后说 "好用啊!" | weak signal — 客套话;追问 "下周你自己会用几次" 答 0 = 真信号弱 |
+| PM 某个 agent 产出 5 次都不达标 | flag founder + 提案换 agent(参考 `catalog.md` 找替补) |
+
+---
+
+## 11. 此 punchlist 来源
+
+- §1 from `PM_phase0_crisis_2026-05-22.md §5` + `PM_founder_capacity_audit_2026-05-22.md §6`(PM-proxy 决策)
+- §2-§3 from `ai_digital_employee_inventory §1.5 dispatch playbook`
+- §5 from `cascade-concierge.md`(自建 agent)+ `concierge_onboarding_script_2026-05-23.md §3`(被 cascade-concierge 替执行)
+- §6 from PM_W5_allocation 周报 cadence
+- §10 from `concierge_onboarding_script §4 KPI rubric`
+
+每节都跨链到 source-of-truth,future PM cycle 可顺藤摸瓜。

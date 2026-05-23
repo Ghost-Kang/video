@@ -81,9 +81,15 @@ Per `03_routing.md §0.1`(founder decision 2026-05-21),Cursor 仍 deprecated。W
 - founder 在 W4D1-7 内显式撤销 `03_routing.md §0.1` 的 deprecation
 - 或 Claude 前端工时严重 over-load(W4 4 票 + frontend 维护,目前看不会出现)
 
-### 3.4 Founder — non-engineering(§4 详列)
+### 3.4 Founder — non-engineering(§4 详列;**W3D4 升级:执行委托 AI 数字员工,founder = decision-only**)
 
-§4 完整列举,与本节 §3 工程线对称对位。
+W3D4 founder pivot:"招聘人员换成 AI 数字员工" + "我只决策"。原 §4 founder 亲手 5h/w 模型被 `founder_punchlist_W4D1_2026-05-28.md`(完全重写)取代为 PM 调度 agent + founder 1-2 h/w 决策模型。
+
+- 185 个 Claude Code subagents 已加载(`docs/nexus/agents/catalog.md`)
+- Cascade Phase 1 选定 8 critical + 4 supplementary(`founder_log/ai_digital_employee_inventory_2026-05-23.md`)
+- 自建 `Cascade Concierge` 替原 `customer-service`(`docs/nexus/agents/cascade-concierge.md`)
+- W4D1 启动流程:见 founder_punchlist 完整 11 节脚本
+- W5 dispatch table:`docs/nexus/PM_W5_allocation.md §4`
 
 ### 3.6 教训:Codex re-route discipline(P4-3 案例 + 4-owner rule 修正)
 

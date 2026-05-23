@@ -126,12 +126,22 @@ W1+W2+W3 累计净交付率(founder 亲手而非工具/AI 代劳):**3/22 ≈ 14%
 
 ## 6. Founder 决策位
 
-> **PM proxy decision** @ 2026-05-23 W3D3 22:35 PDT(founder 明示 "签字 pm 代签" — 与 phase0_crisis §5 同口径授权):
+> **PM proxy decision** @ 2026-05-23 W3D3 22:35 PDT(初版);**2026-05-24 W3D4 升级 (b'+AI agents)** post founder pivot "招聘人员换成 AI 数字员工" + "我只决策"
 >
-> **(b) Shrink scope 主体 + (c) Outsource 子集** —
+> ### 6.0(W3D4 升级)`(b' + AI agents)` — agent 替执行,founder 只决策
+>
+> - **Founder weekly load 新目标:1-2 h/w**(原 5h/w 进一步降);agent 跑 DM/Q&A/content/audit,founder 留 first-run + legal + 决策签字
+> - **8 critical agents 已加载**:见 `ai_digital_employee_inventory_2026-05-23.md §1.1` + Cascade custom `cascade-concierge`
+> - **W4D1 startup**:见 `founder_punchlist_W4D1_2026-05-28.md`(完全重写为 agent 调度)
+> - **PM dispatch playbook**:inventory `§1.5` — 每 cohort 事件 → invoke 对应 agent → 产物自动落 Cascade artifact
+> - **预算**:¥2500-3500 一次性(主要给 P0-A 工商代办;agents 是 token cost,与 Cascade 现有 ¥30/user-day-cap 同 pool)
+> - **Cohort 目标**:仍 3 人(不变)
+> - **6 周 → 8 周**(不变;buffer 留 1.5h/w 节奏)
+>
+> ### 6.1(W3D3 原版)`(b) Shrink scope 主体 + (c) Outsource 子集` — 保留作历史 reference,**已被 §6.0 取代**
 >
 > - **Phase 1 内测目标**:从 "10 人 cohort + daily 内容" → **3 人 cohort + 1 个 concierge creator 完整 onboard 即结案**
-> - **Founder weekly load 承诺**:**5h/w**(与历史实测 ~2h/w 对齐,有缓冲;非赌 20h)
+> - **Founder weekly load 承诺(原)**:**5h/w**(与历史实测 ~2h/w 对齐,有缓冲;非赌 20h)
 > - **W4 工作量缩减**:不做 daily 内容(只 1 篇 seed),不做正式 30min discovery call(改 DM 文字 Q&A 自助调研),保留 1 小时 first-run together(`concierge_onboarding_script §3`,这是产品验证刚需,不可砍)
 > - **6 周 → 8 周**:Phase 1 延至 2026-07-15(原 2026-07-01);为 5h/w 节奏加 2 周 buffer
 > - **Outsource 子集**(C 的最小集):仅 P0-C 5 条 fixture 标注(¥200-500)+ P0-A 工商代办(¥2000-3000);**不外包** DM / 内容 / discovery — 信任 + 一致性收益 > 时间收益
