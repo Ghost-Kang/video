@@ -1,298 +1,341 @@
-# OpenRHTV
+# OpenRHTV · Cascade
 
-使用 LangGraph 复现 RunningHub RHTV 的 **Agent + 人 + 无限画布** 协同工作模式，维持长视频创作心流。
+> **面向中文个人创作者的 AI 短视频创作平台**:把"看懂别人的爆款"和"做自己的版本"合二为一 —— 从源视频分析到锚点级联的画布创作,一条龙。
 
-## 背景
+**Codename**: Cascade(锚点级联 character → scene → grid → frame;叙事级联 开场 → 中段 → 高潮 → 结尾)
+**Phase**: Phase 1 内测(2026-05 起,10 人 cohort,3 个 niche)
 
-[RunningHub](https://www.runninghub.cn/) 是国内最大的云端 ComfyUI 平台，2026 年推出了 [RHTV](https://rhtv.ai/)——一个把 AI Agent 原生嵌入无限画布的一站式内容创作平台。用户通过自然语言驱动 Agent，Agent 在画布上自动完成剧本、分镜、生图、生视频、配音、剪辑全流程，每步可见、可干预、可回退，告别「盲盒抽卡」式的黑盒生成。
+---
 
-OpenRHTV 是对这一模式的**学习性开源复现**，重点探索两个问题：
+## 一句话定位
 
-1. **Agent 如何控制画布**——LangGraph 多角色 Agent 如何与 React Flow 画布双向交互
-2. **人机协同的心流**——如何设计交互让创作者不被工具打断，保持创作连续性
+**用户粘一条抖音/小红书爆款 URL → 系统提取"爆款公式"(钩子模式 + 分场结构 + 锚点) → 用户选自己的 niche → LLM 改写成创作者本人的版本 → 画布生成分镜 + 锚点 + 成片 → 一键复制发布包**。
+
+不是又一个生图工具,是把**发现 + 学习 + 复刻**三件事串成一条 agent 驱动的画布工作流。
+
+---
+
+## 为什么不是又一个 AI 视频生成器
+
+| 现有产品 | 强项 | 缺什么 |
+|---|---|---|
+| 即梦 / 可灵 / Sora 2 | 单条生成质量 | 只有"生成",没有"发现 + 学习" |
+| Heygen / Synthesia | Talking head 工业化 | 不适合中文短视频生态 |
+| 剪映 / CapCut | 后期剪辑 | 不能从零生成 |
+| 新榜 / 飞瓜 / 卡思 | 热度数据 | 只看数据,不能创作 |
+
+Cascade 在做的事:把上面四列**用 agent + 画布串起来**。Day-1 就有的护城河:
+- **锚点级联**(character → scene → grid → frame):同一角色 / 同一场景跨视频复用,避免风格漂移
+- **钩子分类 H1-H9**:9 大开场钩子模式(月龄宝宝、一周不重样、千万别、师傅做、当妈以后…)+ niche-specific 权重
+- **真实输入,真实输出**:不是合成模板,改写来自真实爆款的拆解
+
+---
 
 ## 核心概念
 
-### 三位一体：Agent + 人 + 画布
+### 三位一体:Agent + 人 + 画布
 
 ```
-┌────────────────────────────────────────────┐
-│                  无限画布                    │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
-│  │  剧本节点  │──│  分镜节点  │──│  视频节点  │  │
-│  └──────────┘  └──────────┘  └──────────┘  │
-│       ▲              ▲              ▲        │
-│       │    Agent 自动搭建 + 人随时干预  │        │
-│       └──────────────┴──────────────┘        │
-│                     │                        │
-│              对话面板（自然语言交互）            │
-└────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────┐
+│                    无限画布                          │
+│  ┌─────────┐  ┌──────────┐  ┌────────┐  ┌────────┐ │
+│  │ 源视频  │─▶│ 分析(爆款 │─▶│ 改写(自│─▶│ 分镜 + │ │
+│  │ URL     │  │ 公式提取)│  │ 己版本)│  │ 锚点  │ │
+│  └─────────┘  └──────────┘  └────────┘  └────────┘ │
+│       ▲             ▲             ▲          ▲      │
+│       │     Agent 自动搭建 + 人随时干预         │      │
+│       └─────────────┴─────────────┴──────────┘      │
+│                       │                              │
+│                对话面板(自然语言交互)                 │
+└────────────────────────────────────────────────────┘
 ```
 
 | 角色 | 职责 |
-|------|------|
-| **Agent** | 理解创作意图，拆解任务，调度外部 API，在画布上搭建工作流 |
-| **人** | 下达指令，在关键节点做决策（选方案、定风格、审成片），随时干预修改 |
-| **画布** | 承载全流程的可视化节点树，每一步 100% 透明，支持单节点精准修改 |
+|---|---|
+| **Agent**(Director) | 理解创作意图,在画布上搭建节点,调度 cascade 分析 + 改写 + 生成 API |
+| **人** | 下达指令,在关键节点做决策(选 niche、定锚点、审改写),随时干预 |
+| **画布** | 承载全流程的可视化节点树,每一步透明可追溯,单节点精准修改 |
 
-### 心流（Flow）
-
-传统视频创作需要频繁切换工具：写脚本 → 切换软件 → 找素材 → 切换软件 → 剪辑 → 切回修改……每次切换都是一次上下文中断。
-
-RHTV / OpenRHTV 的思路是**画布即工作区**——所有产出物以节点形式留在画布上，对话历史、中间产物、修改记录全部可视可追溯，创作者始终在一个空间内推进，不被工具边界打断。
-
-## Agent 角色体系
-
-基于 LangGraph 的 DeepAgent，5 个专业角色协同完成创作：
+### Cascade 流水线
 
 ```
-用户一句话指令
-      │
-      ▼
-┌──────────┐     ┌──────────┐     ┌──────────────┐
-│   导演    │────▶│   策划    │────▶│   分镜师      │
-│ Director │     │ Planner  │     │ Storyboarder │
-└──────────┘     └──────────┘     └──────┬───────┘
-                                         │
-                    ┌────────────────────┘
-                    ▼
-┌──────────────┐     ┌──────────┐
-│  形象设计师   │────▶│   剪辑师   │
-│ Visual       │     │  Editor   │
-│ Designer     │     │           │
-└──────────────┘     └──────────┘
+源 URL ──┐
+         ├─▶ Toprador analysis(分析上游) ──▶ CascadeAnalysisContract(JSON)
+         │     │
+         │     └─▶ hook_taxonomy.py 标 H1-H9
+         │
+         └─▶ rewrite_service ──▶ LLM(Doubao seed-1.6,Gemini fallback)──▶ 改写产物
+                                                                          │
+                                                                          ▼
+                                                                  shots[] + anchors[]
+                                                                          │
+                                                                          ▼
+                                                                  画布节点 + 生图/生视频 API
 ```
 
-| 角色 | 职责 | 产出的画布节点 |
-|------|------|--------------|
-| **导演 Director** | 理解用户意图，统筹创作方向，拍板关键决策，调度其他角色 | 项目总览、创意方向 |
-| **策划 Planner** | 拆解需求为可执行任务序列，编排工作流 | 任务清单、依赖关系 |
-| **分镜师 Storyboarder** | 生成分镜脚本，包含镜头描述、构图、运镜、时长 | 分镜节点（时间线） |
-| **形象设计师 Visual Designer** | 锁定角色/产品视觉锚点（三视图、定稿板），确保全片风格统一 | 锚点节点、风格参考 |
-| **剪辑师 Editor** | 串联素材，添加转场、配音、字幕，输出成片 | 成片时间线、导出节点 |
+每个环节都 emit 事件到 `events` 表(see `cascade/events.py`),admin 面板可观测。
 
-角色之间通过 LangGraph 的状态图进行消息传递和任务交接，每个角色的输出都作为画布节点持久化，用户可在任意节点介入修改。
+---
 
-## 全流程链路
+## Phase 1 范围
 
-```
-剧本 → 分镜 → 生图 → 生视频 → 配音 → 剪辑
-  │       │       │       │        │       │
-  ▼       ▼       ▼       ▼        ▼       ▼
-导演+   分镜师  形象设计  外部API   外部API  剪辑师
-策划      +      师调    生视频    TTS     串联
-        导演     ComfyUI                   输出
-        审阅     API
-```
+**3 个 niche**(2026-05 起):
 
-每个环节：
-- **Agent 驱动**：角色自动推进，生成中间产物并写入画布节点
-- **人可干预**：每个节点支持暂停、修改、替换、回退
-- **锚点先行**：在生图阶段之前先锁定视觉锚点，避免后续风格漂移
+| Niche | 中文 | Hook 偏好 |
+|---|---|---|
+| `baomam_fushi` | 宝妈辅食 | H1(月龄)+ H2(一周)+ H3(蹭蹭涨) |
+| `yuer_richang` | 育儿日常 | H5(爸视角)+ H7(一家人)+ H8(当妈以后) |
+| `jiating_chufang` | 家庭厨房 | H4(千万别)+ H6(节日)+ H9(反常识) |
+
+**做了** ✅:
+- 源视频分析合约(`backend/src/agent/cascade/contract.py`)+ 适配层
+- 改写流水线 + niche-specific prompts
+- 锚点系统(`anchors.py`)+ 跨 run 复用统计
+- 评估 harness(`scripts/p2-6_eval.py` — fixture 和 LLM 双模 + judge)
+- Admin 面板 4 张:`/admin/creators` `/admin/events` `/admin/cost` `/analytics/anchors`
+- 落地合规闭环:用户协议 + 隐私 v0(`docs/legal/`)、Click-through 同意门(`ConsentGate.tsx`)、PII 脱敏、未成年人关键词审计、跨境数据硬阻塞
+
+**没做** ❌(超出 Phase 1):
+- 多 cohort scale-up(只 10 人 concierge)
+- 算法备案审批完成(预登记已签,正式备案公测前)
+- 视频生成全自动(图生视频还是 manual 触发)
+- 非中文支持
+
+---
 
 ## 技术栈
 
 | 层 | 技术 |
-|----|------|
-| Agent 框架 | [LangGraph](https://github.com/langchain-ai/langgraph) + [DeepAgents](https://github.com/langchain-ai/deepagents)（Python） |
-| 画布 | [React Flow](https://reactflow.dev/) |
-| 前端 | React + TypeScript |
-| LLM | 可插拔适配（默认支持 OpenAI / Anthropic / DeepSeek） |
-| 生图/生视频 | ComfyUI API / RunningHub API |
-| TTS | 待定 |
-| 后端 | Python（LangGraph 服务端运行，WebSocket 与前端画布通信） |
+|---|---|
+| Agent 框架 | [LangGraph](https://github.com/langchain-ai/langgraph) + [DeepAgents](https://github.com/langchain-ai/deepagents) |
+| 画布前端 | [React Flow](https://reactflow.dev/) (`@xyflow/react`) + React 19 + TypeScript |
+| LLM | 默认 Doubao(火山方舟 ARK,境内不出境);Gemini 作为 fallback |
+| 图片生成 | Apimart(OpenAI 兼容)/ Google Gemini(用户主动二次同意才走) |
+| 视频生成 | Doubao Seedance 2.0(ARK)+ Volcengine SDK |
+| 后端 | Python 3.12 + asyncio(单进程,WebSocket + 手写 HTTP API 同端口) |
+| 持久化 | SQLite + aiosqlite(events / analyses / anchors / rewrites)|
+| 评估 | 自研 harness(mechanical checks + LLM judge) |
+| 测试 | pytest(后端 85+ 测试)+ vitest(前端 79+ 测试) |
 
-## 通信协议
-
-前后端通过 WebSocket 通信，协议如下：
-
-### 连接
-
-```
-ws://localhost:8765/{thread_id}
-```
-
-每个 `thread_id` 对应一个独立会话，拥有独立的画布 JSON 文件和 agent 对话上下文。
-
-### 消息格式
-
-**前端 → 后端：用户消息**
-
-```json
-{
-  "type": "user_message",
-  "content": "帮我创作一支赛博朋克风格的短片"
-}
-```
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `type` | `"user_message"` | 固定值 |
-| `content` | `string` | 用户的自然语言输入 |
-
-**后端 → 前端：Agent 响应 + 画布同步**
-
-```json
-{
-  "type": "agent_response",
-  "content": "好的，我先确认几个问题……",
-  "canvas": {
-    "nodes": {
-      "script-abc123": {
-        "id": "script-abc123",
-        "type": "script",
-        "title": "赛博朋克短片剧本",
-        "description": "……",
-        "status": "done",
-        "result": { "content": "[剧本] ...", "word_count": 120 }
-      }
-    },
-    "edges": []
-  }
-}
-```
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `type` | `"agent_response"` | 固定值 |
-| `content` | `string` | Agent 的文本回复 |
-| `canvas` | `object \| null` | 当前画布完整快照，`nodes` 为节点字典，`edges` 为连线 |
-
-### 数据流
-
-```
-前端 ChatPanel 输入
-    │
-    ▼
-WS: { type: "user_message", content: "..." }
-    │
-    ▼
-后端 server.py → agent.invoke()
-    │
-    ├─ agent 调用 create_canvas_node → 写入 backend/data/canvas/{thread_id}.json
-    ├─ agent 调用 execute_node → 更新节点状态，写入 mock 结果
-    └─ agent 调用 update_canvas_node / delete_canvas_node
-    │
-    ▼
-读取画布 JSON → WS: { type: "agent_response", content: "...", canvas: {...} }
-    │
-    ▼
-前端 onResponse → Zustand store → React Flow 重新渲染节点
-```
-
-### 画布 JSON 存储
-
-后端所有工具操作的画布文件位于 `backend/data/canvas/{thread_id}.json`，每轮对话结束后全量推送给前端。
-
-## 快速开始
-
-> 项目处于早期开发阶段，以下为规划中的启动方式。
-
-```bash
-# 克隆项目
-git clone https://github.com/your-org/OpenRHTV.git
-cd OpenRHTV
-
-# 1. 配置 LLM
-cp .env.example .env
-# 编辑 .env，填入 GOOGLE_API_KEY
-
-# 2. 启动后端 WebSocket 服务
-cd backend
-uv sync
-uv run python -m agent.server
-
-# 3. 启动前端画布（新终端）
-cd frontend
-npm install
-npm run dev
-# 浏览器打开 http://localhost:5173
-```
+---
 
 ## 项目结构
 
 ```
 OpenRHTV/
-├── video_agent/                  # LangGraph + DeepAgents 后端
-│   ├── pyproject.toml            # uv 项目配置, deepagents + websockets
-│   ├── .python-version           # Python 3.12
-│   └── src/video_agent/
-│       ├── main.py               # 入口：组装 Director DeepAgent + 4 个 subagent
-│       ├── state.py              # 画布状态 TypedDict，agent 与前端共享的数据模型
-│       ├── server.py             # WebSocket 服务，双向桥接 agent 与前端
-│       ├── tools/
-│       │   ├── canvas.py         # 画布操作工具：创建/更新/删除/连接节点
-│       │   └── generation.py     # 外部 API 工具：生图/生视频/TTS
-│       └── prompts/
-│           ├── director.md       # Director agent 系统指令
-│           ├── planner.md        # Planner subagent 指令
-│           ├── storyboarder.md   # Storyboarder subagent 指令
-│           ├── visual_designer.md # Visual Designer subagent 指令
-│           └── editor.md         # Editor subagent 指令
+├── backend/                          # Python 3.12 服务
+│   ├── pyproject.toml
+│   ├── src/agent/
+│   │   ├── main.py                   # Director agent 入口(单 agent + canvas-manager subagent)
+│   │   ├── server.py                 # WebSocket + HTTP API 单进程服务
+│   │   ├── llm_factory.py            # Doubao / Gemini provider 切换
+│   │   ├── config.py                 # .env 加载(根目录 .env)
+│   │   ├── pool.py                   # Agent 实例 LRU 池
+│   │   ├── prompts/                  # director.md + canvas-manager.md + rewrite_<niche>.md
+│   │   ├── tools/                    # canvas / generation / video_generation / s3_upload
+│   │   └── cascade/                  # 核心改写流水线
+│   │       ├── contract.py           # CascadeAnalysisContract (Pydantic)
+│   │       ├── analysis_service.py   # 源分析(fixture 或 Toprador 上游)
+│   │       ├── rewrite_service.py    # niche-specific LLM 改写
+│   │       ├── adapter.py            # 上游 payload → contract;含 PII 脱敏 + 跨境阻断
+│   │       ├── anchors.py            # 锚点 CRUD + 跨 run 复用
+│   │       ├── hook_taxonomy.py      # H1-H9 钩子正则 + niche 权重
+│   │       ├── minor_audit.py        # 未成年人关键词审计
+│   │       ├── circuit_breaker.py    # 上游 API 熔断器(60s 窗口,5 次失败开)
+│   │       ├── cost_guard.py         # 预测成本守门(每 run 限额)
+│   │       ├── events.py             # 12 + 4 个事件类型的单一写路径
+│   │       ├── storage.py            # SQLite 持久化(events / analyses / anchors / rewrites)
+│   │       ├── eval/                 # 评估 harness(fixture + LLM judge)
+│   │       └── fixtures/             # synthetic_v1(单元测试)+ real_v1(真实 URL 标注)
+│   └── tests/                        # pytest
 │
-├── frontend/                     # React Flow 前端
+├── frontend/                         # React 19 + Vite + Tailwind v4
+│   ├── package.json
 │   └── src/
-│       ├── main.tsx              # React 入口
-│       ├── App.tsx               # 根组件，三栏布局（Header / Canvas / ChatPanel）
+│       ├── main.tsx                  # 路由根
+│       ├── App.tsx                   # 画布 chat 主页(/chat/:threadId)
+│       ├── pages/
+│       │   ├── Landing.tsx           # /  (含 ConsentGate)
+│       │   ├── LegalDoc.tsx          # /legal/:slug  (协议 + 隐私)
+│       │   ├── AnchorAnalytics.tsx   # /analytics/anchors
+│       │   ├── AdminCreators.tsx     # /admin/creators
+│       │   ├── AdminEvents.tsx       # /admin/events    (事件直播流)
+│       │   └── AdminCost.tsx         # /admin/cost      (成本看板)
 │       ├── components/
-│       │   ├── Header.tsx        # 顶部栏：项目名、创作阶段指示器
-│       │   ├── Canvas.tsx        # React Flow 画布，渲染节点树
-│       │   ├── ChatPanel.tsx     # 对话面板，用户输入自然语言指令
-│       │   └── nodes/
-│       │       ├── ScriptNode.tsx     # 剧本节点
-│       │       ├── StoryboardNode.tsx # 分镜节点
-│       │       ├── ImageNode.tsx      # 图片节点（缩略图预览）
-│       │       ├── VideoNode.tsx      # 视频节点（可播放预览）
-│       │       └── ExportNode.tsx     # 成片导出节点
-│       ├── hooks/
-│       │   ├── useWebSocket.ts   # WebSocket 连接管理与消息收发
-│       │   └── useCanvas.ts      # 画布操作 hook：响应 agent 事件更新节点
-│       ├── store/
-│       │   └── canvasStore.ts    # 前端画布状态（Zustand）：节点/边/选中态
-│       └── types/
-│           └── index.ts          # 共享类型：节点类型枚举、WS 消息协议
+│       │   ├── landing/ConsentGate.tsx
+│       │   ├── Canvas.tsx            # React Flow 实例
+│       │   ├── CardStack.tsx         # 非 pro 视图卡片栈
+│       │   ├── nodes/                # 自定义画布节点
+│       │   └── cards/                # 卡片 UI(ShotCard / ScriptCard / PublishPackCard…)
+│       ├── hooks/                    # useWebSocket / useAnchors / useEvents / useGenerationCost…
+│       ├── lib/                      # anchorApi / creatorsApi / eventsApi / buildPublishPack
+│       ├── store/canvasStore.ts      # Zustand 全局画布状态
+│       └── types/                    # cascade.ts 镜像后端 contract
 │
+├── docs/                             # 设计 + 合规 + 路线
+│   ├── PRODUCT_VISION.md
+│   ├── MVP_SCOPE.md
+│   ├── ROADMAP_6M.md
+│   ├── CANVAS_DESIGN.md
+│   ├── TOPRADOR_SCHEMA.md            # 上游分析合约文档
+│   ├── TOPIC_TO_CREATION_PIPELINE.md
+│   ├── DATA_DASHBOARD.md
+│   ├── legal/                        # user_agreement_v0 + privacy_v0
+│   └── nexus/                        # PM 周期文档 + 评估 + 招募(internal)
+│
+├── scripts/
+│   ├── p2-6_eval.py                  # 跑全 niche 评估,产 baseline JSON + report MD
+│   ├── p2-4_run_real_urls.py         # 真实 URL 改写 batch runner
+│   └── check_progress.sh             # 项目进度 probe(给 PM cycle 用)
+│
+├── .env.example                      # 配置模板
 └── README.md
 ```
 
-### 各文件职责
+---
 
-#### 后端 `video_agent/`
+## 快速开始
 
-| 文件 | 核心职责 |
-|------|---------|
-| `main.py` | 调用 `create_deep_agent()` 创建 Director 主 agent，注入 4 个 subagent（Planner / Storyboarder / Visual Designer / Editor）。配置画布工具、interrupt_on 规则、checkpointer。返回 CompiledStateGraph |
-| `state.py` | 定义画布状态 TypedDict：`nodes`（当前画布节点列表）、`messages`（对话历史）、`phase`（创作阶段：scripting / storyboard / generation / editing / done）。agent 和工具函数共享读写 |
-| `server.py` | WebSocket 服务层。接收前端发来的用户消息→喂给 agent graph→agent 执行过程中的工具调用事件（画布操作）通过 WS 推回前端。管理多 session（thread_id） |
-| `tools/canvas.py` | 画布工具函数集合。Agent 调用它们来操控前端画布：`create_node(type, data, position)`、`update_node(id, data)`、`delete_node(id)`、`connect(source, target)`。函数内部更新 state，同时通过 WS 推送事件 |
-| `tools/generation.py` | 外部 API 调用封装。Agent 调用它们生成实际内容：`generate_image(prompt, style_ref)`、`generate_video(image_ref, motion_desc)`、`generate_tts(text, voice)` 等。具体 API 待定，先用 mock |
-| `prompts/*.md` | 5 个 markdown 文件定义每个 agent 角色的系统指令。描述角色人设、可用工具、输入输出规范、行为边界。从 `main.py` 中读取注入 |
+### 0. 前置
 
-#### 前端 `frontend/`
+- Python 3.12
+- Node 20+(用 pnpm 或 npm)
+- [uv](https://github.com/astral-sh/uv)(Python deps + venv 管理)
+- 一个 Doubao(火山方舟 ARK)API key —— [开通指南](https://console.volcengine.com/ark)
 
-| 文件 | 核心职责 |
-|------|---------|
-| `App.tsx` | 根组件。三栏布局：左侧 `<ChatPanel>` / 右侧 `<Canvas>` / 顶部 `<Header>`。管理全局状态（Zustand store） |
-| `Canvas.tsx` | React Flow 实例。注册 5 种自定义节点类型（Script / Storyboard / Image / Video / Export）。监听 WebSocket 画布事件，动态增删节点和边 |
-| `ChatPanel.tsx` | 用户输入自然语言指令，通过 WebSocket 发给后端。展示 Director agent 的回复消息和进度更新 |
-| `Header.tsx` | 显示当前项目名、创作阶段（剧本→分镜→生图→剪辑）、agent 状态指示 |
-| `nodes/*.tsx` | 5 种自定义 React Flow 节点。每种节点有独立的渲染 UI（如 ImageNode 显示缩略图，VideoNode 有播放按钮），支持点击查看详情、右键菜单操作 |
-| `useWebSocket.ts` | 封装 WebSocket 连接生命周期：连接/断开/重连。收发 JSON 消息，按 `msg.type` 分流到对应 handler |
-| `useCanvas.ts` | 画布操作 hook。暴露 `addNode` `updateNode` `removeNode` `addEdge` 等方法，内部同步更新 Zustand store，同时提供 `handleAgentEvent` 统一处理来自 agent 的画布指令 |
-| `canvasStore.ts` | Zustand store。持有 `nodes: Node[]` `edges: Edge[]` `selectedNodeId`。所有画布变更统一走 store，保证 React Flow 渲染一致 |
-| `types/index.ts` | TypeScript 类型定义。`NodeType` 枚举、`CanvasNode` 接口、`WSMessage` 协议类型，前后端共享协议基准 |
+### 1. 配置 LLM
+
+```bash
+git clone https://github.com/<your-org>/OpenRHTV.git
+cd OpenRHTV
+cp .env.example .env
+# 编辑 .env:
+#   ARK_API_KEY=ark-...
+#   DOUBAO_MODEL=doubao-seed-1-6-250615   # 或您 ARK 控制台开通的 model id / ep-XXX
+```
+
+> Gemini 走 fallback:在 .env 把 `LLM_PROVIDER` 改 `gemini` 并填 `GOOGLE_API_KEY` 即可,无需改代码。
+
+### 2. 起后端
+
+```bash
+cd backend
+uv sync
+uv run python -m agent.server
+# 启动 WS:    ws://localhost:8765
+# 启动 HTTP:  http://localhost:8765/api/*  (共用同端口)
+```
+
+### 3. 起前端
+
+```bash
+cd frontend
+pnpm install   # 或 npm install
+pnpm dev       # http://localhost:5173
+```
+
+### 4. 跑一遍 cascade
+
+1. 浏览器开 `http://localhost:5173/`
+2. 同意用户协议 + 隐私(`ConsentGate`)
+3. 进入 chat session,粘一条 Douyin / 小红书 URL
+4. Director 调用 `request_shallow_analysis(url)` → 拿到 `CascadeAnalysisContract`
+5. 选 niche → 调用 `request_rewrite(analysis_id, niche)` → 改写产物
+6. 画布生成 shots + anchors
+7. 后续生图 / 生视频 / 配音可手动触发
+
+### 5. 运行测试
+
+```bash
+# 后端
+cd backend && uv run pytest -q
+
+# 前端
+cd frontend && pnpm vitest run
+```
+
+### 6. 跑评估 baseline
+
+```bash
+cd backend
+uv run python ../scripts/p2-6_eval.py --niche all --mode llm
+# 产物:
+#   docs/nexus/founder_log/p2-6_baseline_<UTC>.json
+#   docs/nexus/founder_log/p2-6_report_<UTC>.md
+# 报告含 Delta from baseline 自动对比
+```
+
+---
+
+## API 概览
+
+后端在同一端口 `8765` 上提供 WebSocket(画布 + chat)和 HTTP(REST)两路:
+
+### HTTP
+
+| Method | Path | 用途 |
+|---|---|---|
+| GET | `/api/cost/status` | 当前用户 cost guard 余额 |
+| GET | `/api/creators` | Admin 创建者看板聚合 |
+| GET | `/api/events` | 事件直播流(filter: type / user_id / since_ts) |
+| GET | `/api/anchors` | 列表锚点(kind=character\|scene) |
+| GET | `/api/anchors/<id>/reuses` | 锚点复用历史 |
+| POST | `/api/anchors` | 创建锚点 |
+| POST | `/api/anchors/<id>/reuse` | 标记锚点被复用 |
+| POST | `/api/events` | 写入 telemetry 事件 |
+| POST | `/api/rewrite` | niche 改写 |
+| POST | `/api/analysis/shallow` | 源 URL 浅分析 |
+
+### WebSocket
+
+`ws://localhost:8765` —— 首条消息 auth 绑定 `user_id`,后续消息隔离。
+
+主要 message types(详见 `frontend/src/types/`):
+- `user_message`(前 → 后): 用户输入
+- `agent_response`(后 → 前): 完整回复 + 画布快照
+- `agent_stream`(后 → 前): 流式 token + tool_call 事件
+- `canvas_updated`(后 → 前): 单独画布推送
+- `session_state` / `session_list` / `processing` 等
+
+---
+
+## 合规与隐私(Phase 1 内测口径)
+
+- **数据全境内**:Doubao 在境内推理,SQLite 存于本地;Gemini 仅 fallback 且需用户二次同意
+- **Click-through 同意**:进入应用前必须勾选用户协议 + 隐私;localStorage 存证 + 服务端 `consent_accepted` event 审计
+- **PII 脱敏**:`_strip_pii` 自动剔除 IP / 作者昵称等字段(`backend/src/agent/cascade/adapter.py`)
+- **跨境数据硬阻塞**:`STRICT_CROSS_BORDER_REJECT=True` 默认开,触发 W9 → S9 拒绝
+- **未成年人审计**:13 词中英文关键词命中 `W14_MINOR_SUBJECT_DETECTED`(INFO 级,不阻断)
+- **删除承诺**:邮件请求 24h 内删全部 run(协议 §5.2 + 隐私 §7.2)
+
+详见 `docs/legal/user_agreement_v0.md` + `docs/legal/privacy_v0.md`。
+
+---
 
 ## 路线图
 
-- [ ] **Phase 1** — LangGraph 5 角色基础编排，命令行对话交互
-- [ ] **Phase 2** — React Flow 画布搭建，Agent 可通过 WebSocket 操作画布节点
-- [ ] **Phase 3** — 对话面板接入，用户与 Agent 自然语言交互
-- [ ] **Phase 4** — 对接 ComfyUI API，实现生图/生视频节点
-- [ ] **Phase 5** — 全链路跑通：一句话 → 成片
+- [x] **Phase 0** — 基础设施 + 合规闭环(2026-05 close)
+- [x] **Phase 1 工程**(2026-05): Cascade 分析 + 改写 + 锚点 + 画布 + 4 个 admin 看板 + 评估 harness
+- [ ] **Phase 1 内测**(进行中): 10 人 concierge cohort,3 niche
+- [ ] **Phase 2**(规划中): cohort scale 到 30 人,引入新榜热度雷达,完整生视频自动化
+- [ ] **Phase 3**: 算法备案审批通过,公测开放
+- [ ] **Phase 4-6**: 详见 `docs/ROADMAP_6M.md`
+
+North star:**Day 1 创作完成率 ≥ 40%、14 天留存 ≥ 25%、人均 7 天 ≥ 3 条**。
+
+---
 
 ## 参考
 
-- [RHTV 官方](https://rhtv.ai/)
-- [RunningHub 社区](https://www.runninghub.cn/)
 - [LangGraph 文档](https://langchain-ai.github.io/langgraph/)
-- [React Flow 文档](https://reactflow.dev/)
+- [DeepAgents](https://github.com/langchain-ai/deepagents)
+- [React Flow](https://reactflow.dev/) (`@xyflow/react`)
+- [火山方舟 ARK 控制台](https://console.volcengine.com/ark)
+- [RHTV 官方](https://rhtv.ai/)(原型参考)
+- [RunningHub 社区](https://www.runninghub.cn/)
+
+---
+
+## License
+
+(待定 — 项目处于内测阶段,license 公开发布时确定)
