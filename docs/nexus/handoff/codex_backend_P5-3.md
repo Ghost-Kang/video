@@ -11,7 +11,13 @@
 
 ## 0. 背景与决策
 
-Toprador 是 founder 老项目的视频分析服务(Flask + MySQL),`MVP_SCOPE A1` 原计划 5 天脱敏 + Postgres 迁移 + 公网部署。**已废弃此路径**,改走全 Doubao(火山方舟 ARK)多模态 + ASR + text LLM 三件套自建。
+Toprador 是 founder 老项目的视频分析服务(Flask + MySQL),`MVP_SCOPE A1` 原计划 5 天脱敏 + Postgres 迁移 + 公网部署。**已废弃此路径**,改走 **火山 MediaKit(server-side 抽帧/抽音/转写)+ Doubao Vision(多模态) + Doubao text LLM(语义聚合)** 全境内自建。
+
+**重要更新 2026-05-23 W3D3 22:55 PDT**(founder 提供 MediaKit curl 后):
+- Sub-phase A 不再需要本地 ffmpeg + 火山 ASR 直调;统一走 **MediaKit `tools/extract-audio` + `extract-frames` + `transcribe`**(per founder 确认 3 tool 完整)
+- Auth 简化为单 Bearer token(原 brief 假设的 ASR 三件套作废)
+- Sub-phase A 工时 1d → **0.5d**(server-side 处理,代码大幅简化)
+- 总工时 8d → **~7.5d**
 
 理由(per founder W3D3 decision):
 1. **Provider 一致性**:Cascade 链路 LLM 改写(P3-R2) + judge(P4-1) + 视频生成(Seedance)已统一在 ARK;视频分析也走 ARK = 全境内单 provider
@@ -36,17 +42,45 @@ Toprador 是 founder 老项目的视频分析服务(Flask + MySQL),`MVP_SCOPE A1
 
 ## 2. Sub-phase 拆解(5 阶段,每阶段独立 commit)
 
-### Sub-phase A — ffmpeg 抽帧 + 火山 ASR 接通(1 天)
+### Sub-phase A — MediaKit 抽帧 + 转写接通(0.5 天)
+
+**Founder 2026-05-23 决定**:用火山 **MediaKit** 服务(`mediakit.cn-beijing.volces.com/api/v1/tools/*`)做 server-side 抽帧 + 抽音 + 转写,**不再需要本地 ffmpeg + 文件下载**。
+
+**已知 API 契约**(来自 founder 提供的 curl,2026-05-23):
+
+```bash
+# extract-audio (已验证)
+curl -X POST 'https://mediakit.cn-beijing.volces.com/api/v1/tools/extract-audio' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <VOLC_MEDIAKIT_AK>' \
+  -d '{"video_url": "https://example.com/my_video.mp4"}'
+
+# MediaKit 还含(per founder 确认): extract-frames + transcribe
+# 三个 endpoint 假设统一 base URL + auth + 类似输入(video_url 或 audio_url)
+```
+
+**Auth 方式**:**单 Bearer token**(`Authorization: Bearer <VOLC_MEDIAKIT_AK>`),不是 AK+SK HMAC。token 形态 `AKLT...`(Volc Access Key)。
 
 **目标**:给一条视频 URL,产 `scenes[]` 的局部输出(timestamps + dialogue_and_narration + 占位 visual_content)。
 
 **Done-signal**:
-- 新文件 `backend/src/agent/cascade/doubao_lite/frame_extractor.py`(ffmpeg subprocess + key frame 抽取)
-- 新文件 `backend/src/agent/cascade/doubao_lite/asr_client.py`(火山 ASR HTTP client;不引入 SDK,直 POST)
-- ASR 配置 3 行加 `config.py`:`VOLC_ASR_APP_ID` / `VOLC_ASR_ACCESS_TOKEN` / `VOLC_ASR_CLUSTER`(对应 `volcengineapi.com` ASR endpoint;`.env.example` 同步注释如何获取)
-- 端到端测试:1 条本地 .mp4 → 抽 8-12 关键帧到 tmp dir + ASR 返回带 word_timestamps 的 transcript → 按 5-15s 边界切 `scenes[]`(timestamps 字段 + dialogue_and_narration 字段填充)
-- 5 unit tests:frame extraction count 在 8-16 范围;ASR client mock 返回 → scene 切片正确;edge case 静音视频 → empty dialogue 但 scenes 仍生成;超时 fallback;采样率不一致兼容
-- commit:`feat(P5-3a): ffmpeg frame extraction + 火山 ASR client → partial scenes[]`
+- 新文件 `backend/src/agent/cascade/doubao_lite/mediakit_client.py` — 三个方法:
+  - `async extract_audio(video_url) -> dict`(返回结构待 Codex 第一次跑 staging 探测)
+  - `async extract_frames(video_url, count=12) -> list[dict]`(假设响应有 frame_url + timestamp_s;**Codex 需用本 token 跑 1 次真实 curl 确认 schema**)
+  - `async transcribe(video_or_audio_url) -> dict`(假设有 segments[] + word_timestamps;**同上待 Codex 探测**)
+- 配置 1 行加 `config.py`:`VOLC_MEDIAKIT_AK = os.getenv("VOLC_MEDIAKIT_AK", "")`
+- `.env.example` 加 1 行注释 + placeholder
+- 因 SDK 不存在,直 httpx POST + 沿用 P3-7 retry/breaker 范式
+- 端到端测试:1 条公开 video URL → 抽帧 + 转写 → 按 transcribe 的 segment 边界切 `scenes[]`(timestamps 字段 + dialogue_and_narration 字段填充)
+- 5 unit tests:happy path mock / 401 auth refused / 5xx retry / 静音视频 → empty dialogue 但 scenes 仍生成 / 单 service 超时 fallback
+- 1 个 staging script `scripts/p5-3a_mediakit_probe.py` 用 founder 提供的 dev key 跑一次真实 video URL,把 3 个 endpoint 返回的 raw JSON 落盘到 `founder_log/p5-3a_mediakit_schemas_<UTC>.md`(为后续 phase 提供 schema 真理来源)
+- commit:`feat(P5-3a): MediaKit client (extract-audio/frames/transcribe) → partial scenes[]`
+
+**⚠️ Pre-execution 待 founder 给 PM 确认 / 提供**:
+
+1. **`VOLC_MEDIAKIT_AK`** 长期有效的 key(founder 之前给的 `AKLT...` 是临时测试,不入 git)
+2. `extract-frames` 与 `transcribe` 的精确 endpoint path —— 假设是 `/api/v1/tools/extract-frames` 和 `/api/v1/tools/transcribe`,**Codex sub-phase A 第一步用临时 key probe 1 次确认**
+3. 公开 docs 找不到 MediaKit;Codex 第一次 probe 时把 3 个 endpoint 的真实 request/response JSON 写到 `founder_log/p5-3a_mediakit_schemas_<UTC>.md`,后续 phase 当真理源
 
 **边界**(不在 sub-phase A):
 - 不调 Doubao Vision(下一 phase)
@@ -163,11 +197,11 @@ CASCADE_UPSTREAM=doubao_lite
 # Doubao Vision(多模态)
 DOUBAO_VISION_MODEL=doubao-1-5-vision-pro-32k
 
-# 火山 ASR
-VOLC_ASR_APP_ID=
-VOLC_ASR_ACCESS_TOKEN=
-VOLC_ASR_CLUSTER=volcengine_streaming_common
-# (或非流式 endpoint,见火山引擎 ASR 文档)
+# 火山 MediaKit(server-side 抽帧 + 抽音 + 转写,2026-05-23 founder 决定路径)
+# Endpoint base: https://mediakit.cn-beijing.volces.com/api/v1/tools/
+# Auth: Authorization: Bearer <VOLC_MEDIAKIT_AK>
+# 公开 docs 缺;开通 / 申请方式 founder 内部渠道
+VOLC_MEDIAKIT_AK=
 ```
 
 ### 3.4 PII 不写入 events
@@ -189,11 +223,12 @@ VOLC_ASR_CLUSTER=volcengine_streaming_common
 ## 5. Upstream dep / Blocker
 
 - ✅ `ARK_API_KEY`(已配)
-- ⏳ **founder 申请 `VOLC_ASR_APP_ID` + `VOLC_ASR_ACCESS_TOKEN`**:这是火山 ASR 独立 product,不在 ARK 范围内 — founder 需要在火山引擎控制台 https://console.volcengine.com/asr 创建 app + 拿 access token
+- ⏳ **founder 给长期 `VOLC_MEDIAKIT_AK`**:`AKLT...` 形态;2026-05-23 提供的临时测试 key 已用于本 brief 设计验证,**不要** 落进 git。Codex sub-phase A 起跑前需要长期 key 才能跑真实 staging。
 - ⏳ founder 确认 `DOUBAO_VISION_MODEL` 在你 ARK 账户已开通(多模态推理点可能与 text 不同)
-- ✅ `docs/TOPRADOR_SCHEMA.md v1.0`(已 stable)
+- ⏳ MediaKit `/tools/extract-frames` + `/tools/transcribe` endpoint path 仅为 PM 推测;Codex sub-phase A 第一步必须 probe 真实 API 落 schema(per sub-phase A §"Pre-execution 待 founder 给 PM 确认 / 提供" §2-§3)
+- ✅ `docs/TOPRADOR_SCHEMA.md v1.0`(已 stable;MediaKit 真实 schema 探测后,adapter 兜底补齐)
 
-**Sub-phase A 起跑前 founder 必须先配 VOLC_ASR_* 三件**,否则 ASR client 启动即抛 RuntimeError。Sub-phase B/C 只需 ARK key 已有就行。
+**Sub-phase A 起跑前 founder 必须先给长期 `VOLC_MEDIAKIT_AK`**,否则 staging probe 跑不通。Sub-phase B/C 只需 ARK key 已有就行。
 
 ---
 
