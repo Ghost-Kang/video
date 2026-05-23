@@ -276,15 +276,16 @@
 ## 5. Upstream dep / Blocker
 
 - ✅ `ARK_API_KEY`(已配,P4-1 已使用)
-- ✅ `VOLC_MEDIAKIT_AK`(founder W3D3 已申请;临时 AKLT* 已用于本 brief 写作的 probe;长期 key 待发放,或临时 key 长期有效待确认)
-- ⏳ **toprador URL resolver 接续方式**(founder W3D3 决定保留模块,但接续协议待:独立 endpoint / 嵌入 lib / 微服务三选一)— 这是 sub-phase 0 阻塞
+- ✅ `VOLC_MEDIAKIT_AK`(**2026-05-23 23:40 PDT founder 提供长期 key**;本地写 `backend/.env`(gitignored),验证 auth + extract-audio task 提交 + polling 全 OK)
+- ⏳ **toprador URL resolver 接续方式**(founder W3D3 决定保留模块;接续协议未定 —— passthrough stub 默认让 Cascade 直接传 .mp4 URL 给 MediaKit 即可;Phase 1 concierge first-run 可让 creator 自己给直链 .mp4 OR 等 W5+ toprador resolver wire)
 - ✅ MediaKit 3 个 API 文档已就位(本 brief §2 嵌入完整契约)
+- ✅ **视频理解 Chat API 双 key 拼接确认**:`Authorization: Bearer <ARK_API_KEY>/<VOLC_MEDIAKIT_AK>`(founder 2026-05-23 确认 amk+ark 组合)
 
-**Sub-phase 0 起跑前 founder 必须给**:
-1. 长期可用 `VOLC_MEDIAKIT_AK`
-2. toprador URL resolver 接续协议(`POST /api/resolve-url` endpoint? 还是 python module import?)
+**Sub-phase 0/A/B/C/D/E 全部 shipped**(见 §3.5)— P5-3 实际工时 ~1d(Codex 极快 + Claude prompt 并发)。
 
-其他 sub-phase A/B/C/D/E 可在 0 完成后顺序执行,不再需要 founder 介入。
+**仅 toprador URL resolver 接续待**(可选 — Phase 1 不依赖):
+- 当前 `TOPRADOR_RESOLVER_MODE=passthrough`(默认)
+- 若 founder W5+ 决定接 toprador resolver,加 env `TOPRADOR_RESOLVER_MODE=toprador_http` 或 `toprador_pyimport` 后写实现即可,**无需改 P5-3 任何已 ship 代码**
 
 ---
 

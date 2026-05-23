@@ -70,7 +70,8 @@ Same as W1/W2/W3 (see `PM_W1_allocation.md §0`). One owner, one done-signal, on
 | **P4-6 Toprador cache 跨进程持久化** | `handoff/codex_backend_P4-6.md` ✅(W3D3 新加)| shipped `6d202b7`:SQLite `toprador_cache` 持久化层;P4-3 emit hooks 保留;5 unit tests 覆盖 save/load/expire/重启/隔离 | P3-7 + P4-3 | ✅ done |
 | **P4-7 events 表 retention 策略** | `handoff/codex_backend_P4-7.md` ✅(W3D3 新加)| shipped `fa9b66c`:`retention_sweep()` + CLI `scripts/retention_sweep.py`;3 类事件分级保留(永久/180d/90d);4 unit tests | P4-4 索引(done) | ✅ done |
 | **P4-8 cost_guard 校准报告** | `handoff/codex_backend_P4-8.md` ✅(W3D3 新加)| shipped `2d971b4`:`scripts/cost_calibration.py` 产 markdown 报告对比 PREDICT vs p50/p95/max 实际值;baseline 报告已落地 | P4-2 + generation_cost events | ✅ done(samples_count=0,等真实流量) |
-| **P4-9 Toprador 真实端到端 staging** | `handoff/codex_backend_P4-9.md` ✅(blocked brief)| `scripts/p4-9_toprador_staging.py` 已准备;真实 staging 报告需 `TOPRADOR_ENDPOINT` + `TOPRADOR_API_KEY` + 2 条 founder 新 URL 后生成 | Toprador endpoint/key | ⏳ blocked on founder env |
+| **P4-9 Toprador 真实端到端 staging** | `handoff/codex_backend_P4-9.md` ⛔ SUPERSEDED | `scripts/p4-9_toprador_staging.py` 保留作 historical reference;**P5-3 MediaKit 重写取代 toprador 分析层**(per founder W3D3) | n/a | ⛔ dormant |
+| **P5-3 MediaKit 视频分析(toprador 替代)** | `handoff/codex_backend_P5-3.md` ✅(W3D3 重写 7.5d → 3d) | 5/5 sub-phase shipped:`d3e6e3d`(0 resolver)+ `088f1d9`(A client)+ `28dbadf`(B adapter)+ `5392ecb`+`222fdb5`+`358d821`(C overlay+prompt)+ `b36682d`(D wire)+ default switch(`.env.example` `CASCADE_UPSTREAM=mediakit`)。45 mediakit tests pass;auth 已验证长期 AK 可用(2026-05-23 23:43 PDT)| MediaKit 长期 AK + ARK key | ✅ done |
 
 ### 3.3 Cursor — deprecated(no W4 allocation)
 
