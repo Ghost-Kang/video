@@ -1,0 +1,1387 @@
+{
+  "timestamp": "2026-05-23T05:41:23Z",
+  "mode": "llm",
+  "model": "doubao-seed-1-6-250615",
+  "prompt_version_hash": "25a25b26528230e1",
+  "niches": [
+    {
+      "niche": "baomam_fushi",
+      "cases": [
+        {
+          "source_url": "https://www.douyin.com/video/7385782607067335962",
+          "niche": "baomam_fushi",
+          "rewrite_id": "rw_5f4dcc3b5aa765d6",
+          "hook_pattern_id": "H1+H2",
+          "source_classification": "positive",
+          "source_title": "来看看12龄宝宝一周辅食不重样 都吃了些什么😋",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=323",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.90",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": false,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.17 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": false,
+              "detail": "rewrite mixes categories ['staple', 'vegetable'] (source ambiguous)",
+              "mandatory": true
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": true,
+              "detail": "shot 1 hits ['H1', 'H2'] (required any of ['H1', 'H2'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": true,
+              "detail": "3 distinct hooks: ['H1', 'H2', 'H9']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H4'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "n/a (not jiating_chufang)",
+              "mandatory": false
+            }
+          ],
+          "mechanical_pass": false,
+          "llm_judge": {
+            "kept_formula": "yes",
+            "kept_formula_reason": "保留H1+H2结构，含一周辅食不重样及互动",
+            "realism_1to5": 5,
+            "realism_reason": "食材处理、制作步骤及宝宝进食场景真实合理",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0148
+        },
+        {
+          "source_url": "https://www.douyin.com/video/7616954826602428411",
+          "niche": "baomam_fushi",
+          "rewrite_id": "rw_5f4dcc3b5aa765d6",
+          "hook_pattern_id": "H5+H7",
+          "source_classification": "positive",
+          "source_title": "添加辅食 #宝宝辅食 #厨房小白 #只有宝妈才懂吧",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=349",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.90",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": false,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.17 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": true,
+              "detail": "single category: ['vegetable']",
+              "mandatory": true
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": true,
+              "detail": "shot 1 hits ['H1', 'H2'] (required any of ['H1', 'H2'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": true,
+              "detail": "2 distinct hooks: ['H1', 'H2']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H4'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "n/a (not jiating_chufang)",
+              "mandatory": false
+            }
+          ],
+          "mechanical_pass": true,
+          "llm_judge": {
+            "kept_formula": "yes",
+            "kept_formula_reason": "保留H5痛点+H7成果结构及添加辅食主题",
+            "realism_1to5": 5,
+            "realism_reason": "具体月龄、做法及宝宝反应细节真实可信",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0152
+        },
+        {
+          "source_url": "https://www.douyin.com/video/7597405987096756090",
+          "niche": "baomam_fushi",
+          "rewrite_id": "rw_5f4dcc3b5aa765d6",
+          "hook_pattern_id": "H1+H2+H3",
+          "source_classification": "positive",
+          "source_title": "分享一岁宝宝一周辅食不重样,每天都是新口味,做法简单好吃又营养!",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=371",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.90",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": true,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.14 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": true,
+              "detail": "single category: ['vegetable']",
+              "mandatory": true
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": true,
+              "detail": "shot 1 hits ['H1', 'H2'] (required any of ['H1', 'H2'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": true,
+              "detail": "2 distinct hooks: ['H1', 'H2']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H4'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "n/a (not jiating_chufang)",
+              "mandatory": false
+            }
+          ],
+          "mechanical_pass": true,
+          "llm_judge": {
+            "kept_formula": "yes",
+            "kept_formula_reason": "保留H1+H2+H3钩子组合及一周辅食不重样核心",
+            "realism_1to5": 5,
+            "realism_reason": "家庭厨房场景及宝宝挑食、进食细节真实自然",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0151
+        },
+        {
+          "source_url": "https://www.douyin.com/video/7636273648585173748",
+          "niche": "baomam_fushi",
+          "rewrite_id": "rw_5f8d2a7b3c9e1d4f",
+          "hook_pattern_id": "H1+H2+H3+H5",
+          "source_classification": "positive",
+          "source_title": "一岁宝宝一周辅食不重样!有肉有菜!辅食助力,个子蹭蹭涨!问我拿食谱噢!",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=325",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.90",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": true,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.19 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": false,
+              "detail": "rewrite adds categories ['vegetable'] not in source ['protein']",
+              "mandatory": true
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": true,
+              "detail": "shot 1 hits ['H1', 'H2'] (required any of ['H1', 'H2'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": true,
+              "detail": "3 distinct hooks: ['H1', 'H2', 'H5']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H4'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "n/a (not jiating_chufang)",
+              "mandatory": false
+            }
+          ],
+          "mechanical_pass": false,
+          "llm_judge": {
+            "kept_formula": "yes",
+            "kept_formula_reason": "保留原H1+H2+H3+H5钩子组合",
+            "realism_1to5": 5,
+            "realism_reason": "场景和喂辅食过程贴近真实家庭生活",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0153
+        },
+        {
+          "source_url": "https://www.douyin.com/video/7621007462442939770",
+          "niche": "baomam_fushi",
+          "rewrite_id": "rw_5f4dcc3b5aa765d6",
+          "hook_pattern_id": "H1",
+          "source_classification": "positive",
+          "source_title": "六月龄宝宝辅食添加的顺序",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=331",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.90",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": true,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.22 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": true,
+              "detail": "single category: ['vegetable']",
+              "mandatory": true
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": true,
+              "detail": "shot 1 hits ['H1', 'H2'] (required any of ['H1', 'H2'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": true,
+              "detail": "2 distinct hooks: ['H1', 'H2']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H4'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "n/a (not jiating_chufang)",
+              "mandatory": false
+            }
+          ],
+          "mechanical_pass": true,
+          "llm_judge": {
+            "kept_formula": "yes",
+            "kept_formula_reason": "保留H1月龄锚定+问题解决，补充数字清单",
+            "realism_1to5": 5,
+            "realism_reason": "厨房操作、宝宝互动细节符合真实场景",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0148
+        }
+      ],
+      "mechanical_pass_rate": 0.6,
+      "judge_realism_avg": 5.0,
+      "judge_kept_formula_yes_rate": 1.0,
+      "judge_ad_risk_count": 0,
+      "founder_pass_rate": 0.0
+    },
+    {
+      "niche": "yuer_richang",
+      "cases": [
+        {
+          "source_url": "https://www.douyin.com/video/7466377349529881856",
+          "niche": "yuer_richang",
+          "rewrite_id": "rw_5f4e3d2c1b0a9876",
+          "hook_pattern_id": "",
+          "source_classification": "negative_ref",
+          "source_title": "新手妈妈带娃日记",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=247",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_in_range",
+              "passed": true,
+              "detail": "conf=0.55 (negative_ref cap)",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": true,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.22 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": true,
+              "detail": "n/a (not baomam_fushi)",
+              "mandatory": false
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": false,
+              "detail": "shot 1 hits ∅ (required any of ['H8'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": false,
+              "detail": "1 distinct hooks: ['H4']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H2'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "n/a (not jiating_chufang)",
+              "mandatory": false
+            }
+          ],
+          "mechanical_pass": false,
+          "llm_judge": {
+            "kept_formula": "yes",
+            "kept_formula_reason": "保留原新手妈妈带娃日记核心及情绪弧",
+            "realism_1to5": 5,
+            "realism_reason": "凌晨带娃、孩子安慰妈妈等场景真实可信",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0135
+        },
+        {
+          "source_url": "https://www.douyin.com/video/7029849085913943329",
+          "niche": "yuer_richang",
+          "rewrite_id": "rw_5f4dcc3b5aa765d6",
+          "hook_pattern_id": "H7+H5",
+          "source_classification": "positive",
+          "source_title": "当孩子读的书,比我烧过的菜还多,宠娃除了厨艺配锅铲,还嘚请台神灯",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=306",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.90",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": true,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.16 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": true,
+              "detail": "n/a (not baomam_fushi)",
+              "mandatory": false
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": false,
+              "detail": "shot 1 hits ∅ (required any of ['H8'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": true,
+              "detail": "2 distinct hooks: ['H4', 'H8']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H2'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "n/a (not jiating_chufang)",
+              "mandatory": false
+            }
+          ],
+          "mechanical_pass": false,
+          "llm_judge": {
+            "kept_formula": "partial",
+            "kept_formula_reason": "原H7+H5改为H8+H5+H7，部分保留",
+            "realism_1to5": 5,
+            "realism_reason": "深夜哄睡、踢被子等细节符合真实育儿场景",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0141
+        },
+        {
+          "source_url": "https://www.douyin.com/video/7496042444683021619",
+          "niche": "yuer_richang",
+          "rewrite_id": "rw_5f4d7a8b9c2e3f1a",
+          "hook_pattern_id": "H6",
+          "source_classification": "positive",
+          "source_title": "记录妍妍肉肉放学后的vlog #带娃日常 #我的带娃日常 #记录生活",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=402",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.90",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": true,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.25 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": true,
+              "detail": "n/a (not baomam_fushi)",
+              "mandatory": false
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": true,
+              "detail": "shot 1 hits ['H8'] (required any of ['H8'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": true,
+              "detail": "4 distinct hooks: ['H4', 'H6', 'H7', 'H8']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H2'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "n/a (not jiating_chufang)",
+              "mandatory": false
+            }
+          ],
+          "mechanical_pass": true,
+          "llm_judge": {
+            "kept_formula": "partial",
+            "kept_formula_reason": "保留H6钩子，新增H8钩子，未完全保留原公式",
+            "realism_1to5": 5,
+            "realism_reason": "场景细节真实，符合妈妈睡前带娃日常",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.015
+        },
+        {
+          "source_url": "https://www.douyin.com/video/7551614334665755919",
+          "niche": "yuer_richang",
+          "rewrite_id": "rw_5f4dcc3b5aa765d6",
+          "hook_pattern_id": "H4",
+          "source_classification": "positive",
+          "source_title": "刷短视频是怎么让大脑变笨的",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=234",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.90",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": false,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.14 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": true,
+              "detail": "n/a (not baomam_fushi)",
+              "mandatory": false
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": false,
+              "detail": "shot 1 hits ∅ (required any of ['H8'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": true,
+              "detail": "2 distinct hooks: ['H4', 'H8']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H2'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "n/a (not jiating_chufang)",
+              "mandatory": false
+            }
+          ],
+          "mechanical_pass": false,
+          "llm_judge": {
+            "kept_formula": "no",
+            "kept_formula_reason": "改写内容与源公式“H4·刷短视频”无关",
+            "realism_1to5": 5,
+            "realism_reason": "育儿哄睡场景贴近日常，细节真实",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0136
+        },
+        {
+          "source_url": "https://www.douyin.com/video/7610100974662207717",
+          "niche": "yuer_richang",
+          "rewrite_id": "rw_5f4dcc3b5aa7479c",
+          "hook_pattern_id": "H8",
+          "source_classification": "positive",
+          "source_title": "当妈以后才发现 最累的不是熬夜带娃 而是没人理解你的委屈",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=261",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=5",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.88",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": false,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.19 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": true,
+              "detail": "n/a (not baomam_fushi)",
+              "mandatory": false
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": false,
+              "detail": "shot 1 hits ∅ (required any of ['H8'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": true,
+              "detail": "2 distinct hooks: ['H4', 'H8']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H2'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "n/a (not jiating_chufang)",
+              "mandatory": false
+            }
+          ],
+          "mechanical_pass": false,
+          "llm_judge": {
+            "kept_formula": "yes",
+            "kept_formula_reason": "保留了“当妈后最累非熬夜而是委屈”的核心公式",
+            "realism_1to5": 5,
+            "realism_reason": "场景符合真实育儿日常,情感自然",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0142
+        }
+      ],
+      "mechanical_pass_rate": 0.2,
+      "judge_realism_avg": 5.0,
+      "judge_kept_formula_yes_rate": 0.4,
+      "judge_ad_risk_count": 0,
+      "founder_pass_rate": 0.0
+    },
+    {
+      "niche": "jiating_chufang",
+      "cases": [
+        {
+          "source_url": "https://www.douyin.com/video/6664336625771744520",
+          "niche": "jiating_chufang",
+          "rewrite_id": "rw_5f4dcc3b5aa765d6",
+          "hook_pattern_id": "H4",
+          "source_classification": "positive",
+          "source_title": "",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=442",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.90",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": true,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.24 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": true,
+              "detail": "n/a (not baomam_fushi)",
+              "mandatory": false
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": true,
+              "detail": "shot 1 hits ['H4'] (required any of ['H4', 'H9'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": false,
+              "detail": "1 distinct hooks: ['H4']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H8'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "shot 1 has dish '排骨'",
+              "mandatory": true
+            }
+          ],
+          "mechanical_pass": true,
+          "llm_judge": {
+            "kept_formula": "yes",
+            "kept_formula_reason": "保留低成本复刻餐厅菜公式，加入H4和H9元素",
+            "realism_1to5": 5,
+            "realism_reason": "家庭厨房场景及烹饪步骤符合实际操作",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0153
+        },
+        {
+          "source_url": "https://www.douyin.com/video/7429237817613520140",
+          "niche": "jiating_chufang",
+          "rewrite_id": "rw_5f4dcc3b5aa765d6",
+          "hook_pattern_id": "H5",
+          "source_classification": "positive",
+          "source_title": "看马爷做河间包肉,实在痛快",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=356",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.88",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": true,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.09 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": true,
+              "detail": "n/a (not baomam_fushi)",
+              "mandatory": false
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": true,
+              "detail": "shot 1 hits ['H4'] (required any of ['H4', 'H9'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": false,
+              "detail": "1 distinct hooks: ['H4']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H8'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "shot 1 has dish '包肉'",
+              "mandatory": true
+            }
+          ],
+          "mechanical_pass": true,
+          "llm_judge": {
+            "kept_formula": "yes",
+            "kept_formula_reason": "保留H5结构，替换场景并加入H4、H9",
+            "realism_1to5": 5,
+            "realism_reason": "家庭厨房场景及烹饪步骤符合现实",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0146
+        },
+        {
+          "source_url": "https://www.douyin.com/video/6843033067318185223",
+          "niche": "jiating_chufang",
+          "rewrite_id": "rw_5f4dcc3b5aa765d6",
+          "hook_pattern_id": "H7",
+          "source_classification": "positive",
+          "source_title": "三叔盘出家常菜红烧肉,再忙也要好好吃饭",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=515",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.90",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": true,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.20 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": true,
+              "detail": "n/a (not baomam_fushi)",
+              "mandatory": false
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": true,
+              "detail": "shot 1 hits ['H4'] (required any of ['H4', 'H9'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": true,
+              "detail": "3 distinct hooks: ['H3', 'H4', 'H9']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H8'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "shot 1 has dish '红烧肉'",
+              "mandatory": true
+            }
+          ],
+          "mechanical_pass": true,
+          "llm_judge": {
+            "kept_formula": "yes",
+            "kept_formula_reason": "保留H7家庭温情内核，结构符合",
+            "realism_1to5": 5,
+            "realism_reason": "家庭厨房场景及操作符合日常真实情况",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0158
+        },
+        {
+          "source_url": "https://www.douyin.com/video/7296430710208941322",
+          "niche": "jiating_chufang",
+          "rewrite_id": "rw_5f4dcc3b5aa765d6",
+          "hook_pattern_id": "H5",
+          "source_classification": "edge_case",
+          "source_title": "二伯快乐油升级版!梅广明师傅亲自调味制定配方",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=468",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.72",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": true,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.16 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": true,
+              "detail": "n/a (not baomam_fushi)",
+              "mandatory": false
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": true,
+              "detail": "shot 1 hits ['H4'] (required any of ['H4', 'H9'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": true,
+              "detail": "2 distinct hooks: ['H3', 'H4']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H8'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "shot 1 has dish-anchor pattern",
+              "mandatory": true
+            }
+          ],
+          "mechanical_pass": true,
+          "llm_judge": {
+            "kept_formula": "yes",
+            "kept_formula_reason": "保留餐厅vs家常成本反差及关键步骤",
+            "realism_1to5": 5,
+            "realism_reason": "符合家庭厨房场景和博主阿琳人设",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0158
+        },
+        {
+          "source_url": "https://www.douyin.com/video/7165786165239352607",
+          "niche": "jiating_chufang",
+          "rewrite_id": "rw_5f4dcc3b5aa765d6",
+          "hook_pattern_id": "H7",
+          "source_classification": "positive",
+          "source_title": "老公生日,华华晚上准备海鲜大餐,一家人围着庆祝,最后还有惊喜礼物",
+          "checks": [
+            {
+              "name": "script_length_80_600",
+              "passed": true,
+              "detail": "len=445",
+              "mandatory": false
+            },
+            {
+              "name": "shot_count_3_5",
+              "passed": true,
+              "detail": "count=4",
+              "mandatory": false
+            },
+            {
+              "name": "no_forbidden_terms",
+              "passed": true,
+              "detail": "leaked=[]",
+              "mandatory": false
+            },
+            {
+              "name": "confidence_ge_0_5",
+              "passed": true,
+              "detail": "conf=0.90",
+              "mandatory": false
+            },
+            {
+              "name": "rationale_marker_present",
+              "passed": true,
+              "detail": "checked '保留' + '改' in script",
+              "mandatory": false
+            },
+            {
+              "name": "visual_diversity_score",
+              "passed": true,
+              "detail": "max overlap 0.22 (threshold 0.5)",
+              "mandatory": false
+            },
+            {
+              "name": "nutrient_category_consistency",
+              "passed": true,
+              "detail": "n/a (not baomam_fushi)",
+              "mandatory": false
+            },
+            {
+              "name": "hook_p0_compliance",
+              "passed": true,
+              "detail": "shot 1 hits ['H4'] (required any of ['H4', 'H9'])",
+              "mandatory": true
+            },
+            {
+              "name": "hook_diversity",
+              "passed": true,
+              "detail": "3 distinct hooks: ['H3', 'H4', 'H7']",
+              "mandatory": false
+            },
+            {
+              "name": "negative_hook_absence",
+              "passed": true,
+              "detail": "no forbidden hooks (['H8'])",
+              "mandatory": false
+            },
+            {
+              "name": "dish_anchor_present",
+              "passed": true,
+              "detail": "shot 1 has dish-anchor pattern",
+              "mandatory": true
+            }
+          ],
+          "mechanical_pass": true,
+          "llm_judge": {
+            "kept_formula": "partial",
+            "kept_formula_reason": "保留H7家庭温情及生日庆祝，缺惊喜礼物",
+            "realism_1to5": 5,
+            "realism_reason": "家常烹饪步骤合理，家庭场景自然真实",
+            "ad_risk": "no",
+            "ad_risk_fragment": "",
+            "skipped": false
+          },
+          "founder_qualitative": "not_reviewed",
+          "cost_cny": 0.0154
+        }
+      ],
+      "mechanical_pass_rate": 1.0,
+      "judge_realism_avg": 5.0,
+      "judge_kept_formula_yes_rate": 0.8,
+      "judge_ad_risk_count": 0,
+      "founder_pass_rate": 0.0
+    }
+  ],
+  "overall_mechanical_pass_rate": 0.6,
+  "overall_judge_realism_avg": 5.0,
+  "overall_judge_ad_risk_count": 0,
+  "delta_from_baseline": {
+    "baseline_timestamp": "2026-05-21T16:32:07Z",
+    "mechanical_pass_rate": -0.4,
+    "judge_realism_avg": 5.0,
+    "judge_ad_risk_count": 0,
+    "per_niche": {
+      "baomam_fushi": {
+        "mechanical_pass_rate": -0.4,
+        "judge_realism_avg": 5.0,
+        "judge_ad_risk_count": 0,
+        "founder_pass_rate": 0.0
+      },
+      "jiating_chufang": {
+        "mechanical_pass_rate": 0.0,
+        "judge_realism_avg": 5.0,
+        "judge_ad_risk_count": 0,
+        "founder_pass_rate": 0.0
+      },
+      "yuer_richang": {
+        "mechanical_pass_rate": -0.8,
+        "judge_realism_avg": 5.0,
+        "judge_ad_risk_count": 0,
+        "founder_pass_rate": 0.0
+      }
+    }
+  }
+}
