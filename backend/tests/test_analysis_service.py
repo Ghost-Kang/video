@@ -101,7 +101,7 @@ def test_analysis_returned_includes_minor_audit(monkeypatch: pytest.MonkeyPatch,
     raw = json.loads((SYNTH / "jiating_chufang" / "001.json").read_text(encoding="utf-8"))
     raw["scenes"][0]["visual_content"] = "宝宝坐在厨房地垫上看镜头"
 
-    async def loader(source_url: str) -> dict:
+    async def loader(source_url: str, **_kwargs) -> dict:
         return dict(raw)
 
     monkeypatch.setattr("agent.cascade.analysis_service._load_upstream_payload", loader)
@@ -117,7 +117,7 @@ def test_hard_failure_records_failure_event(
 ) -> None:
     db_path = _use_tmp_db(monkeypatch, tmp_path)
 
-    async def corrupted_fixture(source_url: str) -> dict:
+    async def corrupted_fixture(source_url: str, **_kwargs) -> dict:
         return json.loads((SYNTH / "edge_no_formula.json").read_text(encoding="utf-8"))
 
     monkeypatch.setattr("agent.cascade.analysis_service._load_upstream_payload", corrupted_fixture)
@@ -161,7 +161,7 @@ def test_concurrent_same_url_emits_once(monkeypatch: pytest.MonkeyPatch, tmp_pat
         ready = asyncio.Event()
         calls = 0
 
-        async def loader(source_url: str) -> dict:
+        async def loader(source_url: str, **_kwargs) -> dict:
             nonlocal calls
             calls += 1
             if calls == 2:

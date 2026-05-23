@@ -38,6 +38,15 @@ _TOPRADOR_CACHE_TTL_S = 60.0
 _TOPRADOR_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _TOPRADOR_BREAKER = "toprador"
 
+# P4-3 storm-prevention: per-endpoint last cascade_circuit_open emit timestamp.
+# Same endpoint emits at most once per 60s even if many callers hit the open breaker.
+_CIRCUIT_OPEN_EMIT_WINDOW_S = 60.0
+_last_circuit_open_emit: dict[str, float] = {}
+
+
+def _hash_source_url(source_url: str) -> str:
+    return hashlib.sha1(source_url.encode("utf-8")).hexdigest()[:12]
+
 
 async def request_shallow_analysis(
     source_url: str,
@@ -51,7 +60,7 @@ async def request_shallow_analysis(
         return existing
 
     try:
-        raw = await _load_upstream_payload(source_url)
+        raw = await _load_upstream_payload(source_url, user_id=user_id, run_id=run_id)
         raw = copy.deepcopy(raw)
         upstream_latency_ms = int(raw.pop("_upstream_latency_ms", 0) or 0)
         upstream_attempts = int(raw.pop("_upstream_attempts", 0) or 0)
@@ -90,12 +99,17 @@ async def request_shallow_analysis(
     return contract
 
 
-async def _load_upstream_payload(source_url: str) -> dict[str, Any]:
+async def _load_upstream_payload(
+    source_url: str,
+    *,
+    user_id: str,
+    run_id: str | None,
+) -> dict[str, Any]:
     upstream = os.getenv("CASCADE_UPSTREAM", "fixture").strip().lower() or "fixture"
     if upstream == "fixture":
         return _load_fixture(source_url)
     if upstream == "toprador":
-        return await _call_toprador(source_url)
+        return await _call_toprador(source_url, user_id=user_id, run_id=run_id)
     raise ValueError(f"unsupported CASCADE_UPSTREAM: {upstream}")
 
 
@@ -105,21 +119,47 @@ def _load_fixture(source_url: str) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-async def _call_toprador(source_url: str) -> dict[str, Any]:
+async def _call_toprador(
+    source_url: str,
+    *,
+    user_id: str,
+    run_id: str | None,
+) -> dict[str, Any]:
     endpoint = os.getenv("TOPRADOR_ENDPOINT") or config.TOPRADOR_ENDPOINT
     api_key = os.getenv("TOPRADOR_API_KEY") or config.TOPRADOR_API_KEY
     if not endpoint:
         raise HardFailure(FailureCode.S8_UPSTREAM_REFUSED, "toprador_endpoint_missing")
 
+    source_url_hash = _hash_source_url(source_url)
     now = time.monotonic()
     cached = _TOPRADOR_CACHE.get(source_url)
     if cached and cached[0] > now:
+        await emit(
+            "cascade_cache_hit",
+            user_id=user_id,
+            run_id=run_id,
+            payload={
+                "source_url_hash": source_url_hash,
+                "ttl_remaining_s": round(cached[0] - now, 3),
+            },
+        )
         payload = copy.deepcopy(cached[1])
         payload["_upstream_latency_ms"] = 0
         payload["_upstream_attempts"] = 0
         return payload
+    await emit(
+        "cascade_cache_miss",
+        user_id=user_id,
+        run_id=run_id,
+        payload={"source_url_hash": source_url_hash},
+    )
 
-    circuit_breaker.before_call(_TOPRADOR_BREAKER)
+    try:
+        circuit_breaker.before_call(_TOPRADOR_BREAKER)
+    except HardFailure as exc:
+        if exc.debug_detail == "circuit_open":
+            await _emit_circuit_open(endpoint, user_id=user_id, run_id=run_id)
+        raise
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     start = time.monotonic()
     attempts = 0
@@ -127,17 +167,22 @@ async def _call_toprador(source_url: str) -> dict[str, Any]:
     async with httpx.AsyncClient(timeout=30.0) as client:
         for attempt in range(1, 4):
             attempts = attempt
+            attempt_start = time.monotonic()
             try:
                 resp = await client.post(endpoint, json={"url": source_url}, headers=headers)
             except httpx.TimeoutException as exc:
                 last_exc = HardFailure(FailureCode.S7_UPSTREAM_TIMEOUT, str(exc))
                 if attempt < 3:
+                    await _emit_retry(endpoint, attempt, "timeout", attempt_start,
+                                      user_id=user_id, run_id=run_id)
                     await _retry_sleep(attempt)
                     continue
                 raise last_exc from exc
             except httpx.TransportError as exc:
                 last_exc = HardFailure(FailureCode.S8_UPSTREAM_REFUSED, f"transport_error: {exc}")
                 if attempt < 3:
+                    await _emit_retry(endpoint, attempt, "transport_error", attempt_start,
+                                      user_id=user_id, run_id=run_id)
                     await _retry_sleep(attempt)
                     continue
                 circuit_breaker.record_failure(_TOPRADOR_BREAKER)
@@ -149,6 +194,8 @@ async def _call_toprador(source_url: str) -> dict[str, Any]:
                     f"upstream_5xx_{resp.status_code}",
                 )
                 if attempt < 3:
+                    await _emit_retry(endpoint, attempt, f"upstream_5xx_{resp.status_code}",
+                                      attempt_start, user_id=user_id, run_id=run_id)
                     await _retry_sleep(attempt)
                     continue
                 circuit_breaker.record_failure(_TOPRADOR_BREAKER)
@@ -186,6 +233,61 @@ async def _call_toprador(source_url: str) -> dict[str, Any]:
 
 async def _retry_sleep(attempt: int) -> None:
     await asyncio.sleep((2 ** (attempt - 1)) * random.uniform(0.75, 1.25))
+
+
+async def _emit_retry(
+    endpoint: str,
+    attempt: int,
+    reason: str,
+    attempt_start: float,
+    *,
+    user_id: str,
+    run_id: str | None,
+) -> None:
+    await emit(
+        "cascade_retry",
+        user_id=user_id,
+        run_id=run_id,
+        payload={
+            "endpoint": endpoint,
+            "attempt": int(attempt),
+            "reason": reason,
+            "duration_ms": int((time.monotonic() - attempt_start) * 1000),
+        },
+    )
+
+
+async def _emit_circuit_open(
+    endpoint: str,
+    *,
+    user_id: str,
+    run_id: str | None,
+) -> None:
+    """Emit cascade_circuit_open with per-endpoint 60s storm-prevention."""
+    now = time.monotonic()
+    last = _last_circuit_open_emit.get(endpoint)
+    if last is not None and now - last < _CIRCUIT_OPEN_EMIT_WINDOW_S:
+        return
+    _last_circuit_open_emit[endpoint] = now
+    state = circuit_breaker._BREAKERS.get(_TOPRADOR_BREAKER)
+    consecutive_failures = len(state.failures) if state is not None else 0
+    if state is not None and state.opened_at is not None:
+        cooldown_s = max(
+            0.0,
+            state.opened_at + circuit_breaker.COOLDOWN_S - now,
+        )
+    else:
+        cooldown_s = circuit_breaker.COOLDOWN_S
+    await emit(
+        "cascade_circuit_open",
+        user_id=user_id,
+        run_id=run_id,
+        payload={
+            "endpoint": endpoint,
+            "consecutive_failures": consecutive_failures,
+            "cooldown_s": round(cooldown_s, 3),
+        },
+    )
 
 
 def _analysis_id(user_id: str, source_url: str) -> str:

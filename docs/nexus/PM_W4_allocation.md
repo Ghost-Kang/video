@@ -65,7 +65,7 @@ Same as W1/W2/W3 (see `PM_W1_allocation.md §0`). One owner, one done-signal, on
 
 | Ticket | Brief | Done-signal | Upstream dep | 实际状态 |
 |---|---|---|---|---|
-| **P4-3 cascade observability counters** | `handoff/codex_backend_P4-3.md` ✅ | 4 个新 event_type(`cascade_retry/circuit_open/cache_hit/cache_miss`)+ 6 unit tests | P3-7(done) | 📋 Codex 待起跑 |
+| **P4-3 cascade observability counters** | `handoff/codex_backend_P4-3.md` ✅ | 4 个新 event_type(`cascade_retry/circuit_open/cache_hit/cache_miss`)+ 6 unit tests | P3-7(done) | 🔁 **2026-05-23 W3D3 re-routed Codex → Claude**(brief 就位 18h+ 无响应;Claude bandwidth idle 待 P4-1 env;backend 票虽属 Codex lane,但 4-owner allocation rule 优先于 lane defaults — 票不能因 owner silent 永久搁置)|
 | **P4-4 events 表索引优化** | `handoff/codex_backend_P4-4.md` ✅ | shipped `74adbd9`:`idx_events_thread_ts` + `idx_events_type_ts` + migration + test_events_index | none | ✅ done(Codex 提前 ship,W4D0 前完工)|
 
 ### 3.3 Cursor — deprecated(no W4 allocation)

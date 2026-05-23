@@ -22,6 +22,11 @@ ALLOWED_EVENTS: frozenset[str] = frozenset({
     "generation_cost",
     "interview_logged",
     "consent_accepted",
+    # P4-3 cascade observability events (no PII — endpoints/hashes only)
+    "cascade_retry",
+    "cascade_circuit_open",
+    "cascade_cache_hit",
+    "cascade_cache_miss",
 })
 
 _REQUIRED_FIELDS: dict[str, frozenset[str]] = {
@@ -50,6 +55,10 @@ _REQUIRED_FIELDS: dict[str, frozenset[str]] = {
     "generation_cost": frozenset({"run_id", "call_kind", "provider", "model", "cost_fen", "latency_ms", "tokens_in", "tokens_out", "outcome"}),
     "interview_logged": frozenset({"value_statement_match", "would_pay_39", "notes_url", "niche"}),
     "consent_accepted": frozenset({"version", "accepted_at", "documents"}),
+    "cascade_retry": frozenset({"endpoint", "attempt", "reason", "duration_ms"}),
+    "cascade_circuit_open": frozenset({"endpoint", "consecutive_failures", "cooldown_s"}),
+    "cascade_cache_hit": frozenset({"source_url_hash", "ttl_remaining_s"}),
+    "cascade_cache_miss": frozenset({"source_url_hash"}),
 }
 
 _lock = asyncio.Lock()
