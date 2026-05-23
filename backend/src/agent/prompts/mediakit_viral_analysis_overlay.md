@@ -27,32 +27,18 @@
 5. 时间用秒("第 47 秒")或 mm:ss("00:47"),不用 ms,不用浮点 decimal
 6. 若 storyline 没明确某字段(例如无清晰高潮节点)→ 填 `"<n/a — storyline 未呈现>"`,**绝不瞎猜**;字数仍 ≤ 上限
 
-# Hook taxonomy H1-H9 速查(founder 校准,跨 niche 共用)
+# Hook taxonomy H1-H9 速查
 
-| ID | 名称 | 触发关键 |
-|---|---|---|
-| H1 | 月龄 / 阶段 | 数字 + 月龄 / 岁 / 幼儿 / 婴儿 |
-| H2 | 数字清单 | 一周 / N 天 + 数字 + 不重样 / 清单 / N 款 / N 道 |
-| H3 | 蹭蹭涨 / 长高 | 蹭蹭涨 / 长高 / 个子涨 / 教你 / 必收藏 / 先收藏 |
-| H4 | 反常识 / 危机 | 千万别 / 绝对不能 / 复刻 / VS / 对比 / 你以为 / 餐厅 N 我做 |
-| H5 | 师傅 / 长辈视角 | 爷做 / 叔做 / 师傅 / 爸视角 / 爸日记 / vlog N |
-| H6 | 节日 / 季节性 | 过年 / 中秋 / 端午 / 六一 / 开学 / 睡前 / 晨间 / 周末厨房 |
-| H7 | 家庭温情 | 一家人 / 好好吃饭 / 再忙也 / 家的味道 / 妈妈的 / 烟火气 / 围着 |
-| H8 | 情绪共鸣 | 当妈以后 / 才发现 / 没人懂 / 崩溃 / 委屈 / 心累 / 凌晨 N / 半夜 N / 又醒了 / 又哭了 / 第 N 次(P5-1a 扩) |
-| H9 | 反常识小知识 | 为什么 / 不是 / 偏要 / 其实 / 很多人 / 你以为 / 都搞错了 |
+H1=月龄/阶段 · H2=数字清单 · H3=蹭蹭涨/长高 · H4=反常识/危机 · H5=师傅长辈视角 · H6=节日/季节 · H7=家庭温情 · H8=情绪共鸣(扩含 凌晨/又醒了/第N次) · H9=反常识小知识
 
-# Hook + niche 权重(founder 标定,改写流水线已用)
+# Niche P0 hook(只描述源视频实际有什么,不要当目标)
 
-- **baomam_fushi**(宝妈辅食):P0 = H1, H2;P1 = H3, H7
-- **yuer_richang**(育儿日常):P0 = H8;P1 = H7, H4(仅危机类);反面 = H2
-- **jiating_chufang**(家庭厨房):P0 = H4, H9;P1 = H6, H5, H7
-
-源视频 hook 命中可参考 niche 权重做证据加权 — 但**只描述源视频实际有什么**,不要把 niche 权重当目标。
+baomam_fushi=H1+H2 · yuer_richang=H8 · jiating_chufang=H4+H9
 
 # 输入
 
 - `video_url` content part:ARK 视觉模型直接读画面 + 时序(由 client fps/max_frames 控制采样)
-- `{{storyline_context}}`:由 client 把 MediaKit storyline result 的关键字段 JSON 序列化注入(含 source_video_summary / tags / storyline_clips 关键字段);**优先以 storyline 为 evidence,只在 storyline 没说的细节用 video frame 补**
+- Storyline 上下文(下方):由 client 把 MediaKit storyline result 的关键字段 JSON 序列化注入(含 source_video_summary / tags / storyline_clips 关键字段);**优先以 storyline 为 evidence,只在 storyline 没说的细节用 video frame 补**
 
 # Storyline 上下文
 
