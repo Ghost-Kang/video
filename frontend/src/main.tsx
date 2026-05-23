@@ -8,6 +8,7 @@ import { Landing } from "./pages/Landing";
 import { AnchorAnalytics } from "./pages/AnchorAnalytics";
 import { AdminCreators } from "./pages/AdminCreators";
 import { AdminEvents } from "./pages/AdminEvents";
+import { AdminCost } from "./pages/AdminCost";
 import { LegalDoc } from "./pages/LegalDoc";
 
 function newSessionId() {
@@ -58,6 +59,7 @@ function AppRoutes() {
       <Route path="/analytics/anchors" element={<AnchorAnalytics />} />
       <Route path="/admin/creators" element={<AdminCreators />} />
       <Route path="/admin/events" element={<AdminEvents />} />
+      <Route path="/admin/cost" element={<AdminCost />} />
 
       {/* Authed routes (upstream 66758bd: WS auth + multi-user isolation) */}
       <Route
