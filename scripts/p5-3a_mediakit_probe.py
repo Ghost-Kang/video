@@ -41,11 +41,17 @@ from dotenv import load_dotenv
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(REPO_ROOT / ".env")
+load_dotenv(REPO_ROOT / "backend" / ".env")
 
 MEDIAKIT_BASE = "https://mediakit.cn-beijing.volces.com/api/v1/tools"
 MEDIAKIT_ROOT = "https://mediakit.cn-beijing.volces.com/api/v1"
 # Confirmed working (returns 200 + task_id): extract-audio
 # Confirmed 404 (tool not found): extract-frames, transcribe
+CONFIRMED_PROBE_TOOLS = (
+    "extract-audio",
+    "extract-frames",
+    "transcribe",
+)
 # Candidates to try for frame extraction:
 FRAME_CANDIDATES = (
     "keyframes",
@@ -88,6 +94,11 @@ def main() -> int:
         default=DEFAULT_TIMEOUT_S,
         help=f"Per-endpoint timeout (default {DEFAULT_TIMEOUT_S})",
     )
+    parser.add_argument(
+        "--include-candidates",
+        action="store_true",
+        help="Also probe slug candidates that previously failed; default probes only the 3 canonical P5-3a tools.",
+    )
     args = parser.parse_args()
 
     ak = os.getenv("VOLC_MEDIAKIT_AK", "").strip()
@@ -126,9 +137,14 @@ def main() -> int:
         "Authorization": f"Bearer {ak}",
     }
     payload = {"video_url": args.video_url}
+    tools = list(CONFIRMED_PROBE_TOOLS)
+    if args.include_candidates:
+        tools.extend(FRAME_CANDIDATES)
+        tools.extend(TRANSCRIBE_CANDIDATES)
+    tools = list(dict.fromkeys(tools))
 
     with httpx.Client(timeout=args.timeout_s) as client:
-        for tool in TOOLS:
+        for tool in tools:
             url = f"{MEDIAKIT_BASE}/{tool}"
             sections.append(f"## /{tool}")
             sections.append("")

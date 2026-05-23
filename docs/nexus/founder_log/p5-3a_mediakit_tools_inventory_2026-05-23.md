@@ -1,8 +1,8 @@
 # P5-3a 火山 MediaKit tools inventory — 2026-05-23 W3D3
 
-**Source**: founder 截图 from 火山控制台 amk(2026-05-23 W3D3 晚)+ PM probe 40 候选 slug 全 fail
-**Purpose**: list the **canonical tool slugs** Codex sub-phase A needs;blocked on founder filling §"endpoint slug" column from console API docs
-**Status**: ⛔ **BLOCKED · 待 founder 在控制台点进每 tool 看接口文档拿 slug**
+**Source**: founder 截图 from 火山控制台 amk(2026-05-23 W3D3 晚)+ PM probe 40 候选 slug 全 fail + **founder W3D3 提供 3 份完整 API 文档(场景切分 / 剧情故事线分析 / 视频理解 Chat API)**
+**Purpose**: list the **canonical tool slugs** Codex sub-phase A needs;~~blocked~~ → **RESOLVED for 3 critical slugs**
+**Status**: ✅ **RESOLVED for critical 3 slugs**(场景切分 / 剧情故事线 / 视频理解);其他工具(字幕擦除 / 视频抠图 / 高光集锦等)非 Cascade Phase 1 必需,后期按需查
 
 ---
 

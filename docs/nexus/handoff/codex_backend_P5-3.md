@@ -1,281 +1,290 @@
-# Codex handoff — P5-3 Doubao-lite 视频分析(替代 toprador 分析层)
+# Codex handoff — P5-3 MediaKit-driven 视频分析(替代 toprador 分析层)
 
 **Owner**: Codex session (backend)
-**Status**: ⛔ **BLOCKED · awaiting founder MediaKit tools 完整列表 + URL resolver 接续路径**(见 §0.1)
-**Time budget**: ~6-8 工作日(待 §0.1 解锁后给出精确值;5 sub-phase 仍是骨架)
-**Allocation**: PM_W5_allocation.md §3.2(本 brief 写于 W3D3 晚,起跑时机待 §0.1 解锁后定)
-**Partial-supersede**: `handoff/codex_backend_P4-9.md`(Toprador staging)— 分析层 deprecated;但 toprador 的 **页面 URL → 直接媒体 URL resolver 模块保留**(见 §0.1.3)
-**Founder decision (2026-05-23 W3D3)**: "toprador 路径 = PM 开 P5-3 Doubao-lite 重写(推荐)" + "老 toprador 有 URL resolver 这块逻辑,保留该模块"
+**Status**: ✅ **READY** (post 2026-05-23 W3D3 大重写;founder 提供 3 份完整 MediaKit API 文档后)
+**Time budget**: **~3 工作日**(从原 7.5d 砍掉 ~60% — `analyze-video-storyline` 一 API 直接覆盖 scenes + dialogue + visual + score 四件套)
+**Allocation**: PM_W5_allocation.md §3.2(W4D7 → W5D1 起跑)
+**Partial-supersede**: `handoff/codex_backend_P4-9.md`(Toprador staging)— 分析层 deprecated;**老 toprador 的"页面 URL → 直接媒体 URL resolver 模块保留**(per Founder W3D3 决定)
+**Sources of truth(API 文档,founder W3D3 提供)**:
+1. **场景切分** API(`POST /api/v1/tools/segment-scenes`)— 异步,task_id 模式;返回 `result.segments[].{start_time, end_time, segment_video_url}`
+2. **剧情故事线分析** API(`POST /api/v1/tools/analyze-video-storyline`)— **战略 jackpot**:一次调用拿到 clip_title / clip_summary(画面)/ clip_dialogue(口播)/ clip_score / clip_snapshot_url + source_video_summary + storyline_highlights
+3. **视频理解 Chat API**(`POST https://amk-ark.cn-beijing.volces.com/api/v1/chat/completions`)— ARK Chat 兼容;**Authorization 两 key 斜杠拼接**:`Bearer <ARK_API_KEY>/<VOLC_MEDIAKIT_AK>`;支持 5GB URL 视频,自由 prompt + fps/max_frames/max_pixels 控帧
 
 ---
 
-## 0.1 ⛔ BLOCKED 状态 / 3 个待 founder 返回的 unknown(2026-05-23 W3D3 23:00 PDT 加)
+## 0. 关键架构转向(post W3D3)
 
-PM 已用 founder 提供的 MediaKit AK 跑 probe(`founder_log/p5-3a_mediakit_schemas_20260523T143852Z.md`),发现 3 个 critical 现实和原 brief 假设不符:
+原 brief(`3392938` + `528525f` + `d155b23`)基于 3 个错假设,全废:
+- ❌ 假设 MediaKit 有"完整 3-tool 套" extract-audio + extract-frames + transcribe
+- ❌ 假设需要自建 Doubao Vision + Doubao text LLM 聚合 4 步流水线
+- ❌ 假设 MediaKit 工时 7.5d
 
-### 0.1.1 MediaKit 实际只有 `extract-audio`,**extract-frames + transcribe 不存在**
+实际(根据 founder 提供的 3 份完整文档):
+- ✅ **`analyze-video-storyline` 一 API 一站式覆盖 P5-3 sub-phase A+B+C 的 80%**
+- ✅ `segment-scenes` 仅用于场景物理切分(若 storyline 已含 clip_start_time/end_time 则可不用)
+- ✅ ARK 视频理解 Chat API 仅用于补 viral_analysis 中 storyline 没明确字段对应的 hook / pacing / climax / emotional_arc
+- ✅ 不需要 ffmpeg / 不需要 ASR / 不需要 Vision 单独调用
 
-probe 实测:`POST /tools/extract-frames` 和 `POST /tools/transcribe` 都返回 `tool(<name>) not found`。MediaKit 用 `/api/v1/tools/<X>` 路由模式,任何未注册 tool 名一律 200 + success:false + error.code=InvalidParameter。
-
-**待 founder 给**:**完整 MediaKit tools 列表**(去火山控制台 MediaKit 产品页或客服查)。在这之前,PM **不要猜 endpoint 名**;只有 extract-audio 确认存在。
-
-可能候选(待证):keyframes / snapshot / screenshot / extract-keyframes / video-frames / asr / speech-to-text / stt / extract-text / audio-to-text。
-
-### 0.1.2 frame 抽取 + ASR 路径未定
-
-如果 MediaKit 真没有这两类工具,P5-3 sub-phase A 要分裂:
-- **frame 抽取**:Doubao Vision 直调 video URL(部分模型支持)/ ffmpeg 本地 / 其他 fallback
-- **ASR**:火山 ASR 独立 product(原 brief 假设)/ 第三方 / 不做(纯靠 frame 推测口播,质量差)
-
-**待 founder 决定**:见 §0.1.1 答案返回后由 PM 在重写时定。
-
-### 0.1.3 MediaKit **不能消费 Douyin / 小红书页面 URL** — 需要 URL resolver
-
-probe 实测:把 Douyin 视频 URL(`https://www.douyin.com/video/...`)喂 extract-audio,task 状态 `failed`,error 显示 MediaKit 内部 `ffprobe` 读到空 JSON — 因为 MediaKit 把 URL 当 HTTP 资源下载,拿到 Douyin 页面 HTML,不是 .mp4。
-
-**结论**:MediaKit 要 **直接媒体 URL**(.mp4 / .mov),不是页面 URL。
-
-**Founder W3D3 决定**:"老 toprador 有 URL resolver 这块逻辑,保留该模块(不丢)" — 即 toprador 的"页面 URL → 直接 .mp4 URL"模块**保留**;P5-3 只替换分析层(viral_analysis / scenes),URL resolver 仍是 toprador 提供。
-
-**待 founder 给**:toprador URL resolver 的接续方式 — 三选一:
-- (a) toprador 一个独立 endpoint(例如 `POST /api/v1/resolve-url`),P5-3 调它拿 .mp4 URL
-- (b) toprador 内嵌在 P5-3 流水线里,Codex 直接 import 老 toprador 的 resolver 代码
-- (c) 把 resolver 抽成独立 Python lib / micro-service,Codex 起跑前 founder 帮交付
-
-### 0.1.4 阻塞 sub-phase A 的硬条件
-
-sub-phase A 起跑前 founder 必须给:
-1. **完整 MediaKit tools 列表**(§0.1.1)
-2. **frame + ASR 选型**(§0.1.2,基于 §0.1.1 数据)
-3. **toprador URL resolver 接续方式**(§0.1.3 a/b/c)
-4. **长期 VOLC_MEDIAKIT_AK**(已 W3D3 给临时 AKLT*,Codex sub-phase A 起跑前要长期 key)
-
-Sub-phase B/C(Doubao Vision + text LLM 聚合)**仍可起跑**,但 sub-phase A 的产物 schema 未定时,Codex 在 sub-phase B 的输入 mock 起来困难 — 建议**整 P5-3 暂停**,等 §0.1.1-0.1.3 全到位再重写 brief + 起跑。
-
----
-
----
-
-## 0. 背景与决策
-
-Toprador 是 founder 老项目的视频分析服务(Flask + MySQL),`MVP_SCOPE A1` 原计划 5 天脱敏 + Postgres 迁移 + 公网部署。**已废弃此路径**,改走 **火山 MediaKit(server-side 抽帧/抽音/转写)+ Doubao Vision(多模态) + Doubao text LLM(语义聚合)** 全境内自建。
-
-**重要更新 2026-05-23 W3D3 22:55 PDT**(founder 提供 MediaKit curl 后):
-- Sub-phase A 不再需要本地 ffmpeg + 火山 ASR 直调;统一走 **MediaKit `tools/extract-audio` + `extract-frames` + `transcribe`**(per founder 确认 3 tool 完整)
-- Auth 简化为单 Bearer token(原 brief 假设的 ASR 三件套作废)
-- Sub-phase A 工时 1d → **0.5d**(server-side 处理,代码大幅简化)
-- 总工时 8d → **~7.5d**
-
-理由(per founder W3D3 decision):
-1. **Provider 一致性**:Cascade 链路 LLM 改写(P3-R2) + judge(P4-1) + 视频生成(Seedance)已统一在 ARK;视频分析也走 ARK = 全境内单 provider
-2. **PIPL §38 合规**:全境内,不出境,与 `privacy_v0.md §4.2` 口径一致
-3. **工时节省**:跳过 MVP_SCOPE A1 的 5 天部署 + 后续运维成本
-4. **架构简洁**:嵌入 `analysis_service.py` 作为新 upstream 分支,不引入 Flask / MySQL / 公网服务
+工时 7.5d → **~3d**(详见 §3 phase 拆解)。
 
 ---
 
 ## 1. 总 Done-signal(P5-3 全部 ship 后)
 
-- `CASCADE_UPSTREAM=doubao_lite` 是新分支(`analysis_service.py:_load_upstream_payload`)
-- `CASCADE_UPSTREAM=doubao_lite` 设为 `.env.example` 新默认(取代 fixture);`fixture` 模式保留用于 offline test
-- 端到端跑通:粘 1 条 Douyin / 小红书 URL → `request_shallow_analysis(url, ...)` → 返回 `CascadeAnalysisContract`,**与现有 fixture mode 输出结构 100% 一致**(per `docs/TOPRADOR_SCHEMA.md v1.0` §1-§3)
-- 5 条真实 niche URL(3 个 niche × 1-2 条)端到端验证 + staging 报告落 `founder_log/p5-3_doubao_lite_staging_<UTC>.md`
-- `P3-7 retry / breaker` + `P4-3 cascade_*` events + `P4-6 cache 持久化` 全部沿用(emit 路径不动,只换 upstream provider)
-- 单视频成本 ≤ ¥0.50;p95 延迟 ≤ 90s
-- 30+ unit tests(分 sub-phase 累积)
-- `handoff/codex_backend_P4-9.md` 标 deprecated/superseded
+- `CASCADE_UPSTREAM=mediakit` 是新分支(`analysis_service.py:_load_upstream_payload`)— 命名从 doubao_lite 改为 mediakit 更准确反映来源
+- `.env.example` 默认从 `fixture` 改为 `mediakit`;`fixture` 保留作 offline test
+- 端到端跑通:粘一条 Douyin / 小红书 URL → toprador URL resolver 拿直链 .mp4 → `request_shallow_analysis(...)` → 返回 `CascadeAnalysisContract`,与 fixture mode 输出结构 100% 一致
+- 5 条真实 niche URL(3 niche × 1-2 条)端到端验证 + staging 报告
+- P3-7 retry / breaker + P4-3 cascade_* events + P4-6 cache 持久化沿用
+- 60s 视频端到端 ≤ 8 分钟(MediaKit 平均 RTF 3-5,storyline ~4-6 min)
+- 单视频成本 ≤ ¥0.50(MediaKit storyline + 可选 ARK Chat 补维)
+- 25+ unit tests(累积 5 sub-phase)
+- `handoff/codex_backend_P4-9.md` 顶部 SUPERSEDED 标记保留
 
 ---
 
-## 2. Sub-phase 拆解(5 阶段,每阶段独立 commit)
+## 2. MediaKit 关键 API 契约(已确认,真实文档)
 
-### Sub-phase A — MediaKit 抽帧 + 转写接通(0.5 天)
+### 2.1 `POST /api/v1/tools/analyze-video-storyline` ⭐ 核心
 
-**Founder 2026-05-23 决定**:用火山 **MediaKit** 服务(`mediakit.cn-beijing.volces.com/api/v1/tools/*`)做 server-side 抽帧 + 抽音 + 转写,**不再需要本地 ffmpeg + 文件下载**。
-
-**已知 API 契约**(来自 founder 提供的 curl,2026-05-23):
-
-```bash
-# extract-audio (已验证)
-curl -X POST 'https://mediakit.cn-beijing.volces.com/api/v1/tools/extract-audio' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer <VOLC_MEDIAKIT_AK>' \
-  -d '{"video_url": "https://example.com/my_video.mp4"}'
-
-# MediaKit 还含(per founder 确认): extract-frames + transcribe
-# 三个 endpoint 假设统一 base URL + auth + 类似输入(video_url 或 audio_url)
+**Request**:
+```json
+{
+  "video_urls": ["https://example.com/movie_part1.mp4"],
+  "enable_snapshot": true
+}
 ```
 
-**Auth 方式**:**单 Bearer token**(`Authorization: Bearer <VOLC_MEDIAKIT_AK>`),不是 AK+SK HMAC。token 形态 `AKLT...`(Volc Access Key)。
+**Auth**: `Authorization: Bearer <VOLC_MEDIAKIT_AK>`
 
-**目标**:给一条视频 URL,产 `scenes[]` 的局部输出(timestamps + dialogue_and_narration + 占位 visual_content)。
+**Limits**:
+- 单视频建议 ≤ 150 min(2.5h),累计 ≤ 210 min(3.5h)
+- 单任务最多 30 个 video file
+- 分辨率最高 1080p
+- 单账号 20 并发,超出排队
 
-**Done-signal**:
-- 新文件 `backend/src/agent/cascade/doubao_lite/mediakit_client.py` — 三个方法:
-  - `async extract_audio(video_url) -> dict`(返回结构待 Codex 第一次跑 staging 探测)
-  - `async extract_frames(video_url, count=12) -> list[dict]`(假设响应有 frame_url + timestamp_s;**Codex 需用本 token 跑 1 次真实 curl 确认 schema**)
-  - `async transcribe(video_or_audio_url) -> dict`(假设有 segments[] + word_timestamps;**同上待 Codex 探测**)
-- 配置 1 行加 `config.py`:`VOLC_MEDIAKIT_AK = os.getenv("VOLC_MEDIAKIT_AK", "")`
-- `.env.example` 加 1 行注释 + placeholder
-- 因 SDK 不存在,直 httpx POST + 沿用 P3-7 retry/breaker 范式
-- 端到端测试:1 条公开 video URL → 抽帧 + 转写 → 按 transcribe 的 segment 边界切 `scenes[]`(timestamps 字段 + dialogue_and_narration 字段填充)
-- 5 unit tests:happy path mock / 401 auth refused / 5xx retry / 静音视频 → empty dialogue 但 scenes 仍生成 / 单 service 超时 fallback
-- 1 个 staging script `scripts/p5-3a_mediakit_probe.py` 用 founder 提供的 dev key 跑一次真实 video URL,把 3 个 endpoint 返回的 raw JSON 落盘到 `founder_log/p5-3a_mediakit_schemas_<UTC>.md`(为后续 phase 提供 schema 真理来源)
-- commit:`feat(P5-3a): MediaKit client (extract-audio/frames/transcribe) → partial scenes[]`
+**Response (sync)**:
+```json
+{"success": true, "task_id": "amk-tool-analyze-video-storyline-...", "request_id": "..."}
+```
 
-**⚠️ Pre-execution 待 founder 给 PM 确认 / 提供**:
+**Polling**: `GET /api/v1/tasks/{task_id}` → `status: completed` 时:
+```jsonc
+{
+  "result": {
+    "duration": 342.36,
+    "source_video_info": [
+      {
+        "source_video_index": 0,
+        "source_video_url": "...",
+        "source_video_title": "AI 生成标题",
+        "source_video_summary": "AI 生成 ~150 字摘要",
+        "source_video_tag": ["tag1", "tag2", ...]  // 5 个
+      }
+    ],
+    "storyline_clips": [
+      {
+        "clip_index": 0,
+        "source_video_index": 0,
+        "clip_start_time": 9.12,
+        "clip_end_time": 43.28,
+        "clip_title": "场景标题",
+        "clip_summary": "AI 生成场景描述,含居家室内/书桌/人物等画面细节",
+        "clip_dialogue": "完整口播文字 + 时序",
+        "clip_score": 3.5,           // 精彩度 0-5
+        "clip_snapshot_url": "..."   // enable_snapshot=true 才有
+      }
+    ],
+    "storyline_highlights": [
+      {
+        "highlight_index": 0,
+        "highlight_clips_index": [0, 1, 2],
+        "highlight_title": "...",
+        "highlight_summary": "..."
+      }
+    ]
+  },
+  "created_at": ..., "finished_at": ..., "expires_at": ...
+}
+```
 
-1. **`VOLC_MEDIAKIT_AK`** 长期有效的 key(founder 之前给的 `AKLT...` 是临时测试,不入 git)
-2. `extract-frames` 与 `transcribe` 的精确 endpoint path —— 假设是 `/api/v1/tools/extract-frames` 和 `/api/v1/tools/transcribe`,**Codex sub-phase A 第一步用临时 key probe 1 次确认**
-3. 公开 docs 找不到 MediaKit;Codex 第一次 probe 时把 3 个 endpoint 的真实 request/response JSON 写到 `founder_log/p5-3a_mediakit_schemas_<UTC>.md`,后续 phase 当真理源
+**字段映射 Cascade contract(`docs/TOPRADOR_SCHEMA.md v1.0`)**:
 
-**边界**(不在 sub-phase A):
-- 不调 Doubao Vision(下一 phase)
-- 不写 viral_analysis(sub-phase C)
-- 不接入 analysis_service.py(sub-phase D)
+| Cascade 字段 | MediaKit 来源 |
+|---|---|
+| `analysis_id` | 本地生成(sha256 of url+user_id) |
+| `source_url` | input video_url(toprador resolver 解析后的直链)|
+| `platform` | 从 input 原 Douyin/XHS URL 推断(adapter 层) |
+| `duration_s` | `result.duration` |
+| `model` | `"mediakit-storyline"`(固定串)|
+| `cost_cny` | 本地估算(待 W5 cost calibration P4-8 跑后给) |
+| `viral_analysis.replicable_formula` | **`source_video_summary` + storyline_highlights[].summary 拼接 + ARK Chat 补 prompt(详 §2.3)** |
+| `viral_analysis.target_audience` | **`source_video_tag` 翻译** |
+| `viral_analysis.hook / pacing / climax / emotional_arc / score_breakdown / niche_signals` | **ARK Chat API 补维**(详 §2.3),input = storyline clips 的 dialogue + summary |
+| `scenes[i].timestamps` | `storyline_clips[i].{clip_start_time, clip_end_time}` |
+| `scenes[i].visual_content` | `storyline_clips[i].clip_summary` |
+| `scenes[i].dialogue_and_narration` | `storyline_clips[i].clip_dialogue` |
+| `scenes[i].shot_type` | **ARK Chat 推断**或暂 default "medium" |
+| `scenes[i].importance_score`(新)| `storyline_clips[i].clip_score` (若 contract 不含此字段,加进 schema v1.1) |
+| `scenes[i].snapshot_url`(新)| `storyline_clips[i].clip_snapshot_url` |
+| `warnings[]` | adapter 层根据 missing fields 补 |
+| `confidence` | 本地算法:storyline clip 数 / duration ratio + avg clip_score |
 
----
+### 2.2 `POST /api/v1/tools/segment-scenes`(可选,见 §3.0 决策)
 
-### Sub-phase B — Doubao Vision 出 visual_content + shot_type(2 天)
+如果 storyline 的 `clip_start_time/end_time` 边界质量不够(需要更细 / 更稳),用 segment-scenes 替代:
 
-**目标**:每帧调 Doubao 多模态,出 `scenes[i].visual_content` + `shot_type`(close_up / medium / wide / aerial / pov)。
+**Request**:
+```json
+{
+  "video_url": "https://...",
+  "segment_threshold": 10,      // 0-100,默认推荐 10
+  "min_duration": 2.5,          // s,合并过短片段
+  "max_duration": 30,           // s,强制切分长片段
+  "enable_clip_fade": false
+}
+```
 
-**Done-signal**:
-- 新文件 `backend/src/agent/cascade/doubao_lite/vision_client.py`
-- 使用模型 `doubao-1-5-vision-pro-32k`(或当时最新可用 vision-pro 系列;在 `config.py` 加 `DOUBAO_VISION_MODEL`)
-- 单 prompt 出 JSON 结构:
-  ```json
-  {
-    "visual_content": "厨房,母亲背影,正在切菜",
-    "shot_type": "medium",
-    "subject_count": 1,
-    "lighting": "自然光"
+**Polling result**:
+```json
+{
+  "result": {
+    "duration": 185.5,
+    "segments": [
+      {"start_time": 0.0, "end_time": 15.2, "segment_video_url": "https://...clip_1.mp4"}
+    ]
   }
-  ```
-- prompt 设计放在 `prompts/doubao_lite_vision.md`(新),要求严格 JSON 不带 markdown 围栏
-- 单帧调用成本 ≤ ¥0.02;p95 延迟 ≤ 8s
-- 6 unit tests:happy path mock / malformed JSON fallback / shot_type enum coerce / 多人场景 / 文字遮挡场景 / 黑屏帧(应返回 "transition / black_frame")
-- 端到端:把 sub-phase A 的 partial scenes 喂进来,每个 scene 取该段最具代表性 1 帧 → vision 调用 → 填 visual_content + shot_type
-- commit:`feat(P5-3b): Doubao Vision client → scenes[].visual_content + shot_type`
+}
+```
 
-**边界**:
-- 不做帧级 OCR(那是 P6-x 范围)
-- 不做 character recognition(那是 anchor 系统的事)
-- 不做"光影分析" subjective field — 只填 enum 化的客观字段
+**用法**(若启用):用 segment-scenes 拿物理 segment_video_url[],再把每段 segment_video_url 输入 analyze-video-storyline 拿语义解析。增加成本 + 延迟,但可控切分粒度。
+
+**Codex 决策点**:**先不上 segment-scenes**;直接用 storyline 的 clip 边界 ship 第一版;首位 concierge creator first-run 后看 founder 评价是否需要更精细切分,再决定是否引入。
+
+### 2.3 ARK 视频理解 Chat API(补 viral_analysis 8 维)
+
+**Endpoint**: `POST https://amk-ark.cn-beijing.volces.com/api/v1/chat/completions`
+
+**Auth**(注意!): `Authorization: Bearer <ARK_API_KEY>/<VOLC_MEDIAKIT_AK>` — **两 key 斜杠拼接成一个 string**
+
+**Model**:沿用现有 `doubao-seed-1-6-250615`(或新 multimodal `doubao-seed-1-6-vision-*`,Codex 调研)
+
+**Request schema**(标准 OpenAI Chat,但 content 含 video_url):
+```json
+{
+  "model": "doubao-seed-1-6-250615",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "<viral_analysis 8 维专用 prompt>"},
+        {
+          "type": "video_url",
+          "video_url": {
+            "url": "https://...direct-mp4...",
+            "fps": 1,
+            "max_frames": 100,
+            "max_pixels": 518400
+          }
+        }
+      ]
+    }
+  ],
+  "stream": false
+}
+```
+
+**用法**:在 storyline 解析完成后,**用一次** ARK Chat API call 把视频 URL + storyline summary 一起喂给 doubao 视觉模型,问 8 维结构化 JSON:hook / pacing / climax / emotional_arc / replicable_formula 等。Codex 设计 prompt 在 `prompts/mediakit_viral_analysis_overlay.md`。
+
+**Token 预算**:200k(MediaKit 内置抽帧 cost 控制),默认 fps=1 即可;Phase 1 内测 60s 视频成本 ~¥0.10。
 
 ---
 
-### Sub-phase C — Doubao text LLM 聚合产 viral_analysis 8 维(2 天)
+## 3. Sub-phase 拆解(5 阶段,~3d 总)
 
-**目标**:把完整 scenes[](sub-phase A+B 产出)+ 视频元数据(duration, platform, source_url)喂给 Doubao text LLM,出 `viral_analysis` 8 维 JSON,对齐 `docs/TOPRADOR_SCHEMA.md §2`。
+### Sub-phase 0 — 预备(0.25d)
 
-**Done-signal**:
-- 新文件 `backend/src/agent/cascade/doubao_lite/viral_analyzer.py`
-- 使用 `doubao-seed-1-6-250615`(已配,P4-1 用同款)
-- 单 prompt 出 viral_analysis JSON:hook / pacing / climax / emotional_arc / replicable_formula / target_audience / niche_signals / score_breakdown
-- prompt 放在 `prompts/doubao_lite_viral_analysis.md`
-- 调用成本 ≤ ¥0.15;p95 延迟 ≤ 30s
-- 8 unit tests:8 维度字段全填 / replicable_formula 长度 < 600 字 / score_breakdown 数值 in [0,1] / hook_pattern_id 与 hook_taxonomy.HOOK_PATTERNS 兼容 / emotional_arc enum 校验 / 文字暴力/敏感内容跳过(返回 W14 warning)
-- commit:`feat(P5-3c): Doubao text LLM → viral_analysis 8 dims (replaces toprador analysis_result)`
+- **复用 toprador URL resolver**:与 founder 确认 toprador 的 URL resolver 接续方式(独立 endpoint / 嵌入 lib / 微服务)
+- 新建 `backend/src/agent/cascade/mediakit/` 目录(替代原 doubao_lite/)
+- `config.py` 加 `VOLC_MEDIAKIT_AK`(.env)
+- `.env.example` 加 5 行 MediaKit 配置注释
 
-**边界**:
-- 不动 `adapter.py` / `contract.py`(下一 phase)
-- 不做 "为什么 score 是 0.83" 的可解释性输出 — 那是 P6-x
+### Sub-phase A — analyze-video-storyline client + task polling(1d)
 
----
-
-### Sub-phase D — analysis_service.py 接 doubao_lite 分支(2 天)
-
-**目标**:让 `request_shallow_analysis(url, ...)` 在 `CASCADE_UPSTREAM=doubao_lite` 时调上面 3 个 sub-phase 的客户端,组装成与 toprador / fixture **一模一样** 的 dict 结构,经 `adapter.normalize_analysis_result()` → `CascadeAnalysisContract`。
-
-**Done-signal**:
-- `analysis_service.py:_load_upstream_payload` 新增分支:
+- 新文件 `mediakit/storyline_client.py`:
   ```python
-  if upstream == "doubao_lite":
-      return await _call_doubao_lite(source_url, user_id=user_id, run_id=run_id)
+  async def submit_storyline_task(video_urls, *, enable_snapshot=True) -> str  # task_id
+  async def poll_task(task_id, *, timeout_s=600, poll_interval_s=10) -> dict
+  async def analyze_storyline(video_url, *, user_id, run_id) -> dict  # 高层 wrapper
   ```
-- 新函数 `_call_doubao_lite()` 编排 sub-phase A + B + C(并发抽帧 + vision + ASR;最后串行 viral_analyzer)
-- **P3-7 retry / breaker + P4-3 emit 路径完全复用**:对 Doubao 调用包装相同的 retry / circuit_breaker / cascade_retry / cascade_circuit_open emits(像现在的 `_call_toprador`)
-- **P4-6 cache 复用**:同 URL 命中同 cache,SQLite 持久化
-- 8 unit tests:happy path / ASR 失败 fallback / vision 失败 fallback / viral_analyzer 失败 → S5 / 部分 scenes 不完整 / 整体超时 → S7 / 24h cache 命中 / 不同 user 同 URL 共享 cache
-- 端到端 staging:跑 3 niche × 1 URL,落 `founder_log/p5-3_doubao_lite_staging_<UTC>.md`
-- commit:`feat(P5-3d): analysis_service doubao_lite branch with retry/cache/observability`
+- 异步 httpx + retry/breaker(沿用 P3-7 范式;新建 `_STORYLINE_BREAKER`)
+- P4-3 emit:`cascade_retry / cascade_circuit_open / cascade_cache_hit / cascade_cache_miss`
+- P4-6 cache:`save_toprador_cache` 复用,key prefix `f"mediakit_storyline::{url_hash}"`
+- 7 unit tests:submit 200 + parse task_id / poll completed / poll failed → S8 / poll timeout → S7 / mid-poll retry / hash isolation / 24h cache hit
 
-**边界**:
-- 不动 fixture mode(保留 offline test 用)
-- 不删 `_call_toprador()` 函数(保留作 P4-9 fallback;只在配置层设默认改 doubao_lite)
+### Sub-phase B — adapter:storyline → CascadeAnalysisContract(0.75d)
 
----
+- 新文件 `mediakit/storyline_adapter.py:storyline_to_contract(storyline_result, source_url, user_id) -> dict`
+- 映射逻辑实现 §2.1 表格(map_field by map_field)
+- **加 schema v1.1 兼容字段**:`scenes[i].importance_score` + `scenes[i].snapshot_url`(若 contract.py 不含,加 optional field + W14 warning)
+- 6 unit tests:happy path mapping / missing snapshot field / niche tag fallback / multiple source_video_info / empty storyline_clips → S5 / clip ordering by start_time
 
-### Sub-phase E — 默认切换 + 老 toprador 标 deprecated + cleanup(1 天)
+### Sub-phase C — ARK Chat API for viral_analysis 8-dim overlay(0.5d)
 
-**目标**:Phase 1 内测正式使用 Doubao-lite 作为分析上游。
+- 新文件 `mediakit/viral_overlay.py:overlay_viral_dims(contract_dict, video_url) -> dict`
+- 调用 `https://amk-ark.cn-beijing.volces.com/api/v1/chat/completions`
+- prompt 放 `prompts/mediakit_viral_analysis_overlay.md`(基于 hook_taxonomy H1-H9 + 现有 niche)
+- 失败 fallback:返回 storyline-only contract,viral_analysis 8 维字段以默认值或 storyline_highlights summary 兜底
+- 4 unit tests:happy path / Chat API timeout → fallback to storyline-only / malformed JSON → S5 + warning / 200k token budget 截断
 
-**Done-signal**:
-- `.env.example` 默认 `CASCADE_UPSTREAM=doubao_lite`(原 `fixture`)
+### Sub-phase D — analysis_service.py 接入(0.5d)
+
+- 新分支:
+  ```python
+  elif upstream == "mediakit":
+      direct_url = await resolve_to_direct_media(source_url)  # toprador URL resolver
+      storyline = await analyze_storyline(direct_url, user_id=user_id, run_id=run_id)
+      contract_dict = storyline_to_contract(storyline, source_url, user_id)
+      contract_dict = await overlay_viral_dims(contract_dict, direct_url)
+      return contract_dict
+  ```
+- retry / breaker / cache observability 沿用现有 `_call_toprador` 范式
+- 8 unit tests:happy path / resolve fail → S8 / storyline timeout → S7 / overlay fail → degraded contract / 重入幂等性 / 不同 user 同 URL 隔离 / Adapter S5 / contract validate fail
+
+### Sub-phase E — 默认切换 + cleanup(0.5d)
+
+- `.env.example` `CASCADE_UPSTREAM=mediakit`
 - `config.py` 默认值同步
-- `docs/TOPRADOR_SCHEMA.md` 顶部加 deprecation 注:"原 toprador 上游路径自 P5-3 起 deprecated,Doubao-lite 复用此 schema 作为产物契约;字段语义不变"
-- `handoff/codex_backend_P4-9.md` 顶部加:"**SUPERSEDED by P5-3** @ 2026-05-23 W3D3 — 不再执行,除非 founder 主动 ARK 不可用 fallback"
-- `PM_W5_allocation.md §"engineering done"` 标 P5-3 全 5 phase done
-- `scripts/check_progress.sh` 加 `p5_3` probe:扫 `analysis_service.py` 含 `_call_doubao_lite` 即标 done
-- 第一份真实 staging 报告 commit 进 `founder_log/`
-- commit:`feat(P5-3e): default Cascade upstream to doubao_lite; deprecate toprador path`
+- `docs/TOPRADOR_SCHEMA.md` 顶部加 v1.1 schema 更新注 + MediaKit 字段映射 reference
+- `handoff/codex_backend_P4-9.md` SUPERSEDED 标记(原已有,确认仍生效)
+- `scripts/check_progress.sh` 加 `p5_3 probe`:扫 `analysis_service.py` 含 `analyze_storyline` 即标 done
+- 第一份真实 staging 报告 commit `founder_log/p5-3_mediakit_staging_<UTC>.md`(5 真实 niche URL 端到端跑通)
 
 ---
 
-## 3. 全 brief 共享的实现指引
+## 4. 边界(不在此 brief)
 
-### 3.1 Schema 不动
-
-输出最终必须满足 `docs/TOPRADOR_SCHEMA.md v1.0`(`schema_version: "1.0"` + §1-§3 字段)。所有下游(`adapter.py` / `contract.py` / `rewrite.py` / `events.py` / `anchors.py`)**零改动**。如果 sub-phase 输出某字段不全,**adapter 兜底加 warning**(P0-4 范式),不要往 schema 加字段。
-
-### 3.2 复用 Cascade 现有基础
-
-- retry / breaker:沿用 `circuit_breaker.py` 的 `_TOPRADOR_BREAKER` 范式,新建 `_DOUBAO_VISION_BREAKER` + `_VOLC_ASR_BREAKER` + `_DOUBAO_TEXT_BREAKER`,每个独立熔断
-- cache:沿用 `storage.save_toprador_cache` 范式,可加 `save_doubao_lite_cache`(或复用同一 table,namespace 字段区分)— **简单做法是直接复用 toprador_cache table**,key 用 `f"doubao_lite::{source_url_hash}"` 前缀避免冲突
-- observability events:沿用 `cascade_retry / cascade_circuit_open / cascade_cache_hit / cascade_cache_miss`,只是 `endpoint` 字段值变成 doubao endpoint URL
-
-### 3.3 配置项汇总(`.env.example` 同步加)
-
-```
-# Doubao-lite 视频分析(P5-3,2026-05-23 默认上游)
-CASCADE_UPSTREAM=doubao_lite
-
-# Doubao Vision(多模态)
-DOUBAO_VISION_MODEL=doubao-1-5-vision-pro-32k
-
-# 火山 MediaKit(server-side 抽帧 + 抽音 + 转写,2026-05-23 founder 决定路径)
-# Endpoint base: https://mediakit.cn-beijing.volces.com/api/v1/tools/
-# Auth: Authorization: Bearer <VOLC_MEDIAKIT_AK>
-# 公开 docs 缺;开通 / 申请方式 founder 内部渠道
-VOLC_MEDIAKIT_AK=
-```
-
-### 3.4 PII 不写入 events
-
-任何 emit 携带的 source_url 一律 hash(per `_hash_source_url`,P3-R1 + P4-3 已建立的口径)。ASR transcript / vision content 在生产 db 落地受 P4-7 retention 策略管(business 永久保留,因 anchor 复用刚需)。
-
----
-
-## 4. 不在此 brief 范围
-
-- ❌ 重建 toprador 自身(不需要 — 整个被替换)
-- ❌ MVP_SCOPE B5(BGM 选取)/ B6(字幕渲染)/ B7(剪辑合成)— 这些是后期工作,与 P5-3 无关
-- ❌ 多模态 Transformer 自训(per `TOPIC_INTELLIGENCE_DEEPENING_PLAN §4.4`,5万样本后才进路线图)
-- ❌ Kling / Seedance 视频生成(已独立配置 `ARK_VIDEO_MODEL=doubao-seedance-2-0-260128`)
-- ❌ ffmpeg server-side 端到端合成
+- ❌ 重建 toprador URL resolver(founder 决定保留;只是 P5-3 调用方)
+- ❌ 视频生成 / Seedance(独立)
+- ❌ TTS / 配乐 / 剪辑合成(MVP B5-B7,后期)
+- ❌ MediaKit 其他工具(画质增强 / 字幕擦除 / 视频抠图等;后期按需引)
+- ❌ ARK Chat API 高级用法(streaming / tool calling)— Phase 1 简单 non-stream 即可
+- ❌ 5GB 大视频特殊处理(Phase 1 短视频均 < 100MB)
 
 ---
 
 ## 5. Upstream dep / Blocker
 
-- ✅ `ARK_API_KEY`(已配)
-- ⏳ **founder 给长期 `VOLC_MEDIAKIT_AK`**:`AKLT...` 形态;2026-05-23 提供的临时测试 key 已用于本 brief 设计验证,**不要** 落进 git。Codex sub-phase A 起跑前需要长期 key 才能跑真实 staging。
-- ⏳ founder 确认 `DOUBAO_VISION_MODEL` 在你 ARK 账户已开通(多模态推理点可能与 text 不同)
-- ⏳ MediaKit `/tools/extract-frames` + `/tools/transcribe` endpoint path 仅为 PM 推测;Codex sub-phase A 第一步必须 probe 真实 API 落 schema(per sub-phase A §"Pre-execution 待 founder 给 PM 确认 / 提供" §2-§3)
-- ✅ `docs/TOPRADOR_SCHEMA.md v1.0`(已 stable;MediaKit 真实 schema 探测后,adapter 兜底补齐)
+- ✅ `ARK_API_KEY`(已配,P4-1 已使用)
+- ✅ `VOLC_MEDIAKIT_AK`(founder W3D3 已申请;临时 AKLT* 已用于本 brief 写作的 probe;长期 key 待发放,或临时 key 长期有效待确认)
+- ⏳ **toprador URL resolver 接续方式**(founder W3D3 决定保留模块,但接续协议待:独立 endpoint / 嵌入 lib / 微服务三选一)— 这是 sub-phase 0 阻塞
+- ✅ MediaKit 3 个 API 文档已就位(本 brief §2 嵌入完整契约)
 
-**Sub-phase A 起跑前 founder 必须先给长期 `VOLC_MEDIAKIT_AK`**,否则 staging probe 跑不通。Sub-phase B/C 只需 ARK key 已有就行。
+**Sub-phase 0 起跑前 founder 必须给**:
+1. 长期可用 `VOLC_MEDIAKIT_AK`
+2. toprador URL resolver 接续协议(`POST /api/resolve-url` endpoint? 还是 python module import?)
+
+其他 sub-phase A/B/C/D/E 可在 0 完成后顺序执行,不再需要 founder 介入。
 
 ---
 
@@ -283,22 +292,19 @@ VOLC_MEDIAKIT_AK=
 
 | 指标 | 目标 | 失败 → 动作 |
 |---|---|---|
-| 60s 视频端到端延迟 p95 | ≤ 90s | 拆帧降 to 6-8 / 并发 vision call / W7 加 cache pre-warm |
-| 单视频成本 | ≤ ¥0.50 | 拆帧降 / 改用 `doubao-1-5-vision-lite`(更便宜)/ 或降频 |
-| 3 niche × 5 URL pass rate(adapter 不抛) | ≥ 80% | 适配层修 schema 偏移 |
-| Founder qualitative 信号("和 fixture mode 比 viral_analysis 准不准") | ≥ 7/10 | prompt 调 viral_analyzer §2 + 加 in-context exemplar |
+| 60s 视频端到端延迟 p95 | ≤ 8 min(MediaKit RTF 3-5)| W5 加 storyline 任务 prewarm / 并发提交 |
+| 单视频成本 | ≤ ¥0.50 | 关 enable_snapshot / 关 ARK overlay(degraded mode) |
+| 3 niche × 5 URL adapter pass rate(不抛 S5)| ≥ 80% | 改 adapter / 加 warning 兜底 |
+| Founder qualitative("storyline 准不准") | ≥ 7/10 | 调 ARK overlay prompt / 启用 segment-scenes 精细切分 |
+| viral_analysis hook_pattern_id 与 fixture 一致率 | ≥ 70% | 重写 ARK overlay prompt + 在 in-context exemplar 加更多 hook 例 |
 
 ---
 
-## 7. P4-9 处理
+## 7. 与 Phase 1 内测的关系
 
-P5-3e 同步在 `handoff/codex_backend_P4-9.md` 顶部加:
+P5-3 ship 后 Phase 1 内测 first-run together 可用真实 video URL,不再走 fixture。即:
 
-```
-**SUPERSEDED by P5-3** @ 2026-05-23 W3D3
-理由:founder 2026-05-23 决定 toprador 路径走 Doubao-lite 自建(P5-3),
-不再要求老 toprador 脱敏部署。本 brief 仅在 P5-3 ship 后 staging 失败
-或 founder 明示要求回滚时才执行。当前状态:dormant。
-```
+- W4D5-D7(per `concierge_onboarding_script §3`)concierge creator 体验时,若 P5-3 已 ship,creator 粘 Douyin URL → toprador resolver → MediaKit storyline → 改写 → 锚点 → 发布包,**全程真实数据**
+- 若 P5-3 仍在跑,Phase 1 first-run 退回 fixture mode(`CASCADE_UPSTREAM=fixture`),不阻塞 concierge 体验,只是 viral_analysis 是 mock 数据(creator 仍能体验改写 + 锚点 + 发布包流程)
 
-P5-3 sub-phase E 包含这个动作,P4-9 brief 文件 **保留**(不删 — git history 完整)。
+**P5-3 ship 时机最理想 = W4D5 之前(Phase 1 first-run 落地前)**;若推迟到 W4D7+,fixture mode 兜底,concierge 体验仍可继续。
