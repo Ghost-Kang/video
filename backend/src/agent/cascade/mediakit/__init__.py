@@ -5,9 +5,11 @@ from agent.cascade.mediakit.storyline_client import (
     poll_task,
     submit_storyline_task,
 )
+from agent.cascade.mediakit.storyline_adapter import storyline_to_payload
 
 __all__ = [
     "analyze_storyline",
     "poll_task",
+    "storyline_to_payload",
     "submit_storyline_task",
 ]
