@@ -1,9 +1,9 @@
 # PM · Week-4 Work Allocation
 
-**Date**: 2026-05-22 (W3D2 morning)
+**Date**: 2026-05-22 (W3D2 morning,DRAFT);**LOCKED 2026-05-23 W3D3 08:42 Asia/Shanghai** post phase0_crisis PM-proxy A+C
 **PM**: Senior PM (Claude session in PM mode)
 **Trigger**: W3 engineering closed early — `w3_eng_done=6/6` on `scripts/check_progress.sh` 2026-05-22; idle backend/frontend bandwidth — draft W4 ahead of W3D7 to avoid Codex+Claude 3-day idle gap
-**Status**: **DRAFT** (formal start = W4D1 = 2026-05-28; locks when Phase 0 decision made per `PM_phase0_crisis_2026-05-22.md`)
+**Status**: **LOCKED** (formal start = W4D1 = 2026-05-28;phase0 decision per `PM_phase0_crisis_2026-05-22.md §5` = **A+C by PM-proxy**;founder override window 直到 W4D1 上午)
 **Cadence**: daily check at 09:00 + 18:00 (founder timezone) via `pm-check-progress` routine
 **Reading order**: this doc → `PM_W3_allocation.md` → `PM_phase0_crisis_2026-05-22.md` → owner-specific briefs in `handoff/`
 
@@ -55,17 +55,18 @@ Same as W1/W2/W3 (see `PM_W1_allocation.md §0`). One owner, one done-signal, on
 
 ### 3.1 Claude(LLM + frontend)
 
-| Ticket | Brief | Done-signal | Upstream dep |
-|---|---|---|---|
-| **P4-1 LLM judge baseline (Doubao mode)** | `handoff/claude_eval_P4-1.md`(草稿待写)— P3-1 原本等 `GOOGLE_API_KEY`;P3-R2 切完 Doubao 后改用 `LLM_PROVIDER=doubao` 跑 `p2-6_eval.py --mode llm`,产 baseline JSON | `docs/nexus/founder_log/p2-6_baseline_<UTC>.json` 含 `mode=llm` 且 `judge_realism_avg > 0`(非 skipped);`mode=fixture` 与 `mode=llm` 两份 baseline 同期保留 | `ARK_API_KEY` + `DOUBAO_MODEL` 已在 `.env` |
-| **P4-2 admin events firehose 面板** | `handoff/claude_frontend_P4-2.md`(草稿待写)— `/admin/events` 新页,反向时间序展示 `events` 表最近 200 条,前端 filter by `event_type` / `phase` / `user_id`;后端 `/api/events?limit=200&type=*` 端点 | 页面存在;后端 endpoint 返回数组;3 个 vitest 用例(filter / paging / live refresh);手动验证 fire 一条 `consent_accepted` event 能在前端看到 | P3-3 admin layout(done)|
+| Ticket | Brief | Done-signal | Upstream dep | 实际状态 |
+|---|---|---|---|---|
+| **P4-1 LLM judge baseline (Doubao mode)** | `handoff/claude_eval_P4-1.md` ✅(audit 已完成 `9eee6e1`)— P3-R2 切完 Doubao 后改用 `LLM_PROVIDER=doubao` 跑 `p2-6_eval.py --mode llm`,产 baseline JSON | `docs/nexus/founder_log/p2-6_baseline_<UTC>.json` 含 `mode=llm` 且 `judge_realism_avg > 0`;`mode=fixture` baseline 保留 | `ARK_API_KEY` + `DOUBAO_MODEL` 已在 `.env` | ⏳ blocked on founder env |
+| **P4-2 admin events firehose 面板** | `handoff/claude_frontend_P4-2.md` ✅ | shipped `4d58628`:`/admin/events` 页 + `GET /api/events` + 7 pytest + 6 vitest | P3-3 admin layout | ✅ done |
+| **P4-5 generation_cost admin 仪表盘**(W3D3 新加,补 P4-1 idle) | `handoff/claude_frontend_P4-5.md`(待写)| `/admin/cost` 显示 generation_cost events 聚合(by user / by day / cumulative),复用 `/api/events?type=generation_cost`;后端可能加 `/api/cost/aggregate` | P4-2 events 端点(done) | 📋 brief 待写 |
 
 ### 3.2 Codex(后端)
 
-| Ticket | Brief | Done-signal | Upstream dep |
-|---|---|---|---|
-| **P4-3 cascade observability counters** | `handoff/codex_backend_P4-3.md`(草稿待写)— 把 P3-7 加的 retry/circuit-breaker/cache 内部状态以 events 形式发出来:`cascade_retry`, `cascade_circuit_open`, `cascade_cache_hit/miss`,带 `endpoint` + `duration_ms` + `reason` payload。**不引入 Prometheus / OTel,只复用现有 events 表**(P4-2 面板会用到) | events 表里新事件类型有数据;6 个 unit tests 覆盖每种触发路径;Toprador 失败仿真 → 看到 cascade_circuit_open event | P3-7(done) |
-| **P4-4 events 表索引优化** | `handoff/codex_backend_P4-4.md`(草稿待写)— `(thread_id, ts DESC)` 复合索引 + `(event_type, ts DESC)` 索引;Alembic / 手写 migration script;EXPLAIN 验证 admin events 查询用上索引 | migration 文件存在;`pragma index_list(events)` 列出 2 个新索引;`uv run pytest tests/test_events_index.py` 跑通(新增的 1 个 perf-shape 测试,断言 EXPLAIN 输出含 `USING INDEX`) | P4-2 endpoint 不阻塞,可并行 |
+| Ticket | Brief | Done-signal | Upstream dep | 实际状态 |
+|---|---|---|---|---|
+| **P4-3 cascade observability counters** | `handoff/codex_backend_P4-3.md` ✅ | 4 个新 event_type(`cascade_retry/circuit_open/cache_hit/cache_miss`)+ 6 unit tests | P3-7(done) | 📋 Codex 待起跑 |
+| **P4-4 events 表索引优化** | `handoff/codex_backend_P4-4.md` ✅ | shipped `74adbd9`:`idx_events_thread_ts` + `idx_events_type_ts` + migration + test_events_index | none | ✅ done(Codex 提前 ship,W4D0 前完工)|
 
 ### 3.3 Cursor — deprecated(no W4 allocation)
 
@@ -83,9 +84,9 @@ Per `03_routing.md §0.1`(founder decision 2026-05-21),Cursor 仍 deprecated。W
 
 | Owner | What slipped in W3 | W4 recovery |
 |---|---|---|
-| **Founder** | DM batch(0 / 35 target,W2+W3 累计),seed post,算法备案,discovery calls(0),P0-A 受理回执 | 全部进入 §4 + §2 critical path。若 W4D3 仍 0 进度 → capacity audit. |
-| Codex | (none — 5 张 P3 票全 done) | 接 P4-3 + P4-4 W4D1 起 |
-| Claude | (none — 4 张 P3 票全 done + 协助文档 + 协议起草) | 接 P4-1 + P4-2 W4D1 起;P4-1 等 founder 把 `ARK_API_KEY` 写入 `.env` |
+| **Founder** | DM batch(0 / 35 target,W2+W3 累计),seed post,算法备案,discovery calls(0),P0-A 受理回执,**phase0 §5 决策签字过 14h 仍空** → PM 代签 A+C 2026-05-23 W3D3 | **capacity audit 已写**(`founder_log/PM_founder_capacity_audit_2026-05-22.md`);全部进入 §4 + §2 critical path;若 W4D3 founder lane 仍 0 → 升级到 founder_capacity_audit §"escalation paths" |
+| Codex | (none — 5 张 P3 票全 done) | **P4-4 已提前 ship** `74adbd9`;**P4-3 仍待 Codex 起跑**(brief 已就位 14h+,W4D1 必须开工) |
+| Claude | (none — 4 张 P3 票全 done + 协助文档 + 协议起草) | **P4-2 已 ship** `4d58628` + **P4-1 audit 已 done** `9eee6e1`;**P4-5 cost 仪表盘** 新加补位(W4D1-2 起跑);P4-1 baseline 等 founder env |
 | Cursor | (deprecated;n/a) | 0 expected |
 
 ---
@@ -169,9 +170,26 @@ W5 票根据 W4 评估生成。不预分配。**预期方向**:
 
 ---
 
-## 9. Founder commitments locked at W4 entry(待 W4D0 写入)
+## 9. Founder commitments locked at W4 entry(2026-05-23 W3D3 由 PM 按 A+C 代签回填)
 
-(此 §9 在 W4D0 founder 完成 `PM_phase0_crisis_2026-05-22.md §5` 决策后由 PM 回填。不在 W3D2 预写。)
+按 `PM_phase0_crisis_2026-05-22.md §5` PM-proxy 决策(A+C),W4 founder lane 必须执行的承诺:
+
+| Commitment | W4 Day | Done-signal | 失败 → 触发 |
+|---|---|---|---|
+| 在 `backend/.env` 写入 `LLM_PROVIDER=doubao` + `ARK_API_KEY` + `DOUBAO_MODEL` | W4D1 | `cd backend && uv run python -c "from agent.llm_factory import get_chat_model; get_chat_model()"` 不抛 RuntimeError | P4-1 baseline 继续 slip → 重写 `claude_eval_P4-1.md §8` ETA |
+| 找 1 位审稿人外包标 5 条 real fixture(P0-C 剩余)| W4D1-3 | `backend/src/agent/cascade/fixtures/real_v1/*.json` ≥ 20 + `founder_log/p0-c_outsource_log_*.md` 含审稿人合约 | 升级 `founder_capacity_audit §"escalation paths"` 选 (b) 或 (c) |
+| 重跑合约测试:`cd backend && uv run pytest tests/test_cascade_contract.py -q` 验证 skipped=0(Codex 协助仅 0.5h)| W4D1 | probe 输出 `skipped=0` | 若 fail 由 Codex 独立 debug,不再阻塞 founder |
+| 小红书 seed 帖发布(`seed_post_url_2026-05-22.md` 顶部贴真 URL,不是 `<FILL>` 占位)| W4D1 | probe 输出 `Marketing seed=YES` | W4D3 仍 NO → capacity audit §"escalation paths" 选 (d) Claude 起草 founder 复审制 |
+| DM ≥ 5/天 × 7 天(`recruitment.md` 至少 35 条 `- DM` 行)| W4D1-7 | `grep -c "^- DM" docs/nexus/founder_log/recruitment.md` ≥ 35 | W4D3 仍 0 → 升级 |
+| Discovery call #1(`interview_logged` event)| W4D2 | `bash scripts/check_progress.sh` → `Recruit calls=1+` | W4D4 仍 0 → 升级 |
+| Concierge creator #1 真 run | W4D5-7 | `interview_logged event with phase=onboarded` + 1 个 `run_completed` 类似事件 | W5 起转 capacity audit |
+
+**Override 通道**: 同 phase0_crisis §5 — founder 在 §5 末尾追加 `**FOUNDER OVERRIDE**: ...` 行,本 §9 自动作废,PM 在下次 session 重新协商。**Override deadline W4D1 上午**。
+
+**Failure escalation flow**:
+- W4D1 founder lane 仍 0 → PM 更新 `PM_founder_capacity_audit_2026-05-22.md §"escalation paths"`
+- W4D3 founder lane 仍 0 → PM 写 `PM_W4_replan_2026-05-30.md`,直接重新设计 6 周时间表
+- W4D7 founder lane 仍 0 → PM 写 `PM_pause_recommendation_2026-06-03.md`,提议暂停 6 周计划进入 30 天 reset
 
 ---
 

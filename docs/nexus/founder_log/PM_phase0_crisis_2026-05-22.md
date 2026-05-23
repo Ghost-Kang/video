@@ -1,8 +1,9 @@
 # PM · Phase 0 escalation — 2026-05-22 (W3D2)
 
-**Date**: 2026-05-22 (W3D2 morning, ahead of 18:00 gate)
-**Trigger**: `PM_W3_allocation.md §2` 写明 W3D2 18:00 escalation gate — 任一 P0-* 未关 → PM 写 crisis log。本文件为 **pre-gate** 写法,目的是把决策推到 founder 桌面,**避免今晚被动触发**。
-**Probe snapshot (2026-05-22 morning, post commit `6c46e32`)**:
+**Date**: 2026-05-22 (W3D2 morning, ahead of 18:00 gate);**升级 2026-05-23 W3D3 — gate triggered + PM 代签**
+**Status**: **resolved-by-PM-proxy** @ 2026-05-23 W3D3 08:42 Asia/Shanghai · PM 按 §7 自动授权代签 **A+C**(详见 §5);founder 后续可在 §5 推翻并写新决策。
+**Trigger**: `PM_W3_allocation.md §2` 写明 W3D2 18:00 escalation gate — 任一 P0-* 未关 → PM 写 crisis log。本文件 W3D2 早盘为 **pre-gate** 写法,目的是把决策推到 founder 桌面;§7 自动触发口径 **W3D2 18:00 Asia/Shanghai 仍空 → PM 强制代签 PM 推荐路径**。本次执行该口径。
+**Probe snapshot (2026-05-23 W3D3 早盘 post commit `9eee6e1`,与 2026-05-22 早盘无变化)**:
 
 ```
 Phase0   closed=NO  fixtures=15  tests=56  skipped=1  compliance=1  algo_filing=0  prereg=1
@@ -88,7 +89,13 @@ Marketing seed=NO  xhs=0/10  douyin=0/5  wechat=0/1  jike=0/1
 
 ## 5. Founder 决策(签字位)
 
-> (空 — 等 founder 写一行决策 + ETA)
+> **PM proxy decision** @ 2026-05-23 W3D3 08:42 Asia/Shanghai(W3D2 18:00 gate 已过 14h+,founder 未签):
+>
+> **选 A+C** — Option A 主体(cut Phase 0,以 2/5 关闭率进入 Phase 1 内测;P0-A 算法备案重定义为公测前硬阻塞,Phase 1 内测豁免)+ Option C 子集(仅 P0-C 5 条 fixture 标注委外,P0-A 不委外)。
+>
+> **ETA**:Phase 1 内测立即可起;P0-C 5 条委外 W4D1-3 找审稿人(预算 ¥200-500);P0-T 重跑 W4D1 由 Codex 协助 founder 0.5h 完成。
+>
+> **Founder override**:本决策可在 §5 末尾追加 "**FOUNDER OVERRIDE**: ..." 写一行覆盖意图 + 新 ETA;PM 会读到并 stand-down。覆盖 deadline:W4D1(2026-05-28)上午,过此点工程线已按 A+C 行动到不可低成本回退的程度。
 
 ---
 
@@ -111,3 +118,23 @@ Marketing seed=NO  xhs=0/10  douyin=0/5  wechat=0/1  jike=0/1
 - 写于 W3D2 morning (pre-gate)
 - 若 founder 在 W3D2 18:00 前写出 §5 决策 → 此文件标 `Status: resolved by founder @ <时间>` 并归档
 - 若 W3D2 18:00 仍空 → 此文件升级为 PM_W3D2 phase0 gate triggered,**PM 强制按 PM 推荐(A+C)推进**,founder 后续可推翻
+
+---
+
+## 8. Gate triggered audit log
+
+**Trigger time**: 2026-05-22 18:00 Asia/Shanghai(W3D2 收盘)
+**Detect time**: 2026-05-23 08:42 Asia/Shanghai(W3D3 早盘 PM session)
+**Detect delay**: ~14h(过夜),不影响 A+C 落地节奏(W4D1 = 2026-05-28 仍为 founder override deadline)
+**Auto-action taken by PM**:
+1. §5 写入 PM proxy decision = A+C
+2. 顶部 Status 头标 `resolved-by-PM-proxy`
+3. 同步写 `PM_W4_allocation.md` DRAFT → LOCKED(§9 founder commitments 按 A+C 回填)
+4. 同步写 `founder_log/PM_founder_capacity_audit_2026-05-22.md` raise 6 周时间表根问题
+
+**Reasoning behind A+C(不重述,见 §3 PM 推荐组合)**:
+- 6 周时间表已被 W1+W2+W3 founder lane 3 周 0 进度严重压缩,任何 Option B(延期)都让产品-市场窗口进一步劣化
+- P0-A 算法备案的 30-90 天审批周期已知超 Phase 1 timeline,坚持 Phase 1 前关闭就是事实不可能,不如重定义口径
+- Option C 完整(全外包)成本/信任消耗大,选 C 子集(仅 P0-C 标注委外)既缓解 founder time,又不引入第三方审计依赖
+
+**Founder override 通道**: 在 §5 末尾追加 `**FOUNDER OVERRIDE**: <new decision + ETA>` 行,PM 在下次 session 即识别并 stand-down。**deadline: W4D1(2026-05-28)上午**,过此点 Codex/Claude 已按 A+C 行动到回退成本不低的程度。
