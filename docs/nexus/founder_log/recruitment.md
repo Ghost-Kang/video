@@ -1,7 +1,7 @@
 # Recruitment log
 
 **Started**: 2026-05-21 (W2D0)
-**Cadence commitment**: ≥ 5 DM / day · target 25 DMs by W2 end · 3 discovery calls by W3 start
+**Cadence commitment**(**updated W3D3 2026-05-23 per `PM_founder_capacity_audit §6` PM 代签 (b)+(c) shrink-mode**): 5 DM / day · target 35 DMs by W6 end · **1 concierge creator first-run by W4D7**;**discovery call 只在 creator 主动要求时约**(默认走 DM 文字 Q&A 自助调研)
 **Read by**: `scripts/check_progress.sh` grep `^- DM` / `^- CALL` / `^- COMMIT`
 
 ---

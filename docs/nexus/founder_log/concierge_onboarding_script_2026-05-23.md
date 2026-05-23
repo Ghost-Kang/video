@@ -86,6 +86,13 @@ T+7d-10d      Founder 收第一次反馈 — Phase 1 真正 unblock
 
 ## 2. Discovery call 脚本(30 分钟,1 对 1)
 
+> **⚠️ Shrink-mode 路径**(默认,per `PM_founder_capacity_audit §6` PM 代签 (b)+(c)):
+> **跳过本节**。改用 §1 DM 模板里追问 + 文字 Q&A 自助调研。下面这 5 个倾听问题(§2.4)用 DM 文字版逐个问,creator 文字回答 → founder 把回答 append 到 `recruitment.md` 对应 creator 行下。
+>
+> **保留本节的情况**:creator **主动**说"想视频聊一下" / "电话方便吗"时,才约 30 min call;此时按本 §2 全文走。
+>
+> 理由:founder weekly load 5h/w 不支持 N×30min 视频 call 节奏;DM 文字 Q&A 在 Phase 1 shrink-scope 体量(3 人 cohort)下信息密度足够。本质性反馈仍在 §3 first-run together(1 小时,保留)。
+
 ### 2.1 准备(call 前 10 min,founder 一定要做)
 
 - [ ] 重新过一遍 creator 最近 3 条作品 — 记下 hook 是什么、有没有用 H1-H9 中的某个

@@ -178,14 +178,80 @@ for t in "$p2_1" "$p2_2" "$p2_4" "$p2_5" "$p2_6"; do
   [ "$t" = "done" ] && w2_eng_done=$((w2_eng_done + 1))
 done
 
+# ---------- W4 ticket probes ----------
+p4_1="open"
+for f in docs/nexus/founder_log/p2-6_baseline_*.json; do
+  [ -e "$f" ] || continue
+  if grep -q '"mode": "llm"' "$f" 2>/dev/null && grep -q '"overall_judge_realism_avg": [1-9]' "$f" 2>/dev/null; then
+    p4_1="done"
+  fi
+done
+p4_2_back=$(status_probe "backend/src/agent/cascade/storage.py" "async def list_events")
+p4_2_front=$(status_probe "frontend/src/pages/AdminEvents.tsx" "AdminEvents")
+if [ "$p4_2_back" = "done" ] && [ "$p4_2_front" = "done" ]; then
+  p4_2="done"
+elif [ "$p4_2_back" != "open" ] || [ "$p4_2_front" != "open" ]; then
+  p4_2="partial"
+else
+  p4_2="open"
+fi
+p4_3=$(status_probe "backend/src/agent/cascade/events.py" "cascade_retry|cascade_circuit_open|cascade_cache_hit|cascade_cache_miss")
+p4_4=$(status_probe "backend/src/agent/cascade/storage.py" "idx_events_thread_ts|idx_events_type_ts")
+p4_5_front=$(status_probe "frontend/src/pages/AdminCost.tsx" "AdminCost|成本看板")
+p4_5_hook=$(status_probe "frontend/src/hooks/useGenerationCost.ts" "useGenerationCost|generation_cost")
+if [ "$p4_5_front" = "done" ] && [ "$p4_5_hook" = "done" ]; then
+  p4_5="done"
+elif [ "$p4_5_front" != "open" ] || [ "$p4_5_hook" != "open" ]; then
+  p4_5="partial"
+else
+  p4_5="open"
+fi
+p4_6_storage=$(status_probe "backend/src/agent/cascade/storage.py" "save_toprador_cache|load_toprador_cache|cleanup_expired_toprador_cache")
+if [ "$p4_6_storage" = "done" ] && [ -f backend/tests/test_toprador_cache_persistence.py ]; then
+  p4_6="done"
+elif [ "$p4_6_storage" != "open" ] || [ -f backend/tests/test_toprador_cache_persistence.py ]; then
+  p4_6="partial"
+else
+  p4_6="open"
+fi
+p4_7_storage=$(status_probe "backend/src/agent/cascade/storage.py" "async def retention_sweep")
+if [ "$p4_7_storage" = "done" ] && [ -f scripts/retention_sweep.py ]; then
+  p4_7="done"
+elif [ "$p4_7_storage" != "open" ] || [ -f scripts/retention_sweep.py ]; then
+  p4_7="partial"
+else
+  p4_7="open"
+fi
+if [ -f scripts/cost_calibration.py ] && ls docs/nexus/founder_log/cost_calibration_*.md >/dev/null 2>&1; then
+  p4_8="done"
+elif [ -f scripts/cost_calibration.py ]; then
+  p4_8="partial"
+else
+  p4_8="open"
+fi
+if ls docs/nexus/founder_log/p4-9_toprador_staging_*.md >/dev/null 2>&1; then
+  p4_9="done"
+elif [ -f scripts/p4-9_toprador_staging.py ]; then
+  p4_9="blocked"
+else
+  p4_9="open"
+fi
+w4_eng_done=0
+for t in "$p4_1" "$p4_2" "$p4_3" "$p4_4" "$p4_5" "$p4_6" "$p4_7" "$p4_8" "$p4_9"; do
+  [ "$t" = "done" ] && w4_eng_done=$((w4_eng_done + 1))
+done
+
 # Phase indicator — newest active allocation doc wins.
 w2_allocation_exists="NO"
 [ -f docs/nexus/PM_W2_allocation.md ] && w2_allocation_exists="YES"
 w3_allocation_exists="NO"
 [ -f docs/nexus/PM_W3_allocation.md ] && w3_allocation_exists="YES"
+w4_allocation_exists="NO"
+[ -f docs/nexus/PM_W4_allocation.md ] && w4_allocation_exists="YES"
 active_phase="W1"
 [ "$w2_allocation_exists" = "YES" ] && active_phase="W2"
 [ "$w3_allocation_exists" = "YES" ] && active_phase="W3"
+[ "$w4_allocation_exists" = "YES" ] && active_phase="W4"
 
 # ---------- Recruitment + marketing (read from founder log if exists) ----------
 recruit_log="docs/nexus/founder_log/recruitment.md"
@@ -253,6 +319,8 @@ if [ "$JSON" = "1" ]; then
     "$ts" "$active_phase" "$w2_eng_done" "$p2_1" "$p2_2" "$p2_4" "$p2_5" "$p2_6"
   printf '{"ts":"%s","scope":"pm_w3","w3_eng_done":%d,"P3_3":"%s","P3_4":"%s","P3_5":"%s","P3_6":"%s","P3_7":"%s","P3_8":"%s"}\n' \
     "$ts" "$w3_eng_done" "$p3_3" "$p3_4" "$p3_5" "$p3_6" "$p3_7" "$p3_8"
+  printf '{"ts":"%s","scope":"pm_w4","active":"%s","w4_eng_done":%d,"P4_1":"%s","P4_2":"%s","P4_3":"%s","P4_4":"%s","P4_5":"%s","P4_6":"%s","P4_7":"%s","P4_8":"%s","P4_9":"%s"}\n' \
+    "$ts" "$active_phase" "$w4_eng_done" "$p4_1" "$p4_2" "$p4_3" "$p4_4" "$p4_5" "$p4_6" "$p4_7" "$p4_8" "$p4_9"
   printf '{"ts":"%s","scope":"recruit","dms":%d,"calls":%d,"commits":%d,"runs":%d,"returns":%d}\n' \
     "$ts" "$dms" "$calls" "$commits" "$runs_count" "$returns_count"
   printf '{"ts":"%s","scope":"marketing","seed":"%s","xhs":%d,"douyin":%d,"wechat":%d,"jike":%d}\n' \
@@ -268,6 +336,8 @@ else
     "$active_phase" "$w2_eng_done" "$p2_1" "$p2_2" "$p2_4" "$p2_5" "$p2_6"
   printf 'PM_W3    w3_eng_done=%d/6  P3-3=%s  P3-4=%s  P3-5=%s  P3-6=%s  P3-7=%s  P3-8=%s\n' \
     "$w3_eng_done" "$p3_3" "$p3_4" "$p3_5" "$p3_6" "$p3_7" "$p3_8"
+  printf 'PM_W4    active=%s  w4_eng_done=%d/9  P4-1=%s  P4-2=%s  P4-3=%s  P4-4=%s  P4-5=%s  P4-6=%s  P4-7=%s  P4-8=%s  P4-9=%s\n' \
+    "$active_phase" "$w4_eng_done" "$p4_1" "$p4_2" "$p4_3" "$p4_4" "$p4_5" "$p4_6" "$p4_7" "$p4_8" "$p4_9"
   printf 'Recruit  dms=%d  calls=%d  commits=%d  runs=%d  returns=%d\n' \
     "$dms" "$calls" "$commits" "$runs_count" "$returns_count"
   printf 'Marketing seed=%s  xhs=%d/10  douyin=%d/5  wechat=%d/1  jike=%d/1\n' \

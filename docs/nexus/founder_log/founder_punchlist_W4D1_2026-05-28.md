@@ -16,42 +16,20 @@
 
 ---
 
-## 1. 09:00-10:00 · 决策签字(2 件)
+## 1. 09:00-10:00 · 决策已 PM 代签(可推翻,默认接受)
 
-### 1.1 在 PM_phase0_crisis_2026-05-22.md §5 末尾追加(若不同意 PM 代签 A+C)
+W3D3 founder ping "签字 pm 代签" 后,PM 已双双代签:
 
-打开 `docs/nexus/founder_log/PM_phase0_crisis_2026-05-22.md`,如果你**同意** PM 代签的 A+C(Phase 1 内测立刻起 + P0-A 转公测前阻塞 + 仅 P0-C 5 条委外),**不用动**。
+| 文档 | PM 代签内容 | 你的动作 |
+|---|---|---|
+| `PM_phase0_crisis_2026-05-22.md §5` | **A+C**:Phase 1 内测立即起 + P0-A 转公测前阻塞 + 仅 P0-C 5 条委外 | **默认接受** — 若不同意在 §5 末尾追加 `**FOUNDER OVERRIDE @ 2026-05-28**: <新路径> / ETA: <X> / 理由: <一句>` |
+| `PM_founder_capacity_audit_2026-05-22.md §6` | **(b) Shrink scope + (c) Outsource 子集**:3 人 cohort + 5h/w + 不约 30min discovery call + ¥2500-3500 一次性预算 + 6 周延 8 周 | **默认接受** — 若不同意同上格式 override |
 
-如果你**不同意**,在 §5 末尾追加一行:
+**默认接受 = 什么都不用做,直接进 §2**。
 
-```
-**FOUNDER OVERRIDE @ 2026-05-28**: <你想选的路径,例如 B(extend Phase 1)/ C(全部外包)/ 自定>
-ETA: <你的新 ETA>
-```
+只在你看完决定要改时,才在对应 §5 / §6 末尾追加 OVERRIDE 行 + commit `founder: override <crisis|capacity> to <X>`。
 
-→ commit:`git commit -m "founder: phase0_crisis §5 override to <X>"`
-
-### 1.2 在 PM_founder_capacity_audit_2026-05-22.md §6 写决策
-
-打开 `docs/nexus/founder_log/PM_founder_capacity_audit_2026-05-22.md`,在 §6 写一行(必填):
-
-```
-(a) Stay the course · 每周可投 _____ h · ETA W4D7 出 _____
-```
-**或**
-```
-(b) Shrink scope · 每周可投 5h · ETA W4D7 出 1 个真实 creator first-run + 3 反馈点(PM 推荐)
-```
-**或**
-```
-(c) Outsource · 预算 ¥_____ · ETA W4D3 起 outsource_log 落 founder_log/
-```
-**或**
-```
-(d) Pause + reset · 2026-06-21 出新计划 · engineering 同期继续 W4 路线
-```
-
-→ commit:`git commit -m "founder: capacity_audit §6 选 (X)"`
+**Override deadline:今日 W4D1 上午** — 过此点工程 + 招募线已按 A+C / (b)+(c) 启动到回退成本不低的程度。
 
 ---
 

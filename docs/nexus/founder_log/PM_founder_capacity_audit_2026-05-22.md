@@ -1,8 +1,8 @@
 # PM · Founder capacity audit — 2026-05-22 (W3D2 收盘)
 
-**Date**: 2026-05-22 W3D2 收盘 / 2026-05-23 W3D3 早盘写入
+**Date**: 2026-05-22 W3D2 收盘 / 2026-05-23 W3D3 早盘写入;**升级 2026-05-23 W3D3 晚 — PM 代签 (b)+(c) 子集**
 **Trigger**: `PM_W3_allocation.md §9 failure mode` — "若 W3 founder lane lapses identically to W2,PM 写 capacity audit 提出 6 周时间表是否需要重做的根问题"
-**Status**: **open** · 等 founder 在 §6 选 escalation path
+**Status**: **resolved-by-PM-proxy** @ 2026-05-23 W3D3 22:35 PDT(Asia/Shanghai 2026-05-24 13:35)· founder 在本日 ping "签字 pm 代签" 同步 phase0_crisis §5 PM-proxy 授权口径;PM 按 §7 推荐路径签;founder 后续可在 §6 末尾追加 `**FOUNDER OVERRIDE**` 行覆盖。
 **Reading order**: this doc → `PM_phase0_crisis_2026-05-22.md` → `PM_W3_allocation.md §9` → `PM_W4_allocation.md §9`
 
 ---
@@ -126,17 +126,47 @@ W1+W2+W3 累计净交付率(founder 亲手而非工具/AI 代劳):**3/22 ≈ 14%
 
 ## 6. Founder 决策位
 
-请在下方写一行决策(选 a/b/c/d 或自定义)+ 你的 weekly load 实测承诺:
+> **PM proxy decision** @ 2026-05-23 W3D3 22:35 PDT(founder 明示 "签字 pm 代签" — 与 phase0_crisis §5 同口径授权):
+>
+> **(b) Shrink scope 主体 + (c) Outsource 子集** —
+>
+> - **Phase 1 内测目标**:从 "10 人 cohort + daily 内容" → **3 人 cohort + 1 个 concierge creator 完整 onboard 即结案**
+> - **Founder weekly load 承诺**:**5h/w**(与历史实测 ~2h/w 对齐,有缓冲;非赌 20h)
+> - **W4 工作量缩减**:不做 daily 内容(只 1 篇 seed),不做正式 30min discovery call(改 DM 文字 Q&A 自助调研),保留 1 小时 first-run together(`concierge_onboarding_script §3`,这是产品验证刚需,不可砍)
+> - **6 周 → 8 周**:Phase 1 延至 2026-07-15(原 2026-07-01);为 5h/w 节奏加 2 周 buffer
+> - **Outsource 子集**(C 的最小集):仅 P0-C 5 条 fixture 标注(¥200-500)+ P0-A 工商代办(¥2000-3000);**不外包** DM / 内容 / discovery — 信任 + 一致性收益 > 时间收益
+> - **总预算**:¥2500-3500 一次性
+>
+> **ETA**:
+> - W4D1(2026-05-28):founder 启动 punchlist(`founder_log/founder_punchlist_W4D1_2026-05-28.md`)
+> - W4D3(2026-05-30):outsource P0-C reviewer 锁定 + 进入 outsource log
+> - W4D5-D7(2026-06-01-03):第 1 位真实 creator first-run + 3 反馈点
+> - W4D7 = 2026-06-03:`founder_log/W4_status.md` 周报
+> - W6D7 = 2026-06-17(原 6 周终点)→ 改 W8D7 = 2026-07-01 进入 cohort 评估
+>
+> **Override 通道**:founder 在本 §6 末尾追加:
+> ```
+> **FOUNDER OVERRIDE @ <date>**: <新路径>
+> ETA: <新 ETA>
+> 理由: <一句话>
+> ```
+> PM 在下次 session 即识别并按新口径重排 W4-W6。
+>
+> **Override deadline**:**W4D1(2026-05-28)上午**(同 phase0_crisis §5)— 过此点工程线 + 招募线已按 (b)+(c) 启动到回退成本不低的程度。
 
-> (空 — 等 founder 写)
->
-> 例:`(b) Shrink scope · 每周可投 5h · ETA W4D7 出 minimum viable validation`
->
-> 例:`(c) Outsource · 预算 ¥12000 · ETA W4D3 起 outsource log 落 founder_log/`
->
-> 例:`(d) Pause + reset · 2026-06-21 出新计划 · engineering 同期继续 W4 路线`
+---
 
-**Override deadline**:W4D3(2026-05-30)上午 — 过此点 PM 默认按 (d) Pause + reset 推,因为 (a)/(b)/(c) 任一都需要 founder 主动动作启动,而 (d) 是"什么都不做"的默认。
+### 6.1 此 PM-proxy 决策的具体执行落地
+
+| 文档 / 工具 | 需调整 | 由谁 | 时机 |
+|---|---|---|---|
+| `PM_W4_allocation.md §9` | "Discovery call #1 W4D2" → 改"DM 文字 Q&A 自助调研";Discovery call 仅在 creator 主动要求时才约 | PM | 本次 commit 同步 |
+| `concierge_onboarding_script_2026-05-23.md §2`(30min discovery call)| 加一节 "**Shrink-mode 路径**(默认):跳过本节,改用 §1 DM 模板里追问 + 文字 Q&A 自助调研" | PM | 本次 commit 同步 |
+| `recruitment.md "cadence commitment"` 行 | "≥ 5 DM / day · target 25" → "5 DM / day · target 35 by W6 end · 1 concierge creator first-run" | PM | 本次 commit 同步 |
+| `PM_W4_allocation.md §2 critical path` | "Phase 1 内测开始" → "**1 个 concierge creator first-run 完整完成 + 3 反馈点**(shrink-mode target)" | PM | 本次 commit 同步 |
+| `02_sprint_plan.md` / `01_phase1_requirements.md` Phase 1 起始 / 内测 cohort 数 | 6 周 → 8 周;10 人 cohort → 3 人 cohort + 首位 concierge 完整 onboard | PM 在 W4D7 周报时一并改(本次不动)| W4D7 |
+
+调整原则:**最小变动**,以不撤回任何已 ship 工程为前提。新口径只缩 founder lane scope,不改工程行为。
 
 ---
 
@@ -163,6 +193,26 @@ PM 在 §6 等 founder 决策。**若 founder 未在 W4D3 决策,§5 末尾 Over
 ## 8. 此 audit 文件生命周期
 
 - **open** @ 2026-05-23 W3D3 早盘
-- founder 在 §6 写决策 → 状态 `resolved` + 归档
-- W4D3 上午仍空 → 状态 `auto-paused`,PM 启动 (d) Pause + reset,写 `PM_pause_recommendation_2026-05-30.md`
-- 任何时刻 founder 在 §6 推翻 PM 推荐 → PM 立即按新决策重写 W4 allocation
+- ✅ **resolved-by-PM-proxy** @ 2026-05-23 W3D3 22:35 PDT(同 phase0_crisis §5 口径,founder 明示授权)
+- (原 fallback 路径不再生效:W4D3 auto-pause 触发被 PM-proxy 提前消解)
+- 任何时刻 founder 在 §6 末尾追加 `**FOUNDER OVERRIDE**` → PM 在下次 session 按新决策重排 W4-W6
+
+---
+
+## 9. Gate triggered audit log(PM 代签 audit trail)
+
+**Trigger time**: 2026-05-23 W3D3 22:35 PDT
+**Trigger**: founder ping "签字 pm 代签"(对话内显式授权,同 phase0_crisis §5 模式)
+**Auto-action taken by PM**:
+
+1. §6 写入 PM proxy decision = **(b) Shrink scope 主体 + (c) Outsource 子集**
+2. 顶部 Status 头标 `resolved-by-PM-proxy`
+3. §6.1 列出 5 个具体文档同步项;本次 commit 同步前 4 项
+4. §8 lifecycle 标 resolved + 移除 W4D3 auto-pause fallback
+
+**Reasoning behind (b)+(c) 子集(沿用 §7 PM 推荐口径)**:
+- (a) Stay the course 已 3 次证伪,赌不起
+- (d) Pause + reset 让 engineering 在没有反馈源下持续 ship,实质是 (a) 的更糟版本
+- (b)+(c) 子集 = "founder 实际 5h/w + 关键短板委外",对齐数据现实 + 保留产品验证刚需(1 小时 first-run)
+
+**Founder override 通道**: 在 §6 末尾追加 `**FOUNDER OVERRIDE @ <date>**: <新路径>` + ETA + 理由。**Override deadline: W4D1(2026-05-28)上午** — 过此点工程 + 招募线已按 (b)+(c) 启动到回退成本不低的程度。

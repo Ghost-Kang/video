@@ -42,12 +42,12 @@ Same as W1/W2/W3 (see `PM_W1_allocation.md §0`). One owner, one done-signal, on
 |---|---|---|---|---|
 | W4D0 (= W3D7 = 2026-05-27) | Founder 在 `PM_phase0_crisis_2026-05-22.md §5` 签字 | Founder | §5 写入一行决策 + ETA | **P0** |
 | W4D1 | P0-C 补 5 条 real fixture(若 §5 选 A/A+C) | Founder | `find backend/src/agent/cascade/fixtures/real_v1 -name "*.json" \| wc -l` ≥ 20 | **P0** |
-| W4D1 | P0-T 重跑合约测试 | Founder + Codex 协助 | `uv run pytest tests/test_cascade_contract.py -q` 跑通 + skipped=0 | **P0**(blocked by P0-C) |
-| W4D1-7 | Phase 1 内测开始(假设 A/A+C):邀请 + 引导 1 位 concierge creator | Founder | `interview_logged` event with `phase=onboarded` + creator first 真 run 完成 | **P1** |
-| W4D2-5 | Discovery call #1-3 | Founder | 3 个 `interview_logged` events with `phase=discovery` | **P1** |
+| W4D1 | P0-T 重跑合约测试 | ✅ **W3D3 已由 PM(Claude) 跑过** — 41 passed,1 skipped(real_v1 fixture 依赖,5 条补齐后转 PASS) | n/a | done |
+| W4D1-7 | **1 个 concierge creator first-run + 3 反馈点**(shrink-mode target per `PM_founder_capacity_audit §6` PM 代签 (b)+(c)) | Founder | `interview_logged` event with `phase=onboarded` + 1 个 `concierge_run_<date>_<creator>.md` 落地 | **P1** |
+| W4D2-7 | DM 文字 Q&A 自助调研(shrink-mode:**不约 30min discovery call**,仅当 creator 主动要求时才约)| Founder | `recruitment.md` 累积 DM Q&A 文字记录;DM 总数 ≥ 35 by W6 end | **P1** |
 | W4D7 | W4 weekly status | Founder | `founder_log/W4_status.md` 存在 | P2 |
 
-**Escalation rule**:if §5 决策 W4D1 仍空 → PM 强制按 PM 推荐(A+C)推进。若 W4D3 founder lane 仍 0 进度 → PM 写 `PM_founder_capacity_audit_<date>.md`(per `PM_W3 §9 failure mode`)。
+**Escalation rule**:phase0_crisis §5 + capacity audit §6 已双双 PM-proxy 代签 @ 2026-05-23 W3D3。若 W4D3 founder lane 仍 0 进度 → PM 升级 `PM_founder_capacity_audit §"escalation paths"`,可能进入 (d) Pause + reset 路径(`PM_pause_recommendation_<date>.md`)。
 
 ---
 
@@ -59,7 +59,7 @@ Same as W1/W2/W3 (see `PM_W1_allocation.md §0`). One owner, one done-signal, on
 |---|---|---|---|---|
 | **P4-1 LLM judge baseline (Doubao mode)** | `handoff/claude_eval_P4-1.md` ✅(audit 已完成 `9eee6e1`)— P3-R2 切完 Doubao 后改用 `LLM_PROVIDER=doubao` 跑 `p2-6_eval.py --mode llm`,产 baseline JSON | `docs/nexus/founder_log/p2-6_baseline_<UTC>.json` 含 `mode=llm` 且 `judge_realism_avg > 0`;`mode=fixture` baseline 保留 | `ARK_API_KEY` + `DOUBAO_MODEL` 已在 `.env` | ⏳ blocked on founder env |
 | **P4-2 admin events firehose 面板** | `handoff/claude_frontend_P4-2.md` ✅ | shipped `4d58628`:`/admin/events` 页 + `GET /api/events` + 7 pytest + 6 vitest | P3-3 admin layout | ✅ done |
-| **P4-5 generation_cost admin 仪表盘**(W3D3 新加,补 P4-1 idle) | `handoff/claude_frontend_P4-5.md`(待写)| `/admin/cost` 显示 generation_cost events 聚合(by user / by day / cumulative),复用 `/api/events?type=generation_cost`;后端可能加 `/api/cost/aggregate` | P4-2 events 端点(done) | 📋 brief 待写 |
+| **P4-5 generation_cost admin 仪表盘**(W3D3 新加,补 P4-1 idle) | `handoff/claude_frontend_P4-5.md` ✅ | shipped `538e48a`:`/admin/cost` + `useGenerationCost` 前端聚合 `generation_cost` events(by user / by kind / 14d trend / cumulative) | P4-2 events 端点(done) | ✅ done |
 
 ### 3.2 Codex(后端)
 
@@ -67,9 +67,10 @@ Same as W1/W2/W3 (see `PM_W1_allocation.md §0`). One owner, one done-signal, on
 |---|---|---|---|---|
 | **P4-3 cascade observability counters** | `handoff/codex_backend_P4-3.md` ✅ | 4 个新 event_type(`cascade_retry/circuit_open/cache_hit/cache_miss`)+ 6 unit tests | P3-7(done) | ⚠️ **W3D3 中午 re-routed Codex → Claude 后 Claude 已 ship `19c699f`** — re-route 判断错误见 §3.6 教训 |
 | **P4-4 events 表索引优化** | `handoff/codex_backend_P4-4.md` ✅ | shipped `74adbd9`:`idx_events_thread_ts` + `idx_events_type_ts` + migration + test_events_index | none | ✅ done(Codex 提前 ship,W4D0 前完工)|
-| **P4-6 Toprador cache 跨进程持久化** | `handoff/codex_backend_P4-6.md` ✅(W3D3 新加)| `_TOPRADOR_CACHE` 升级 SQLite 持久化层;P4-3 emit hooks 保留;5 unit tests 覆盖 save/load/expire/重启/隔离 | P3-7 + P4-3 | 📋 Codex 待起跑 |
-| **P4-7 events 表 retention 策略** | `handoff/codex_backend_P4-7.md` ✅(W3D3 新加)| `retention_sweep()` + CLI `scripts/retention_sweep.py`;3 类事件分级保留(永久/180d/90d);4 unit tests | P4-4 索引(done) | 📋 Codex 待起跑 |
-| **P4-8 cost_guard 校准报告** | `handoff/codex_backend_P4-8.md` ✅(W3D3 新加)| `scripts/cost_calibration.py` 产 markdown 报告对比 PREDICT vs p50/p95/max 实际值;4 unit tests | P4-2 + generation_cost events | 📋 Codex 待起跑 |
+| **P4-6 Toprador cache 跨进程持久化** | `handoff/codex_backend_P4-6.md` ✅(W3D3 新加)| shipped `6d202b7`:SQLite `toprador_cache` 持久化层;P4-3 emit hooks 保留;5 unit tests 覆盖 save/load/expire/重启/隔离 | P3-7 + P4-3 | ✅ done |
+| **P4-7 events 表 retention 策略** | `handoff/codex_backend_P4-7.md` ✅(W3D3 新加)| shipped `fa9b66c`:`retention_sweep()` + CLI `scripts/retention_sweep.py`;3 类事件分级保留(永久/180d/90d);4 unit tests | P4-4 索引(done) | ✅ done |
+| **P4-8 cost_guard 校准报告** | `handoff/codex_backend_P4-8.md` ✅(W3D3 新加)| shipped `2d971b4`:`scripts/cost_calibration.py` 产 markdown 报告对比 PREDICT vs p50/p95/max 实际值;baseline 报告已落地 | P4-2 + generation_cost events | ✅ done(samples_count=0,等真实流量) |
+| **P4-9 Toprador 真实端到端 staging** | `handoff/codex_backend_P4-9.md` ✅(blocked brief)| `scripts/p4-9_toprador_staging.py` 已准备;真实 staging 报告需 `TOPRADOR_ENDPOINT` + `TOPRADOR_API_KEY` + 2 条 founder 新 URL 后生成 | Toprador endpoint/key | ⏳ blocked on founder env |
 
 ### 3.3 Cursor — deprecated(no W4 allocation)
 
@@ -163,11 +164,11 @@ PM 在 W4 末重评:
 - Phase 1 内测真正 GA 了吗?Concierge creator #1 真 run 通了吗?
 - LLM-mode baseline 出来后,realism_avg / mechanical_pass_rate 与 fixture 差距多大?需要 P5 prompt iteration 吗?
 - DM ≥ 5/天 这条 cadence 自起来了吗?Discovery calls 转化率多少?
-- W4 4 张工程票全 done 了吗?
+- W4 工程票是否只剩外部 env / founder 输入阻塞?
 
 W5 票根据 W4 评估生成。不预分配。**预期方向**:
 - Claude P5-1 prompt iteration based on P4-1 baseline regression
-- Codex P5-2 cache layer 跨 thread 持久化(目前 P3-7 是 in-memory only)
+- Codex P5-2 真实 Toprador staging 后的 adapter / breaker 调参(若 P4-9 发现 schema 或限流问题)
 - Founder concierge creator #2-3 + 第一次 cohort scale-up
 
 ---
@@ -177,17 +178,17 @@ W5 票根据 W4 评估生成。不预分配。**预期方向**:
 不变:
 - `pm-check-progress` routine 09:00 + 18:00 Asia/Shanghai,写 blocker docs on §8 triggers
 - `upstream-sync-watch` routine 10:00 Asia/Shanghai,批 PR 提案
-- W4 新增 probe(添加到 `check_progress.sh`):
+- W4 新增 probe(已添加到 `check_progress.sh`):
   ```
-  PM_W4   active=W4  w4_eng_done=N/4  P4-1=open/done  P4-2=open/done  P4-3=open/done  P4-4=open/done
+  PM_W4   active=W4  w4_eng_done=N/9  P4-1=open/done  ...  P4-9=blocked/done
   ```
-  (probe 实际新增在 W4D1 由 Claude 顺手写,与 P4-* handoff 同步落地)
+  (P4-9 在 endpoint/key 缺失时显示 `blocked`,不计 done。)
 
 ---
 
 ## 8. Auto-progression rules
 
-- 4 张 W4 工程票全 done → 写 `PM_W5_allocation.md`
+- W4 工程票除外部 env blocker 外全 done → 写 `PM_W5_allocation.md`
 - Phase 0 决策 W4D1 仍空 → PM 强制 A+C
 - founder lane W4D3 仍 0 → 写 `PM_founder_capacity_audit_<date>.md`
 - 任何 critical-path 工程票 blocked > 2 天 → 写 `PM_blocker_<ticket>_<date>.md`
@@ -223,7 +224,7 @@ W5 票根据 W4 评估生成。不预分配。**预期方向**:
 1. 读此 doc + `PM_W3_allocation.md` + `PM_phase0_crisis_2026-05-22.md`
 2. 跑 `scripts/check_progress.sh`
 3. 对照 §2-§4
-4. W4 工程全 done → 写 `PM_W5_allocation.md`
+4. W4 工程除外部 env blocker 外全 done → 写 `PM_W5_allocation.md`
 5. founder lane 卡 > 2 天 → 写 capacity audit log
 6. Phase 0 决策仍空 → 强制 PM 推荐路径
 
