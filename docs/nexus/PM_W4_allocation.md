@@ -65,8 +65,11 @@ Same as W1/W2/W3 (see `PM_W1_allocation.md §0`). One owner, one done-signal, on
 
 | Ticket | Brief | Done-signal | Upstream dep | 实际状态 |
 |---|---|---|---|---|
-| **P4-3 cascade observability counters** | `handoff/codex_backend_P4-3.md` ✅ | 4 个新 event_type(`cascade_retry/circuit_open/cache_hit/cache_miss`)+ 6 unit tests | P3-7(done) | 🔁 **2026-05-23 W3D3 re-routed Codex → Claude**(brief 就位 18h+ 无响应;Claude bandwidth idle 待 P4-1 env;backend 票虽属 Codex lane,但 4-owner allocation rule 优先于 lane defaults — 票不能因 owner silent 永久搁置)|
+| **P4-3 cascade observability counters** | `handoff/codex_backend_P4-3.md` ✅ | 4 个新 event_type(`cascade_retry/circuit_open/cache_hit/cache_miss`)+ 6 unit tests | P3-7(done) | ⚠️ **W3D3 中午 re-routed Codex → Claude 后 Claude 已 ship `19c699f`** — re-route 判断错误见 §3.6 教训 |
 | **P4-4 events 表索引优化** | `handoff/codex_backend_P4-4.md` ✅ | shipped `74adbd9`:`idx_events_thread_ts` + `idx_events_type_ts` + migration + test_events_index | none | ✅ done(Codex 提前 ship,W4D0 前完工)|
+| **P4-6 Toprador cache 跨进程持久化** | `handoff/codex_backend_P4-6.md` ✅(W3D3 新加)| `_TOPRADOR_CACHE` 升级 SQLite 持久化层;P4-3 emit hooks 保留;5 unit tests 覆盖 save/load/expire/重启/隔离 | P3-7 + P4-3 | 📋 Codex 待起跑 |
+| **P4-7 events 表 retention 策略** | `handoff/codex_backend_P4-7.md` ✅(W3D3 新加)| `retention_sweep()` + CLI `scripts/retention_sweep.py`;3 类事件分级保留(永久/180d/90d);4 unit tests | P4-4 索引(done) | 📋 Codex 待起跑 |
+| **P4-8 cost_guard 校准报告** | `handoff/codex_backend_P4-8.md` ✅(W3D3 新加)| `scripts/cost_calibration.py` 产 markdown 报告对比 PREDICT vs p50/p95/max 实际值;4 unit tests | P4-2 + generation_cost events | 📋 Codex 待起跑 |
 
 ### 3.3 Cursor — deprecated(no W4 allocation)
 
@@ -80,12 +83,33 @@ Per `03_routing.md §0.1`(founder decision 2026-05-21),Cursor 仍 deprecated。W
 
 §4 完整列举,与本节 §3 工程线对称对位。
 
+### 3.6 教训:Codex re-route discipline(P4-3 案例 + 4-owner rule 修正)
+
+**2026-05-23 W3D3 中午 founder 反馈**:"Codex agent 每次很快就可以做完任务,请合理安排他们中间工作"。
+
+**Root cause**:
+- W3D3 早盘 PM 看到 P4-3 brief 在 handoff/ 就位 18h+ 无新 commit → 误判为 "Codex 不响应"
+- 实际:Codex 没 "不响应",只是 brief 队列里只有这一张 + Codex 还没轮到 / 还没被 ping
+- PM 一拍脑袋 re-routed Codex → Claude,Claude 接住 ship 了 `19c699f`
+- 同时 Codex 此前已主动 ship 了 P4-4(`74adbd9`),证明 Codex 在监控 brief 队列
+
+**4-owner rule 修正口径**:
+1. **Codex idle 不是 "未响应",可能是 "队列没东西可挑"**。PM 应该多堆 brief 让 Codex 自己选最先做哪个。
+2. **18h "未响应" 阈值无意义** — Codex 不像 Claude 在 session 里 always-on;它是 batch / poll 模式。
+3. **Re-route 触发条件应该改为:工程线全空 + Codex 队列 ≥ 3 brief 没动 + 某 brief 标 critical-path**。任一不满足都不应跨 lane 抢票。
+4. **PM 应该提前堆 brief**,Phase 1 整个生命周期保持 Codex 队列 ≥ 2 brief 不空。这次 W3D3 补 P4-6/P4-7/P4-8 三张就是这个口径的执行。
+
+**Compensation for this re-route**:
+- P4-3 已 ship by Claude(`19c699f`),不撤回(撤回成本 > 收益)
+- W3D3 当下 Codex 队列从 0(P4-4 ship 后)恢复到 3 张(P4-6/P4-7/P4-8),保持 Codex idle 时不发生
+- 后续若 Claude 也想接其中一张,需 PM 显式 re-route + 在此 §3.6 加记录
+
 ### 3.5 Delays carry-forward(W3 slip → W4 action)
 
 | Owner | What slipped in W3 | W4 recovery |
 |---|---|---|
 | **Founder** | DM batch(0 / 35 target,W2+W3 累计),seed post,算法备案,discovery calls(0),P0-A 受理回执,**phase0 §5 决策签字过 14h 仍空** → PM 代签 A+C 2026-05-23 W3D3 | **capacity audit 已写**(`founder_log/PM_founder_capacity_audit_2026-05-22.md`);全部进入 §4 + §2 critical path;若 W4D3 founder lane 仍 0 → 升级到 founder_capacity_audit §"escalation paths" |
-| Codex | (none — 5 张 P3 票全 done) | **P4-4 已提前 ship** `74adbd9`;**P4-3 仍待 Codex 起跑**(brief 已就位 14h+,W4D1 必须开工) |
+| Codex | (none — 5 张 P3 票全 done) | **P4-4 已提前 ship** `74adbd9`;P4-3 误 re-route 给 Claude(已 ship `19c699f`,见 §3.6 教训);**W3D3 新堆 P4-6 / P4-7 / P4-8 三张 brief 保持队列不空** |
 | Claude | (none — 4 张 P3 票全 done + 协助文档 + 协议起草) | **P4-2 已 ship** `4d58628` + **P4-1 audit 已 done** `9eee6e1`;**P4-5 cost 仪表盘** 新加补位(W4D1-2 起跑);P4-1 baseline 等 founder env |
 | Cursor | (deprecated;n/a) | 0 expected |
 
