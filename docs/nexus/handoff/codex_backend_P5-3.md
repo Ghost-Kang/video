@@ -1,11 +1,58 @@
-# Codex handoff — P5-3 Doubao-lite 视频分析(替代 toprador)
+# Codex handoff — P5-3 Doubao-lite 视频分析(替代 toprador 分析层)
 
 **Owner**: Codex session (backend)
-**Status**: READY · no upstream blocker(`ARK_API_KEY` 已在 `.env`)
-**Time budget**: 8 工作日(分 5 sub-phase,每 phase 独立可 ship)
-**Allocation**: PM_W5_allocation.md §3.2(本 brief 写于 W3D3 晚,W5D1 开工)
-**Supersedes**: `handoff/codex_backend_P4-9.md`(Toprador staging)— 该 brief 改为 deprecated;若 P5-3 ship 顺利,P4-9 永不执行
-**Founder decision (2026-05-23 W3D3)**: "toprador 路径 = PM 开 P5-3 Doubao-lite 重写(推荐)"
+**Status**: ⛔ **BLOCKED · awaiting founder MediaKit tools 完整列表 + URL resolver 接续路径**(见 §0.1)
+**Time budget**: ~6-8 工作日(待 §0.1 解锁后给出精确值;5 sub-phase 仍是骨架)
+**Allocation**: PM_W5_allocation.md §3.2(本 brief 写于 W3D3 晚,起跑时机待 §0.1 解锁后定)
+**Partial-supersede**: `handoff/codex_backend_P4-9.md`(Toprador staging)— 分析层 deprecated;但 toprador 的 **页面 URL → 直接媒体 URL resolver 模块保留**(见 §0.1.3)
+**Founder decision (2026-05-23 W3D3)**: "toprador 路径 = PM 开 P5-3 Doubao-lite 重写(推荐)" + "老 toprador 有 URL resolver 这块逻辑,保留该模块"
+
+---
+
+## 0.1 ⛔ BLOCKED 状态 / 3 个待 founder 返回的 unknown(2026-05-23 W3D3 23:00 PDT 加)
+
+PM 已用 founder 提供的 MediaKit AK 跑 probe(`founder_log/p5-3a_mediakit_schemas_20260523T143852Z.md`),发现 3 个 critical 现实和原 brief 假设不符:
+
+### 0.1.1 MediaKit 实际只有 `extract-audio`,**extract-frames + transcribe 不存在**
+
+probe 实测:`POST /tools/extract-frames` 和 `POST /tools/transcribe` 都返回 `tool(<name>) not found`。MediaKit 用 `/api/v1/tools/<X>` 路由模式,任何未注册 tool 名一律 200 + success:false + error.code=InvalidParameter。
+
+**待 founder 给**:**完整 MediaKit tools 列表**(去火山控制台 MediaKit 产品页或客服查)。在这之前,PM **不要猜 endpoint 名**;只有 extract-audio 确认存在。
+
+可能候选(待证):keyframes / snapshot / screenshot / extract-keyframes / video-frames / asr / speech-to-text / stt / extract-text / audio-to-text。
+
+### 0.1.2 frame 抽取 + ASR 路径未定
+
+如果 MediaKit 真没有这两类工具,P5-3 sub-phase A 要分裂:
+- **frame 抽取**:Doubao Vision 直调 video URL(部分模型支持)/ ffmpeg 本地 / 其他 fallback
+- **ASR**:火山 ASR 独立 product(原 brief 假设)/ 第三方 / 不做(纯靠 frame 推测口播,质量差)
+
+**待 founder 决定**:见 §0.1.1 答案返回后由 PM 在重写时定。
+
+### 0.1.3 MediaKit **不能消费 Douyin / 小红书页面 URL** — 需要 URL resolver
+
+probe 实测:把 Douyin 视频 URL(`https://www.douyin.com/video/...`)喂 extract-audio,task 状态 `failed`,error 显示 MediaKit 内部 `ffprobe` 读到空 JSON — 因为 MediaKit 把 URL 当 HTTP 资源下载,拿到 Douyin 页面 HTML,不是 .mp4。
+
+**结论**:MediaKit 要 **直接媒体 URL**(.mp4 / .mov),不是页面 URL。
+
+**Founder W3D3 决定**:"老 toprador 有 URL resolver 这块逻辑,保留该模块(不丢)" — 即 toprador 的"页面 URL → 直接 .mp4 URL"模块**保留**;P5-3 只替换分析层(viral_analysis / scenes),URL resolver 仍是 toprador 提供。
+
+**待 founder 给**:toprador URL resolver 的接续方式 — 三选一:
+- (a) toprador 一个独立 endpoint(例如 `POST /api/v1/resolve-url`),P5-3 调它拿 .mp4 URL
+- (b) toprador 内嵌在 P5-3 流水线里,Codex 直接 import 老 toprador 的 resolver 代码
+- (c) 把 resolver 抽成独立 Python lib / micro-service,Codex 起跑前 founder 帮交付
+
+### 0.1.4 阻塞 sub-phase A 的硬条件
+
+sub-phase A 起跑前 founder 必须给:
+1. **完整 MediaKit tools 列表**(§0.1.1)
+2. **frame + ASR 选型**(§0.1.2,基于 §0.1.1 数据)
+3. **toprador URL resolver 接续方式**(§0.1.3 a/b/c)
+4. **长期 VOLC_MEDIAKIT_AK**(已 W3D3 给临时 AKLT*,Codex sub-phase A 起跑前要长期 key)
+
+Sub-phase B/C(Doubao Vision + text LLM 聚合)**仍可起跑**,但 sub-phase A 的产物 schema 未定时,Codex 在 sub-phase B 的输入 mock 起来困难 — 建议**整 P5-3 暂停**,等 §0.1.1-0.1.3 全到位再重写 brief + 起跑。
+
+---
 
 ---
 
