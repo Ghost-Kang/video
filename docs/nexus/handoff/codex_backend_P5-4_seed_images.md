@@ -34,6 +34,56 @@ grep -E "^GOOGLE_API_KEY|^IMAGE_GEN_PROVIDER" .env
 
 ---
 
+## 0.6 GEMINI BILLING BLOCKER(W3D7 reality-fail #2,**必读**)
+
+**2026-05-24 W3D7 12:14 UTC** 实跑 9/9 全 429 失败:
+
+```
+limit: 0, model: gemini-3.1-flash-image
+quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier
+```
+
+**结论**:`gemini-3.1-flash-image-preview` 在 Google AI Studio free tier 的 quota 是 **0**;此 image preview model 只对**已开通 Google Cloud billing** 的 project 开放。PM 在 W3D7 brief §0 推荐 "Gemini 免费层够用" 是 reality-fail,需 founder 决策后再起 P5-4 retry。
+
+**Codex / 后续 PM session 起跑前必须 verify**:
+```bash
+# 单张 dry-call 看是否 429
+cd backend && uv run python -c "
+import asyncio
+from agent.tools.generation import GoogleProvider
+async def t():
+    p = GoogleProvider()
+    r = await p.generate(prompt='small bowl on wood', size='3:4', resolution='2k')
+    print(r if 'error' in r else 'OK 已开 billing')
+asyncio.run(t())
+"
+```
+若仍返回 `error: ... RESOURCE_EXHAUSTED` → billing 未开,**直接 abort**,不要硬 retry。
+
+**完整错误日志**:`docs/nexus/founder_log/xhs_post_2026-05-23_images/_gen_log.md`
+
+### 4 个 unblock 路径(founder W3D7 待决策)
+
+| 选项 | 操作 | 时间 / 钱 | 风险 |
+|---|---|---|---|
+| **A** 开 Google Cloud billing(同 key 继续用) | `console.cloud.google.com` → enable billing → 绑卡 | ~5 min + ~¥3 总成本 | 0(脚本不变) |
+| **B** 切 Apimart(`IMAGE_GEN_API_KEY` + `IMAGE_GEN_PROVIDER=apimart`) | `apimart.ai` 注册 + key + 充值 + 改 `.env` | ~10 min + ~¥5 | 0(脚本支持 provider 切换) |
+| **C** 即梦 / 通义万相 网页版手动 gen | 网页粘 9 prompt × 9 次 + 下载 PNG | ~15 min 手动 | 0,但脱离自动化 |
+| **D** 回退 founder 自拍(原 punchlist §3 路径) | iPhone 5-15 min 实拍 + 美图秀秀套模板 | 5-15 min | 0,且 trust signal 反而最强 |
+
+**PM W3D7 偏见**:**D > C > A > B**(详 PM W3D7 chat reasoning;trust signal + zero-blocker 路径)。等 founder 签字。
+
+### founder 决策签字位
+
+待 founder 在本文件末尾追加一行:
+```
+**FOUNDER OVERRIDE W3D7**: 选 <A/B/C/D> 因 <一句>
+```
+
+Codex 看到这行后立即起跑;无 OVERRIDE = P5-4 持续 blocked。
+
+---
+
 ## 0. 背景
 
 founder W3D6(2026-05-23 Sat)触发"现在就启动"路径 B(`founder_punchlist_W4D1_2026-05-28.md §2-§3` 提前到 W3D6),原本 seed 帖封面 + 8 正文图由 founder iPhone 5 min 拍 + 美图秀秀套模板。founder 现场决定 9 张全 AI gen,以节省拍摄 5 min。
