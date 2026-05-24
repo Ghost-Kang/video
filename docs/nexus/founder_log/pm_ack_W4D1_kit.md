@@ -51,7 +51,10 @@
 
 ### PM 写回(founder review 后 / 同步发布后)
 
-- `recruitment.md` append 5 行 `- DM | <用户名> | <date> | sent | <剩余名额>`
+- `recruitment.md` append 5 行,严格按文件 §"格式"小节定义的 space-delimited schema:
+  `- DM 2026-05-28 小红书 @<用户名> niche=baomam_fushi 状态=已发`
+  (probe `scripts/check_progress.sh:272` 用 `grep -ic '^- DM'` 不挑分隔符,但日后 dashboard /
+   字段提取需要 `niche=` `状态=` key=value 格式 — 不要写 pipe 分隔)
 - commit message:`founder: W4D1 DM batch sent — <X> candidates via Xiaohongshu Specialist`
 
 ---
