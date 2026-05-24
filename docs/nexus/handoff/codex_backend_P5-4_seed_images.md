@@ -8,8 +8,29 @@
 **Source of truth**:
 - 9 张图原始 brief:`docs/nexus/founder_log/xhs_post_2026-05-23.md`(Content Creator agent 出)
 - 9 个 image2 prompts:本文件 §4(Image Prompt Engineer agent 出,2026-05-23)
-- ApimartProvider 接口:`backend/src/agent/tools/generation.py:32`(submit + poll + generate 三方法)
-- 默认 model:`backend/src/agent/config.py:27` `IMAGE_GEN_MODEL=gpt-image-2`
+- **GoogleProvider 接口**:`backend/src/agent/tools/generation.py:125`(W3D7 founder 选 B 路径,gemini-3.1-flash-image-preview 免费层)
+- model:`backend/src/agent/config.py:28` `IMAGE_GEN_GOOGLE_MODEL=gemini-3.1-flash-image-preview`
+
+---
+
+## 0. ENV BLOCKER(必读,Codex 起跑前 verify)
+
+**2026-05-24 W3D7 founder 选路径 B**(`PM W3D7 reality-check`):用 GoogleProvider 而非 ApimartProvider。
+
+`.env` 必须有:
+```
+GOOGLE_API_KEY=<在 aistudio.google.com 拿>
+IMAGE_GEN_PROVIDER=google   # 已是默认值,可省;为 explicit 推荐显式写
+```
+
+Verify:
+```bash
+grep -E "^GOOGLE_API_KEY|^IMAGE_GEN_PROVIDER" .env
+```
+
+若 `GOOGLE_API_KEY` 未设 → 脚本第 1 张就抛 `genai.Client(api_key=None)` 异常,**整体 abort**。
+
+**不要** 尝试切到 ApimartProvider 兜底(`.env` 也没 `IMAGE_GEN_API_KEY`)— founder W3D7 显式拒绝 A 路径。两 provider 都缺 key 时 → Codex 在 chat ping founder "ENV BLOCKER, 待补 GOOGLE_API_KEY"。
 
 ---
 
@@ -32,9 +53,9 @@ P5-4 = Codex 跑 ApimartProvider × 9 次,产 9 张 PNG,落 `docs/nexus/founder_
   - `cover.png`(封面,3:4 portrait)
   - `img_2.png` ~ `img_9.png`(正文 8 张,3:4 portrait)
 - `docs/nexus/founder_log/xhs_post_2026-05-23_images/_gen_log.md` 记录:
-  - 每张图:prompt_index、submit_ts、url(从 ApimartProvider 返回的)、actual_time(秒)、download status、本地 PNG 路径
-  - 总成本估算(¥;按 gpt-image-2 ~¥0.5/张 ≈ ¥4.5 总)
-  - 失败重试次数(若 ApimartProvider.poll 返回 error 自动重试 ≤ 2 次)
+  - 每张图:prompt_index、actual_time(秒)、attempt 次数、bytes 大小、本地 PNG 路径
+  - 总成本估算(Gemini 3.1 flash image preview 免费层 ≤ X 次/分钟;若进入付费按 google ai pricing 查)
+  - 失败重试次数(GoogleProvider.poll 返回 error 自动重试 ≤ 2 次)
 - 在 chat 给 founder 一行:"P5-4 done,9 张图本地 `docs/nexus/founder_log/xhs_post_2026-05-23_images/`,文件名 cover.png + img_2-9.png,直接发小红书"
 - commit `feat(P5-4): seed 帖 9 张 image2 gen — Codex ship`
 
@@ -46,74 +67,75 @@ P5-4 = Codex 跑 ApimartProvider × 9 次,产 9 张 PNG,落 `docs/nexus/founder_
 
 `scripts/p5-4_seed_images.py`(新)
 
-### 2.2 接口要点(`tools/generation.py:32 ApimartProvider`)
+### 2.2 接口要点(`tools/generation.py:125 GoogleProvider`)
 
 ```python
-from agent.tools.generation import ApimartProvider
+from agent.tools.generation import GoogleProvider
 
-provider = ApimartProvider()
+provider = GoogleProvider()  # 内部 genai.Client(api_key=GOOGLE_API_KEY)
 result = await provider.generate(
     prompt="...",
-    size="3:4",   # 注意:默认是 "16:9",seed 帖必须覆盖为 "3:4"
+    size="3:4",   # 注意:GoogleProvider 当前实现 size 参数未传到底层(genai 接口不需要),
+                  # 比例由 prompt 显式声明 "3:4 portrait" 控制(每个 prompt 已嵌入)
     resolution="2k",
 )
-# result = {"url": "https://...", "actual_time": 45} 或 {"error": "..."}
+# result = {"image_data": <bytes>, "actual_time": 12.3} 或 {"error": "..."}
 ```
 
-`generate()` 内部 = submit + poll(20s × 6 = 120s 上限)。
+**重要差异 vs ApimartProvider**:GoogleProvider 直接返回 `image_data: bytes` 而非 URL — 不需要 httpx 下载步骤,bytes 直接 `path.write_bytes(image_bytes)` 落盘。
 
-### 2.3 脚本骨架(伪码)
+### 2.3 脚本骨架(GoogleProvider 版)
 
 ```python
-"""P5-4 seed 帖 9 张图 image2 gen。
+"""P5-4 seed 帖 9 张图 image gen (Google Gemini 3.1 flash image preview)。
 
 使用:
     cd backend && uv run python ../scripts/p5-4_seed_images.py
 """
 import asyncio, json, time
 from pathlib import Path
-import httpx
 
-from agent.tools.generation import ApimartProvider
+from agent.tools.generation import GoogleProvider
 
 OUT_DIR = Path(__file__).parent.parent / "docs/nexus/founder_log/xhs_post_2026-05-23_images"
-PROMPTS_JSON = Path(__file__).parent / "p5-4_prompts.json"  # 见 §4,Codex 现场把 §4 prompts 抄进去
+PROMPTS_JSON = Path(__file__).parent / "p5-4_prompts.json"
 
-async def gen_one(provider, idx, name, prompt, retries=2):
+async def gen_one(provider, name, prompt, retries=2):
     for attempt in range(retries + 1):
         result = await provider.generate(prompt=prompt, size="3:4", resolution="2k")
-        if "url" in result:
+        if "image_data" in result:
             return {**result, "attempt": attempt + 1}
         if attempt == retries:
             return result
-        print(f"[{name}] 重试 {attempt + 1}/{retries}")
-        await asyncio.sleep(5)
-
-async def download(url, path):
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.get(url)
-        path.write_bytes(resp.content)
+        print(f"[{name}] 重试 {attempt + 1}/{retries}: {result.get('error')}")
+        await asyncio.sleep(3)
 
 async def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    prompts = json.loads(PROMPTS_JSON.read_text())  # [{"name": "cover", "prompt": "..."}, ...]
-    provider = ApimartProvider()
-    log_lines = ["# P5-4 image gen log", f"started: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}", ""]
+    prompts = json.loads(PROMPTS_JSON.read_text())
+    provider = GoogleProvider()
+    log_lines = [
+        "# P5-4 image gen log (GoogleProvider · gemini-3.1-flash-image-preview)",
+        f"started: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}",
+        "",
+    ]
 
     for idx, item in enumerate(prompts, start=1):
         name = item["name"]
         print(f"[{idx}/9] {name} 提交中...")
-        result = await gen_one(provider, idx, name, item["prompt"])
-        if "url" in result:
+        result = await gen_one(provider, name, item["prompt"])
+        if "image_data" in result:
             local = OUT_DIR / f"{name}.png"
-            await download(result["url"], local)
-            log_lines.append(f"- {name}: ✅ url={result['url']} time={result['actual_time']}s attempt={result['attempt']} local={local.name}")
+            local.write_bytes(result["image_data"])
+            log_lines.append(
+                f"- {name}: ✅ time={result['actual_time']:.1f}s "
+                f"attempt={result['attempt']} bytes={len(result['image_data'])} → {local.name}"
+            )
         else:
             log_lines.append(f"- {name}: ❌ {result.get('error', 'unknown')}")
             print(f"[{name}] 失败:{result.get('error')}")
 
-    log_lines.append("")
-    log_lines.append(f"finished: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}")
+    log_lines += ["", f"finished: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}"]
     (OUT_DIR / "_gen_log.md").write_text("\n".join(log_lines), encoding="utf-8")
     print(f"完成,日志 {OUT_DIR / '_gen_log.md'}")
 
@@ -123,10 +145,11 @@ if __name__ == "__main__":
 
 ### 2.4 Codex 实现建议
 
-- prompts 写到 `scripts/p5-4_prompts.json`(从本文件 §4 提取,数组顺序 = 1..9,name = `cover` / `img_2` / ... / `img_9`)
-- 跑前确认 `backend/.env` 有 `IMAGE_GEN_API_KEY` + `IMAGE_GEN_BASE_URL`(已在 `config.py:24-29` 读)
-- 跑前 + 跑后各看一眼 `/admin/cost`(若有 dashboard)记总开销;否则按 9 × ¥0.5 估
-- 不要并发提交 9 个(ApimartProvider 是 task_id 模式,顺序提交更稳;若并发可 `asyncio.gather` 但要看 Apimart 平台限流口径)
+- prompts 写到 `scripts/p5-4_prompts.json`(从本文件 §4 提取,数组顺序 = 1..9,`name` = `cover` / `img_2` / ... / `img_9`)
+- 跑前 verify `.env` 有 `GOOGLE_API_KEY`(参考 §0 ENV BLOCKER)
+- 跑前 + 跑后看 `aistudio.google.com` quota 是否进入付费;Gemini 3.1 flash image preview 免费层一般够 9 张
+- 顺序提交即可(GoogleProvider 内部 `asyncio.create_task` 并发友好,但本场景顺序更便于人工 review 单张失败)
+- 单张 timeout 120s(GoogleProvider hard-coded),9 张约 1-3 min 总耗
 
 ---
 
@@ -188,9 +211,9 @@ Top-down overhead flat-lay photograph of a small plain white ceramic bowl placed
 
 ## 5. 失败兜底
 
-- ApimartProvider 返回 `{"error": "timeout"}` → 自动重试 ≤ 2 次,仍失败标注 `_gen_log.md` + PM 在 chat 给 founder 报 "图 N 失败,founder 决定:跳过 / 重试 / 转 GoogleProvider(gemini-3.1-flash-image-preview)"
-- ApimartProvider 返回 `{"error": "提交失败: ..."}` → 极大概率是 IMAGE_GEN_API_KEY 配置 / 账户余额问题,Codex 直接报 founder,不要硬重试
-- 9 张图全部失败 → P5-4 标 blocked,founder 决定退路:(a)Codex 切到 GoogleProvider 重跑,(b)founder 5 min 拍封面 + AI 补 8 张
+- GoogleProvider 返回 `{"error": "timeout"}` → 自动重试 ≤ 2 次,仍失败标注 `_gen_log.md` + PM 在 chat 给 founder 报 "图 N 失败,founder 决定:跳过 / 重试 / 降回 hybrid(founder 自拍 1 张 + 其他重试)"
+- GoogleProvider 返回 `{"error": "Google 生图失败: ..."}` 含 quota / billing 字样 → 极大概率免费 quota 用完;Codex 直接报 founder,founder 决定补付费 OR 切回 Option C hybrid(打回原始 founder 自拍流程)
+- 9 张图全部失败 → P5-4 标 blocked,founder 决定:(a)开通 Google 付费 quota 重跑,(b)切 Apimart(需新补 IMAGE_GEN_API_KEY),(c)founder 5 min 拍封面 + 美图秀秀伪造其余
 - 单张图质量明显不符合 prompt(例如出现可读 Chinese text / 出现 Western kitchen / 出现 human hands)→ founder review 后 chat 说"图 N 重生,加约束 X",Codex 现场改 prompt + 单图重跑
 
 ---
@@ -198,8 +221,9 @@ Top-down overhead flat-lay photograph of a small plain white ceramic bowl placed
 ## 6. Upstream dep
 
 - ✅ `xhs_post_2026-05-23.md`(seed 帖文案 + 9 图 brief,commit `bb99ebe`)
-- ✅ `IMAGE_GEN_API_KEY` + `IMAGE_GEN_BASE_URL` 在 `backend/.env`(已用于 main agent canvas image gen,Codex 默认配置已 work)
-- ✅ ApimartProvider 已生产环境验证(canvas 现实使用)
+- ⛔ `GOOGLE_API_KEY` 待 founder W3D7 现场补到根 `.env`(`aistudio.google.com` → API keys → Create)
+- ✅ `google-genai>=1.75.0` 已在 `backend/pyproject.toml:11`
+- ✅ GoogleProvider 已生产环境验证(canvas image gen 现实使用)
 
 ---
 
@@ -209,7 +233,7 @@ Top-down overhead flat-lay photograph of a small plain white ceramic bowl placed
 - `scripts/p5-4_prompts.json`(从 §4 提取的 9 个 prompts,Codex 现场抄进去)
 - `docs/nexus/founder_log/xhs_post_2026-05-23_images/cover.png` + `img_2.png` ~ `img_9.png`(9 PNG)
 - `docs/nexus/founder_log/xhs_post_2026-05-23_images/_gen_log.md`(gen 日志)
-- commit:`feat(P5-4): seed 帖 9 张 image2 gen — Codex ship`(若一遍过)/`feat(P5-4): seed 帖 9 张 image2 gen — N 张需重生`(若有失败)
+- commit:`feat(P5-4): seed 帖 9 张 gemini-3.1-flash image gen — Codex ship`(若一遍过)/`feat(P5-4): seed 帖 9 张 image gen — N 张需重生`(若有失败)
 
 ---
 
