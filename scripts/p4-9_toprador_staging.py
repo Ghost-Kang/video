@@ -1,12 +1,13 @@
-"""P4-9 Toprador real end-to-end staging runner.
+"""P4-9/P5-3 real end-to-end staging runner.
 
 Usage:
     cd backend && uv run python ../scripts/p4-9_toprador_staging.py \
       --url https://www.douyin.com/video/... \
       --url https://www.douyin.com/video/...
 
-Requires:
-    TOPRADOR_ENDPOINT and TOPRADOR_API_KEY in backend/.env or environment.
+Default upstream:
+    mediakit, using the configured Doubao/ARK model path. The legacy Toprador
+    HTTP endpoint can still be exercised with --upstream toprador.
 """
 
 from __future__ import annotations
@@ -66,10 +67,9 @@ def _load_default_urls() -> list[str]:
     return urls[:3]
 
 
-def _configured() -> bool:
+def _toprador_configured() -> bool:
     endpoint = os.getenv("TOPRADOR_ENDPOINT", "").strip()
-    api_key = os.getenv("TOPRADOR_API_KEY", "").strip()
-    return bool(endpoint and api_key)
+    return bool(endpoint)
 
 
 async def _run_one(index: int, url: str) -> StagingResult:
@@ -173,8 +173,8 @@ def _render_report(results: list[StagingResult], events: list[dict[str, Any]], g
     return "\n".join(lines) + "\n"
 
 
-async def _run(urls: list[str]) -> Path:
-    os.environ["CASCADE_UPSTREAM"] = "toprador"
+async def _run(urls: list[str], *, upstream: str) -> Path:
+    os.environ["CASCADE_UPSTREAM"] = upstream
     results: list[StagingResult] = []
     for index, url in enumerate(urls, start=1):
         results.append(await _run_one(index, url))
@@ -183,19 +183,25 @@ async def _run(urls: list[str]) -> Path:
 
     generated_at = datetime.now(timezone.utc)
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    report_path = REPORT_DIR / f"p4-9_toprador_staging_{generated_at.strftime('%Y%m%dT%H%M%SZ')}.md"
+    report_path = REPORT_DIR / f"p4-9_{upstream}_staging_{generated_at.strftime('%Y%m%dT%H%M%SZ')}.md"
     report_path.write_text(_render_report(results, await _recent_events(), generated_at), encoding="utf-8")
     return report_path
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run P4-9 Toprador staging against real URLs.")
+    parser = argparse.ArgumentParser(description="Run P4-9/P5-3 staging against real URLs.")
     parser.add_argument("--url", action="append", default=[], help="extra founder-provided staging URL; pass twice to reach 5 URLs")
     parser.add_argument("--allow-partial-url-set", action="store_true", help="run with fewer than 5 URLs for connectivity debugging")
+    parser.add_argument(
+        "--upstream",
+        choices=["mediakit", "toprador", "fixture"],
+        default=os.getenv("CASCADE_UPSTREAM", "mediakit").strip().lower() or "mediakit",
+        help="analysis upstream to stage; default follows CASCADE_UPSTREAM or mediakit",
+    )
     args = parser.parse_args()
 
-    if not _configured():
-        print("blocked: TOPRADOR_ENDPOINT and TOPRADOR_API_KEY are required for P4-9 staging", file=sys.stderr)
+    if args.upstream == "toprador" and not _toprador_configured():
+        print("blocked: --upstream toprador requires TOPRADOR_ENDPOINT", file=sys.stderr)
         return 2
 
     urls = _load_default_urls()
@@ -206,7 +212,7 @@ def main() -> int:
         print("blocked: P4-9 requires 5 URLs; add two founder URLs via --url or pass --allow-partial-url-set", file=sys.stderr)
         return 2
 
-    report_path = asyncio.run(_run(urls[:5]))
+    report_path = asyncio.run(_run(urls[:5], upstream=args.upstream))
     print(report_path)
     return 0
 

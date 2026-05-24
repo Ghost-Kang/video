@@ -229,10 +229,10 @@ elif [ -f scripts/cost_calibration.py ]; then
 else
   p4_8="open"
 fi
-if ls docs/nexus/founder_log/p4-9_toprador_staging_*.md >/dev/null 2>&1; then
+if ls docs/nexus/founder_log/p4-9_*_staging_*.md >/dev/null 2>&1; then
   p4_9="done"
 elif [ -f scripts/p4-9_toprador_staging.py ]; then
-  p4_9="blocked"
+  p4_9="partial"
 else
   p4_9="open"
 fi
