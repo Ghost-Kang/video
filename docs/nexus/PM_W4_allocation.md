@@ -187,9 +187,9 @@ W5 票根据 W4 评估生成。不预分配。**预期方向**:
 - `upstream-sync-watch` routine 10:00 Asia/Shanghai,批 PR 提案
 - W4 新增 probe(已添加到 `check_progress.sh`):
   ```
-  PM_W4   active=W4  w4_eng_done=N/9  P4-1=open/done  ...  P4-9=blocked/done
+  PM_W4   active=W4  w4_eng_done=N/9  P4-1=open/done  ...  P4-9=partial/done
   ```
-  (P4-9 在 endpoint/key 缺失时显示 `blocked`,不计 done。)
+  (P4-9 已被 P5-3 MediaKit/Doubao 路线 supersede;runner 默认走 `CASCADE_UPSTREAM=mediakit`,仅显式 `--upstream toprador` 时才需要旧 endpoint。)
 
 ---
 

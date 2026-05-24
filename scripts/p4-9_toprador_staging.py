@@ -104,7 +104,7 @@ async def _run_one(index: int, url: str) -> StagingResult:
 
 
 async def _exercise_cache(url: str) -> None:
-    # Different user_id avoids analysis idempotency and reaches the Toprador cache layer.
+    # Different user_id avoids analysis idempotency and reaches the upstream cache layer.
     await request_shallow_analysis(url, user_id="staging-cache", run_id="p4-9-cache")
 
 
@@ -123,13 +123,20 @@ def _event_counts(events: list[dict[str, Any]]) -> dict[str, int]:
     return counts
 
 
-def _render_report(results: list[StagingResult], events: list[dict[str, Any]], generated_at: datetime) -> str:
+def _render_report(
+    results: list[StagingResult],
+    events: list[dict[str, Any]],
+    generated_at: datetime,
+    *,
+    upstream: str,
+) -> str:
     issue_count = sum(1 for result in results if not result.ok)
     counts = _event_counts(events)
     title_status = "READY" if issue_count == 0 else f"{issue_count} issues"
     lines = [
-        f"# P4-9 Toprador staging report - {generated_at.isoformat()}",
+        f"# P4-9 {upstream} staging report - {generated_at.isoformat()}",
         "",
+        f"upstream: {upstream}",
         f"status: {title_status}",
         f"samples_count: {len(results)}",
         "",
@@ -184,7 +191,10 @@ async def _run(urls: list[str], *, upstream: str) -> Path:
     generated_at = datetime.now(timezone.utc)
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     report_path = REPORT_DIR / f"p4-9_{upstream}_staging_{generated_at.strftime('%Y%m%dT%H%M%SZ')}.md"
-    report_path.write_text(_render_report(results, await _recent_events(), generated_at), encoding="utf-8")
+    report_path.write_text(
+        _render_report(results, await _recent_events(), generated_at, upstream=upstream),
+        encoding="utf-8",
+    )
     return report_path
 
 
