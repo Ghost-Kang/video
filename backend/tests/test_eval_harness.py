@@ -88,15 +88,21 @@ def test_run_checks_jiating_requires_dish():
 
 
 def test_judge_skips_without_api_key(monkeypatch):
-    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    def missing_model():
+        raise RuntimeError("LLM_PROVIDER=doubao but ARK_API_KEY missing")
+
+    monkeypatch.setattr("agent.llm_factory.get_chat_model", missing_model)
     result = judge_one(_stub_result(), niche="baomam_fushi")
     assert result.get("skipped") is True
+    assert "ARK_API_KEY missing" in result.get("reason", "")
 
 
 def test_judge_skips_under_env_override(monkeypatch):
-    monkeypatch.setenv("GOOGLE_API_KEY", "fake")
     monkeypatch.setenv("CASCADE_EVAL_JUDGE", "skip")
+    monkeypatch.setattr(
+        "agent.llm_factory.get_chat_model",
+        lambda: (_ for _ in ()).throw(RuntimeError("should not load model")),
+    )
     result = judge_one(_stub_result(), niche="baomam_fushi")
     assert result.get("skipped") is True
 

@@ -61,14 +61,15 @@ def judge_one(
 
     `result` is a rewrite output dict (RewriteResult-shaped).
     """
+    if os.getenv("CASCADE_EVAL_JUDGE", "live").strip().lower() == "skip":
+        return {"skipped": True, "reason": "CASCADE_EVAL_JUDGE=skip"}
+
     from agent.llm_factory import get_chat_model
 
     try:
         get_chat_model()
     except RuntimeError as exc:
         return {"skipped": True, "reason": str(exc)}
-    if os.getenv("CASCADE_EVAL_JUDGE", "live").strip().lower() == "skip":
-        return {"skipped": True, "reason": "CASCADE_EVAL_JUDGE=skip"}
 
     try:
         return _live_judge(
