@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from pathlib import Path
 
+import pytest
 from dotenv import load_dotenv
 from volcenginesdkarkruntime import Ark
 
@@ -13,6 +15,11 @@ from agent.config import ARK_API_KEY, ARK_BASE_URL, ARK_VIDEO_MODEL
 
 _project_root = Path(__file__).resolve().parent.parent.parent
 load_dotenv(_project_root / ".env")
+
+pytestmark = pytest.mark.skipif(
+    os.getenv("RUN_LIVE_VIDEO_TESTS") != "1",
+    reason="live Seedance video tests require RUN_LIVE_VIDEO_TESTS=1",
+)
 
 
 def _client():

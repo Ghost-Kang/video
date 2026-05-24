@@ -9,6 +9,8 @@ from __future__ import annotations
 import io
 from pathlib import Path
 
+import os
+import pytest
 from dotenv import load_dotenv
 from google import genai
 from PIL import Image as PILImage
@@ -18,6 +20,11 @@ _project_root = Path(__file__).resolve().parent.parent.parent
 load_dotenv(_project_root / ".env")
 
 MODEL = "gemini-3.1-flash-image-preview"
+
+pytestmark = pytest.mark.skipif(
+    os.getenv("RUN_LIVE_GENERATION_TESTS") != "1",
+    reason="live Google image-generation tests require RUN_LIVE_GENERATION_TESTS=1",
+)
 
 
 def _call(prompt: str, refs: list[PILImage.Image] | None = None):
