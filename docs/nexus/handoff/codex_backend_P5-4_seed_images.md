@@ -67,7 +67,7 @@ asyncio.run(t())
 | 选项 | 操作 | 时间 / 钱 | 风险 |
 |---|---|---|---|
 | **A** 开 Google Cloud billing(同 key 继续用) | `console.cloud.google.com` → enable billing → 绑卡 | ~5 min + ~¥3 总成本 | 0(脚本不变) |
-| **B** 切 Apimart(`IMAGE_GEN_API_KEY` + `IMAGE_GEN_PROVIDER=apimart`) | `apimart.ai` 注册 + key + 充值 + 改 `.env` | ~10 min + ~¥5 | 0(脚本支持 provider 切换) |
+| **B** 切 Apimart(`IMAGE_GEN_API_KEY` + `IMAGE_GEN_PROVIDER=apimart`) | `apimart.ai` 注册 + key + 充值 + 改 `.env` | ~10 min + ~¥5 | 0(脚本支持 provider 切换);**W3D7 founder 决定推到 W5**:当前 P5-4 已用 A 路径 ship 9 PNG,Apimart 留作"Google 抽风/限流"的后备,W5+ 批量 image gen 时再起 |
 | **C** 即梦 / 通义万相 网页版手动 gen | 网页粘 9 prompt × 9 次 + 下载 PNG | ~15 min 手动 | 0,但脱离自动化 |
 | **D** 回退 founder 自拍(原 punchlist §3 路径) | iPhone 5-15 min 实拍 + 美图秀秀套模板 | 5-15 min | 0,且 trust signal 反而最强 |
 
