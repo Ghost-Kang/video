@@ -84,6 +84,15 @@ Codex 看到这行后立即起跑;无 OVERRIDE = P5-4 持续 blocked。
 
 ---
 
+**FOUNDER OVERRIDE W3D7 (2026-05-24)**: 选 **A** — Google Cloud billing 已充值,gemini-3.1-flash-image-preview 解锁。9/9 PNG ship 落地 `xhs_post_2026-05-23_images/`,详 `_gen_log.md`。
+
+**额外约束 fix(W3D7 同日 ship)**:
+- `GoogleProvider._generate_async` 加 `aspect_ratio` 传 `types.ImageConfig` 修 SDK 不接 size 的 bug(否则全输出 16:9 landscape)
+- 4 个 prompt(img_3 / img_4 / img_5 / img_7 / img_9)加强 "no character-like marks" 约束,因 Gemini 把"illegible handwriting"字面渲染成可读 pseudo-English
+- W3D7 reality-fail #3:Gemini 对"handwriting""scribbles"等词的解释 = 真写字。任何想要"涂鸦感"的图必须显式 "horizontal gray placeholder bars, NOT letterforms"。
+
+---
+
 ## 0. 背景
 
 founder W3D6(2026-05-23 Sat)触发"现在就启动"路径 B(`founder_punchlist_W4D1_2026-05-28.md §2-§3` 提前到 W3D6),原本 seed 帖封面 + 8 正文图由 founder iPhone 5 min 拍 + 美图秀秀套模板。founder 现场决定 9 张全 AI gen,以节省拍摄 5 min。

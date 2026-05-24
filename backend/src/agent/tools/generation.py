@@ -142,19 +142,30 @@ class GoogleProvider:
         task_id = uuid.uuid4().hex
         refs = await self._download_refs(image_urls)
 
-        coro = self._generate_async(prompt, refs)
+        coro = self._generate_async(prompt, refs, aspect_ratio=size)
         self._tasks[task_id] = asyncio.create_task(coro)
 
         return {"task_id": task_id}
 
-    async def _generate_async(self, prompt: str, refs: list[PILImage.Image] | None) -> bytes:
+    async def _generate_async(
+        self,
+        prompt: str,
+        refs: list[PILImage.Image] | None,
+        aspect_ratio: str | None = None,
+    ) -> bytes:
         """原生异步 genai 调用 → 返回 image_bytes。失败抛异常。"""
+        from google.genai import types
+
         contents = [prompt] + (refs or [])
+
+        config_kwargs: dict = {"response_modalities": ["TEXT", "IMAGE"]}
+        if aspect_ratio and ":" in aspect_ratio:
+            config_kwargs["image_config"] = types.ImageConfig(aspect_ratio=aspect_ratio)
 
         response = await self._client.aio.models.generate_content(
             model=IMAGE_GEN_GOOGLE_MODEL,
             contents=contents,
-            config={"response_modalities": ["TEXT", "IMAGE"]},
+            config=types.GenerateContentConfig(**config_kwargs),
         )
 
         for part in response.parts:
