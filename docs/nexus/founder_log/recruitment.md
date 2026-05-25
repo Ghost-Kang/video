@@ -33,6 +33,18 @@
 (此处 append 你今天发出的 5 条)
 
 
+## DM batch · W4 (target 35)
+
+> **W4D1 = 2026-05-25**(实启动日,W3D6/D7 流程提前):founder 亲手 sourcing 5 + Xiaohongshu Specialist 文案 + 小红书 app 私信发出
+> 文案 source-of-truth: `dm_batch_2026-05-25.md`
+
+- DM 2026-05-25 小红书 @朵朵妈妈 niche=baomam_fushi 状态=已发
+- DM 2026-05-25 小红书 @单单妈的辅食日记 niche=baomam_fushi 状态=已发
+- DM 2026-05-25 小红书 @mido米朵麻麻 niche=baomam_fushi 状态=已发
+- DM 2026-05-25 小红书 @芒果mango niche=baomam_fushi 状态=已发
+- DM 2026-05-25 小红书 @诗小馒 niche=baomam_fushi 状态=已发
+
+
 ---
 
 ## 📋 速查 · DM 文案模板(逐字复制,**不要群发,每条改 [作品标题] + [名字]**)
