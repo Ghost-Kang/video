@@ -8,10 +8,12 @@
 
 ## 发布 URL(填在这里)
 
+> **DEFER 2026-05-26 W4D2**: founder 说 seed 帖图片已发(img_7 灰条 anti-text fix 已 ack),URL **2026-05-27 W4D3 回填**。在那之前 probe 仍报 `Marketing seed=NO`,这是真实状态。PM W4D3 早盘提醒 founder 贴 URL。
+
 发布后把小红书帖子 URL 贴下面这一行,**保留 `seed_url:` 前缀**:
 
 ```
-seed_url: <FILL 你发出的小红书帖 URL>
+seed_url: <FILL 你发出的小红书帖 URL — defer to 2026-05-27>
 posted_at: <FILL YYYY-MM-DD HH:MM Asia/Shanghai>
 platform: 小红书
 ```

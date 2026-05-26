@@ -37,6 +37,7 @@
 
 > **W4D1 = 2026-05-25**(实启动日,W3D6/D7 流程提前):founder 亲手 sourcing 5 + Xiaohongshu Specialist 文案 + 小红书 app 私信发出
 > 文案 source-of-truth: `dm_batch_2026-05-25.md`
+> **W4D2 = 2026-05-26 DEFER**: founder 说"跳过 dm batch"。今日 0 条 sourcing。35 目标对应到 W6 末仍可达(剩 5 天补 30 条 = 6/天 节奏 OK,但留无 buffer)。PM W4D3 早盘再 ping sourcing。
 
 - DM 2026-05-25 小红书 @朵朵妈妈 niche=baomam_fushi 状态=已发
 - DM 2026-05-25 小红书 @单单妈的辅食日记 niche=baomam_fushi 状态=已发
