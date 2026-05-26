@@ -5,7 +5,11 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: {},
+  server: {
+    proxy: {
+      "/api": "http://localhost:8766",
+    },
+  },
   build: {
     chunkSizeWarningLimit: 800,
   },

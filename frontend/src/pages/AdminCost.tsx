@@ -1,4 +1,5 @@
 import { useGenerationCost, type DailyTrendPoint } from "../hooks/useGenerationCost";
+import { PageShell } from "../components/PageShell";
 
 const AUTO_REFRESH_MS = 30_000;
 
@@ -16,23 +17,27 @@ export function AdminCost() {
   });
 
   return (
-    <main className="min-h-screen bg-stone-50 py-10 px-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <header className="flex items-baseline justify-between">
-          <div>
-            <h1 className="text-2xl font-medium text-stone-900">成本看板</h1>
-            <p className="mt-1 text-sm text-stone-500">
-              generation_cost 聚合 · 每 {AUTO_REFRESH_MS / 1000}s 自动刷新
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            className="text-xs text-stone-500 hover:text-stone-900 underline"
-          >
-            手动刷新
-          </button>
-        </header>
+    <PageShell>
+      <main className="px-6 pt-16 pb-20">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <p className="anim-fade-up text-[11px] uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400" style={{ animationDelay: "0ms" }}>
+            Admin · Cost
+          </p>
+          <header className="anim-fade-up flex items-baseline justify-between" style={{ animationDelay: "120ms" }}>
+            <div>
+              <h1 className="font-serif-cn text-3xl md:text-4xl text-stone-900 dark:text-stone-50">成本看板</h1>
+              <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
+                generation_cost 聚合 · 每 {AUTO_REFRESH_MS / 1000}s 自动刷新
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="text-xs text-stone-500 dark:text-stone-400 hover:text-[#7c2d12] dark:hover:text-[#ea580c] underline underline-offset-4 transition-colors"
+            >
+              手动刷新
+            </button>
+          </header>
 
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-4" aria-label="KPI">
           <KpiTile label="今日" value={fmtCny(kpis.today)} hint={`${kpis.callsToday} 次调用`} />
@@ -40,7 +45,7 @@ export function AdminCost() {
           <KpiTile label="累计" value={fmtCny(kpis.allTime)} hint={`${kpis.callsAllTime} 次调用`} />
         </section>
 
-        <section className="rounded-2xl bg-white border border-stone-200 p-5">
+        <section className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/70 dark:border-stone-800/70 p-5 shadow-soft">
           <h2 className="text-sm uppercase tracking-wider text-stone-500 mb-3">14 日 trend</h2>
           {trend.length === 0 ? (
             <EmptyHint />
@@ -50,7 +55,7 @@ export function AdminCost() {
         </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <section className="rounded-2xl bg-white border border-stone-200 p-5">
+          <section className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/70 dark:border-stone-800/70 p-5 shadow-soft">
             <h2 className="text-sm uppercase tracking-wider text-stone-500 mb-3">按 creator</h2>
             {by_user.length === 0 ? (
               isLoading ? <p className="text-sm text-stone-500">加载中…</p> : <EmptyHint />
@@ -89,7 +94,7 @@ export function AdminCost() {
             </p>
           </section>
 
-          <section className="rounded-2xl bg-white border border-stone-200 p-5">
+          <section className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/70 dark:border-stone-800/70 p-5 shadow-soft">
             <h2 className="text-sm uppercase tracking-wider text-stone-500 mb-3">按 call_kind</h2>
             {by_kind.length === 0 ? (
               isLoading ? <p className="text-sm text-stone-500">加载中…</p> : <EmptyHint />
@@ -114,9 +119,10 @@ export function AdminCost() {
               </ul>
             )}
           </section>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </PageShell>
   );
 }
 
@@ -128,10 +134,10 @@ interface KpiTileProps {
 
 function KpiTile({ label, value, hint }: KpiTileProps) {
   return (
-    <div className="rounded-2xl bg-white border border-stone-200 p-5 shadow-sm">
-      <div className="text-xs uppercase tracking-wider text-stone-500">{label}</div>
-      <div className="mt-2 text-3xl font-medium text-stone-900 tabular-nums">{value}</div>
-      <div className="mt-1 text-xs text-stone-500">{hint}</div>
+    <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/70 dark:border-stone-800/70 p-5 shadow-soft hover:shadow-soft-lg hover:-translate-y-0.5 transition-all duration-300">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-stone-500 dark:text-stone-400">{label}</div>
+      <div className="mt-2 font-serif-cn text-3xl text-stone-900 dark:text-stone-50 tabular">{value}</div>
+      <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">{hint}</div>
     </div>
   );
 }

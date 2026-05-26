@@ -16,9 +16,9 @@ export function CardStack() {
 
   if (!analysis) {
     return (
-      <main className="flex-1 overflow-y-auto bg-stone-50 p-6">
+      <main className="flex-1 overflow-y-auto bg-transparent p-6">
         <div className="mx-auto max-w-[640px]">
-          <p className="text-base text-stone-600 text-center py-16">
+          <p className="text-base text-stone-500 dark:text-stone-400 text-center py-16">
             {COPY.empty_state}
           </p>
         </div>
@@ -27,7 +27,7 @@ export function CardStack() {
   }
 
   return (
-    <main className="flex-1 overflow-y-auto bg-stone-50 p-4 md:p-6">
+    <main className="flex-1 overflow-y-auto bg-transparent p-4 md:p-6">
       <div className="mx-auto flex max-w-[920px] gap-4">
         <div className="w-full max-w-[640px] space-y-4">
           {failure ? (
@@ -42,7 +42,7 @@ export function CardStack() {
                 onScriptChange={setScript}
               />
 
-              <h2 className="text-lg font-medium text-stone-900 px-1 pt-2">
+              <h2 className="font-serif-cn text-lg text-stone-900 dark:text-stone-50 px-1 pt-2">
                 {COPY.shots_header}
               </h2>
 

@@ -27,23 +27,45 @@ export function Header({
   onToggleProView,
   hideProToggle = false,
 }: Props) {
+  const dotColor = connecting
+    ? "bg-amber-500"
+    : connected
+      ? "bg-emerald-500"
+      : "bg-rose-500";
+
   return (
-    <div style={S.bar}>
-      <button onClick={onToggleSidebar} style={S.toggle} title={sidebarOpen ? "收起侧栏" : "展开侧栏"}>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+    <div className="relative z-20 flex items-center gap-3 h-12 px-6 border-b border-stone-200/70 dark:border-stone-800/70 bg-[var(--color-paper)]/85 dark:bg-stone-950/85 backdrop-blur-md text-stone-500 dark:text-stone-400 text-[13px] tracking-[-0.005em]">
+      <button
+        onClick={onToggleSidebar}
+        className="flex h-6 w-6 items-center justify-center rounded-md text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+        title={sidebarOpen ? "收起侧栏" : "展开侧栏"}
+        type="button"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75">
           <path d={sidebarOpen ? "M10.5 3.5L5 8l5.5 4.5" : "M5.5 3.5L11 8l-5.5 4.5"} />
         </svg>
       </button>
 
-      <span style={S.logo}>OpenRHTV</span>
-      <span style={S.slogan}>Make it easy</span>
-      <span style={connecting ? S.dot("connecting") : S.dot(connected ? "on" : "off")} />
+      <span className="font-medium text-[13px] tracking-[0.01em] text-stone-900 dark:text-stone-50">
+        Cascade
+      </span>
 
-      <span style={S.sessionName}>{sessionName}</span>
+      <span className={`inline-block h-1.5 w-1.5 rounded-full ${dotColor}`} aria-hidden />
 
-      <button onClick={onNewSession} style={S.plusBtn} title="新建会话">
+      <span className="text-[11px] font-normal text-stone-400 dark:text-stone-500">
+        {sessionName}
+      </span>
+
+      <button
+        onClick={onNewSession}
+        className="flex h-[22px] w-[22px] items-center justify-center rounded-md border border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-stone-400 dark:hover:border-stone-500 hover:text-stone-900 dark:hover:text-stone-100 text-[14px] font-light leading-none transition-colors"
+        title="新建"
+        type="button"
+      >
         +
       </button>
+
+      <span className="ml-auto" />
 
       {onToggleProView && (
         <ProViewToggle
@@ -53,116 +75,16 @@ export function Header({
         />
       )}
 
-      <span style={S.hint}>策划书 → image → video → composite</span>
+      <span className="text-[11px] text-stone-400 dark:text-stone-500">{userId}</span>
 
-      <span style={S.userId}>{userId}</span>
-      <button onClick={onLogout} style={S.logoutBtn} title="退出登录">
+      <button
+        onClick={onLogout}
+        className="rounded-md border border-stone-200 dark:border-stone-700 bg-transparent text-[11px] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:border-stone-400 dark:hover:border-stone-500 px-2.5 py-0.5 transition-colors"
+        title="退出"
+        type="button"
+      >
         退出
       </button>
     </div>
   );
 }
-
-const S = {
-  bar: {
-    height: 48,
-    display: "flex",
-    alignItems: "center",
-    padding: "0 20px",
-    borderBottom: "1px solid #e4e4e7",
-    background: "#fff",
-    fontSize: 13,
-    color: "#71717a",
-    gap: 10,
-  } as React.CSSProperties,
-
-  toggle: {
-    width: 28,
-    height: 28,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "transparent",
-    color: "#71717a",
-    border: "none",
-    borderRadius: 6,
-    cursor: "pointer",
-    padding: 0,
-    transition: "background 0.1s",
-  } as React.CSSProperties,
-
-  logo: {
-    fontWeight: 600,
-    fontSize: 14,
-    letterSpacing: "-0.01em",
-    color: "#18181b",
-  } as React.CSSProperties,
-
-  slogan: {
-    fontSize: 11,
-    fontWeight: 400,
-    color: "#a1a1aa",
-    fontStyle: "italic",
-    letterSpacing: "0.02em",
-  } as React.CSSProperties,
-
-  dot: (state: "on" | "off" | "connecting") => ({
-    display: "inline-block",
-    width: 7,
-    height: 7,
-    borderRadius: "50%",
-    background: state === "on" ? "#22c55e" : state === "connecting" ? "#f59e0b" : "#ef4444",
-    boxShadow:
-      state === "on" ? "0 0 6px rgba(34,197,94,0.4)"
-      : state === "connecting" ? "0 0 6px rgba(245,158,11,0.4)"
-      : "0 0 6px rgba(239,68,68,0.4)",
-  }) as React.CSSProperties,
-
-  sessionName: {
-    fontSize: 12,
-    color: "#a1a1aa",
-    marginLeft: 4,
-  } as React.CSSProperties,
-
-  plusBtn: {
-    width: 24,
-    height: 24,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "transparent",
-    color: "#71717a",
-    border: "1px solid #e4e4e7",
-    borderRadius: 6,
-    cursor: "pointer",
-    fontSize: 16,
-    fontWeight: 300,
-    lineHeight: 1,
-    padding: 0,
-    transition: "all 0.15s",
-  } as React.CSSProperties,
-
-  hint: {
-    marginLeft: "auto",
-    fontSize: 11,
-    color: "#d4d4d8",
-    letterSpacing: "0.02em",
-  } as React.CSSProperties,
-
-  userId: {
-    fontSize: 11,
-    color: "#a1a1aa",
-    fontWeight: 500,
-  } as React.CSSProperties,
-
-  logoutBtn: {
-    fontSize: 11,
-    color: "#71717a",
-    border: "1px solid #e4e4e7",
-    borderRadius: 4,
-    background: "#f4f4f5",
-    cursor: "pointer",
-    padding: "2px 8px",
-    fontFamily: "inherit",
-  } as React.CSSProperties,
-};

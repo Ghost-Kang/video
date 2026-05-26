@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useEvents } from "../hooks/useEvents";
 import type { EventRow } from "../lib/eventsApi";
+import { PageShell } from "../components/PageShell";
 
 const EVENT_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "", label: "全部类型" },
@@ -64,32 +65,36 @@ export function AdminEvents() {
   }, [events]);
 
   return (
-    <main className="min-h-screen bg-stone-50 py-10 px-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <header className="flex items-baseline justify-between">
-          <div>
-            <h1 className="text-2xl font-medium text-stone-900">事件直播流</h1>
-            <p className="mt-1 text-sm text-stone-500">
-              最近 {events.length} 条事件 · 每 {AUTO_REFRESH_MS / 1000}s 自动刷新
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            className="text-xs text-stone-500 hover:text-stone-900 underline"
-          >
-            手动刷新
-          </button>
-        </header>
+    <PageShell>
+      <main className="px-6 pt-16 pb-20">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <p className="anim-fade-up text-[11px] uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400" style={{ animationDelay: "0ms" }}>
+            Admin · Events
+          </p>
+          <header className="anim-fade-up flex items-baseline justify-between" style={{ animationDelay: "120ms" }}>
+            <div>
+              <h1 className="font-serif-cn text-3xl md:text-4xl text-stone-900 dark:text-stone-50">事件直播流</h1>
+              <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
+                最近 {events.length} 条事件 · 每 {AUTO_REFRESH_MS / 1000}s 自动刷新
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="text-xs text-stone-500 dark:text-stone-400 hover:text-[#7c2d12] dark:hover:text-[#ea580c] underline underline-offset-4 transition-colors"
+            >
+              手动刷新
+            </button>
+          </header>
 
-        <div className="rounded-2xl bg-white border border-stone-200 p-5 space-y-4">
+          <div className="anim-fade-up rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/70 dark:border-stone-800/70 p-5 space-y-4 shadow-soft" style={{ animationDelay: "240ms" }}>
           <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
             <label className="text-xs text-stone-500 flex items-center gap-2">
               事件类型
               <select
                 value={eventType}
                 onChange={(e) => setEventType(e.target.value)}
-                className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300"
+                className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c2d12]/30 dark:focus:ring-[#ea580c]/30"
                 aria-label="event type filter"
               >
                 {EVENT_TYPE_OPTIONS.map((opt) => (
@@ -106,7 +111,7 @@ export function AdminEvents() {
                 value={userId}
                 onChange={(e) => setUserId(e.target.value)}
                 placeholder="精确匹配"
-                className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300"
+                className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c2d12]/30 dark:focus:ring-[#ea580c]/30"
                 aria-label="user_id filter"
               />
             </label>
@@ -166,9 +171,10 @@ export function AdminEvents() {
               </table>
             </div>
           )}
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </PageShell>
   );
 }
 
@@ -183,7 +189,7 @@ function EventTableRow({ event, expanded, onToggle }: EventTableRowProps) {
     <>
       <tr
         onClick={onToggle}
-        className="border-t border-stone-100 hover:bg-stone-50 cursor-pointer"
+        className="border-t border-stone-100 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800/50 cursor-pointer transition-colors"
         data-testid="event-row"
       >
         <td className="px-3 py-2 text-stone-500 tabular-nums">{formatTs(event.ts)}</td>
@@ -193,9 +199,9 @@ function EventTableRow({ event, expanded, onToggle }: EventTableRowProps) {
         <td className="px-3 py-2 text-stone-500 text-xs">{previewPayload(event.payload)}</td>
       </tr>
       {expanded && (
-        <tr className="border-t border-stone-100 bg-stone-50">
+        <tr className="border-t border-stone-100 dark:border-stone-800 bg-stone-50 dark:bg-stone-800/40">
           <td colSpan={5} className="px-3 py-3">
-            <pre className="text-xs text-stone-700 whitespace-pre-wrap break-all">
+            <pre className="text-xs text-stone-700 dark:text-stone-300 whitespace-pre-wrap break-all">
               {JSON.stringify(event.payload, null, 2)}
             </pre>
           </td>

@@ -1,13 +1,447 @@
 @import "tailwindcss";
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@source "./**/*.{ts,tsx,jsx,js}";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-paper: #faf8f3;
+  --color-paper-deeper: #f5f1e8;
+  --color-ink: #1c1917;
+  --color-ink-soft: #44403c;
+  --color-clay: #7c2d12;
+  --color-clay-soft: #c2410c;
+  --color-cream: #fef9e7;
 }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+/* 关键:reset 必须放在 @layer base 里,否则会覆盖 @layer utilities (mx-auto / max-w-* 等) */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+
+  body {
+    font-family:
+      -apple-system, BlinkMacSystemFont,
+      "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei",
+      "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "ss01", "ss02", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.005em;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
 }
-#root {
-  height: 100vh;
+
+/* ============ 动效层 ============ */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0); }
+  33% { transform: translate(30px, -20px); }
+  66% { transform: translate(-20px, 25px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes pulseRing {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+}
+
+@keyframes textShimmer {
+  0%, 100% { background-position: 200% center; }
+  50% { background-position: -100% center; }
+}
+
+@keyframes aurora1 {
+  0%, 100% { transform: translate(-10%, -8%) scale(1); }
+  33% { transform: translate(15%, -15%) scale(1.1); }
+  66% { transform: translate(-20%, 10%) scale(0.95); }
+}
+
+@keyframes aurora2 {
+  0%, 100% { transform: translate(20%, 25%) scale(1); }
+  33% { transform: translate(-15%, 10%) scale(1.15); }
+  66% { transform: translate(25%, -10%) scale(0.9); }
+}
+
+@keyframes auroraGlow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.85; }
+}
+
+@keyframes spinSlow {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ripple {
+  to {
+    transform: scale(20);
+    opacity: 0;
+  }
+}
+
+@keyframes pageOut {
+  to {
+    opacity: 0;
+    transform: translateY(-12px);
+    filter: blur(6px);
+  }
+}
+
+/* CTA — 输入框为空时呼吸邀请 */
+@keyframes ctaBreathe {
+  0%, 100% { opacity: 0.65; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.03); }
+}
+
+/* CTA — 输入有内容时强烈光晕脉冲(告诉用户:可以发射了) */
+@keyframes ctaGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 4px rgba(124, 45, 18, 0.12),
+      0 6px 18px -2px rgba(124, 45, 18, 0.30);
+  }
+  50% {
+    box-shadow:
+      0 0 0 10px rgba(124, 45, 18, 0.18),
+      0 10px 28px -2px rgba(124, 45, 18, 0.50);
+  }
+}
+
+/* 箭头小幅右推循环 — 暗示前进方向 */
+@keyframes arrowNudge {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(4px); }
+}
+
+/* URL 输入框光晕 — 有内容时整圈描边发光 */
+@keyframes inputGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124, 45, 18, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(124, 45, 18, 0.08); }
+}
+
+/* 关键短语下划线绘入 */
+@keyframes drawLine {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* 关键短语 hover 时背景 swipe */
+@keyframes phraseSwipe {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+/* 卡片装饰元素飘动 — 不同相位 / 速度,造"活" */
+@keyframes floatA {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(-4px, -10px) rotate(8deg); }
+}
+@keyframes floatB {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(6px, -14px) rotate(-12deg); }
+}
+@keyframes floatC {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); opacity: 0.5; }
+  50% { transform: translate(-8px, -6px) rotate(15deg); opacity: 0.9; }
+}
+
+/* 主图标轻微脉动(默认),hover 加速 */
+@keyframes iconBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+/* 蒸汽升腾 — 向上漂 + 淡出(放大) */
+@keyframes steamRise {
+  0% { transform: translateY(8px) scaleX(1); opacity: 0; }
+  20% { opacity: 0.95; }
+  100% { transform: translateY(-32px) scaleX(0.5); opacity: 0; }
+}
+
+/* 火苗闪烁 — 微旋转 + Y 缩放(放大) */
+@keyframes flameFlicker {
+  0%, 100% { transform: scaleY(1) scaleX(1) rotate(0deg); }
+  20% { transform: scaleY(1.25) scaleX(0.88) rotate(-6deg); }
+  40% { transform: scaleY(0.85) scaleX(1.1) rotate(4deg); }
+  60% { transform: scaleY(1.18) scaleX(0.92) rotate(-3deg); }
+  80% { transform: scaleY(0.95) scaleX(1.05) rotate(5deg); }
+}
+
+/* 心跳 — scale 1↔1.25 双拍(放大) */
+@keyframes heartBeat {
+  0%, 100% { transform: scale(1); }
+  15% { transform: scale(1.25); }
+  30% { transform: scale(0.92); }
+  45% { transform: scale(1.18); }
+  60% { transform: scale(0.95); }
+}
+
+/* 摇摆 wobble — 左右晃(放大) */
+@keyframes wobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-7deg); }
+  75% { transform: rotate(7deg); }
+}
+
+/* 眨眼 blink — 更频繁 + 完全闭眼 */
+@keyframes blink {
+  0%, 88%, 100% { transform: scaleY(1); }
+  92%, 96% { transform: scaleY(0); }
+}
+
+/* sparkle ✦ 闪烁 — hover 时 sparkle 出现并自转闪烁 */
+@keyframes sparkleTwinkle {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.4) rotate(180deg);
+    opacity: 0.6;
+  }
+}
+
+@layer components {
+  /* entrance animations — 配合 inline style { animationDelay } 实现 stagger */
+  .anim-fade-up {
+    opacity: 0;
+    animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .anim-fade-in {
+    opacity: 0;
+    animation: fadeIn 0.8s ease-out forwards;
+  }
+  .anim-drift {
+    animation: drift 18s ease-in-out infinite;
+  }
+  .anim-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(124, 45, 18, 0.08) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 3s ease-in-out infinite;
+  }
+  .anim-marquee {
+    animation: marquee 40s linear infinite;
+  }
+  .anim-pulse-ring {
+    animation: pulseRing 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .anim-aurora-1 {
+    animation: aurora1 28s ease-in-out infinite, auroraGlow 7s ease-in-out infinite;
+  }
+  .anim-aurora-2 {
+    animation: aurora2 36s ease-in-out infinite, auroraGlow 9s ease-in-out infinite;
+  }
+  .anim-spin-slow {
+    animation: spinSlow 20s linear infinite;
+  }
+
+  /* 钛色 → 落日橘 文字渐变流动 */
+  .text-shimmer-clay {
+    background: linear-gradient(
+      90deg,
+      #7c2d12 0%,
+      #7c2d12 35%,
+      #ea580c 50%,
+      #7c2d12 65%,
+      #7c2d12 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: textShimmer 5s ease-in-out infinite;
+  }
+
+  .anim-draw-line {
+    transform: scaleX(0);
+    transform-origin: left center;
+    animation: drawLine 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .anim-sparkle-twinkle {
+    animation: sparkleTwinkle 1.4s ease-in-out infinite;
+  }
+  .anim-float-a {
+    animation: floatA 4s ease-in-out infinite;
+  }
+  .anim-float-b {
+    animation: floatB 5s ease-in-out infinite;
+  }
+  .anim-float-c {
+    animation: floatC 6s ease-in-out infinite;
+  }
+  .anim-icon-breathe {
+    animation: iconBreathe 3s ease-in-out infinite;
+  }
+  .anim-steam {
+    animation: steamRise 2.4s ease-out infinite;
+    transform-origin: bottom center;
+  }
+  .anim-flame {
+    animation: flameFlicker 0.45s ease-in-out infinite;
+    transform-origin: bottom center;
+  }
+  .anim-heart-beat {
+    animation: heartBeat 1.2s ease-in-out infinite;
+    transform-origin: center;
+  }
+  .anim-wobble {
+    animation: wobble 2.2s ease-in-out infinite;
+    transform-origin: bottom center;
+  }
+  .anim-blink {
+    animation: blink 3.5s ease-in-out infinite;
+    transform-origin: center;
+  }
+  .anim-cta-breathe {
+    animation: ctaBreathe 2.4s ease-in-out infinite;
+  }
+  .anim-cta-glow {
+    animation: ctaGlow 2s ease-in-out infinite;
+  }
+  .anim-arrow-nudge {
+    animation: arrowNudge 1.4s ease-in-out infinite;
+  }
+  .anim-input-glow {
+    animation: inputGlow 2.6s ease-in-out infinite;
+  }
+
+  /* 点击 ripple 圆形扩散 */
+  .ripple-dot {
+    position: absolute;
+    border-radius: 9999px;
+    background: rgba(124, 45, 18, 0.25);
+    transform: scale(0);
+    opacity: 0.6;
+    pointer-events: none;
+    animation: ripple 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  /* 页面退出过渡 */
+  .anim-page-out {
+    animation: pageOut 0.32s cubic-bezier(0.6, 0, 0.4, 1) forwards;
+  }
+
+  /* 极细网格 — 鼠标光斑扫过时若隐若现 */
+  .paper-grid {
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      rgba(28, 25, 23, 0.06) 1px,
+      transparent 0
+    );
+    background-size: 28px 28px;
+  }
+
+  /* ============ Dark mode ============ */
+  html.dark {
+    background: #0c0a09;
+    color: #f5f1e8;
+  }
+
+  html.dark body {
+    background: #0c0a09;
+    color: #f5f1e8;
+  }
+
+  html.dark .paper-grid {
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      rgba(245, 241, 232, 0.08) 1px,
+      transparent 0
+    );
+  }
+
+  /* respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .anim-fade-up, .anim-fade-in, .anim-drift, .anim-shimmer, .anim-marquee, .anim-pulse-ring,
+    .anim-aurora-1, .anim-aurora-2, .anim-spin-slow, .text-shimmer-clay,
+    .ripple-dot, .anim-page-out,
+    .anim-cta-breathe, .anim-cta-glow, .anim-arrow-nudge, .anim-input-glow,
+    .anim-draw-line, .anim-sparkle-twinkle,
+    .anim-float-a, .anim-float-b, .anim-float-c, .anim-icon-breathe,
+    .anim-steam, .anim-flame, .anim-heart-beat, .anim-wobble, .anim-blink {
+      animation: none !important;
+      opacity: 1 !important;
+    }
+  }
+
+  .font-serif-cn {
+    font-family:
+      "Source Han Serif SC", "Noto Serif SC", "Songti SC",
+      "STSong", "SimSun", serif;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .shadow-soft {
+    box-shadow:
+      0 1px 2px rgba(28, 25, 23, 0.04),
+      0 4px 12px -2px rgba(28, 25, 23, 0.06);
+  }
+  .shadow-soft-lg {
+    box-shadow:
+      0 2px 4px rgba(28, 25, 23, 0.04),
+      0 12px 32px -4px rgba(28, 25, 23, 0.08);
+  }
+
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hidden {
+    scrollbar-width: none;
+  }
+
+  .paper-noise {
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      rgba(28, 25, 23, 0.015) 1px,
+      transparent 0
+    );
+    background-size: 24px 24px;
+  }
 }

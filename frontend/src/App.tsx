@@ -8,8 +8,24 @@ import { ChatPanel } from "./components/ChatPanel";
 import { NodeDetail } from "./components/NodeDetail";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useCanvasStore } from "./store/canvasStore";
-import { shouldHideProToggle } from "./lib/proViewAccess";
+import { shouldHideProToggle, isAdminUser } from "./lib/proViewAccess";
+import { DarkModeToggle } from "./components/landing/DarkModeToggle";
 import type { NodeType, WSIncoming } from "./types";
+
+// 把后端 tool_call 名映射成宝妈看得懂的中文进度词;未知 tool 默认 "整理中"。
+const TOOL_LABELS: Record<string, string> = {
+  script_writer: "🍳 在写开头脚本…",
+  image_generate: "✨ 在生成画面参考…",
+  analyze_source: "🔍 在拆解视频…",
+  request_shallow_analysis: "🔍 在拆解视频…",
+  rewrite_to_niche: "📝 在改写成你的版本…",
+  storyboard: "🎬 在排分镜…",
+  publish_pack: "📦 在准备发布包…",
+};
+function labelToolCall(name: string | undefined): string {
+  if (!name) return "✨ 整理中…";
+  return TOOL_LABELS[name] || "✨ 整理中…";
+}
 
 function lsKey(key: string, userId: string) { return `openrhtv_${userId}_${key}`; }
 
@@ -54,8 +70,10 @@ export default function App({ userId, onLogout }: AppProps) {
 
   const [sessions, setSessions] = useState<string[]>(() => loadJSON<string[]>(lsKey("sessions", userId), []));
   const [names, setNames] = useState<Record<string, string>>(() => loadJSON<Record<string, string>>(lsKey("names", userId), {}));
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [chatOpen, setChatOpen] = useState(true);
+  const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches;
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
+  const [chatOpen, setChatOpen] = useState(!isMobile);
+  const showProToggle = isAdminUser(userId);
   const [thinking, setThinking] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const messages = useCanvasStore((s) => s.messages);
@@ -122,7 +140,7 @@ export default function App({ userId, onLogout }: AppProps) {
           break;
         case "agent_stream":
           if (res.event === "tool_call") {
-            setThinking((t) => [...t, `${res.name}(${res.args?.slice(0, 80) || ""})`]);
+            setThinking((t) => [...t, labelToolCall(res.name)]);
           } else if (res.event === "text" && res.content) {
             appendStreaming(res.content);
           }
@@ -304,7 +322,8 @@ export default function App({ userId, onLogout }: AppProps) {
   }, [loading]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <div className="relative flex flex-col h-screen bg-[var(--color-paper)] dark:bg-stone-950 text-stone-900 dark:text-stone-100 transition-colors duration-500">
+      <DarkModeToggle />
       <Header
         userId={userId}
         sessionName={names[tid] || "新会话"}
@@ -315,10 +334,10 @@ export default function App({ userId, onLogout }: AppProps) {
         onNewSession={handleNewSession}
         onLogout={onLogout}
         isProView={isProView}
-        onToggleProView={toggleProView}
-        hideProToggle={shouldHideProToggle(tid)}
+        onToggleProView={showProToggle ? toggleProView : undefined}
+        hideProToggle={shouldHideProToggle(userId)}
       />
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      <div className="flex flex-1 overflow-hidden">
         {sidebarOpen && (
           <Sidebar
             sessions={sessions}
@@ -328,27 +347,6 @@ export default function App({ userId, onLogout }: AppProps) {
             onRename={handleRename}
             onDelete={handleDelete}
           />
-        )}
-        {chatOpen ? (
-          <ChatPanel
-            messages={messages}
-            streaming={streamingContent}
-            thinking={thinking}
-            onSend={handleSend}
-            loading={loading}
-            onToggleCollapse={() => setChatOpen(false)}
-          />
-        ) : (
-          <button
-            onClick={() => setChatOpen(true)}
-            style={S.floatBtn}
-            title="展开聊天"
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M3 5h14M3 10h10M3 15h14" />
-              <circle cx="15.5" cy="5" r="3" fill="#22c55e" stroke="none" />
-            </svg>
-          </button>
         )}
         {isProView ? (
           <>
@@ -367,28 +365,29 @@ export default function App({ userId, onLogout }: AppProps) {
         ) : (
           <CardStack />
         )}
+        {chatOpen ? (
+          <ChatPanel
+            messages={messages}
+            streaming={streamingContent}
+            thinking={thinking}
+            onSend={handleSend}
+            loading={loading}
+            onToggleCollapse={() => setChatOpen(false)}
+          />
+        ) : (
+          <button
+            onClick={() => setChatOpen(true)}
+            className="absolute bottom-6 right-6 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 dark:bg-[#7c2d12] text-[#faf8f3] shadow-[0_6px_20px_-4px_rgba(28,25,23,0.25)] dark:shadow-[0_6px_20px_-4px_rgba(124,45,18,0.5)] hover:scale-105 active:scale-95 transition-transform duration-200"
+            title="问导演"
+            type="button"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M3 4h12M3 9h12M3 14h8" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-const S = {
-  floatBtn: {
-    position: "absolute",
-    bottom: 20,
-    left: 20,
-    width: 44,
-    height: 44,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#18181b",
-    color: "#fff",
-    border: "none",
-    borderRadius: 12,
-    cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-    zIndex: 10,
-    transition: "transform 0.15s",
-  } as React.CSSProperties,
-};

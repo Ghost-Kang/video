@@ -11,9 +11,36 @@ interface Props {
   onToggleCollapse: () => void;
 }
 
+function CascadeLoading({ thinking }: { thinking: string[] }) {
+  const recent = thinking.slice(-3);
+  return (
+    <div className="self-start rounded-2xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 px-4 py-3 max-w-[90%] shadow-soft">
+      <div className="flex items-center gap-1.5 mb-2" aria-hidden>
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-stone-400 dark:bg-stone-500 animate-bounce [animation-delay:-0.3s]" />
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-stone-400 dark:bg-stone-500 animate-bounce [animation-delay:-0.15s]" />
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-stone-400 dark:bg-stone-500 animate-bounce" />
+      </div>
+      <p className="font-serif-cn text-sm text-stone-900 dark:text-stone-100 mb-1">
+        Cascade 正在拆解…
+      </p>
+      {recent.length > 0 ? (
+        <ul className="text-xs space-y-1 mt-2 text-stone-600 dark:text-stone-400">
+          {recent.map((t, i) => (
+            <li key={i} className={i === recent.length - 1 ? "text-stone-500 dark:text-stone-500" : "text-stone-700 dark:text-stone-300"}>
+              <span className="text-stone-400 dark:text-stone-600 mr-1.5">{i === recent.length - 1 ? "○" : "✓"}</span>
+              {t}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">大约 30 秒</p>
+      )}
+    </div>
+  );
+}
+
 export function ChatPanel({ messages, streaming, thinking, onSend, loading, onToggleCollapse }: Props) {
   const [input, setInput] = useState("");
-  const [thinkOpen, setThinkOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -26,19 +53,37 @@ export function ChatPanel({ messages, streaming, thinking, onSend, loading, onTo
     setInput("");
   };
 
+  const quickBtnCls =
+    "rounded-full border border-stone-300 dark:border-stone-700 bg-transparent px-3 py-1 text-xs text-stone-600 dark:text-stone-400 hover:border-[#7c2d12] dark:hover:border-[#ea580c] hover:text-[#7c2d12] dark:hover:text-[#ea580c] transition-all font-inherit";
+
   return (
-    <div style={S.panel}>
-      <div style={S.title}>
-        <span style={S.titleText}>OpenRHTV</span>
-        <button onClick={onToggleCollapse} style={S.collapseBtn} title="收起聊天">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M10.5 3.5L5 8l5.5 4.5" />
+    <div className="flex w-[360px] flex-col border-l border-stone-200/70 dark:border-stone-800/70 bg-[var(--color-paper)]/60 dark:bg-stone-950/60 backdrop-blur-md">
+      <div className="flex items-center justify-between border-b border-stone-200/70 dark:border-stone-800/70 px-5 py-4">
+        <span className="font-serif-cn font-medium text-[14px] tracking-[-0.01em] text-stone-900 dark:text-stone-50">
+          问导演
+        </span>
+        <button
+          onClick={onToggleCollapse}
+          className="flex h-6 w-6 items-center justify-center rounded text-stone-400 dark:text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+          title="收起"
+          type="button"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M5.5 3.5L11 8l-5.5 4.5" />
           </svg>
         </button>
       </div>
-      <div style={S.msgs}>
+
+      <div className="flex flex-1 flex-col gap-3 overflow-auto p-5">
         {messages.map((m, i) => (
-          <div key={i} style={m.role === "user" ? S.userBubble : S.agentBubble} className={m.role === "agent" ? "agent-msg" : ""}>
+          <div
+            key={i}
+            className={
+              m.role === "user"
+                ? "self-end max-w-[85%] rounded-2xl rounded-br-sm bg-stone-900 dark:bg-[#7c2d12] px-3.5 py-2.5 text-[13px] leading-[1.55] text-[#faf8f3]"
+                : "agent-msg self-start max-w-[85%] rounded-2xl rounded-bl-sm border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3 text-[13px] leading-[1.65] text-stone-900 dark:text-stone-100"
+            }
+          >
             {m.role === "agent" ? (
               <Markdown remarkPlugins={[remarkGfm]}>{m.content}</Markdown>
             ) : (
@@ -47,137 +92,84 @@ export function ChatPanel({ messages, streaming, thinking, onSend, loading, onTo
           </div>
         ))}
         {streaming && (
-          <div style={S.agentBubble} className="agent-msg">
+          <div className="agent-msg self-start max-w-[85%] rounded-2xl rounded-bl-sm border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3 text-[13px] leading-[1.65] text-stone-900 dark:text-stone-100">
             <Markdown remarkPlugins={[remarkGfm]}>{streaming}</Markdown>
           </div>
         )}
-        {loading && !streaming && <div style={S.loading}>导演思考中...</div>}
+        {loading && !streaming && <CascadeLoading thinking={thinking} />}
         <div ref={bottomRef} />
       </div>
-
-      {thinking.length > 0 && (
-        <div style={S.thinkBar}>
-          <button onClick={() => setThinkOpen(!thinkOpen)} style={S.thinkToggle}>
-            {thinkOpen ? "▾" : "▸"} 思考中 ({thinking.length} 步)
-          </button>
-          {thinkOpen && (
-            <div style={S.thinkLog}>
-              {thinking.map((t, i) => (
-                <div key={i} style={S.thinkLine}>{t}</div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       <style>{`
         .agent-msg p { margin: 4px 0; }
         .agent-msg ul, .agent-msg ol { margin: 4px 0; padding-left: 18px; }
         .agent-msg li { margin: 2px 0; }
-        .agent-msg h1, .agent-msg h2, .agent-msg h3 { font-size: 14px; margin: 8px 0 4px; }
-        .agent-msg code { font-family: monospace; font-size: 12px; background: #f4f4f5; padding: 1px 4px; border-radius: 3px; }
-        .agent-msg pre { background: #f4f4f5; padding: 8px; border-radius: 6px; overflow-x: auto; font-size: 12px; }
-        .agent-msg blockquote { border-left: 2px solid #e4e4e7; padding-left: 10px; color: #71717a; margin: 4px 0; }
+        .agent-msg h1, .agent-msg h2, .agent-msg h3 { font-size: 14px; margin: 8px 0 4px; font-family: "Source Han Serif SC", "Songti SC", serif; }
+        .agent-msg code { font-family: ui-monospace, monospace; font-size: 12px; background: rgba(124, 45, 18, 0.08); padding: 1px 5px; border-radius: 4px; color: #7c2d12; }
+        .dark .agent-msg code { background: rgba(234, 88, 12, 0.15); color: #ea580c; }
+        .agent-msg pre { background: rgba(124, 45, 18, 0.06); padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 12px; }
+        .dark .agent-msg pre { background: rgba(234, 88, 12, 0.10); }
+        .agent-msg blockquote { border-left: 2px solid #d6d3d1; padding-left: 12px; color: #78716c; margin: 4px 0; }
+        .dark .agent-msg blockquote { border-left-color: #44403c; color: #a8a29e; }
         .agent-msg table { border-collapse: collapse; font-size: 12px; }
-        .agent-msg th, .agent-msg td { border: 1px solid #e4e4e7; padding: 4px 8px; text-align: left; }
-        .agent-msg th { background: #f4f4f5; }
+        .agent-msg th, .agent-msg td { border: 1px solid #e7e5e4; padding: 4px 8px; text-align: left; }
+        .dark .agent-msg th, .dark .agent-msg td { border-color: #292524; }
+        .agent-msg th { background: #faf8f3; font-weight: 500; }
+        .dark .agent-msg th { background: #292524; }
       `}</style>
 
-      <div style={S.inputArea}>
-        <div style={S.quickPhrases}>
+      <div className="border-t border-stone-200/70 dark:border-stone-800/70 bg-[var(--color-paper)]/40 dark:bg-stone-950/40 px-5 py-4">
+        <div className="mb-2.5 flex flex-wrap gap-1.5">
           <button
             disabled={loading}
             onClick={() => onSend("继续下一步")}
-            style={{
-              ...S.quickBtn,
-              opacity: loading ? 0.4 : 1,
-              cursor: loading ? "not-allowed" : "pointer",
-            }}
+            className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
+            type="button"
           >
             继续下一步
+          </button>
+          <button
+            disabled={loading}
+            onClick={() => onSend("开头再吸引人点")}
+            className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
+            type="button"
+          >
+            开头再抓
+          </button>
+          <button
+            disabled={loading}
+            onClick={() => onSend("再口语化一点")}
+            className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
+            type="button"
+          >
+            更口语
           </button>
         </div>
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
           }}
-          placeholder="描述你的创作需求..."
+          placeholder="想改哪里,直接说"
           rows={3}
-          style={S.textarea}
           disabled={loading}
+          className="w-full rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-[13px] leading-[1.55] text-stone-900 dark:text-stone-100 outline-none placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:border-stone-900 dark:focus:border-stone-100 transition-colors resize-y font-inherit"
         />
-        <button onClick={handleSend} disabled={loading} style={{
-          ...S.btn,
-          opacity: loading ? 0.5 : 1,
-          cursor: loading ? "not-allowed" : "pointer",
-        }}>
+        <button
+          onClick={handleSend}
+          disabled={loading}
+          className={`mt-2.5 w-full rounded-xl bg-stone-900 dark:bg-[#7c2d12] py-2.5 text-[13px] font-medium tracking-[0.01em] text-[#faf8f3] transition-colors hover:bg-stone-800 dark:hover:bg-[#9a3412] font-inherit ${
+            loading ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+          }`}
+          type="button"
+        >
           发送
         </button>
       </div>
     </div>
   );
 }
-
-const S: Record<string, React.CSSProperties> = {
-  panel: {
-    width: 360,
-    display: "flex",
-    flexDirection: "column",
-    borderRight: "1px solid #e4e4e7",
-    background: "#fafafa",
-  },
-  title: {
-    padding: "16px 20px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderBottom: "1px solid #e4e4e7",
-    background: "#fff",
-  },
-  titleText: { fontWeight: 600, fontSize: 15, letterSpacing: "-0.01em", color: "#18181b" },
-  collapseBtn: {
-    width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
-    background: "transparent", color: "#a1a1aa", border: "none", borderRadius: 4, cursor: "pointer", padding: 0,
-  },
-  msgs: { flex: 1, overflow: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: 10 },
-  userBubble: {
-    alignSelf: "flex-end", background: "#18181b", color: "#fafafa", padding: "10px 14px",
-    borderRadius: 16, borderBottomRightRadius: 4, maxWidth: "85%", fontSize: 13, lineHeight: 1.5,
-  },
-  agentBubble: {
-    alignSelf: "flex-start", background: "#fff", border: "1px solid #e4e4e7", padding: "10px 14px",
-    borderRadius: 16, borderBottomLeftRadius: 4, maxWidth: "85%", fontSize: 13, lineHeight: 1.6, color: "#3f3f46",
-  },
-  streaming: { alignSelf: "flex-start", color: "#a1a1aa", fontSize: 12, padding: "4px 8px" },
-  loading: { alignSelf: "flex-start", color: "#a1a1aa", fontSize: 12, padding: "4px 8px" },
-  thinkBar: { borderTop: "1px solid #e4e4e7", background: "#fafafa" },
-  thinkToggle: {
-    width: "100%", padding: "6px 16px", background: "transparent", border: "none",
-    cursor: "pointer", fontSize: 11, color: "#a1a1aa", textAlign: "left" as const, fontWeight: 500,
-  },
-  thinkLog: { padding: "0 16px 8px", display: "flex", flexDirection: "column", gap: 2 },
-  thinkLine: { fontSize: 11, color: "#a1a1aa", fontFamily: "monospace" },
-  quickPhrases: { display: "flex", gap: 6, marginBottom: 8 },
-  quickBtn: {
-    padding: "4px 12px",
-    fontSize: 12,
-    color: "#3f3f46",
-    background: "#f4f4f5",
-    border: "1px solid #e4e4e7",
-    borderRadius: 14,
-    cursor: "pointer",
-    transition: "background 0.15s",
-  },
-  inputArea: { padding: "12px 16px 16px", borderTop: "1px solid #e4e4e7", background: "#fff" },
-  textarea: {
-    width: "100%", border: "1px solid #e4e4e7", borderRadius: 10, padding: "10px 12px", fontSize: 13,
-    resize: "vertical" as const, outline: "none", fontFamily: "inherit", color: "#18181b", background: "#fafafa",
-  },
-  btn: {
-    marginTop: 10, width: "100%", padding: "10px 0", background: "#18181b", color: "#fff",
-    border: "none", borderRadius: 10, cursor: "pointer", fontSize: 14, fontWeight: 500,
-    letterSpacing: "0.02em", transition: "background 0.15s",
-  },
-};
