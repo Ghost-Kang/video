@@ -16,7 +16,7 @@ from websockets.exceptions import ConnectionClosedOK
 from agent.config import IMAGE_GEN_PROVIDER
 from agent.llm_factory import get_chat_model
 from agent.pool import AgentPool
-from agent.store import get_messages, save_message, list_sessions, ensure_session_exists, rename_session, delete_session as store_delete_session
+from agent.store import get_messages, save_message, list_sessions, ensure_session_exists, delete_session as store_delete_session
 from agent.tools import canvas as canvas_tools
 from agent.cascade.analysis_service import request_shallow_analysis
 from agent.cascade.anchors import create_anchor, list_anchors, list_reuses, reuse_anchor
@@ -617,13 +617,6 @@ async def handle(websocket):
                     node_id=nid,
                     optimized_prompt=optimized,
                 )
-                continue
-
-            if msg_type == "rename_session":
-                target_thread = msg.get("thread_id", "")
-                new_title = msg.get("title", "").strip()
-                if target_thread and new_title:
-                    rename_session(user_id, target_thread, new_title)
                 continue
 
             if msg_type == "delete_session":
