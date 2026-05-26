@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { ConsentGate } from "../components/landing/ConsentGate";
 import { HotCardGrid } from "../components/landing/HotCardGrid";
 import { UrlFallback } from "../components/landing/UrlFallback";
-import { WaitlistCta } from "../components/landing/WaitlistCta";
 import { AmbientCursor } from "../components/landing/AmbientCursor";
 import { CreatorTicker } from "../components/landing/CreatorTicker";
 import { StatCounter } from "../components/landing/StatCounter";
@@ -135,8 +134,6 @@ export function Landing() {
           </ConsentGate>
         </div>
       </div>
-
-      <WaitlistCta />
 
       <div className={`relative z-10 ${exiting ? "anim-page-out" : ""}`}>
         <CreatorTicker />

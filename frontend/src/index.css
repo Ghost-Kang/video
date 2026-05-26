@@ -263,6 +263,21 @@
   .anim-marquee {
     animation: marquee 40s linear infinite;
   }
+  .anim-marquee-fast {
+    animation: marquee 25s linear infinite;
+  }
+
+  /* hover 父容器 → 整条 marquee 暂停 */
+  .marquee-pause-on-hover:hover .anim-marquee,
+  .marquee-pause-on-hover:hover .anim-marquee-fast {
+    animation-play-state: paused;
+  }
+
+  /* 左右两端 fade out mask — 让内容滑入滑出更优雅 */
+  .marquee-fade {
+    -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+    mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  }
   .anim-pulse-ring {
     animation: pulseRing 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
