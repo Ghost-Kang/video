@@ -29,8 +29,10 @@ from agent.tools.canvas_persistence.db import (
     set_user_id,
 )
 from agent.tools.canvas_persistence.edges_repo import (
+    _delete_edge,
     _load_all_edges,
     _renormalize_positions,
+    _set_edge_position,
     _upsert_edge,
 )
 from agent.tools.canvas_persistence.generation_repo import (
@@ -39,6 +41,7 @@ from agent.tools.canvas_persistence.generation_repo import (
     update_generation_state,
 )
 from agent.tools.canvas_persistence.nodes_repo import (
+    _delete_node,
     _load_all_nodes,
     _load_node,
     _row_to_node,
@@ -154,18 +157,8 @@ def reorder_edge(edge_id: str, direction: str) -> dict:
         return {"error": "已是边界位置"}
 
     a, b = siblings[idx], siblings[swap_idx]
-    pos_a, pos_b = a["position"], b["position"]
-    db = _db()
-    db.execute(
-        "UPDATE canvas_edges SET position=? WHERE user_id=? AND thread_id=? AND edge_id=?",
-        (pos_b, _current_user_id.get(), _current_thread_id.get(), a["id"]),
-    )
-    db.execute(
-        "UPDATE canvas_edges SET position=? WHERE user_id=? AND thread_id=? AND edge_id=?",
-        (pos_a, _current_user_id.get(), _current_thread_id.get(), b["id"]),
-    )
-    db.commit()
-    db.close()
+    _set_edge_position(a["id"], b["position"])
+    _set_edge_position(b["id"], a["position"])
     _renormalize_positions(edge["target"])
     return {"id": edge_id, "direction": direction, "swapped_with": b["id"]}
 
@@ -176,16 +169,8 @@ def delete_canvas_edge(edge_id: str) -> dict:
     edge = next((e for e in edges if e["id"] == edge_id), None)
     if not edge:
         return {"error": f"边 {edge_id} 不存在"}
-    target_id = edge["target"]
-
-    db = _db()
-    db.execute(
-        "DELETE FROM canvas_edges WHERE user_id=? AND thread_id=? AND edge_id=?",
-        (_current_user_id.get(), _current_thread_id.get(), edge_id),
-    )
-    db.commit()
-    db.close()
-    _renormalize_positions(target_id)
+    _delete_edge(edge_id)
+    _renormalize_positions(edge["target"])
     return {"id": edge_id, "deleted": True}
 
 
@@ -342,18 +327,8 @@ def update_canvas_node(
 
 
 def delete_canvas_node(node_id: str) -> dict:
-    """删除画布上的一个节点。"""
-    db = _db()
-    db.execute(
-        "DELETE FROM canvas_nodes WHERE user_id=? AND thread_id=? AND node_id=?",
-        (_current_user_id.get(), _current_thread_id.get(), node_id),
-    )
-    db.execute(
-        "DELETE FROM canvas_edges WHERE user_id=? AND thread_id=? AND (source=? OR target=?)",
-        (_current_user_id.get(), _current_thread_id.get(), node_id, node_id),
-    )
-    db.commit()
-    db.close()
+    """删除画布上的一个节点(级联删除关联边)。"""
+    _delete_node(node_id)
     return {"id": node_id, "deleted": True}
 
 

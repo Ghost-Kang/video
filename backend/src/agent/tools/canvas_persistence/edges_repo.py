@@ -52,3 +52,27 @@ def _renormalize_positions(target_id: str, *, user_id: str | None = None, thread
         )
     db.commit()
     db.close()
+
+
+def _set_edge_position(edge_id: str, position: int, *, user_id: str | None = None, thread_id: str | None = None) -> None:
+    """单边 position 更新(reorder swap 用)。"""
+    uid, tid = _resolve_ids(user_id, thread_id)
+    db = _db()
+    db.execute(
+        "UPDATE canvas_edges SET position=? WHERE user_id=? AND thread_id=? AND edge_id=?",
+        (position, uid, tid, edge_id),
+    )
+    db.commit()
+    db.close()
+
+
+def _delete_edge(edge_id: str, *, user_id: str | None = None, thread_id: str | None = None) -> None:
+    """单边删除(不做 position 重整 — caller 自行 renormalize)。"""
+    uid, tid = _resolve_ids(user_id, thread_id)
+    db = _db()
+    db.execute(
+        "DELETE FROM canvas_edges WHERE user_id=? AND thread_id=? AND edge_id=?",
+        (uid, tid, edge_id),
+    )
+    db.commit()
+    db.close()

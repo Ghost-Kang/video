@@ -124,3 +124,19 @@ def _update_node_result(
             existing = updates
         node["result"] = existing
         _upsert_node(node, user_id=user_id, thread_id=thread_id)
+
+
+def _delete_node(node_id: str, *, user_id: str | None = None, thread_id: str | None = None) -> None:
+    """删除节点 + 级联删除所有连接的 edge(同一连接内原子完成)。"""
+    uid, tid = _resolve_ids(user_id, thread_id)
+    db = _db()
+    db.execute(
+        "DELETE FROM canvas_nodes WHERE user_id=? AND thread_id=? AND node_id=?",
+        (uid, tid, node_id),
+    )
+    db.execute(
+        "DELETE FROM canvas_edges WHERE user_id=? AND thread_id=? AND (source=? OR target=?)",
+        (uid, tid, node_id, node_id),
+    )
+    db.commit()
+    db.close()
