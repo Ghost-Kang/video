@@ -1,19 +1,15 @@
 import { useState, useEffect } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { CanvasNode, Shot, NodeStatus, NodeType } from "../types";
+import type { CanvasNode, Shot } from "../types";
+import type { NodeActions } from "../hooks/useNodeActions";
 import { useCanvasStore } from "../store/canvasStore";
 
 interface Props {
-  onReview: (nodeId: string, action: "approve" | "reject", feedback?: string) => void;
-  onExecuteNode: (nodeId: string, nodeType: NodeType, description: string, provider?: string, duration?: number, resolution?: string, generateAudio?: boolean) => void;
-  onUpdateNodeStatus: (nodeId: string, nodeStatus: NodeStatus) => void;
-  onOptimizePrompt: (nodeId: string, prompt: string, feedback: string) => void;
-  onDeleteEdge: (edgeId: string) => void;
-  onReorderEdge: (edgeId: string, direction: "up" | "down") => void;
+  actions: NodeActions;
 }
 
-export function NodeDetail({ onExecuteNode, onUpdateNodeStatus, onOptimizePrompt, onDeleteEdge, onReorderEdge }: Props) {
+export function NodeDetail({ actions }: Props) {
   const selectedId = useCanvasStore((s) => s.selectedNodeId);
   const node = useCanvasStore((s) => s.nodes.find((n) => n.id === selectedId));
   const allNodes = useCanvasStore((s) => s.nodes);
@@ -38,7 +34,7 @@ export function NodeDetail({ onExecuteNode, onUpdateNodeStatus, onOptimizePrompt
     <div style={S.panel}>
       <div style={S.header}>
         <span style={S.title}>{node.title}</span>
-        {isMedia && <NodeStatusToggle node={node} onUpdate={onUpdateNodeStatus} />}
+        {isMedia && <NodeStatusToggle node={node} onUpdate={actions.handleUpdateNodeStatus} />}
         <button onClick={() => selectNode(null)} style={S.close}>✕</button>
       </div>
       <div style={S.body}>
@@ -46,7 +42,7 @@ export function NodeDetail({ onExecuteNode, onUpdateNodeStatus, onOptimizePrompt
           <div style={S.meta}>
             <span style={S.badge()}>{node.type}</span>
             {node.subtype && <span style={S.subtype()}>{node.subtype}</span>}
-            <NodeStatusToggle node={node} onUpdate={onUpdateNodeStatus} />
+            <NodeStatusToggle node={node} onUpdate={actions.handleUpdateNodeStatus} />
           </div>
         )}
 
@@ -68,7 +64,7 @@ export function NodeDetail({ onExecuteNode, onUpdateNodeStatus, onOptimizePrompt
                         <img src={img.url} alt={img.title} style={S.refImg} />
                       )}
                       <button
-                        onClick={() => edge && onDeleteEdge(edge.id)}
+                        onClick={() => edge && actions.handleDeleteEdge(edge.id)}
                         style={S.refDelete}
                         title="删除参考图"
                       >
@@ -76,7 +72,7 @@ export function NodeDetail({ onExecuteNode, onUpdateNodeStatus, onOptimizePrompt
                       </button>
                       {total > 1 && idx < total - 1 && (
                         <button
-                          onClick={() => edge && onReorderEdge(edge.id, "down")}
+                          onClick={() => edge && actions.handleReorderEdge(edge.id, "down")}
                           style={{ ...S.refArrow, right: -10, top: "50%", transform: "translateY(-50%)" }}
                           title="右移"
                         >
@@ -85,7 +81,7 @@ export function NodeDetail({ onExecuteNode, onUpdateNodeStatus, onOptimizePrompt
                       )}
                       {total > 1 && idx > 0 && (
                         <button
-                          onClick={() => edge && onReorderEdge(edge.id, "up")}
+                          onClick={() => edge && actions.handleReorderEdge(edge.id, "up")}
                           style={{ ...S.refArrow, left: -10, top: "50%", transform: "translateY(-50%)" }}
                           title="左移"
                         >
@@ -102,7 +98,7 @@ export function NodeDetail({ onExecuteNode, onUpdateNodeStatus, onOptimizePrompt
 
         {/* 提示词（仅媒体节点） */}
         {isMedia && (
-          <MediaPanel key={node.id} node={node} onExecuteNode={onExecuteNode} onOptimizePrompt={onOptimizePrompt} />
+          <MediaPanel key={node.id} node={node} actions={actions} />
         )}
 
         {/* 生成结果 */}
@@ -113,7 +109,7 @@ export function NodeDetail({ onExecuteNode, onUpdateNodeStatus, onOptimizePrompt
   );
 }
 
-function NodeStatusToggle({ node, onUpdate }: { node: CanvasNode; onUpdate: Props["onUpdateNodeStatus"] }) {
+function NodeStatusToggle({ node, onUpdate }: { node: CanvasNode; onUpdate: NodeActions["handleUpdateNodeStatus"] }) {
   const current = node.node_status || "reviewing";
   return (
     <div style={S.statusToggle}>
@@ -133,10 +129,9 @@ function NodeStatusToggle({ node, onUpdate }: { node: CanvasNode; onUpdate: Prop
   );
 }
 
-function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
+function MediaPanel({ node, actions }: {
   node: CanvasNode;
-  onExecuteNode: Props["onExecuteNode"];
-  onOptimizePrompt: Props["onOptimizePrompt"];
+  actions: NodeActions;
 }) {
   const resultPrompt = (node.result as Record<string, unknown> | null)?.prompt as string | undefined;
   const [prompt, setPrompt] = useState(resultPrompt || node.description || "");
@@ -154,11 +149,11 @@ function MediaPanel({ node, onExecuteNode, onOptimizePrompt }: {
 
   const handleGenerate = () => {
     const isComposite = node.type === "composite";
-    onExecuteNode(node.id, node.type, prompt, isComposite ? undefined : provider, isComposite ? undefined : duration, isComposite ? undefined : resolution, isComposite ? undefined : generateAudio);
+    actions.handleExecuteNode(node.id, node.type, prompt, isComposite ? undefined : provider, isComposite ? undefined : duration, isComposite ? undefined : resolution, isComposite ? undefined : generateAudio);
   };
 
   const handlePolish = () => {
-    onOptimizePrompt(node.id, prompt, feedback);
+    actions.handleOptimizePrompt(node.id, prompt, feedback);
     setShowPolish(false);
     setFeedback("");
   };
