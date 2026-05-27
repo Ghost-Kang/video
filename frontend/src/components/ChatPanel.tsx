@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { COPY } from "../lib/cardCopy";
+import { SampleUrlChips } from "./onboarding/SampleUrlChips";
 
 interface Props {
   messages: { role: "user" | "agent"; content: string }[];
@@ -41,16 +43,34 @@ function CascadeLoading({ thinking }: { thinking: string[] }) {
 
 export function ChatPanel({ messages, streaming, thinking, onSend, loading, onToggleCollapse }: Props) {
   const [input, setInput] = useState("");
+  const [askOpen, setAskOpen] = useState(false);
+  const [askInput, setAskInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "instant" });
   }, [messages, streaming, thinking]);
 
+  const isEmpty = messages.length === 0;
+
   const handleSend = () => {
     if (!input.trim() || loading) return;
     onSend(input.trim());
     setInput("");
+  };
+
+  const handleSampleUrl = (url: string) => {
+    if (loading) return;
+    onSend(url);
+  };
+
+  const handleAskSubmit = () => {
+    if (!askInput.trim() || loading) return;
+    // 前缀触发 Director §0.8: cascade_ask tool。前端文案不进 cardCopy
+    // 里(用户看不到这串 token,纯协议层)。
+    onSend(`[ask: ${askInput.trim()}]`);
+    setAskInput("");
+    setAskOpen(false);
   };
 
   const quickBtnCls =
@@ -75,6 +95,14 @@ export function ChatPanel({ messages, streaming, thinking, onSend, loading, onTo
       </div>
 
       <div className="flex flex-1 flex-col gap-3 overflow-auto p-5">
+        {isEmpty && !streaming && !loading && (
+          <div className="anim-fade-in rounded-2xl border border-dashed border-stone-300/70 dark:border-stone-700/70 px-4 py-4 text-[12.5px] leading-[1.7] text-stone-600 dark:text-stone-400">
+            <p className="font-serif-cn text-[13px] text-stone-900 dark:text-stone-100 mb-1.5">
+              第一次来?
+            </p>
+            <p>把抖音 / 小红书爆款链接 ↓ 粘到下面输入框,或直接点下面任一条样本。</p>
+          </div>
+        )}
         {messages.map((m, i) => (
           <div
             key={i}
@@ -119,32 +147,84 @@ export function ChatPanel({ messages, streaming, thinking, onSend, loading, onTo
       `}</style>
 
       <div className="border-t border-stone-200/70 dark:border-stone-800/70 bg-[var(--color-paper)]/40 dark:bg-stone-950/40 px-5 py-4">
-        <div className="mb-2.5 flex flex-wrap gap-1.5">
-          <button
-            disabled={loading}
-            onClick={() => onSend("继续下一步")}
-            className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
-            type="button"
-          >
-            继续下一步
-          </button>
-          <button
-            disabled={loading}
-            onClick={() => onSend("开头再吸引人点")}
-            className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
-            type="button"
-          >
-            开头再抓
-          </button>
-          <button
-            disabled={loading}
-            onClick={() => onSend("再口语化一点")}
-            className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
-            type="button"
-          >
-            更口语
-          </button>
-        </div>
+        {isEmpty ? (
+          <div className="mb-3">
+            <SampleUrlChips onPick={handleSampleUrl} disabled={loading} />
+          </div>
+        ) : (
+          <>
+            <div className="mb-2.5 flex flex-wrap gap-1.5">
+              <button
+                disabled={loading}
+                onClick={() => onSend(COPY.chat_quick_continue)}
+                className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
+                type="button"
+              >
+                {COPY.chat_quick_continue}
+              </button>
+              <button
+                disabled={loading}
+                onClick={() => onSend("开头再吸引人点")}
+                className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
+                type="button"
+              >
+                {COPY.chat_quick_hook}
+              </button>
+              <button
+                disabled={loading}
+                onClick={() => onSend("再口语化一点")}
+                className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
+                type="button"
+              >
+                {COPY.chat_quick_oral}
+              </button>
+              <button
+                disabled={loading}
+                onClick={() => setAskOpen((v) => !v)}
+                className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""} ${askOpen ? "border-[#7c2d12] dark:border-[#ea580c] text-[#7c2d12] dark:text-[#ea580c]" : ""}`}
+                type="button"
+                aria-expanded={askOpen}
+                data-testid="ask-chip"
+              >
+                💡 {COPY.ask_chip_label}
+              </button>
+            </div>
+            {askOpen && (
+              <div className="mb-2.5 anim-fade-in rounded-xl border border-[#7c2d12]/40 dark:border-[#ea580c]/50 bg-white/50 dark:bg-stone-900/50 p-3">
+                <p className="text-[11px] text-stone-500 dark:text-stone-400 mb-2">
+                  {COPY.ask_hint}
+                </p>
+                <textarea
+                  value={askInput}
+                  onChange={(e) => setAskInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAskSubmit();
+                    }
+                  }}
+                  placeholder={COPY.ask_placeholder}
+                  rows={2}
+                  disabled={loading}
+                  aria-label={COPY.ask_placeholder}
+                  data-testid="ask-textarea"
+                  className="w-full rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-950 px-2.5 py-2 text-[13px] leading-[1.5] text-stone-900 dark:text-stone-100 outline-none placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:border-[#7c2d12] dark:focus:border-[#ea580c] resize-y font-inherit"
+                />
+                <button
+                  type="button"
+                  onClick={handleAskSubmit}
+                  disabled={loading || !askInput.trim()}
+                  data-testid="ask-submit"
+                  className={`mt-2 w-full rounded-lg bg-[#7c2d12] dark:bg-[#ea580c] py-2 text-[12px] font-medium text-[#faf8f3] transition-colors hover:bg-[#9a3412] dark:hover:bg-[#c2410c] font-inherit ${
+                    loading || !askInput.trim() ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+                  }`}
+                >
+                  {COPY.ask_submit}
+                </button>
+              </div>
+            )}
+          </>
+        )}
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -154,10 +234,16 @@ export function ChatPanel({ messages, streaming, thinking, onSend, loading, onTo
               handleSend();
             }
           }}
-          placeholder="想改哪里,直接说"
+          placeholder={isEmpty ? COPY.chat_placeholder_empty : COPY.chat_placeholder_followup}
           rows={3}
           disabled={loading}
-          className="w-full rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-[13px] leading-[1.55] text-stone-900 dark:text-stone-100 outline-none placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:border-stone-900 dark:focus:border-stone-100 transition-colors resize-y font-inherit"
+          aria-label={isEmpty ? COPY.chat_placeholder_empty : COPY.chat_placeholder_followup}
+          className={
+            "w-full rounded-xl border bg-white dark:bg-stone-900 px-3.5 py-2.5 text-[13px] leading-[1.55] text-stone-900 dark:text-stone-100 outline-none placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:border-stone-900 dark:focus:border-stone-100 transition-colors resize-y font-inherit " +
+            (isEmpty && !input
+              ? "border-[#7c2d12]/30 dark:border-[#ea580c]/40 anim-input-glow"
+              : "border-stone-300 dark:border-stone-700")
+          }
         />
         <button
           onClick={handleSend}

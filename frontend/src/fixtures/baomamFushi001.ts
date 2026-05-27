@@ -21,6 +21,19 @@ export const MOCK_BAOMAM_ANALYSIS: CascadeAnalysisContract = {
     engagement_levers: "评论区抛「你家宝宝几个月开始吃辅食」诱导互动",
     replicable_formula:
       "悬念开场（拒食痛点） + 3 步解决方案（换花样/换温度/换工具） + 反差结尾（小孩抢勺子）",
+    audio: {
+      bgm: "舒缓钢琴+渐强弦乐,3 处转点强化情绪",
+      voice_pace: "中速口播 220 字/分,亲和力女声,字幕等长",
+      sound_effects: "关键节点 1 次 whoosh 转场,结尾 0.5s 留白",
+    },
+    production: {
+      cost_tier: "solo_phone",
+      estimated_hours: 2.5,
+      replaceable_anchors: [
+        "原片厨房 → 你的厨房早晨",
+        "原片宝宝餐椅 → 你家宝宝同款角度",
+      ],
+    },
   },
   scenes: [
     {
@@ -92,6 +105,8 @@ export const MOCK_BAOMAM_ANALYSIS: CascadeAnalysisContract = {
     },
   ],
   warnings: [],
+  full_transcript:
+    "你家宝宝是不是也这样，怎么喂都不吃？\n试试换成苹果，颜色更亮宝宝更感兴趣\n蒸 8 分钟，又软又香\n看，张嘴了！这一勺下去妈妈眼泪都要出来了\n我哭了。你家宝宝几个月开始抢勺子的？评论区告诉我。",
 };
 
 export function buildDefaultScript(analysis: CascadeAnalysisContract): string {

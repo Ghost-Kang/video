@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ArrowRight, Link as LinkIcon } from "lucide-react";
 import { useMagnetic } from "../../hooks/useMagnetic";
+import { COPY } from "../../lib/cardCopy";
 
 const PLACEHOLDERS = [
   "粘一条小红书链接",
@@ -86,58 +87,63 @@ export function UrlFallback({ onSubmit }: { onSubmit: (url: string) => void }) {
   };
 
   return (
-    <form
-      ref={formRef}
-      className={`group relative overflow-hidden flex items-center gap-3 rounded-2xl border-2 px-5 py-2 transition-all duration-300 ${
-        canSubmit
-          ? "border-[#7c2d12]/40 bg-white dark:bg-stone-900 shadow-[0_8px_32px_-8px_rgba(124,45,18,0.25)] anim-input-glow"
-          : focused
-            ? "border-stone-900 dark:border-stone-100 bg-white dark:bg-stone-900 shadow-soft-lg"
-            : "border-stone-300/80 dark:border-stone-700/80 bg-white/50 dark:bg-stone-900/40 hover:border-stone-400 dark:hover:border-stone-600"
-      }`}
-      onSubmit={submit}
-    >
-      {/* paste indicator icon (左侧) */}
-      <LinkIcon
-        className={`h-5 w-5 shrink-0 transition-colors duration-300 ${
+    <div>
+      <form
+        ref={formRef}
+        className={`group relative overflow-hidden flex items-center gap-3 rounded-2xl border-2 px-5 py-2 transition-all duration-300 ${
           canSubmit
-            ? "text-[#7c2d12] dark:text-[#ea580c]"
+            ? "border-[#7c2d12]/40 bg-white dark:bg-stone-900 shadow-[0_8px_32px_-8px_rgba(124,45,18,0.25)] anim-input-glow"
             : focused
-              ? "text-stone-900 dark:text-stone-100"
-              : "text-stone-400 dark:text-stone-500"
+              ? "border-stone-900 dark:border-stone-100 bg-white dark:bg-stone-900 shadow-soft-lg"
+              : "border-stone-300/80 dark:border-stone-700/80 bg-white/50 dark:bg-stone-900/40 hover:border-stone-400 dark:hover:border-stone-600"
         }`}
-        aria-hidden
-      />
-
-      <input
-        value={url}
-        onChange={(event) => setUrl(event.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        className="min-w-0 flex-1 bg-transparent text-base md:text-lg text-stone-900 dark:text-stone-100 outline-none placeholder:text-stone-500 dark:placeholder:text-stone-500 py-3 text-left font-medium"
-        placeholder={placeholder + (placeholder ? " │" : "粘一条小红书 / 抖音链接")}
-        aria-label="爆款视频链接"
-        autoFocus
-      />
-
-      {/* CTA 按钮 — 主焦点 */}
-      <button
-        ref={btnRef}
-        type="submit"
-        onClick={submit}
-        disabled={!canSubmit}
-        className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold whitespace-nowrap shrink-0 transition-colors duration-300 ${
-          canSubmit
-            ? "bg-[#7c2d12] hover:bg-[#9a3412] text-white anim-cta-glow"
-            : "bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 border border-stone-200 dark:border-stone-700 anim-cta-breathe cursor-default"
-        }`}
+        onSubmit={submit}
       >
-        拆解
-        <ArrowRight
-          className={`h-4 w-4 ${canSubmit ? "anim-arrow-nudge" : ""}`}
+        {/* paste indicator icon (左侧) */}
+        <LinkIcon
+          className={`h-5 w-5 shrink-0 transition-colors duration-300 ${
+            canSubmit
+              ? "text-[#7c2d12] dark:text-[#ea580c]"
+              : focused
+                ? "text-stone-900 dark:text-stone-100"
+                : "text-stone-400 dark:text-stone-500"
+          }`}
           aria-hidden
         />
-      </button>
-    </form>
+
+        <input
+          value={url}
+          onChange={(event) => setUrl(event.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          className="min-w-0 flex-1 bg-transparent text-base md:text-lg text-stone-900 dark:text-stone-100 outline-none placeholder:text-stone-500 dark:placeholder:text-stone-500 py-3 text-left font-medium"
+          placeholder={placeholder + (placeholder ? " │" : "粘一条小红书 / 抖音链接")}
+          aria-label="爆款视频链接"
+          autoFocus
+        />
+
+        {/* CTA 按钮 — 主焦点 */}
+        <button
+          ref={btnRef}
+          type="submit"
+          onClick={submit}
+          disabled={!canSubmit}
+          className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold whitespace-nowrap shrink-0 transition-colors duration-300 ${
+            canSubmit
+              ? "bg-[#7c2d12] hover:bg-[#9a3412] text-white anim-cta-glow"
+              : "bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 border border-stone-200 dark:border-stone-700 anim-cta-breathe cursor-default"
+          }`}
+        >
+          拆解
+          <ArrowRight
+            className={`h-4 w-4 ${canSubmit ? "anim-arrow-nudge" : ""}`}
+            aria-hidden
+          />
+        </button>
+      </form>
+      <p className="mt-2 text-center text-[11px] text-stone-500 dark:text-stone-400">
+        {COPY.duration_hint}
+      </p>
+    </div>
   );
 }

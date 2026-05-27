@@ -49,6 +49,7 @@ export type Feedback1 = string;
 export type Type12 = "user_message";
 export type ThreadId10 = string;
 export type Content = string;
+export type SelectedNiche = ("baomam_fushi" | "yuer_richang" | "jiating_chufang") | null;
 export type Type13 = "error";
 export type Code = string;
 export type Message = string;
@@ -88,6 +89,21 @@ export type Content2 = string;
 export type Canvas2 = {
   [k: string]: unknown;
 } | null;
+export type Type21 = "analysis_returned";
+export type ThreadId17 = string;
+export type Type22 = "rewrite_returned";
+export type ThreadId18 = string;
+export type AnalysisId = string;
+export type Type23 = "shot_first_frame_returned";
+export type ThreadId19 = string;
+export type RewriteId = string;
+export type ShotIndex = number;
+export type ImageUrl = string;
+export type Type24 = "analysis_answer_returned";
+export type ThreadId20 = string;
+export type AnalysisId1 = string;
+export type Question = string;
+export type Answer = string;
 
 export interface WSMessages {
   WSInbound?:
@@ -112,7 +128,11 @@ export interface WSMessages {
     | PromptOptimizedEvent
     | ProcessingEvent
     | AgentStreamEvent
-    | AgentResponseEvent;
+    | AgentResponseEvent
+    | AnalysisReturnedEvent
+    | RewriteReturnedEvent
+    | ShotFirstFrameReturnedEvent
+    | AnalysisAnswerReturnedEvent;
   [k: string]: unknown;
 }
 export interface AuthMsg {
@@ -189,6 +209,7 @@ export interface UserMessageMsg {
   type: Type12;
   thread_id: ThreadId10;
   content: Content;
+  selected_niche?: SelectedNiche;
 }
 export interface ErrorEvent {
   type: Type13;
@@ -234,4 +255,62 @@ export interface AgentResponseEvent {
   thread_id: ThreadId16;
   content: Content2;
   canvas?: Canvas2;
+}
+/**
+ * Pushed by `cascade_analyze` tool after upstream analysis succeeds.
+ *
+ * Carries the full `CascadeAnalysisContract.model_dump()` so the frontend
+ * CardStack can render ScriptCard/ShotCard immediately without an extra
+ * HTTP round-trip.
+ */
+export interface AnalysisReturnedEvent {
+  type: Type21;
+  thread_id: ThreadId17;
+  analysis: Analysis;
+}
+export interface Analysis {
+  [k: string]: unknown;
+}
+/**
+ * Pushed by `cascade_rewrite` tool after niche rewrite succeeds.
+ *
+ * Carries `RewriteResult.model_dump()` plus the originating analysis_id so
+ * the frontend can correlate the rewrite back to its source analysis card.
+ */
+export interface RewriteReturnedEvent {
+  type: Type22;
+  thread_id: ThreadId18;
+  analysis_id: AnalysisId;
+  rewrite: Rewrite;
+}
+export interface Rewrite {
+  [k: string]: unknown;
+}
+/**
+ * Pushed by `cascade_generate_first_frame` after a per-shot image succeeds.
+ *
+ * Frontend matches `shot_index` against `shots[].scene_index` and patches in
+ * `image_url` so the matching ShotCard re-renders without a full payload
+ * refresh.
+ */
+export interface ShotFirstFrameReturnedEvent {
+  type: Type23;
+  thread_id: ThreadId19;
+  rewrite_id: RewriteId;
+  shot_index: ShotIndex;
+  image_url: ImageUrl;
+}
+/**
+ * Pushed by `cascade_ask` after a free-form Q&A LLM call succeeds.
+ *
+ * Carries the analysis_id + the user's question + the bounded (~300 char)
+ * answer so the frontend chat panel can render a styled bubble (or, in
+ * Phase 1, just chat-relay it via the Director's reply).
+ */
+export interface AnalysisAnswerReturnedEvent {
+  type: Type24;
+  thread_id: ThreadId20;
+  analysis_id: AnalysisId1;
+  question: Question;
+  answer: Answer;
 }

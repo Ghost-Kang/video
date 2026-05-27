@@ -12,6 +12,7 @@ import { useNodeActions } from "./hooks/useNodeActions";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { shouldHideProToggle, isAdminUser } from "./lib/proViewAccess";
 import { useCanvasStore } from "./store/canvasStore";
+import { useNicheStore, type NicheId } from "./store/nicheStore";
 import { useSessionStore } from "./store/sessionStore";
 import { useWSStore } from "./store/wsStore";
 import type { WSEvent } from "./types/ws";
@@ -55,7 +56,10 @@ export default function App({ userId, onLogout }: AppProps) {
   }, [connected, connecting, reconnectAttempt, setConnectionStatus]);
   const sendChatMessage = useCallback((text: string) => {
     addMessage("user", text);
-    sendCommand({ type: "user_message", thread_id: tid, content: text });
+    // Niche is now a proper WS field (codegen'd from backend Pydantic). undefined
+    // when the user hasn't picked one yet — backend treats it as "ask the user".
+    const niche = useNicheStore.getState().niche;
+    sendCommand({ type: "user_message", thread_id: tid, content: text, selected_niche: niche ?? undefined });
     setLoading(true);
     timerRef.current = setTimeout(() => {
       setLoading(false);
@@ -63,6 +67,21 @@ export default function App({ userId, onLogout }: AppProps) {
     }, 300_000);
   }, [addMessage, sendCommand, setLoading, tid]);
   const actions = useNodeActions(tid, sendCommand, sendChatMessage);
+  // Per-shot first-frame trigger. The bracket-prefix convention mirrors
+  // `[selected_niche: ...]` — Director's §0.6 prompt picks up the cue and
+  // calls `cascade_generate_first_frame`. ShotCard owns the local "generating"
+  // spinner; the WS frame `shot_first_frame_returned` patches the image in.
+  const onGenerateFirstFrame = useCallback((idx: number) => {
+    sendChatMessage(`[generate_first_frame: shot_index=${idx}]`);
+  }, [sendChatMessage]);
+  // Niche CTA on the ScriptCard. The bracket-prefix is picked up by
+  // Director §0.6 — it sees the `[selected_niche: ...]` and immediately
+  // calls `cascade_rewrite`. We also persist the choice in nicheStore so
+  // subsequent natural-language follow-ups inherit the same niche.
+  const onTriggerRewrite = useCallback((niche: NicheId) => {
+    useNicheStore.getState().setNiche(niche);
+    sendChatMessage(`[selected_niche: ${niche}] 改成这个方向`);
+  }, [sendChatMessage]);
   useEffect(() => {
     setSessionUserId(userId);
   }, [setSessionUserId, userId]);
@@ -82,6 +101,21 @@ export default function App({ userId, onLogout }: AppProps) {
   useEffect(() => {
     if (!loading) clearTimeout(timerRef.current ?? undefined);
   }, [loading]);
+  // Landing 上 quick-pick / URL 提交把链接放在 ?source_url= 里跳过来; 等 WS 连通后
+  // 自动发出 user_message 触发 cascade,并清掉 query 避免回退时重发。
+  const autosentRef = useRef(false);
+  useEffect(() => {
+    if (autosentRef.current || !connected) return;
+    const sourceUrl = searchParams.get("source_url");
+    if (!sourceUrl) return;
+    autosentRef.current = true;
+    sendChatMessage(decodeURIComponent(sourceUrl));
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("source_url");
+      return next;
+    }, { replace: true });
+  }, [connected, searchParams, sendChatMessage, setSearchParams]);
   const switchSession = useCallback((id: string) => {
     if (id === tid) return;
     clearTimeout(timerRef.current ?? undefined);
@@ -114,7 +148,7 @@ export default function App({ userId, onLogout }: AppProps) {
             <Canvas onPositionChange={(pos) => sendCommand({ ...pos, thread_id: tid })} onCreateEdge={actions.handleCreateEdge} onDeleteEdge={actions.handleDeleteEdge} />
             {selectedNodeId && <NodeDetail actions={actions} />}
           </>
-        ) : <CardStack />}
+        ) : <CardStack onGenerateFirstFrame={onGenerateFirstFrame} onTriggerRewrite={onTriggerRewrite} />}
         {chatOpen ? <ChatPanel messages={messages} streaming={streaming} thinking={thinking} onSend={sendChatMessage} loading={loading} onToggleCollapse={() => setChatOpen(false)} /> : (
           <button onClick={() => setChatOpen(true)} className="absolute bottom-6 right-6 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 dark:bg-[#7c2d12] text-[#faf8f3] shadow-[0_6px_20px_-4px_rgba(28,25,23,0.25)] dark:shadow-[0_6px_20px_-4px_rgba(124,45,18,0.5)] hover:scale-105 active:scale-95 transition-transform duration-200" title="问导演" type="button">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 4h12M3 9h12M3 14h8" strokeLinecap="round" /></svg>

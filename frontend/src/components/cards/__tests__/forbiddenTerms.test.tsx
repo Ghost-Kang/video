@@ -36,4 +36,16 @@ describe("forbidden terms in rendered card HTML", () => {
     );
     assertNoForbiddenTerms(publishEl.textContent ?? "", "PublishPackCard");
   });
+
+  it("ScriptCard in NicheCTA mode (empty script) has zero forbidden terms", () => {
+    const { container } = render(
+      <ScriptCard
+        analysis={MOCK_BAOMAM_ANALYSIS}
+        script=""
+        onScriptChange={() => {}}
+        onTriggerRewrite={() => {}}
+      />
+    );
+    assertNoForbiddenTerms(container.textContent ?? "", "ScriptCard(NicheCTA)");
+  });
 });

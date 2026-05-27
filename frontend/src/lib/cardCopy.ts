@@ -1,6 +1,8 @@
 export const COPY = {
   script_header: "改完的版本",
   shots_header: "镜头草稿",
+  source_shots_header: "源视频每一幕",
+  rewrite_shots_header: "改写后的镜头",
   publish_header: "准备发出去",
   hook_label: "开头怎么抓人",
   pacing_label: "中间为什么不快进",
@@ -25,6 +27,62 @@ export const COPY = {
   card_view_label: "卡片视图",
   suggested_titles: "标题备选",
   tags_label: "话题标签",
+
+  onboarding_title: "粘条爆款链接,把它改成你自己的",
+  onboarding_subtitle: "粘一条链接,几十秒后看到分析 + 改好的版本",
+  onboarding_step1_title: "粘条爆款链接",
+  onboarding_step1_desc: "抖音 / 小红书都行,直接复制视频链接",
+  onboarding_step2_title: "看分析 + 改完的版本",
+  onboarding_step2_desc: "拆解这条为什么火,顺手给你一份能直接发的版本",
+
+  niche_baomam: "宝妈辅食",
+  niche_yuer: "育儿日常",
+  niche_kitchen: "家庭厨房",
+
+  sample_url_label: "想先试试?用这几条爆款做样本",
+  sample_url_hint_baomam: "试一条 宝妈辅食 爆款",
+  sample_url_hint_yuer: "试一条 育儿日常 爆款",
+  sample_url_hint_kitchen: "试一条 家庭厨房 爆款",
+
+  chat_placeholder_empty: "粘一条抖音 / 小红书爆款链接到这里 ↓",
+  chat_placeholder_followup: "想改哪里,直接说",
+  chat_quick_continue: "继续下一步",
+  chat_quick_hook: "开头再抓",
+  chat_quick_oral: "更口语",
+
+  shot_generate_first_frame: "生成首帧",
+  shot_generating_first_frame: "正在生成…",
+
+  rewrite_cta_header: "改成你自己的版本",
+  rewrite_cta_hint: "选一个方向, 我帮你改成你自己的",
+
+  duration_hint: "建议 ≤ 3 分钟·最佳 15-90 秒",
+  duration_too_long_fallback: "这条视频过长,建议先剪到 3 分钟内再来分析",
+  duration_too_short_fallback: "视频太短,没什么可分析的",
+  ask_acknowledge: "好的,问下面这个",
+
+  audio_header: "音频拆解",
+  audio_bgm_label: "BGM",
+  audio_pace_label: "口播 / 语速",
+  audio_sfx_label: "音效",
+
+  transcript_header: "完整原片台词",
+  transcript_expand: "展开",
+  transcript_collapse: "收起",
+  transcript_copy: "复制",
+  transcript_copied: "已复制完整台词",
+
+  production_header: "拍这条要花多少",
+  production_cost_solo: "一个人 + 手机",
+  production_cost_team: "小团队",
+  production_cost_heavy: "重后期",
+  production_hours_suffix: "h",
+  production_replaceable_header: "能换成你自己的",
+
+  ask_chip_label: "问点别的",
+  ask_placeholder: "比如:这条 BGM 给人什么感觉?",
+  ask_submit: "发问",
+  ask_hint: "针对刚才的分析提任何问题",
 } as const;
 
 /** Terms that must never appear in card-stack UI copy or DOM. */

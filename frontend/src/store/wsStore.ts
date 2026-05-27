@@ -3,6 +3,7 @@ import { useCanvasStore } from "./canvasStore";
 import { useSessionStore } from "./sessionStore";
 import { useToastStore, type ToastAction } from "./toastStore";
 import type { WSEvent } from "../types/ws";
+import { mapRewriteShotsToScenes } from "../lib/cascadeMapper";
 
 
 // 把后端 invalid_command code 映射成宝妈看得懂的中文标题。
@@ -42,6 +43,8 @@ interface WSStore {
   connected: boolean;
   connecting: boolean;
   reconnectAttempt: number;
+  lastAnswerAt: number | null;
+  lastAnswerSnippet: string | null;
   setCurrentThreadId: (threadId: string) => void;
   setLoading: (loading: boolean) => void;
   resetThinking: () => void;
@@ -56,6 +59,8 @@ export const useWSStore = create<WSStore>((set, get) => ({
   connected: false,
   connecting: false,
   reconnectAttempt: 0,
+  lastAnswerAt: null,
+  lastAnswerSnippet: null,
 
   setCurrentThreadId: (threadId) => set({ currentThreadId: threadId }),
   setLoading: (loading) => set({ loading }),
@@ -87,11 +92,24 @@ export const useWSStore = create<WSStore>((set, get) => ({
     if (rid && rid !== get().currentThreadId) return;
 
     switch (event.type) {
-      case "agent_response":
+      case "agent_response": {
         set({ loading: false, thinking: [] });
+        const last = get();
+        if (
+          last.lastAnswerAt !== null &&
+          Date.now() - last.lastAnswerAt < 5000 &&
+          last.lastAnswerSnippet &&
+          event.content.startsWith(last.lastAnswerSnippet)
+        ) {
+          set({ lastAnswerAt: null, lastAnswerSnippet: null });
+          useCanvasStore.setState({ streamingContent: "" });
+          if (event.canvas) queueMicrotask(() => canvas.setCanvas(event.canvas!));
+          break;
+        }
         canvas.finalizeStreaming(event.content);
         if (event.canvas) queueMicrotask(() => canvas.setCanvas(event.canvas!));
         break;
+      }
       case "canvas_updated":
         if (event.canvas) queueMicrotask(() => canvas.setCanvas(event.canvas!));
         break;
@@ -107,6 +125,35 @@ export const useWSStore = create<WSStore>((set, get) => ({
         } else if (event.event === "text" && event.content) {
           canvas.appendStreaming(event.content);
         }
+        break;
+      case "analysis_returned":
+        // cascade_analyze tool 完成 → 装上分析卡。脚本/分镜先不动,等 rewrite 才覆盖。
+        queueMicrotask(() => {
+          useCanvasStore.getState().loadFromAnalysis(event.analysis);
+        });
+        break;
+      case "rewrite_returned":
+        // cascade_rewrite 完成 → 只替换改写结果,保留源视频每一幕。
+        queueMicrotask(() => {
+          const { setScript, setRewriteShots } = useCanvasStore.getState();
+          setScript(event.rewrite.script_markdown);
+          setRewriteShots(mapRewriteShotsToScenes(event.rewrite.shots));
+        });
+        break;
+      case "shot_first_frame_returned":
+        // 单镜首帧返回 → 把 image_url 打到对应 scene_index 的 ShotCard 上。
+        queueMicrotask(() => {
+          useCanvasStore.getState().updateShotFirstFrame(event.shot_index, event.image_url);
+        });
+        break;
+      case "analysis_answer_returned":
+        canvas.addMessage("agent", event.answer);
+        set({
+          loading: false,
+          thinking: [],
+          lastAnswerAt: Date.now(),
+          lastAnswerSnippet: event.answer.slice(0, 50),
+        });
         break;
       case "prompt_optimized":
         queueMicrotask(() => {

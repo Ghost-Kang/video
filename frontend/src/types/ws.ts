@@ -31,6 +31,10 @@ export type {
   ProcessingEvent,
   AgentStreamEvent,
   AgentResponseEvent,
+  AnalysisReturnedEvent,
+  RewriteReturnedEvent,
+  ShotFirstFrameReturnedEvent,
+  AnalysisAnswerReturnedEvent,
 } from "./ws_generated";
 
 import type {
@@ -55,8 +59,13 @@ import type {
   ProcessingEvent,
   AgentStreamEvent,
   AgentResponseEvent,
+  AnalysisReturnedEvent,
+  RewriteReturnedEvent,
+  ShotFirstFrameReturnedEvent,
+  AnalysisAnswerReturnedEvent,
 } from "./ws_generated";
 import type { CanvasData } from "./canvas";
+import type { CascadeAnalysisContract } from "./cascade";
 
 export interface ChatMessageEvent {
   role: "user" | "agent";
@@ -85,6 +94,28 @@ export interface AgentResponseEventTyped extends Omit<AgentResponseEvent, "canva
   canvas?: CanvasData | null;
 }
 
+/** WS frame from `cascade_analyze` tool. `analysis` is the full Contract dump. */
+export interface AnalysisReturnedEventTyped extends Omit<AnalysisReturnedEvent, "analysis"> {
+  analysis: CascadeAnalysisContract;
+}
+
+/** WS frame from `cascade_rewrite` tool. `rewrite` matches backend RewriteResult. */
+export interface RewriteReturnedEventTyped extends Omit<RewriteReturnedEvent, "rewrite"> {
+  rewrite: {
+    rewrite_id: string;
+    analysis_id: string;
+    niche: string;
+    script_markdown: string;
+    shots: { shot_index: number; dialogue: string; visual: string }[];
+    parser_warnings: string[];
+    confidence: number;
+    cost_cny: number;
+    model: string;
+    hook_pattern_id?: string;
+    source_classification?: string;
+  };
+}
+
 /** 客户端 → 服务端 命令。Codex-D 把 useWebSocket 的 12 个 sendXxx 收敛到 sendCommand<T extends WSCommand>。*/
 export type WSCommand =
   | AuthMsg
@@ -110,4 +141,8 @@ export type WSEvent =
   | PromptOptimizedEvent
   | ProcessingEvent
   | AgentStreamEvent
-  | AgentResponseEventTyped;
+  | AgentResponseEventTyped
+  | AnalysisReturnedEventTyped
+  | RewriteReturnedEventTyped
+  | ShotFirstFrameReturnedEvent
+  | AnalysisAnswerReturnedEvent;

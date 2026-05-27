@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import type { Scene } from "../../types/cascade";
 import { COPY } from "../../lib/cardCopy";
@@ -9,15 +9,22 @@ import { WarningChips } from "../feedback/WarningChip";
 
 interface Props {
   scene: Scene;
+  onGenerateFirstFrame?: (sceneIndex: number) => void;
 }
 
-export function ShotCard({ scene }: Props) {
+export function ShotCard({ scene, onGenerateFirstFrame }: Props) {
   const [pickerKind, setPickerKind] = useState<AnchorKind | null>(null);
   const [picked, setPicked] = useState<Anchor | null>(null);
+  const [generating, setGenerating] = useState(false);
   const dialogue = scene.dialogue_and_narration?.trim();
   const sceneWarnings = scene.warnings.filter((warning) =>
     warning.field.startsWith(`scenes[${scene.scene_index - 1}].`)
   );
+
+  // Reset the local spinner once the WS frame patches the URL in.
+  useEffect(() => {
+    if (scene.first_frame_url) setGenerating(false);
+  }, [scene.first_frame_url]);
 
   const handlePick = (anchor: Anchor) => {
     setPicked(anchor);
@@ -29,6 +36,12 @@ export function ShotCard({ scene }: Props) {
     });
   };
 
+  const handleGenerate = () => {
+    if (!onGenerateFirstFrame || generating) return;
+    setGenerating(true);
+    onGenerateFirstFrame(scene.scene_index);
+  };
+
   return (
     <section className={CARD_CLASS} data-testid={`shot-card-${scene.scene_index}`}>
       <div className="aspect-video w-full overflow-hidden rounded-xl bg-stone-100 mb-4 flex items-center justify-center">
@@ -38,8 +51,25 @@ export function ShotCard({ scene }: Props) {
             alt=""
             className="h-full w-full object-cover"
           />
+        ) : generating ? (
+          <div className="flex flex-col items-center gap-2 text-stone-500">
+            <div
+              className="h-6 w-6 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600"
+              aria-hidden
+            />
+            <span className="text-sm">{COPY.shot_generating_first_frame}</span>
+          </div>
         ) : (
-          <ImageIcon className="h-10 w-10 text-stone-300" aria-hidden />
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={!onGenerateFirstFrame}
+            className="flex items-center gap-2 rounded-lg bg-white/80 hover:bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:text-stone-900 shadow-sm border border-stone-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid={`shot-card-${scene.scene_index}-generate`}
+          >
+            <ImageIcon className="h-4 w-4" aria-hidden />
+            {COPY.shot_generate_first_frame}
+          </button>
         )}
       </div>
 

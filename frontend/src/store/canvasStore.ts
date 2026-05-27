@@ -1,10 +1,8 @@
 import { create } from "zustand";
 import type { CanvasNode } from "../types";
 import type { CascadeAnalysisContract, FailurePayload, Scene } from "../types/cascade";
-import {
-  MOCK_BAOMAM_ANALYSIS,
-  buildDefaultScript,
-} from "../fixtures/baomamFushi001";
+import type { RewriteShot } from "../lib/cascadeMapper";
+import { buildDefaultScript } from "../fixtures/baomamFushi001";
 
 interface Edge {
   id: string;
@@ -21,7 +19,10 @@ interface CanvasStore {
   streamingContent: string;
   analysis: CascadeAnalysisContract | null;
   script: string;
+  /** 源视频每一幕 — 永远绑 analysis.scenes,不被 rewrite 覆盖。 */
   shots: Scene[];
+  /** 改写后的镜头 — 跟 shots 共存,空时不渲染对应区域。 */
+  rewriteShots: RewriteShot[];
   failure: FailurePayload | null;
   setCanvas: (data: { nodes: Record<string, CanvasNode>; edges?: unknown[] }) => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
@@ -35,6 +36,8 @@ interface CanvasStore {
   setAnalysis: (analysis: CascadeAnalysisContract | null) => void;
   setScript: (script: string) => void;
   setShots: (shots: Scene[]) => void;
+  setRewriteShots: (shots: RewriteShot[]) => void;
+  updateShotFirstFrame: (scene_index: number, url: string) => void;
   setFailure: (failure: FailurePayload | null) => void;
   loadFromAnalysis: (analysis: CascadeAnalysisContract) => void;
   clear: () => void;
@@ -46,9 +49,12 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
   messages: [],
   selectedNodeId: null,
   streamingContent: "",
-  analysis: MOCK_BAOMAM_ANALYSIS,
-  script: buildDefaultScript(MOCK_BAOMAM_ANALYSIS),
-  shots: MOCK_BAOMAM_ANALYSIS.scenes,
+  // W4D5: initial state is empty — no mock fixture. Real analysis lands
+  // via WS `analysis_returned` and flips the CardStack into render mode.
+  analysis: null,
+  script: "",
+  shots: [],
+  rewriteShots: [],
   failure: null,
 
   setCanvas: (data) =>
@@ -93,6 +99,15 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
 
   setShots: (shots) => set({ shots }),
 
+  setRewriteShots: (rewriteShots) => set({ rewriteShots }),
+
+  updateShotFirstFrame: (scene_index, url) =>
+    set((s) => ({
+      shots: s.shots.map((sh) =>
+        sh.scene_index === scene_index ? { ...sh, first_frame_url: url } : sh
+      ),
+    })),
+
   setFailure: (failure) => set({ failure }),
 
   loadFromAnalysis: (analysis) =>
@@ -100,6 +115,7 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
       analysis,
       script: buildDefaultScript(analysis),
       shots: analysis.scenes,
+      rewriteShots: [],
       failure: null,
     }),
 
@@ -110,9 +126,10 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
       messages: [],
       selectedNodeId: null,
       streamingContent: "",
-      analysis: MOCK_BAOMAM_ANALYSIS,
-      script: buildDefaultScript(MOCK_BAOMAM_ANALYSIS),
-      shots: MOCK_BAOMAM_ANALYSIS.scenes,
+      analysis: null,
+      script: "",
+      shots: [],
+      rewriteShots: [],
       failure: null,
     }),
 }));

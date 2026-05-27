@@ -34,6 +34,20 @@ export interface Warning_ {
   severity: Severity;
 }
 
+export interface AudioDim {
+  bgm: string;
+  voice_pace: string;
+  sound_effects: string;
+}
+
+export type CostTier = 'solo_phone' | 'small_team' | 'post_heavy';
+
+export interface ProductionDim {
+  cost_tier: CostTier;
+  estimated_hours: number;
+  replaceable_anchors: string[];
+}
+
 export interface ViralAnalysis {
   hook: string;
   pacing: string;
@@ -43,6 +57,8 @@ export interface ViralAnalysis {
   target_audience: string;
   engagement_levers: string;
   replicable_formula: string;
+  audio: AudioDim;
+  production: ProductionDim;
 }
 
 export interface Scene {
@@ -72,6 +88,7 @@ export interface CascadeAnalysisContract {
   scenes: Scene[];
   warnings: Warning_[];
   confidence: number; // 0..1
+  full_transcript: string;
 }
 
 // ============================================================================
