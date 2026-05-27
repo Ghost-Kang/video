@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from agent.cascade.event_names import EventName
 from agent.cascade.events import emit
 
 
@@ -18,6 +19,10 @@ def _use_tmp_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 def test_unknown_event_name_raises() -> None:
     with pytest.raises(ValueError, match="unknown event_name"):
         asyncio.run(emit("not_real", user_id="user_1", run_id=None, payload={}))
+
+
+def test_event_name_enum_preserves_wire_values() -> None:
+    assert EventName.SCRIPT_REWRITTEN.value == "script_rewritten"
 
 
 def test_known_event_missing_required_field_raises() -> None:

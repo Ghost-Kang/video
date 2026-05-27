@@ -16,6 +16,7 @@ from typing import Any
 import aiosqlite
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
+from agent.cascade.event_names import EventName
 from agent.cascade.events import emit
 from agent.cascade.storage import db_path
 
@@ -151,7 +152,7 @@ async def create_anchor(
         await db.close()
 
     await emit(
-        "anchor_created",
+        EventName.ANCHOR_CREATED,
         user_id=user_id,
         run_id=source_run_id,
         payload={
@@ -308,8 +309,8 @@ async def reuse_anchor(
 
         # is_first_reuse_for_user — count prior anchor_reused events for this user.
         prior = await db.execute_fetchall(
-            "SELECT COUNT(*) FROM events WHERE user_id = ? AND event_name = 'anchor_reused'",
-            (user_id,),
+            "SELECT COUNT(*) FROM events WHERE user_id = ? AND event_name = ?",
+            (user_id, EventName.ANCHOR_REUSED.value),
         )
         prior_count = prior[0][0] if prior else 0
         is_first_reuse_for_user = prior_count == 0
@@ -321,7 +322,7 @@ async def reuse_anchor(
     days_since_created = max(0, (datetime.now(timezone.utc) - created_at).days)
 
     await emit(
-        "anchor_reused",
+        EventName.ANCHOR_REUSED,
         user_id=user_id,
         run_id=reused_in_run_id,
         payload={

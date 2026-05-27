@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from agent.cascade.event_names import EventName
 from agent.cascade.persistence.db import _connect
 
 
@@ -28,9 +29,9 @@ async def list_creators() -> list[dict[str, Any]]:
             }
 
         for event_name, key in (
-            ("run_started", "runs_started"),
-            ("script_rewritten", "rewrites_completed"),
-            ("publish_pack_copied", "publish_packs_copied"),
+            (EventName.RUN_STARTED.value, "runs_started"),
+            (EventName.SCRIPT_REWRITTEN.value, "rewrites_completed"),
+            (EventName.PUBLISH_PACK_COPIED.value, "publish_packs_copied"),
         ):
             counter_rows = await db.execute_fetchall(
                 "SELECT user_id, COUNT(*) FROM events WHERE event_name = ? GROUP BY user_id",
@@ -52,7 +53,8 @@ async def list_creators() -> list[dict[str, Any]]:
             pass
 
         interview_rows = await db.execute_fetchall(
-            "SELECT DISTINCT user_id FROM events WHERE event_name = 'interview_logged'"
+            "SELECT DISTINCT user_id FROM events WHERE event_name = ?",
+            (EventName.INTERVIEW_LOGGED.value,),
         )
         for (user_id,) in interview_rows:
             creator = creators.setdefault(user_id, _empty_creator(user_id))

@@ -25,6 +25,7 @@ from pydantic import ValidationError
 from agent.cascade import cost_guard
 from agent.cascade.analysis_service import request_shallow_analysis
 from agent.cascade.anchors import create_anchor, list_anchors, list_reuses, reuse_anchor
+from agent.cascade.event_names import EventName
 from agent.cascade.events import emit
 from agent.cascade.failures import HardFailure
 from agent.cascade.rewrite_service import error_payload, request_rewrite
@@ -164,7 +165,7 @@ async def handle_rewrite(qs: dict, body: dict) -> tuple[int, dict, str]:
         run_id=run_id,
     )
     await emit(
-        "generation_cost",
+        EventName.GENERATION_COST,
         user_id=user_id,
         run_id=run_id,
         payload={
@@ -191,7 +192,7 @@ async def handle_analysis_shallow(qs: dict, body: dict) -> tuple[int, dict, str]
     await cost_guard.cost_guard(user_id, run_id, cost_guard.PREDICT_ANALYSIS_CNY)
     contract = await request_shallow_analysis(source_url, user_id=user_id, run_id=run_id)
     await emit(
-        "generation_cost",
+        EventName.GENERATION_COST,
         user_id=user_id,
         run_id=run_id,
         payload={

@@ -2,18 +2,19 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from agent.cascade.event_names import EventName
 from agent.cascade.persistence.db import _connect
 
 
 _FAILURE_RETENTION_EVENTS = frozenset({
-    "failure_emitted",
-    "failure_recovered",
+    EventName.FAILURE_EMITTED.value,
+    EventName.FAILURE_RECOVERED.value,
 })
 _INFRA_RETENTION_EVENTS = frozenset({
-    "cascade_retry",
-    "cascade_circuit_open",
-    "cascade_cache_hit",
-    "cascade_cache_miss",
+    EventName.CASCADE_RETRY.value,
+    EventName.CASCADE_CIRCUIT_OPEN.value,
+    EventName.CASCADE_CACHE_HIT.value,
+    EventName.CASCADE_CACHE_MISS.value,
 })
 
 

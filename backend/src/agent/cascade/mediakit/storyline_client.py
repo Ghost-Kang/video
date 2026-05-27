@@ -16,6 +16,7 @@ import httpx
 
 from agent import config
 from agent.cascade import circuit_breaker
+from agent.cascade.event_names import EventName
 from agent.cascade.events import emit
 from agent.cascade.failures import FailureCode, HardFailure
 from agent.cascade.persistence.toprador_cache_repo import (
@@ -110,7 +111,7 @@ async def analyze_storyline(
     if cached is not None:
         payload, ttl_remaining_s = cached
         await emit(
-            "cascade_cache_hit",
+            EventName.CASCADE_CACHE_HIT,
             user_id=user_id,
             run_id=run_id,
             payload={
@@ -122,7 +123,7 @@ async def analyze_storyline(
         return copy.deepcopy(payload)
 
     await emit(
-        "cascade_cache_miss",
+        EventName.CASCADE_CACHE_MISS,
         user_id=user_id,
         run_id=run_id,
         payload={"source_url_hash": cache_key},
@@ -223,7 +224,7 @@ async def _emit_retry(
     run_id: str | None,
 ) -> None:
     await emit(
-        "cascade_retry",
+        EventName.CASCADE_RETRY,
         user_id=user_id,
         run_id=run_id,
         payload={

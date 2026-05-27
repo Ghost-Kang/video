@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from agent.cascade.event_names import EventName
 from agent.cascade.persistence.db import _connect
 
 
@@ -25,8 +26,8 @@ async def sum_generation_cost(
     run_id: str | None = None,
     since: str | None = None,
 ) -> float:
-    clauses = ["event_name = 'generation_cost'"]
-    params: list[Any] = []
+    clauses = ["event_name = ?"]
+    params: list[Any] = [EventName.GENERATION_COST.value]
     if user_id is not None:
         clauses.append("user_id = ?")
         params.append(user_id)

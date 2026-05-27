@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from agent.cascade.contract import CascadeAnalysisContract
 from agent.cascade.cost_cap import predict_rewrite_cost
+from agent.cascade.event_names import EventName
 from agent.cascade.events import emit
 from agent.cascade.failures import FailureCode, HardFailure
 from agent.cascade.storage import (
@@ -92,7 +93,7 @@ async def request_rewrite(
         created_at=utc_now_rfc3339(),
     )
     await emit(
-        "script_rewritten",
+        EventName.SCRIPT_REWRITTEN,
         user_id=user_id,
         run_id=run_id,
         payload={

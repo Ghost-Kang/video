@@ -18,6 +18,7 @@ from agent import config
 from agent.cascade import circuit_breaker
 from agent.cascade.adapter import normalize_analysis_result
 from agent.cascade.contract import CascadeAnalysisContract
+from agent.cascade.event_names import EventName
 from agent.cascade.events import emit
 from agent.cascade.failures import FailureCode, HardFailure, WarningCode
 from agent.cascade.mediakit import analyze_storyline, overlay_viral_dims, storyline_to_payload
@@ -74,7 +75,7 @@ async def request_shallow_analysis(
         contract = normalize_analysis_result(raw)
     except HardFailure as exc:
         await emit(
-            "failure_emitted",
+            EventName.FAILURE_EMITTED,
             user_id=user_id,
             run_id=run_id,
             payload={
@@ -88,7 +89,7 @@ async def request_shallow_analysis(
     set_analysis_context(user_id, run_id)
     inserted = await save_analysis(contract)
     if inserted:
-        await emit("analysis_returned",
+        await emit(EventName.ANALYSIS_RETURNED,
             user_id=user_id,
             run_id=run_id,
             payload=_analysis_returned_payload(
@@ -142,7 +143,7 @@ async def _call_toprador(
     if cached is not None:
         cached_payload, ttl_remaining_s = cached
         await emit(
-            "cascade_cache_hit",
+            EventName.CASCADE_CACHE_HIT,
             user_id=user_id,
             run_id=run_id,
             payload={
@@ -156,7 +157,7 @@ async def _call_toprador(
         payload["_upstream_attempts"] = 0
         return payload
     await emit(
-        "cascade_cache_miss",
+        EventName.CASCADE_CACHE_MISS,
         user_id=user_id,
         run_id=run_id,
         payload={"source_url_hash": source_url_hash},
@@ -274,7 +275,7 @@ async def _emit_retry(
     run_id: str | None,
 ) -> None:
     await emit(
-        "cascade_retry",
+        EventName.CASCADE_RETRY,
         user_id=user_id,
         run_id=run_id,
         payload={
@@ -308,7 +309,7 @@ async def _emit_circuit_open(
     else:
         cooldown_s = circuit_breaker.COOLDOWN_S
     await emit(
-        "cascade_circuit_open",
+        EventName.CASCADE_CIRCUIT_OPEN,
         user_id=user_id,
         run_id=run_id,
         payload={
