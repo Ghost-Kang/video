@@ -56,6 +56,34 @@ import type {
   AgentStreamEvent,
   AgentResponseEvent,
 } from "./ws_generated";
+import type { CanvasData } from "./canvas";
+
+export interface ChatMessageEvent {
+  role: "user" | "agent";
+  content: string;
+}
+
+export interface WSSessionInfo {
+  thread_id: string;
+  last_active: string;
+}
+
+export interface SessionListEventTyped extends Omit<SessionListEvent, "sessions"> {
+  sessions: WSSessionInfo[];
+}
+
+export interface SessionStateEventTyped extends Omit<SessionStateEvent, "messages" | "canvas"> {
+  messages: ChatMessageEvent[];
+  canvas?: CanvasData | null;
+}
+
+export interface CanvasUpdatedEventTyped extends Omit<CanvasUpdatedEvent, "canvas"> {
+  canvas?: CanvasData | null;
+}
+
+export interface AgentResponseEventTyped extends Omit<AgentResponseEvent, "canvas"> {
+  canvas?: CanvasData | null;
+}
 
 /** 客户端 → 服务端 命令。Codex-D 把 useWebSocket 的 12 个 sendXxx 收敛到 sendCommand<T extends WSCommand>。*/
 export type WSCommand =
@@ -76,10 +104,10 @@ export type WSCommand =
 /** 服务端 → 客户端 推送。app 用 switch on `event.type` 分发。*/
 export type WSEvent =
   | ErrorEvent
-  | SessionListEvent
-  | SessionStateEvent
-  | CanvasUpdatedEvent
+  | SessionListEventTyped
+  | SessionStateEventTyped
+  | CanvasUpdatedEventTyped
   | PromptOptimizedEvent
   | ProcessingEvent
   | AgentStreamEvent
-  | AgentResponseEvent;
+  | AgentResponseEventTyped;

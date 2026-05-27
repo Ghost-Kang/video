@@ -60,7 +60,7 @@ test("Legal user-agreement 页加载 + 标题 + 返回首页链接", async ({ pa
 test("Legal privacy 页加载 + 正文渲染", async ({ page }) => {
   await page.goto("/legal/privacy");
 
-  await expect(page.getByRole("heading", { level: 1, name: "隐私政策" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "隐私政策", exact: true })).toBeVisible();
   await expect(page.getByText("Privacy · v0")).toBeVisible();
   await expect(page.getByText(/OpenRHTV 隐私政策/)).toBeVisible({ timeout: 5_000 });
 });

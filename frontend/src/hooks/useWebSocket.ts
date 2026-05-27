@@ -1,7 +1,7 @@
 import { useRef, useCallback, useState } from "react";
-import type { WSIncoming, WSPositionUpdate, WSReviewNode, WSExecuteNode, WSOptimizePrompt, NodeStatus } from "../types";
+import type { WSCommand, WSEvent } from "../types/ws";
 
-type Handler = (res: WSIncoming) => void;
+type Handler = (res: WSEvent) => void;
 
 const WS_URL = `ws://${location.hostname}:8765`;
 const RECONNECT_BASE_MS = 1000;
@@ -75,8 +75,7 @@ export function useWebSocket(userId: string, onMessage: Handler) {
     timerRef.current = setTimeout(() => connect(), delay);
   }, [connect]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const _send = useCallback((payload: Record<string, any>) => {
+  const sendCommand = useCallback(<T extends WSCommand>(payload: T) => {
     const data = JSON.stringify(payload);
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       for (const msg of pendingRef.current) {
@@ -90,58 +89,5 @@ export function useWebSocket(userId: string, onMessage: Handler) {
     }
   }, []);
 
-  const sendMessage = useCallback((threadId: string, content: string) => {
-    console.log(`[WS] 发送 user_message thread=${threadId}`);
-    _send({ type: "user_message", thread_id: threadId, content });
-  }, [_send]);
-
-  const sendPosition = useCallback((update: WSPositionUpdate) => {
-    _send(update);
-  }, [_send]);
-
-  const sendGetSessionState = useCallback((threadId: string) => {
-    console.log(`[WS] 发送 get_session_state thread=${threadId}`);
-    _send({ type: "get_session_state", thread_id: threadId });
-  }, [_send]);
-
-  const sendReviewNode = useCallback((review: WSReviewNode) => {
-    console.log(`[WS] 发送 review_node action=${review.action} node=${review.node_id}`);
-    _send(review);
-  }, [_send]);
-
-  const sendExecuteNode = useCallback((payload: WSExecuteNode) => {
-    console.log(`[WS] 发送 execute_node node=${payload.node_id}`);
-    _send(payload);
-  }, [_send]);
-
-  const sendUpdateNodeStatus = useCallback((threadId: string, nodeId: string, nodeStatus: NodeStatus) => {
-    console.log(`[WS] 发送 update_node_status node=${nodeId} ${nodeStatus}`);
-    _send({ type: "update_node_status", thread_id: threadId, node_id: nodeId, node_status: nodeStatus });
-  }, [_send]);
-
-  const sendOptimizePrompt = useCallback((payload: WSOptimizePrompt) => {
-    console.log(`[WS] 发送 optimize_prompt node=${payload.node_id}`);
-    _send(payload);
-  }, [_send]);
-
-  const sendCreateEdge = useCallback((threadId: string, source: string, target: string) => {
-    console.log(`[WS] 发送 create_edge ${source} → ${target}`);
-    _send({ type: "create_edge", thread_id: threadId, source, target });
-  }, [_send]);
-
-  const sendDeleteEdge = useCallback((threadId: string, edgeId: string) => {
-    console.log(`[WS] 发送 delete_edge ${edgeId}`);
-    _send({ type: "delete_edge", thread_id: threadId, edge_id: edgeId });
-  }, [_send]);
-
-  const sendReorderEdge = useCallback((threadId: string, edgeId: string, direction: "up" | "down") => {
-    _send({ type: "reorder_edge", thread_id: threadId, edge_id: edgeId, direction });
-  }, [_send]);
-
-  const sendDeleteSession = useCallback((threadId: string) => {
-    console.log(`[WS] 发送 delete_session thread=${threadId}`);
-    _send({ type: "delete_session", thread_id: threadId });
-  }, [_send]);
-
-  return { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, sendCreateEdge, sendDeleteEdge, sendReorderEdge, sendDeleteSession, connected, connecting };
+  return { connect, sendCommand, connected, connecting };
 }

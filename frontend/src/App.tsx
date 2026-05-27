@@ -151,7 +151,7 @@ export default function App({ userId, onLogout }: AppProps) {
           break;
         case "agent_stream":
           if (res.event === "tool_call") {
-            setThinking((t) => [...t, labelToolCall(res.name)]);
+            setThinking((t) => [...t, labelToolCall(res.name ?? undefined)]);
           } else if (res.event === "text" && res.content) {
             appendStreaming(res.content);
           }
@@ -171,7 +171,7 @@ export default function App({ userId, onLogout }: AppProps) {
     [addMessage, setMessages, setCanvas, appendStreaming, finalizeStreaming, userId]
   );
 
-  const { connect, sendMessage, sendPosition, sendGetSessionState, sendReviewNode, sendExecuteNode, sendUpdateNodeStatus, sendOptimizePrompt, sendCreateEdge, sendDeleteEdge, sendReorderEdge, sendDeleteSession, connected, connecting } =
+  const { connect, sendCommand, connected, connecting } =
     useWebSocket(userId, onMessage);
   currentThreadIdRef.current = tid;
 
@@ -218,9 +218,9 @@ export default function App({ userId, onLogout }: AppProps) {
         saveJSON(lsKey("names", userId), rest);
         return rest;
       });
-      sendDeleteSession(id);
+      sendCommand({ type: "delete_session", thread_id: id });
     },
-    [sendDeleteSession]
+    [sendCommand]
   );
 
   // 初始化 WS
@@ -238,9 +238,9 @@ export default function App({ userId, onLogout }: AppProps) {
       addSession(tid);
       clearMessages();
       setCanvas({ nodes: {}, edges: [] });
-      sendGetSessionState(tid);
+      sendCommand({ type: "get_session_state", thread_id: tid });
     });
-  }, [tid, addSession, clearMessages, setCanvas, sendGetSessionState]);
+  }, [tid, addSession, clearMessages, setCanvas, sendCommand]);
 
   // 当前会话被删时跳转
   useEffect(() => {
@@ -256,33 +256,33 @@ export default function App({ userId, onLogout }: AppProps) {
   const handleSend = useCallback(
     (text: string) => {
       addMessage("user", text);
-      sendMessage(tid, text);
+      sendCommand({ type: "user_message", thread_id: tid, content: text });
       setLoading(true);
       timerRef.current = setTimeout(() => {
         setLoading(false);
         addMessage("agent", "请求超时，请检查后端是否正常运行");
       }, 300_000);
     },
-    [addMessage, sendMessage, tid]
+    [addMessage, sendCommand, tid]
   );
 
   const handleReview = useCallback(
     (nodeId: string, action: "approve" | "reject", feedback?: string) => {
-      sendReviewNode({ type: "review_node", thread_id: tid, node_id: nodeId, action, feedback });
+      sendCommand({ type: "review_node", thread_id: tid, node_id: nodeId, action, feedback });
       if (action === "reject") {
         const f = feedback ? `，反馈意见：${feedback}` : "";
         handleSend(`驳回节点「${nodeId}」${f}\n节点 ${nodeId} 审核未通过，请根据反馈重新生成。`);
       }
       // approve 不自动发消息，由用户自己决定何时推进
     },
-    [sendReviewNode, tid, handleSend]
+    [sendCommand, tid, handleSend]
   );
 
   const handleExecuteNode = useCallback(
     (nodeId: string, nodeType: NodeType, description: string, provider?: string, duration?: number, resolution?: string, generateAudio?: boolean) => {
-      sendExecuteNode({ type: "execute_node", thread_id: tid, node_id: nodeId, node_type: nodeType, description, image_gen_provider: provider, duration, resolution, generate_audio: generateAudio });
+      sendCommand({ type: "execute_node", thread_id: tid, node_id: nodeId, node_type: nodeType, description, image_gen_provider: provider, duration, resolution, generate_audio: generateAudio });
     },
-    [sendExecuteNode, tid]
+    [sendCommand, tid]
   );
 
   const handleUpdateNodeStatus = useCallback(
@@ -295,37 +295,37 @@ export default function App({ userId, onLogout }: AppProps) {
           ),
         }));
       });
-      sendUpdateNodeStatus(tid, nodeId, nodeStatus);
+      sendCommand({ type: "update_node_status", thread_id: tid, node_id: nodeId, node_status: nodeStatus });
     },
-    [sendUpdateNodeStatus, tid]
+    [sendCommand, tid]
   );
 
   const handleCreateEdge = useCallback(
     (source: string, target: string) => {
-      sendCreateEdge(tid, source, target);
+      sendCommand({ type: "create_edge", thread_id: tid, source, target });
     },
-    [sendCreateEdge, tid]
+    [sendCommand, tid]
   );
 
   const handleReorderEdge = useCallback(
     (edgeId: string, direction: "up" | "down") => {
-      sendReorderEdge(tid, edgeId, direction);
+      sendCommand({ type: "reorder_edge", thread_id: tid, edge_id: edgeId, direction });
     },
-    [sendReorderEdge, tid]
+    [sendCommand, tid]
   );
 
   const handleDeleteEdge = useCallback(
     (edgeId: string) => {
-      sendDeleteEdge(tid, edgeId);
+      sendCommand({ type: "delete_edge", thread_id: tid, edge_id: edgeId });
     },
-    [sendDeleteEdge, tid]
+    [sendCommand, tid]
   );
 
   const handleOptimizePrompt = useCallback(
     (nodeId: string, prompt: string, feedback: string) => {
-      sendOptimizePrompt({ type: "optimize_prompt", thread_id: tid, node_id: nodeId, prompt, feedback });
+      sendCommand({ type: "optimize_prompt", thread_id: tid, node_id: nodeId, prompt, feedback });
     },
-    [sendOptimizePrompt, tid]
+    [sendCommand, tid]
   );
 
   useEffect(() => {
@@ -361,7 +361,7 @@ export default function App({ userId, onLogout }: AppProps) {
         )}
         {isProView ? (
           <>
-            <Canvas onPositionChange={(pos) => sendPosition({ ...pos, thread_id: tid })} onCreateEdge={handleCreateEdge} onDeleteEdge={handleDeleteEdge} />
+            <Canvas onPositionChange={(pos) => sendCommand({ ...pos, thread_id: tid })} onCreateEdge={handleCreateEdge} onDeleteEdge={handleDeleteEdge} />
             {selectedNodeId && (
               <NodeDetail
                 onReview={handleReview}
@@ -401,4 +401,3 @@ export default function App({ userId, onLogout }: AppProps) {
     </div>
   );
 }
-
