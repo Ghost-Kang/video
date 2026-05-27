@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * 数字滚动器 — 用 ease-out cubic 缓动,1.8s 滚到 target。
@@ -15,6 +15,7 @@ export function StatCounter({
 }) {
   const [value, setValue] = useState(0);
   const [started, setStarted] = useState(false);
+  const valueRef = useRef(0);
 
   useEffect(() => {
     const t = setTimeout(() => setStarted(true), delayMs);
@@ -24,13 +25,18 @@ export function StatCounter({
   useEffect(() => {
     if (!started) return;
     const start = performance.now();
+    const from = valueRef.current;
+    const delta = target - from;
     const duration = 1800;
     let raf = 0;
     const tick = (now: number) => {
       const t = Math.min((now - start) / duration, 1);
       const eased = 1 - Math.pow(1 - t, 3);
-      setValue(Math.floor(eased * target));
+      const current = Math.floor(from + eased * delta);
+      valueRef.current = current;
+      setValue(current);
       if (t < 1) raf = requestAnimationFrame(tick);
+      else valueRef.current = target;
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);

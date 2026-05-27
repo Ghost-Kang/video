@@ -40,7 +40,7 @@ export function HotCard({ card, onPick }: { card: FeaturedCard; onPick: (card: F
   const { Scene } = meta;
   const imgRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLElement>(null);
-  const [tilt, setTilt] = useState({ rx: 0, ry: 0, glareX: 50, glareY: 50, tx: 0, ty: 0 });
+  const clickedRef = useRef(false);
   const [hovered, setHovered] = useState(false);
 
   const handleMove = (e: React.MouseEvent) => {
@@ -57,15 +57,35 @@ export function HotCard({ card, onPick }: { card: FeaturedCard; onPick: (card: F
     const cy = wrapRect.top + wrapRect.height / 2;
     const tx = (e.clientX - cx) * 0.04;
     const ty = (e.clientY - cy) * 0.04;
-    setTilt({ rx, ry, glareX: x * 100, glareY: y * 100, tx, ty });
+    wrap.style.transform = `translate(${tx}px, ${ty}px)`;
+    wrap.style.transition = "transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)";
+    el.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) scale(1.025)`;
+    el.style.boxShadow = "0 8px 32px -8px rgba(28,25,23,0.18)";
+    el.style.setProperty("--glare-x", `${x * 100}%`);
+    el.style.setProperty("--glare-y", `${y * 100}%`);
+    el.style.setProperty("--glare-opacity", "1");
   };
 
   const handleLeave = () => {
-    setTilt({ rx: 0, ry: 0, glareX: 50, glareY: 50, tx: 0, ty: 0 });
+    const el = imgRef.current;
+    const wrap = wrapRef.current;
+    if (wrap) {
+      wrap.style.transform = "";
+      wrap.style.transition = "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)";
+    }
+    if (el) {
+      el.style.transform = "";
+      el.style.boxShadow = "";
+      el.style.removeProperty("--glare-x");
+      el.style.removeProperty("--glare-y");
+      el.style.removeProperty("--glare-opacity");
+    }
     setHovered(false);
   };
 
   const handleClick = (e: React.MouseEvent) => {
+    if (clickedRef.current) return;
+    clickedRef.current = true;
     const el = imgRef.current;
     if (el) {
       const rect = el.getBoundingClientRect();
@@ -92,24 +112,16 @@ export function HotCard({ card, onPick }: { card: FeaturedCard; onPick: (card: F
       onMouseEnter={() => setHovered(true)}
       style={{
         perspective: "800px",
-        transform: `translate(${tilt.tx}px, ${tilt.ty}px)`,
-        transition:
-          tilt.tx === 0 && tilt.ty === 0
-            ? "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)"
-            : "transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)",
+        transition: "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
       }}
     >
       <div
         ref={imgRef}
         className={`relative aspect-[4/3] rounded-xl overflow-hidden ${meta.gradient} mb-3 will-change-transform`}
         style={{
-          transform: `rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg) scale(${tilt.rx === 0 && tilt.ry === 0 ? 1 : 1.025})`,
           transition: "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
           transformStyle: "preserve-3d",
-          boxShadow:
-            tilt.rx === 0 && tilt.ry === 0
-              ? "0 1px 2px rgba(28,25,23,0.04), 0 4px 12px -2px rgba(28,25,23,0.06)"
-              : "0 8px 32px -8px rgba(28,25,23,0.18)",
+          boxShadow: "0 1px 2px rgba(28,25,23,0.04), 0 4px 12px -2px rgba(28,25,23,0.06)",
         }}
       >
         {card.thumbnail_url ? (
@@ -139,8 +151,9 @@ export function HotCard({ card, onPick }: { card: FeaturedCard; onPick: (card: F
           aria-hidden
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: `radial-gradient(circle at ${tilt.glareX}% ${tilt.glareY}%, rgba(255,255,255,0.45) 0%, transparent 45%)`,
-            opacity: tilt.rx === 0 && tilt.ry === 0 ? 0 : 1,
+            background:
+              "radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 50%), rgba(255,255,255,0.45) 0%, transparent 45%)",
+            opacity: "var(--glare-opacity, 0)",
             transition: "opacity 0.3s ease-out",
           }}
         />

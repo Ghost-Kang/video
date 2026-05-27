@@ -89,7 +89,7 @@ export function AdminEvents() {
 
           <div className="anim-fade-up rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/70 dark:border-stone-800/70 p-5 space-y-4 shadow-soft" style={{ animationDelay: "240ms" }}>
           <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-            <label className="text-xs text-stone-500 flex items-center gap-2">
+            <label className="text-xs text-stone-500 dark:text-stone-400 flex items-center gap-2">
               事件类型
               <select
                 value={eventType}
@@ -104,7 +104,7 @@ export function AdminEvents() {
                 ))}
               </select>
             </label>
-            <label className="text-xs text-stone-500 flex items-center gap-2">
+            <label className="text-xs text-stone-500 dark:text-stone-400 flex items-center gap-2">
               user_id
               <input
                 type="search"
@@ -116,18 +116,18 @@ export function AdminEvents() {
               />
             </label>
             {hasMore && (
-              <span className="ml-auto text-xs text-amber-700">
+              <span className="ml-auto text-xs text-amber-700 dark:text-amber-400">
                 还有更多事件未加载(已达 200 条上限)
               </span>
             )}
           </div>
 
           {Object.keys(summary).length > 0 && (
-            <div className="flex flex-wrap gap-2 text-xs text-stone-500">
+            <div className="flex flex-wrap gap-2 text-xs text-stone-500 dark:text-stone-400">
               {Object.entries(summary).map(([t, n]) => (
                 <span
                   key={t}
-                  className="rounded-full bg-stone-100 px-2 py-0.5"
+                  className="rounded-full bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 px-2 py-0.5"
                   title={`${t}: ${n}`}
                 >
                   {t}:{n}
@@ -137,17 +137,17 @@ export function AdminEvents() {
           )}
 
           {isLoading && events.length === 0 ? (
-            <div className="rounded-xl bg-stone-50 p-10 text-center text-sm text-stone-500">
+            <div className="rounded-xl bg-stone-50 dark:bg-stone-800/50 p-10 text-center text-sm text-stone-500 dark:text-stone-400">
               加载中…
             </div>
           ) : events.length === 0 ? (
-            <div className="rounded-xl bg-stone-50 p-10 text-center text-sm text-stone-500">
+            <div className="rounded-xl bg-stone-50 dark:bg-stone-800/50 p-10 text-center text-sm text-stone-500 dark:text-stone-400">
               没有匹配的事件 — 调整过滤条件或等待新事件触发。
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase tracking-wider text-stone-500">
+                <thead className="text-xs uppercase tracking-wider text-stone-500 dark:text-stone-400">
                   <tr>
                     <th className="px-3 py-2 font-medium">时间</th>
                     <th className="px-3 py-2 font-medium">事件</th>
@@ -192,11 +192,11 @@ function EventTableRow({ event, expanded, onToggle }: EventTableRowProps) {
         className="border-t border-stone-100 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800/50 cursor-pointer transition-colors"
         data-testid="event-row"
       >
-        <td className="px-3 py-2 text-stone-500 tabular-nums">{formatTs(event.ts)}</td>
-        <td className="px-3 py-2 font-mono text-xs">{event.event_name}</td>
-        <td className="px-3 py-2 font-mono text-xs text-stone-700">{event.user_id}</td>
-        <td className="px-3 py-2 font-mono text-xs text-stone-500">{event.run_id || "—"}</td>
-        <td className="px-3 py-2 text-stone-500 text-xs">{previewPayload(event.payload)}</td>
+        <td className="px-3 py-2 text-stone-500 dark:text-stone-400 tabular-nums">{formatTs(event.ts)}</td>
+        <td className="px-3 py-2 font-mono text-xs text-stone-800 dark:text-stone-200">{event.event_name}</td>
+        <td className="px-3 py-2 font-mono text-xs text-stone-700 dark:text-stone-300">{event.user_id}</td>
+        <td className="px-3 py-2 font-mono text-xs text-stone-500 dark:text-stone-400">{event.run_id || "—"}</td>
+        <td className="px-3 py-2 text-stone-500 dark:text-stone-400 text-xs">{previewPayload(event.payload)}</td>
       </tr>
       {expanded && (
         <tr className="border-t border-stone-100 dark:border-stone-800 bg-stone-50 dark:bg-stone-800/40">

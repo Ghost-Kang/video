@@ -70,10 +70,21 @@ export default function App({ userId, onLogout }: AppProps) {
 
   const [sessions, setSessions] = useState<string[]>(() => loadJSON<string[]>(lsKey("sessions", userId), []));
   const [names, setNames] = useState<Record<string, string>>(() => loadJSON<Record<string, string>>(lsKey("names", userId), {}));
-  const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches;
-  const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
-  const [chatOpen, setChatOpen] = useState(!isMobile);
+  const isMobileInitial = typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches;
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobileInitial);
+  const [chatOpen, setChatOpen] = useState(!isMobileInitial);
   const showProToggle = isAdminUser(userId);
+
+  // 监听 viewport 跨阈值变化(横竖屏切换 / 拉宽窗口),自动展开/收起 panel
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 768px)");
+    const onChange = (e: MediaQueryListEvent) => {
+      setSidebarOpen(!e.matches);
+      setChatOpen(!e.matches);
+    };
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
   const [thinking, setThinking] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const messages = useCanvasStore((s) => s.messages);

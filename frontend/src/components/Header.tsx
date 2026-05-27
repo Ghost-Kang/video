@@ -28,10 +28,10 @@ export function Header({
   hideProToggle = false,
 }: Props) {
   const dotColor = connecting
-    ? "bg-amber-500"
+    ? "bg-amber-500 dark:bg-amber-400"
     : connected
-      ? "bg-emerald-500"
-      : "bg-rose-500";
+      ? "bg-emerald-500 dark:bg-emerald-400"
+      : "bg-rose-500 dark:bg-rose-400";
 
   return (
     <div className="relative z-20 flex items-center gap-3 h-12 px-6 border-b border-stone-200/70 dark:border-stone-800/70 bg-[var(--color-paper)]/85 dark:bg-stone-950/85 backdrop-blur-md text-stone-500 dark:text-stone-400 text-[13px] tracking-[-0.005em]">

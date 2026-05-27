@@ -12,14 +12,16 @@ function useTypewriterPlaceholder(phrases: string[], paused: boolean): string {
   const [text, setText] = useState("");
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (paused) {
       setText("");
-      return;
+      return () => {
+        if (timer) clearTimeout(timer);
+      };
     }
     let phraseIdx = 0;
     let charIdx = 0;
     let mode: "typing" | "holding" | "deleting" = "typing";
-    let timer: ReturnType<typeof setTimeout>;
 
     const tick = () => {
       const target = phrases[phraseIdx];
@@ -62,10 +64,12 @@ export function UrlFallback({ onSubmit }: { onSubmit: (url: string) => void }) {
   const canSubmit = url.trim().length > 0;
   const btnRef = useMagnetic<HTMLButtonElement>(0.4, 110);
   const formRef = useRef<HTMLFormElement>(null);
+  const submittedRef = useRef(false);
 
   const submit = (e: React.FormEvent | React.MouseEvent) => {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit || submittedRef.current) return;
+    submittedRef.current = true;
     const el = formRef.current;
     if (el && "clientX" in e) {
       const rect = el.getBoundingClientRect();

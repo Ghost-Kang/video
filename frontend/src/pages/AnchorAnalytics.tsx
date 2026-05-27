@@ -75,9 +75,9 @@ export function AnchorAnalytics() {
 
         {analytics.totalAnchors === 0 ? (
           <section className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/70 dark:border-stone-800/70 p-10 shadow-soft text-center">
-            <p className="text-stone-700">还没有素材,先在画布里创建一些试试。</p>
-            <p className="mt-2 text-sm text-stone-500">
-              当你在 ShotCard 上配置角色或场景图后,它们会自动出现在"你之前用过的"侧栏,反复拖入新的 run 累计复用次数。
+            <p className="text-stone-700 dark:text-stone-200">还没有素材,先在画布里创建一些试试。</p>
+            <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
+              当你在 ShotCard 上配置角色或场景图后,它们会自动出现在「你之前用过的」侧栏,反复拖入新的 run 累计复用次数。
             </p>
           </section>
         ) : (
@@ -95,7 +95,7 @@ export function AnchorAnalytics() {
 
             <section className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/70 dark:border-stone-800/70 p-5 shadow-soft">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-medium text-stone-900">复用次数 Top 5</h2>
+                <h2 className="text-base font-medium text-stone-900 dark:text-stone-50">复用次数 Top 5</h2>
                 <div className="flex gap-2" role="radiogroup" aria-label="kind filter">
                   <button
                     type="button"
@@ -130,39 +130,39 @@ export function AnchorAnalytics() {
             </section>
 
             <section className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/70 dark:border-stone-800/70 p-5 shadow-soft">
-              <h2 className="text-base font-medium text-stone-900 mb-4">复用分布直方图</h2>
+              <h2 className="text-base font-medium text-stone-900 dark:text-stone-50 mb-4">复用分布直方图</h2>
               <div className="flex items-end gap-2 h-32" aria-label="reuse distribution histogram">
                 {distributionBins.map((bin) => (
                   <div key={bin.reuse} className="flex-1 flex flex-col items-center gap-1">
                     <div
-                      className="w-full bg-stone-700 rounded-t"
+                      className="w-full bg-[#7c2d12] dark:bg-[#ea580c] rounded-t"
                       style={{ height: `${Math.max(4, bin.ratio * 100)}%` }}
                       title={`复用 ${bin.reuse} 次的 anchor:${bin.count} 个`}
                       role="presentation"
                     />
-                    <div className="text-xs text-stone-500 tabular-nums">{bin.count}</div>
-                    <div className="text-[10px] text-stone-400 tabular-nums">×{bin.reuse}</div>
+                    <div className="text-xs text-stone-500 dark:text-stone-400 tabular-nums">{bin.count}</div>
+                    <div className="text-[10px] text-stone-400 dark:text-stone-600 tabular-nums">×{bin.reuse}</div>
                   </div>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-stone-500">
+              <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
                 横轴 = 该 anchor 被复用了几次,纵轴 = 有多少个 anchor 落在这一档
               </p>
             </section>
 
             <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/70 dark:border-stone-800/70 p-5 shadow-soft">
-                <h3 className="text-sm uppercase tracking-wider text-stone-500">角色</h3>
-                <div className="mt-2 text-2xl font-medium tabular-nums">
+                <h3 className="text-sm uppercase tracking-wider text-stone-500 dark:text-stone-400">角色</h3>
+                <div className="mt-2 text-2xl font-medium tabular-nums text-stone-900 dark:text-stone-50">
                   {analytics.byKind.character.total}{" "}
-                  <span className="text-base text-stone-500">个 · 共复用 {analytics.byKind.character.totalReuses} 次</span>
+                  <span className="text-base text-stone-500 dark:text-stone-400">个 · 共复用 {analytics.byKind.character.totalReuses} 次</span>
                 </div>
               </div>
               <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/70 dark:border-stone-800/70 p-5 shadow-soft">
-                <h3 className="text-sm uppercase tracking-wider text-stone-500">场景</h3>
-                <div className="mt-2 text-2xl font-medium tabular-nums">
+                <h3 className="text-sm uppercase tracking-wider text-stone-500 dark:text-stone-400">场景</h3>
+                <div className="mt-2 text-2xl font-medium tabular-nums text-stone-900 dark:text-stone-50">
                   {analytics.byKind.scene.total}{" "}
-                  <span className="text-base text-stone-500">个 · 共复用 {analytics.byKind.scene.totalReuses} 次</span>
+                  <span className="text-base text-stone-500 dark:text-stone-400">个 · 共复用 {analytics.byKind.scene.totalReuses} 次</span>
                 </div>
               </div>
             </section>

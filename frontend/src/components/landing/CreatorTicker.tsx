@@ -26,25 +26,25 @@ const TONE_CLS: Record<
     dot: "bg-[#7c2d12] dark:bg-[#ea580c]",
     icon: "text-[#7c2d12]",
     iconDark: "dark:text-[#ea580c]",
-    chipHover: "hover:bg-[#7c2d12]/8 dark:hover:bg-[#ea580c]/15",
+    chipHover: "hover:bg-[#7c2d12]/10 dark:hover:bg-[#ea580c]/15",
   },
   rose: {
     dot: "bg-rose-600 dark:bg-rose-400",
     icon: "text-rose-700",
     iconDark: "dark:text-rose-400",
-    chipHover: "hover:bg-rose-600/8 dark:hover:bg-rose-400/15",
+    chipHover: "hover:bg-rose-600/10 dark:hover:bg-rose-400/15",
   },
   amber: {
     dot: "bg-amber-600 dark:bg-amber-400",
     icon: "text-amber-700",
     iconDark: "dark:text-amber-400",
-    chipHover: "hover:bg-amber-600/8 dark:hover:bg-amber-400/15",
+    chipHover: "hover:bg-amber-600/10 dark:hover:bg-amber-400/15",
   },
   emerald: {
     dot: "bg-emerald-600 dark:bg-emerald-400",
     icon: "text-emerald-700",
     iconDark: "dark:text-emerald-400",
-    chipHover: "hover:bg-emerald-600/8 dark:hover:bg-emerald-400/15",
+    chipHover: "hover:bg-emerald-600/10 dark:hover:bg-emerald-400/15",
   },
 };
 

@@ -3,11 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { ConsentGate } from "../components/landing/ConsentGate";
 import { HotCardGrid } from "../components/landing/HotCardGrid";
 import { UrlFallback } from "../components/landing/UrlFallback";
-import { AmbientCursor } from "../components/landing/AmbientCursor";
 import { CreatorTicker } from "../components/landing/CreatorTicker";
 import { StatCounter } from "../components/landing/StatCounter";
-import { ScrollProgress } from "../components/landing/ScrollProgress";
-import { DarkModeToggle } from "../components/landing/DarkModeToggle";
+import { PageShell } from "../components/PageShell";
 import { HighlightPhrase } from "../components/landing/HighlightPhrase";
 import { useParallax } from "../hooks/useParallax";
 import { useLiveStats } from "../hooks/useLiveStats";
@@ -43,11 +41,7 @@ export function Landing() {
   const subtitleRef = useParallax<HTMLParagraphElement>(3);
 
   return (
-    <main className="relative min-h-screen flex flex-col bg-[var(--color-paper)] dark:bg-stone-950 text-stone-900 dark:text-stone-100 transition-colors duration-500">
-      <ScrollProgress />
-      <DarkModeToggle />
-      <AmbientCursor />
-
+    <PageShell>
       <div className={`relative z-10 flex-1 ${exiting ? "anim-page-out" : ""}`}>
         <div className="mx-auto max-w-2xl px-6 pt-20 pb-24 md:pt-32 md:pb-32 text-center">
           <p
@@ -138,6 +132,6 @@ export function Landing() {
       <div className={`relative z-10 ${exiting ? "anim-page-out" : ""}`}>
         <CreatorTicker />
       </div>
-    </main>
+    </PageShell>
   );
 }
