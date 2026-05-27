@@ -21,18 +21,52 @@
 | `fd72a92` | feat: WS error 帧 → toast(toastStore + ToastContainer + wsStore wiring) | +293 LOC, +9 vitest |
 | `8d194ea` | docs: 3 个 Cursor handoff brief + index | +510 LOC docs |
 | `e9a5a7d` | test: ws_messages Pydantic 契约 unit 测试 | +385 LOC, +39 pytest |
+| `c01c72b` | test: transport context/notify + agent_runner.extract_text | +27 pytest |
+| `b79a32e` | test: agent_runner.run_agent integration(mock LangChain stream) | +10 pytest |
+| `f95d949` | test: workers/{s3, image_pipeline} | +25 pytest |
+| `8d3d5d3` | test: workers/{video, composite}_pipeline | +20 pytest |
+| `173f621` | test: workers/generation_worker(loop + recovery + idempotent start) | +20 pytest |
 
 ---
 
-## Cursor 待办(brief 已写,等 ship)
+## 交付清单(Cursor 本 cycle)
 
-| Task | 标题 | 优先级 | Effort | 文件 |
-|---|---|---|---|---|
-| **W4D5-T1** | WS 重连失败 → 持久 banner | 🔴 高 | M | [`cursor_frontend_W4D5_T1_reconnect_banner.md`](handoff/cursor_frontend_W4D5_T1_reconnect_banner.md) |
-| **W4D5-T2** | Toast 加 recovery action 按钮 | 🟡 中 | M | [`cursor_frontend_W4D5_T2_toast_actions.md`](handoff/cursor_frontend_W4D5_T2_toast_actions.md) |
-| **W4D5-T3** | Toast 可访问性 polish | 🟢 低 | S | [`cursor_frontend_W4D5_T3_toast_a11y.md`](handoff/cursor_frontend_W4D5_T3_toast_a11y.md) |
+3/3 brief 全部 ship:
+
+| Task | 标题 | Commit | 收益 |
+|---|---|---|---|
+| **W4D5-T1** | WS 重连失败 → 持久 banner(useWebSocket 暴露 reconnectAttempt + 正向恢复 toast) | `9b84998` | +ConnectionBanner.tsx + wsStore connection state |
+| **W4D5-T2** | Toast 加 recovery action 按钮(extends Toast model + wsStore 注入 reload action 给 malformed_json) | `9967512` | +ToastAction + 6 vitest |
+| **W4D5-T3** | Toast 可访问性 polish(prefers-reduced-motion / ESC 关 focused toast / 32×32 触摸目标 / focus-visible ring) | `4d37347` | +RTL ToastContainer.test.tsx |
+| _housekeeping_ | mark 3 brief Status: ✅ | `d8cb666` | docs only |
 
 详见 [`_cursor_W4D5_index.md`](handoff/_cursor_W4D5_index.md)。
+
+---
+
+## 测试覆盖大补完(W4D5 续)
+
+W4D5 启动时 backend pytest 256,最初只想做 Claude-B closure(toast)。期间扫描出
+所有新建模块(transport/、workers/、cascade/persistence/、tools/canvas_persistence/)
+都只有**间接**覆盖,没有直接 unit。决定一并补完。
+
+新建测试文件 7 个,共 **+142 backend pytest**(256 → 398):
+
+| 文件 | tests | 覆盖模块 |
+|---|---:|---|
+| `test_ws_messages.py` | 39 | Pydantic 13 inbound + 8 outbound + WSInbound 联合 + INBOUND_MODELS 注册表 |
+| `test_transport_context.py` | 9 | WSCtx / send_json(中文 + multi-kwargs)/ canvas_data 三种状态 |
+| `test_transport_notify.py` | 9 | _ws_registry register/unregister + notify_user 注册/未注册 + _safe_notify 异常吞咽 |
+| `test_agent_runner.py` | 9 | extract_text 纯函数(str / part-list / 非 text 跳过 / fallback) |
+| `test_agent_runner_run.py` | 10 | run_agent 集成(text/tool_call stream + ContextVar + save_message + 错误路径) |
+| `test_workers_s3.py` | 9 | upload_bytes_to_s3 + download_and_upload 失败路径(httpx timeout/4xx/upload exception) |
+| `test_workers_image_pipeline.py` | 16 | make_image_provider + get_ref_urls(真实 DB)+ process_image_task 全状态机 |
+| `test_workers_video_pipeline.py` | 9 | submit param 传递 + 无 fallback 失败 + explicit user/thread |
+| `test_workers_composite_pipeline.py` | 11 | parent collection(混合 image/video)+ ffmpeg/S3 失败 + happy path |
+| `test_workers_generation_worker.py` | 20 | start_workers idempotent + _worker_loop tick + recover_one + apply_poll_result 4 branches |
+
+**关键技巧**:`_worker_loop` 用 monkeypatched `asyncio.sleep` raise BaseException 后退出
+(BaseException 穿透 `except Exception`);real asyncio.sleep 在 patch 前抓引用避免递归调用。
 
 ---
 
@@ -61,10 +95,12 @@
 
 | Suite | 启动时 | W4D3 末 | W4D4 末 | W4D5 末 |
 |---|---:|---:|---:|---:|
-| backend pytest | 256 | 257 | 257 | **296** (+39) |
-| frontend vitest | 81 | 81 | 81 | **92** (+11) |
+| backend pytest | 256 | 257 | 257 | **398** (+142) |
+| frontend vitest | 81 | 81 | 81 | **115** (+34) |
 | Playwright smoke | 12 | 12 | 12 | **12** |
 | tsc + Vite build | green | green | green | **green** |
+
+frontend vitest +34 来自 toast 全套(9 toastStore + 3 wsStore.error + Cursor T2 加的 6 个 action + T3 加的 RTL ToastContainer 测试)。
 
 ---
 
@@ -139,11 +175,7 @@ Cycle 内闭环:
 
 ## 下 cycle 候选
 
-### 等 Cursor ship 完
-- T1 / T2 / T3 全部 ship 后,可写 W4D6 wrap 一并归档
-- Cursor 进度 PM 跟进:`docs/nexus/handoff/_cursor_W4D5_index.md` 每个 brief 末尾有 `Status` 字段
-
-### Phase 1 内测启动观察
+### Phase 1 内测启动观察(主线)
 - 2026-05-28 W4D1 founder 启动第一次 concierge
 - 第一次 cohort 真实用 → 收集 toast / banner / reconnect 在真实网络下的表现
 - 等 W4D7 周报对账 DM 回复率 vs 预测
@@ -153,26 +185,30 @@ Cycle 内闭环:
 - `canvasStore.ts` 默认 import `baomamFushi001` fixture(出 phase 1 时清)
 - `canvas.db` vs `messages.db` 跨 DB join(目前不冲突,先放着)
 
-### 测试覆盖率(选做)
-- `transport/notify.py`(WS registry 操作 — mock WS 后可以测)
-- `transport/agent_runner.py::extract_text`(纯函数,easy unit)
-- `workers/s3.py`(下载 + 上传 mock)
-- 上面 3 个加起来大概 +15-20 unit tests,1-2 小时工作
+### 测试覆盖率(已大幅补完,剩余空白都是低 ROI)
+- ~`transport/notify.py`~ ✅ done(c01c72b)
+- ~`transport/agent_runner.py::extract_text`~ ✅ done(c01c72b)
+- ~`agent_runner.run_agent` integration~ ✅ done(b79a32e)
+- ~`workers/{s3, image, video, composite}_pipeline}`~ ✅ done(f95d949 + 8d3d5d3)
+- ~`workers/generation_worker._worker_loop`~ ✅ done(173f621)
+- 剩下没直接测的:`transport/http_router::handle_http`(间接覆盖良好)、`ws_server.handle`
+  dispatch(间接覆盖良好)— ROI 已边际,建议除非有 bug 发生否则不动
 
 ---
 
 ## 数字总结(W4D3 + W4D4 + W4D5 累积)
 
-- **commit 总数**:19(refactor 12 + docs 4 + feat 1 + test 1 + fix 1)
-- **测试增量**:backend +40,frontend +11(toast/error wiring)
+- **commit 总数**:**27**(refactor 12 + docs 5 + feat 2 + test 7 + fix 1)
+- **测试增量**:backend **+142**(256→398),frontend vitest **+34**(81→115)
+- **Cursor 重新激活并交付完整 cycle**:T1(banner)+ T2(toast action)+ T3(a11y polish)
 - **新基础设施**:transport / workers / persistence / services / canvas_persistence / **toast** 共 6 个 package
 - **跨端契约**:WS (codegen) + canvas (mirror) + cascade (mirror)= 3 个 + Pydantic 39 unit 保护
-- **3 个 Cursor brief 在队列**,Cursor 已激活
+- **直接测试覆盖**:架构 review 起点 0 → 现在 **所有新建模块都有直接 unit / 集成**(只剩 http_router/ws_server.handle 是 dispatch 层间接覆盖)
 
 ---
 
-> **生成时间**: 2026-05-26 W4D5 cycle 末
+> **生成时间**: 2026-05-26 → 2026-05-27 W4D5 cycle 跨日完结
 > **PM**: Claude
 > **前两份 cycle doc**: [`architecture_cycle_W4D3_wrap.md`](architecture_cycle_W4D3_wrap.md) · [`architecture_cycle_W4D4_wrap.md`](architecture_cycle_W4D4_wrap.md)
 > **Cursor brief 入口**: [`handoff/_cursor_W4D5_index.md`](handoff/_cursor_W4D5_index.md)
-> **下次 PM checkpoint**: Cursor 第一个 brief ship 时 / phase 1 第一次 cohort run 时
+> **下次 PM checkpoint**: phase 1 第一次 cohger run(W4D1 = 2026-05-28)/ founder DM 回复率对账(W4D7 = 2026-05-31)
