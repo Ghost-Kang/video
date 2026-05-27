@@ -13,17 +13,39 @@ import { create } from "zustand";
 
 export type ToastKind = "error" | "warning" | "info";
 
+/**
+ * W4D5-T2 — 可选的 recovery action 按钮。
+ *
+ * 用途:transient WS 错误(malformed_json / 已知瞬时故障)有时存在"用户一键就
+ * 能尝试恢复"的操作(刷新页面、再试一次等)。Toast 是 transient 通道,**不**
+ * 用于业务级 retry — 那些走 FailureBanner / inline UI。
+ *
+ * `closeOnClick` 默认 true:点完按钮自动 dismiss,不让 toast 阻碍后续操作。
+ */
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+  closeOnClick?: boolean;
+}
+
 export interface Toast {
   id: string;
   kind: ToastKind;
   title: string;
   body?: string;
   ttlMs: number;
+  action?: ToastAction;
 }
 
 interface ToastStore {
   toasts: Toast[];
-  push: (input: { kind?: ToastKind; title: string; body?: string; ttlMs?: number }) => string;
+  push: (input: {
+    kind?: ToastKind;
+    title: string;
+    body?: string;
+    ttlMs?: number;
+    action?: ToastAction;
+  }) => string;
   dismiss: (id: string) => void;
   clear: () => void;
 }
@@ -37,9 +59,9 @@ function _nextId(): string {
 export const useToastStore = create<ToastStore>((set, get) => ({
   toasts: [],
 
-  push: ({ kind = "info", title, body, ttlMs = 5000 }) => {
+  push: ({ kind = "info", title, body, ttlMs = 5000, action }) => {
     const id = _nextId();
-    const toast: Toast = { id, kind, title, body, ttlMs };
+    const toast: Toast = { id, kind, title, body, ttlMs, action };
     set((state) => ({ toasts: [...state.toasts, toast] }));
 
     if (ttlMs > 0) {

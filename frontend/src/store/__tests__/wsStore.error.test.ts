@@ -53,6 +53,49 @@ describe("wsStore error frame → toast", () => {
     expect(toast.body).toBeUndefined(); // no bad_type → no body
   });
 
+  // ---- W4D5-T2: 已知 code 注入 recovery action ----
+
+  it("malformed_json injects a 刷新页面 action", () => {
+    useWSStore.getState().dispatch(
+      {
+        type: "error",
+        code: "malformed_json",
+        message: "bad json",
+      },
+      "user_test",
+    );
+    const toast = useToastStore.getState().toasts[0];
+    expect(toast.action).toBeDefined();
+    expect(toast.action?.label).toBe("刷新页面");
+    expect(typeof toast.action?.onClick).toBe("function");
+  });
+
+  it("invalid_command does NOT inject an action (no user-actionable recovery)", () => {
+    useWSStore.getState().dispatch(
+      {
+        type: "error",
+        code: "invalid_command",
+        message: "validation error",
+        bad_type: "execute_node",
+      },
+      "user_test",
+    );
+    const toast = useToastStore.getState().toasts[0];
+    expect(toast.action).toBeUndefined();
+  });
+
+  it("unknown error code does not inject any action", () => {
+    useWSStore.getState().dispatch(
+      {
+        type: "error",
+        code: "totally_new_code",
+        message: "?",
+      },
+      "user_test",
+    );
+    expect(useToastStore.getState().toasts[0].action).toBeUndefined();
+  });
+
   it("unknown error code falls back to generic title", () => {
     useWSStore.getState().dispatch(
       {

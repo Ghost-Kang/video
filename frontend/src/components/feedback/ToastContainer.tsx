@@ -49,6 +49,20 @@ function ToastCard({ toast, onClose }: { toast: Toast; onClose: () => void }) {
           </div>
         )}
       </div>
+      {toast.action && (
+        <button
+          type="button"
+          aria-label={toast.action.label}
+          onClick={() => {
+            toast.action!.onClick();
+            // closeOnClick 默认 true — 点完按钮 toast 自动消失,不再阻碍。
+            if (toast.action!.closeOnClick !== false) onClose();
+          }}
+          className="ml-2 shrink-0 rounded-md border border-stone-300 bg-white px-2.5 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-[#7c2d12] hover:text-[#7c2d12] dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:border-[#ea580c] dark:hover:text-[#ea580c]"
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button
         type="button"
         aria-label="关闭通知"

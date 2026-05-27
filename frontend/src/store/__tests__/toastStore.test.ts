@@ -57,4 +57,34 @@ describe("toastStore", () => {
     useToastStore.getState().push({ title: "3" });
     expect(useToastStore.getState().toasts.map((t) => t.title)).toEqual(["1", "2", "3"]);
   });
+
+  // ---- W4D5-T2: ToastAction 字段 ----
+
+  it("stores ToastAction on the toast when pushed", () => {
+    const onClick = vi.fn();
+    useToastStore.getState().push({
+      title: "with action",
+      action: { label: "再试一次", onClick },
+    });
+    const t = useToastStore.getState().toasts[0];
+    expect(t.action).toBeDefined();
+    expect(t.action?.label).toBe("再试一次");
+    expect(t.action?.onClick).toBe(onClick);
+    expect(t.action?.closeOnClick).toBeUndefined(); // default = true at render time
+  });
+
+  it("preserves explicit closeOnClick=false on action", () => {
+    useToastStore.getState().push({
+      title: "sticky action",
+      action: { label: "x", onClick: () => {}, closeOnClick: false },
+    });
+    const t = useToastStore.getState().toasts[0];
+    expect(t.action?.closeOnClick).toBe(false);
+  });
+
+  it("absent action stays undefined (no surprise mutation)", () => {
+    useToastStore.getState().push({ title: "plain" });
+    const t = useToastStore.getState().toasts[0];
+    expect(t.action).toBeUndefined();
+  });
 });

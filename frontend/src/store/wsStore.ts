@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { useCanvasStore } from "./canvasStore";
 import { useSessionStore } from "./sessionStore";
-import { useToastStore } from "./toastStore";
+import { useToastStore, type ToastAction } from "./toastStore";
 import type { WSEvent } from "../types/ws";
 
 
@@ -124,7 +124,19 @@ export const useWSStore = create<WSStore>((set, get) => ({
         const title = ERROR_CODE_TITLES[event.code] ?? "请求出错";
         // body 用 bad_type 给开发者线索;不暴露 Pydantic 详细 message(那对宝妈无意义)。
         const body = event.bad_type ? `操作:${event.bad_type}` : undefined;
-        useToastStore.getState().push({ kind: "error", title, body });
+
+        // W4D5-T2 — 已知可一键恢复的 case 注入 action,其他不给(避免误导)。
+        // - malformed_json: 多半是 JS 端序列化坏掉,reload 重置整个会话状态最简单。
+        // - invalid_command: Pydantic 校验失败,用户没法主动恢复(是开发期 bug)。
+        let action: ToastAction | undefined;
+        if (event.code === "malformed_json") {
+          action = {
+            label: "刷新页面",
+            onClick: () => window.location.reload(),
+          };
+        }
+
+        useToastStore.getState().push({ kind: "error", title, body, action });
         break;
       }
     }
