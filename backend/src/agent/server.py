@@ -503,6 +503,11 @@ async def handle(websocket):
                 await websocket.close(4001, "未认证")
                 return
 
+            if msg_type == "list_sessions":
+                sessions = list_sessions(user_id)
+                await _send(ws=websocket, type="session_list", sessions=sessions)
+                continue
+
             thread_id = msg.get("thread_id", "")
             if not thread_id:
                 continue
@@ -623,11 +628,8 @@ async def handle(websocket):
                 target_thread = msg.get("thread_id", "")
                 if target_thread:
                     store_delete_session(user_id, target_thread)
-                continue
-
-            if msg_type == "list_sessions":
-                sessions = list_sessions(user_id)
-                await _send(ws=websocket, type="session_list", sessions=sessions)
+                    sessions = list_sessions(user_id)
+                    await _send(ws=websocket, type="session_list", sessions=sessions)
                 continue
 
             if msg_type == "get_session_state":
@@ -693,7 +695,12 @@ async def _handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
         qs = parse_qs(parsed.query)
 
         if method == "GET" and route_path == "/api/cost/status":
-            payload = await cost_status(qs.get("user_id", ["default"])[0], qs.get("run_id", ["default"])[0])
+            user_id_q = qs.get("user_id", [None])[0]
+            if not user_id_q:
+                writer.write(_http_response(400, {"error": "user_id required"}, "Bad Request"))
+                await writer.drain()
+                return
+            payload = await cost_status(user_id_q, qs.get("run_id", ["default"])[0])
             writer.write(_http_response(200, payload))
         elif method == "GET" and route_path == "/api/creators":
             creators = await list_creators()
