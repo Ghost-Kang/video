@@ -118,9 +118,9 @@ scripts/sync-ws-types.sh            ─ codegen 一键脚本
 | **P2-1** NodeDetail | — | ✅ 明确跳过(don't-refactor) |
 | **P2-2** canvas 跨端 contract | Codex | ✅ F |
 | **P3-1** 事件名 StrEnum | Codex | ✅ G |
-| **P3-2** `_send` 重连竞态 | — | ⏳ 未做(本 cycle 优先级最低,且 Codex-D 已经收敛 sender 路径,_send 内部结构变了,这条 finding 现状已部分缓解) |
+| **P3-2** `_send` 重连竞态 | Claude | ✅ W4D4 `01d480d`(reality-check 后判定为 dead-code wart,而非真竞态,单点 flush 化) |
 
-**1 个 finding 落到下 cycle**:P3-2(useWebSocket._send 重连 race,低风险)。
+**全部 9 条 finding 已 ship**(P2-1 明确跳过)。W4D4 见 [`architecture_cycle_W4D4_wrap.md`](architecture_cycle_W4D4_wrap.md)。
 
 ---
 
@@ -144,18 +144,16 @@ scripts/sync-ws-types.sh            ─ codegen 一键脚本
 
 ---
 
-## 下 cycle 候选
+## 下 cycle 候选 → W4D4 已部分消化
 
-### P3-2(architect 漏)
-- `useWebSocket._send` 重连时的 pending replay race
-- Effort: S(10 行修)
-- Codex-D 重写后路径变了,需要重新评估是否还存在
+### W4D4 已完成
+- **P3-2**:`useWebSocket._send` dead-code flush 清理(`01d480d`)
+- **`tools/canvas.py` DAO 拆分**:775 → 505 LOC,inline SQL 全清(`9aa9f71` + `5f58fe5`),建立 `canvas_persistence/` 包(db / nodes_repo / edges_repo / generation_repo)
 
-### Architect 给的 followup
-- `tools/canvas.py`(725 LOC) — 同 storage.py 的 DAO/domain 混合
+### 仍在下 cycle 队列
 - `canvas.db` vs `messages.db` 双 SQLite(cross-DB join 会咬)
-- `canvasStore.ts` 默认 import 的 `baomamFushi001` fixture(出 phase 1 时清)
-- `setup_canvas_context` 已删,但 canvas_tools.set_user_id/set_thread_id ContextVar 仍存(handlers 还用) — 完整清理需把 handlers 也改显式参数,scope 较大
+- `canvasStore.ts` 默认 import `baomamFushi001` fixture(出 phase 1 时清)
+- handlers 的 `set_user_id/set_thread_id` ContextVar 残留(workers 已 A2 走显式;handlers 改显式 scope 较大,需 PM 决策)
 
 ### Founder 决策遗留
 - D-2 的"L 队列拆分"是否需要(本 cycle 改成立刻拆已 ship,但未验证 prod 行为)— 等 phase 1 内测观测
