@@ -13,6 +13,7 @@ import asyncio
 
 from websockets.asyncio.server import serve
 
+from agent.cascade.persistence.db import bootstrap_schema
 from agent.transport.http_router import handle_http
 from agent.transport.ws_server import handle
 from agent.workers import generation_worker
@@ -28,6 +29,9 @@ _start_worker = generation_worker.start_workers
 async def main(host: str = "0.0.0.0", port: int = 8765, http_port: int = 8766) -> None:
     print(f"OpenRHTV WebSocket 服务: ws://{host}:{port}")
     print(f"OpenRHTV HTTP API: http://{host}:{http_port}/api/analysis/shallow")
+    # Codex-E 后:schema bootstrap 在 startup 一次性完成,而不是每个 _connect() 里反复
+    # CREATE TABLE IF NOT EXISTS。lazy-init pattern 仍由 repo 内部支持兜底(冷启动安全)。
+    await bootstrap_schema()
     generation_worker.start_workers()
     http_server = await asyncio.start_server(handle_http, host, http_port)
     async with serve(handle, host, port), http_server:
