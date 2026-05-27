@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState } from "react";
+import { useToastStore } from "../store/toastStore";
 import type { WSCommand, WSEvent } from "../types/ws";
 
 type Handler = (res: WSEvent) => void;
@@ -14,6 +15,10 @@ export function useWebSocket(userId: string, onMessage: Handler) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  // W4D5-T1: 暴露 attempt 计数给根级 <ConnectionBanner/>(经 wsStore 中转)。
+  // 与 retryRef 双写 — retryRef 是 onopen 里同步读的真值,reconnectAttempt 是
+  // React state 给 UI render 用,避免直接订阅 ref。
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
   const connect = useCallback(() => {
     if (timerRef.current) {
@@ -34,9 +39,16 @@ export function useWebSocket(userId: string, onMessage: Handler) {
     ws.onopen = () => {
       console.log("[WS] 已连接, 发送 auth");
       ws.send(JSON.stringify({ type: "auth", user_id: userId }));
+      // W4D5-T1: 检测从 disconnected→connected 切回(retryRef>0 说明经历过断
+      // 连),给宝妈一个正向反馈。第一次冷启 onopen 时 retryRef=0,不弹。
+      const wasReconnect = retryRef.current > 0;
       setConnecting(false);
       setConnected(true);
       retryRef.current = 0;
+      setReconnectAttempt(0);
+      if (wasReconnect) {
+        useToastStore.getState().push({ kind: "info", title: "网络已恢复", ttlMs: 2000 });
+      }
       if (pendingRef.current.length) {
         console.log(`[WS] onopen 发送排队消息 x${pendingRef.current.length}`);
         for (const msg of pendingRef.current) {
@@ -70,6 +82,7 @@ export function useWebSocket(userId: string, onMessage: Handler) {
   const scheduleReconnect = useCallback(() => {
     const attempt = retryRef.current + 1;
     retryRef.current = attempt;
+    setReconnectAttempt(attempt);
     const delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, attempt - 1), RECONNECT_MAX_MS);
     console.log(`[WS] ${delay / 1000}s 后重连 (第${attempt}次)`);
     timerRef.current = setTimeout(() => connect(), delay);
@@ -88,5 +101,5 @@ export function useWebSocket(userId: string, onMessage: Handler) {
     }
   }, []);
 
-  return { connect, sendCommand, connected, connecting };
+  return { connect, sendCommand, connected, connecting, reconnectAttempt };
 }

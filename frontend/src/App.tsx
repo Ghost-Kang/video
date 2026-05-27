@@ -45,8 +45,14 @@ export default function App({ userId, onLogout }: AppProps) {
   const setCurrentThreadId = useWSStore((s) => s.setCurrentThreadId);
   const setLoading = useWSStore((s) => s.setLoading);
   const resetThinking = useWSStore((s) => s.resetThinking);
+  const setConnectionStatus = useWSStore((s) => s.setConnectionStatus);
   const onMessage = useCallback((event: WSEvent) => dispatchWSEvent(event, userId), [dispatchWSEvent, userId]);
-  const { connect, sendCommand, connected, connecting } = useWebSocket(userId, onMessage);
+  const { connect, sendCommand, connected, connecting, reconnectAttempt } = useWebSocket(userId, onMessage);
+  // W4D5-T1: 把 useWebSocket 的连接状态镜像到 wsStore,让根级 <ConnectionBanner/>
+  // (在 main.tsx mount,App 之外)能直接订阅。useWebSocket 自身保持 store-agnostic。
+  useEffect(() => {
+    setConnectionStatus({ connected, connecting, reconnectAttempt });
+  }, [connected, connecting, reconnectAttempt, setConnectionStatus]);
   const sendChatMessage = useCallback((text: string) => {
     addMessage("user", text);
     sendCommand({ type: "user_message", thread_id: tid, content: text });

@@ -27,13 +27,25 @@ function labelToolCall(name: string | undefined): string {
   return TOOL_LABELS[name] || "✨ 整理中…";
 }
 
+interface ConnectionStatus {
+  connected?: boolean;
+  connecting?: boolean;
+  reconnectAttempt?: number;
+}
+
 interface WSStore {
   currentThreadId: string;
   thinking: string[];
   loading: boolean;
+  // W4D5-T1: WS 连接状态共享给根级 <ConnectionBanner/>。useWebSocket 是 App
+  // 内部 hook,banner 是全局组件,中间靠 store 解耦。
+  connected: boolean;
+  connecting: boolean;
+  reconnectAttempt: number;
   setCurrentThreadId: (threadId: string) => void;
   setLoading: (loading: boolean) => void;
   resetThinking: () => void;
+  setConnectionStatus: (status: ConnectionStatus) => void;
   dispatch: (event: WSEvent, userId: string) => void;
 }
 
@@ -41,10 +53,19 @@ export const useWSStore = create<WSStore>((set, get) => ({
   currentThreadId: "",
   thinking: [],
   loading: false,
+  connected: false,
+  connecting: false,
+  reconnectAttempt: 0,
 
   setCurrentThreadId: (threadId) => set({ currentThreadId: threadId }),
   setLoading: (loading) => set({ loading }),
   resetThinking: () => set({ thinking: [] }),
+  setConnectionStatus: (status) =>
+    set((state) => ({
+      connected: status.connected ?? state.connected,
+      connecting: status.connecting ?? state.connecting,
+      reconnectAttempt: status.reconnectAttempt ?? state.reconnectAttempt,
+    })),
 
   dispatch: (event, userId) => {
     const canvas = useCanvasStore.getState();

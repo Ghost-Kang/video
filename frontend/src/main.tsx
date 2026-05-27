@@ -10,6 +10,7 @@ import { AdminCreators } from "./pages/AdminCreators";
 import { AdminEvents } from "./pages/AdminEvents";
 import { AdminCost } from "./pages/AdminCost";
 import { LegalDoc } from "./pages/LegalDoc";
+import { ConnectionBanner } from "./components/feedback/ConnectionBanner";
 import { ToastContainer } from "./components/feedback/ToastContainer";
 
 function newSessionId() {
@@ -85,6 +86,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
       <AppRoutes />
+      <ConnectionBanner />
       <ToastContainer />
     </BrowserRouter>
   </StrictMode>
