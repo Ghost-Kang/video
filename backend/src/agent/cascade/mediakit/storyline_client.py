@@ -18,7 +18,7 @@ from agent import config
 from agent.cascade import circuit_breaker
 from agent.cascade.events import emit
 from agent.cascade.failures import FailureCode, HardFailure
-from agent.cascade.storage import (
+from agent.cascade.persistence.toprador_cache_repo import (
     _load_toprador_cache_entry,
     save_toprador_cache,
 )

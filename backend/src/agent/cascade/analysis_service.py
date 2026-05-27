@@ -22,12 +22,14 @@ from agent.cascade.events import emit
 from agent.cascade.failures import FailureCode, HardFailure, WarningCode
 from agent.cascade.mediakit import analyze_storyline, overlay_viral_dims, storyline_to_payload
 from agent.cascade.mediakit.url_resolver import resolve_to_direct_media
-from agent.cascade.storage import (
+from agent.cascade.persistence.toprador_cache_repo import (
     _load_toprador_cache_entry,
+    save_toprador_cache,
+)
+from agent.cascade.storage import (
     load_analysis,
     load_analysis_for_source,
     save_analysis,
-    save_toprador_cache,
     set_analysis_context,
 )
 

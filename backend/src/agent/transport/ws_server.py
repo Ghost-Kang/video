@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 
+from pydantic import ValidationError
 from websockets.exceptions import ConnectionClosedOK
 
 from agent import store  # 通过 module 访问,方便 test monkeypatch
@@ -20,6 +21,7 @@ from agent.tools import canvas as canvas_tools
 from agent.transport import notify
 from agent.transport.context import WSCtx, send_json
 from agent.transport.ws_handlers import HANDLERS
+from agent.transport.ws_messages import AuthMsg
 from agent.workers import generation_worker  # module 访问同理
 
 
@@ -54,10 +56,13 @@ async def handle(websocket) -> None:
 
             # 首条必须是 auth
             if msg_type == "auth":
-                user_id = msg.get("user_id", "").strip()
-                if not user_id:
+                try:
+                    auth = AuthMsg.model_validate(msg)
+                except ValidationError:
+                    # 空 user_id / missing user_id / 多余字段 — 关闭(test 期望 4001)
                     await websocket.close(4001, "user_id required")
                     return
+                user_id = auth.user_id
                 canvas_tools.set_user_id(user_id)
                 notify.register(user_id, websocket)
                 generation_worker.start_workers()
@@ -72,11 +77,28 @@ async def handle(websocket) -> None:
                 await websocket.close(4001, "未认证")
                 return
 
-            handler = HANDLERS.get(msg_type or "")
-            if handler is None:
+            entry = HANDLERS.get(msg_type or "")
+            if entry is None:
                 # 未知 type silently drop(rename_session 回归测试覆盖此路径)
                 continue
-            await handler(ctx, msg)
+            model_cls, handler = entry
+            try:
+                typed_msg = model_cls.model_validate(msg)
+            except ValidationError as exc:
+                # 已知 type 但字段不合规 — 之前会 silent drop;现在回结构化 error 帧。
+                print(f"[MSG] invalid_command type={msg_type}: {exc}")
+                try:
+                    await send_json(
+                        websocket,
+                        type="error",
+                        code="invalid_command",
+                        bad_type=msg_type,
+                        message=str(exc),
+                    )
+                except Exception:
+                    pass
+                continue
+            await handler(ctx, typed_msg)
 
     except ConnectionClosedOK:
         pass
