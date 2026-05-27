@@ -480,7 +480,20 @@ async def handle(websocket):
 
     try:
         async for raw in websocket:
-            msg = json.loads(raw)
+            # P1 fix: malformed JSON 不再 crash 整个连接(1011 internal error),
+            # 而是 silently drop + 发回错误信号让前端可重试。
+            try:
+                msg = json.loads(raw)
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                print(f"[MSG] malformed JSON dropped: {exc}")
+                try:
+                    await _send(ws=websocket, type="error", code="malformed_json", message=str(exc))
+                except Exception:
+                    pass
+                continue
+            if not isinstance(msg, dict):
+                print(f"[MSG] non-dict payload dropped: {type(msg).__name__}")
+                continue
             msg_type = msg.get("type")
             print(f"[MSG] type={msg_type} thread={msg.get('thread_id','?')} user={user_id or '(未认证)'}")
 
@@ -688,7 +701,17 @@ async def _handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
         content_length = int(headers.get("content-length", "0") or "0")
         body_bytes = await reader.readexactly(content_length) if content_length else b"{}"
 
-        body = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
+        # P1 fix: malformed JSON body 必须返 400 而非 500
+        try:
+            body = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            writer.write(_http_response(400, {"error": f"malformed_json: {exc}"}, "Bad Request"))
+            await writer.drain()
+            return
+        if not isinstance(body, dict):
+            writer.write(_http_response(400, {"error": "body must be a JSON object"}, "Bad Request"))
+            await writer.drain()
+            return
         from urllib.parse import parse_qs, urlparse
         parsed = urlparse(path)
         route_path = parsed.path
@@ -787,12 +810,23 @@ async def _handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
                 return
             writer.write(_http_response(200, anchor.model_dump(mode="json")))
         elif method == "POST" and route_path == "/api/events":
-            await emit(
-                str(body["event_name"]),
-                user_id=str(body.get("user_id") or "default"),
-                run_id=body.get("run_id"),
-                payload=body.get("payload") or {},
-            )
+            # P1 fix: 缺 event_name 或未知事件不再裸 500,返 400 with hint
+            event_name = body.get("event_name")
+            if not event_name or not isinstance(event_name, str):
+                writer.write(_http_response(400, {"error": "event_name required (string)"}, "Bad Request"))
+                await writer.drain()
+                return
+            try:
+                await emit(
+                    event_name,
+                    user_id=str(body.get("user_id") or "default"),
+                    run_id=body.get("run_id"),
+                    payload=body.get("payload") or {},
+                )
+            except ValueError as exc:
+                writer.write(_http_response(400, {"error": f"invalid event: {exc}"}, "Bad Request"))
+                await writer.drain()
+                return
             writer.write(_http_response(200, {"ok": True}))
         elif method == "POST" and route_path == "/api/rewrite":
             user_id = str(body.get("user_id") or "default")

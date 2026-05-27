@@ -1,0 +1,272 @@
+"""WS handler 单元测试 — 覆盖 server.handle() 的 auth / list / get_state / delete /
+unknown / malformed / rename(回归)路径。
+
+P1 fix verify(QA W4D2):
+  - malformed JSON 不再 close 1011,而是回 type=error code=malformed_json + 保活
+P2 fix verify:
+  - list_sessions 无 thread_id 仍回 session_list(不被 thread_id 检查吞掉)
+  - delete_session 之后会 push 新的 session_list 作为 ACK
+回归:
+  - rename_session 已删,发送应 silently dropped + 连接存活
+
+测试用直接 await `handle(fake_ws)` + FakeWebSocket 收发,
+不起真实 server,不依赖 LLM/工具调用。
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from pathlib import Path
+
+import pytest
+
+from agent import server
+
+
+class FakeWebSocket:
+    """模拟 websockets.ServerConnection,够喂给 server.handle()。
+
+    - 用 incoming list 模拟 client 推过来的消息(handle 里 `async for raw in ws`)
+    - send(data) 把字符串 capture 到 self.sent
+    - close(code, reason) 标记 self.closed = (code, reason)
+    """
+
+    def __init__(self, incoming: list[str | bytes]):
+        self._incoming = list(incoming)
+        self._idx = 0
+        self.sent: list[dict] = []
+        self.closed: tuple[int, str] | None = None
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        # close 之后停止 iterate
+        if self.closed is not None:
+            raise StopAsyncIteration
+        if self._idx >= len(self._incoming):
+            raise StopAsyncIteration
+        item = self._incoming[self._idx]
+        self._idx += 1
+        return item
+
+    async def send(self, data: str):
+        # capture 成 dict 方便 assert
+        try:
+            self.sent.append(json.loads(data))
+        except json.JSONDecodeError:
+            self.sent.append({"_raw": data})
+
+    async def close(self, code: int = 1000, reason: str = ""):
+        self.closed = (code, reason)
+
+
+# ---------- fixtures ----------
+
+
+@pytest.fixture
+def isolated_ws(monkeypatch, tmp_path):
+    """每个 test 用独立 tmp DB + 干净 _ws_registry + 不启动 background worker。"""
+    db_path = tmp_path / "messages.db"
+    monkeypatch.setattr(server, "_DB_PATH", db_path, raising=False)
+
+    # store.py 用 module-level _DB_PATH 常量,需要直接改它
+    from agent import store
+
+    monkeypatch.setattr(store, "_DB_PATH", db_path)
+    monkeypatch.setattr(store, "_DB_DIR", tmp_path)
+
+    # _ws_registry 是 module global dict,需要隔离避免 test 互相污染
+    monkeypatch.setattr(server, "_ws_registry", {})
+
+    # _start_worker 启动 background task,test 里不需要
+    monkeypatch.setattr(server, "_start_worker", lambda: None)
+
+    yield
+
+
+def _run(coro):
+    """通用 asyncio.run wrapper(避免每个 test 重写)。"""
+    return asyncio.run(coro)
+
+
+# ---------- 测试 ----------
+
+
+def test_auth_happy_path_sends_session_list(isolated_ws):
+    """auth 成功 → 应自动收到 session_list 帧;session_list 已 send 本身就证明 auth 走通了。
+
+    (handle finally 会 pop user_id from _ws_registry,所以 post-handle 时 registry 已清。)
+    """
+    ws = FakeWebSocket([json.dumps({"type": "auth", "user_id": "u1"})])
+    _run(server.handle(ws))
+
+    assert ws.closed is None, "auth 成功不应 close"
+    assert len(ws.sent) == 1
+    assert ws.sent[0]["type"] == "session_list"
+    assert "sessions" in ws.sent[0]
+
+
+def test_auth_registers_user_during_call(isolated_ws):
+    """单独测 auth 写 _ws_registry — 在 send 回调里 capture registry snapshot。"""
+    captured: dict = {}
+
+    class HookedWS(FakeWebSocket):
+        async def send(self, data):
+            captured["registry_keys"] = list(server._ws_registry.keys())
+            await super().send(data)
+
+    ws = HookedWS([json.dumps({"type": "auth", "user_id": "u1"})])
+    _run(server.handle(ws))
+
+    assert captured.get("registry_keys") == ["u1"]
+    # handle 退出后会清理
+    assert "u1" not in server._ws_registry
+
+
+def test_auth_missing_user_id_closes_4001(isolated_ws):
+    """auth 缺 user_id → close(4001, 'user_id required')。"""
+    ws = FakeWebSocket([json.dumps({"type": "auth", "user_id": ""})])
+    _run(server.handle(ws))
+
+    assert ws.closed == (4001, "user_id required")
+    assert ws.sent == []
+
+
+def test_unauth_message_closes_4001(isolated_ws):
+    """没 auth 直接发非-auth 消息 → close(4001, '未认证')。"""
+    ws = FakeWebSocket([json.dumps({"type": "list_sessions", "thread_id": "t1"})])
+    _run(server.handle(ws))
+
+    assert ws.closed == (4001, "未认证")
+    assert ws.sent == []
+
+
+def test_malformed_json_sends_error_frame_keeps_conn(isolated_ws):
+    """P1 fix verify:malformed JSON 不再 close 1011,而是回 error 帧 + 保活。
+
+    auth 成功后再发坏 JSON,然后发 list_sessions 应仍能正常收到 session_list。
+    """
+    ws = FakeWebSocket([
+        json.dumps({"type": "auth", "user_id": "u1"}),  # 1. auth ok → session_list
+        "{not valid json",                                # 2. malformed → error 帧
+        json.dumps({"type": "list_sessions"}),            # 3. 仍能正常工作 → session_list
+    ])
+    _run(server.handle(ws))
+
+    # 不应有 close
+    assert ws.closed is None, "malformed JSON 应保活,不应 close 1011"
+    # 应有 3 个 send: session_list (auth) + error + session_list (list_sessions)
+    assert len(ws.sent) == 3
+    assert ws.sent[0]["type"] == "session_list"
+    assert ws.sent[1]["type"] == "error"
+    assert ws.sent[1]["code"] == "malformed_json"
+    assert ws.sent[2]["type"] == "session_list"
+
+
+def test_non_dict_json_silently_dropped(isolated_ws):
+    """JSON 解出来不是 dict(如数字、字符串、数组)→ 静默 drop,不崩,不回包。"""
+    ws = FakeWebSocket([
+        json.dumps({"type": "auth", "user_id": "u1"}),
+        json.dumps(42),         # 数字
+        json.dumps([1, 2, 3]),  # 数组
+        json.dumps({"type": "list_sessions"}),
+    ])
+    _run(server.handle(ws))
+
+    assert ws.closed is None
+    # auth 回 session_list + list_sessions 回 session_list = 2 个 send,非 dict 不回
+    assert len(ws.sent) == 2
+    assert all(m["type"] == "session_list" for m in ws.sent)
+
+
+def test_list_sessions_without_thread_id_returns_session_list(isolated_ws):
+    """P2 fix verify:list_sessions 没 thread_id 应正常回 session_list
+    (不应被 `if not thread_id: continue` 静默 drop)。"""
+    ws = FakeWebSocket([
+        json.dumps({"type": "auth", "user_id": "u1"}),
+        json.dumps({"type": "list_sessions"}),  # 无 thread_id
+    ])
+    _run(server.handle(ws))
+
+    assert ws.closed is None
+    assert len(ws.sent) == 2
+    assert ws.sent[0]["type"] == "session_list"  # auth 自动下发
+    assert ws.sent[1]["type"] == "session_list"  # list_sessions 显式请求
+
+
+def test_get_session_state_returns_messages_and_canvas(isolated_ws):
+    """get_session_state → 收到 session_state{messages, canvas, thread_id}。"""
+    ws = FakeWebSocket([
+        json.dumps({"type": "auth", "user_id": "u1"}),
+        json.dumps({"type": "get_session_state", "thread_id": "t1"}),
+    ])
+    _run(server.handle(ws))
+
+    assert ws.closed is None
+    assert len(ws.sent) == 2
+    state = ws.sent[1]
+    assert state["type"] == "session_state"
+    assert state["thread_id"] == "t1"
+    assert state["messages"] == []  # 新 session 应该空
+    # canvas 可能为 None(新 session 无节点),不强 assert 内容,只 assert 字段存在
+    assert "canvas" in state
+
+
+def test_delete_session_sends_session_list_ack(isolated_ws):
+    """P2 fix verify:delete_session 之后应 push 新的 session_list 作为 ACK,
+    且被删除的 session 不再出现在列表中。"""
+    from agent.store import ensure_session_exists
+
+    ensure_session_exists("u1", "t-keep")
+    ensure_session_exists("u1", "t-delete")
+
+    ws = FakeWebSocket([
+        json.dumps({"type": "auth", "user_id": "u1"}),
+        json.dumps({"type": "delete_session", "thread_id": "t-delete"}),
+    ])
+    _run(server.handle(ws))
+
+    assert ws.closed is None
+    # 期待 2 个 send:auth 后的 session_list(含 2 个 session)+ delete 后的 ACK session_list(含 1 个)
+    assert len(ws.sent) == 2
+    assert ws.sent[0]["type"] == "session_list"
+    assert ws.sent[1]["type"] == "session_list"
+
+    # ACK 的 session_list 不应包含 t-delete
+    ack_thread_ids = {s["thread_id"] for s in ws.sent[1]["sessions"]}
+    assert "t-delete" not in ack_thread_ids
+    assert "t-keep" in ack_thread_ids
+
+
+def test_unknown_msg_type_silently_dropped(isolated_ws):
+    """未知 msg_type → 静默 drop,连接存活,后续消息仍能正常处理。"""
+    ws = FakeWebSocket([
+        json.dumps({"type": "auth", "user_id": "u1"}),
+        json.dumps({"type": "this_does_not_exist", "thread_id": "t1"}),
+        json.dumps({"type": "list_sessions"}),
+    ])
+    _run(server.handle(ws))
+
+    assert ws.closed is None
+    # auth → session_list,unknown 不回,list_sessions → session_list = 2 个
+    assert len(ws.sent) == 2
+    assert all(m["type"] == "session_list" for m in ws.sent)
+
+
+def test_rename_session_regression_silently_dropped(isolated_ws):
+    """回归:rename_session 已删,发送 → 静默 drop + 连接存活 + 后续消息正常。
+
+    这是 commit 92f40ec 删 rename_session 的回归测试。
+    """
+    ws = FakeWebSocket([
+        json.dumps({"type": "auth", "user_id": "u1"}),
+        json.dumps({"type": "rename_session", "thread_id": "t1", "name": "新名"}),
+        json.dumps({"type": "list_sessions"}),
+    ])
+    _run(server.handle(ws))
+
+    assert ws.closed is None
+    assert len(ws.sent) == 2
+    assert all(m["type"] == "session_list" for m in ws.sent)
