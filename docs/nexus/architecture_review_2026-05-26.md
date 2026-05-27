@@ -257,7 +257,7 @@ canvas/node 域比 cascade contract 在 UI 里还核心,却是唯一没共享 sh
 
 > **以下 5 个任务彼此独立(除 Codex-D 等 Claude-B),可以并行**。建议优先级:E → F → C → D → G。
 
-#### Codex-C · P1-2 `App.tsx` 拆 store(原 Cursor 任务)
+#### Codex-C · P1-2 `App.tsx` 拆 store(原 Cursor 任务) ✅ `305e5b8`
 - 范围:`frontend/src/App.tsx`(404 LOC)→ 拆出
   - `frontend/src/store/sessionStore.ts`
   - `frontend/src/store/wsStore.ts`
