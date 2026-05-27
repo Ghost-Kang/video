@@ -1,7 +1,16 @@
 import { create } from "zustand";
 import { useCanvasStore } from "./canvasStore";
 import { useSessionStore } from "./sessionStore";
+import { useToastStore } from "./toastStore";
 import type { WSEvent } from "../types/ws";
+
+
+// 把后端 invalid_command code 映射成宝妈看得懂的中文标题。
+// 未列的 code 一律 fallback 到通用 "请求出错"。
+const ERROR_CODE_TITLES: Record<string, string> = {
+  invalid_command: "请求格式不对",
+  malformed_json: "数据格式不对",
+};
 
 const TOOL_LABELS: Record<string, string> = {
   script_writer: "🍳 在写开头脚本…",
@@ -87,9 +96,16 @@ export const useWSStore = create<WSStore>((set, get) => ({
           }));
         });
         break;
-      case "error":
-        console.warn("[WS] error", event.code, event.message);
+      case "error": {
+        // 仍保留 console 给开发期 debug。
+        console.warn("[WS] error", event.code, event.message, event.bad_type);
+        // 推到 toast 让用户实际看到 — 不然 Pydantic 校验失败完全静默。
+        const title = ERROR_CODE_TITLES[event.code] ?? "请求出错";
+        // body 用 bad_type 给开发者线索;不暴露 Pydantic 详细 message(那对宝妈无意义)。
+        const body = event.bad_type ? `操作:${event.bad_type}` : undefined;
+        useToastStore.getState().push({ kind: "error", title, body });
         break;
+      }
     }
   },
 }));

@@ -10,6 +10,7 @@ import { AdminCreators } from "./pages/AdminCreators";
 import { AdminEvents } from "./pages/AdminEvents";
 import { AdminCost } from "./pages/AdminCost";
 import { LegalDoc } from "./pages/LegalDoc";
+import { ToastContainer } from "./components/feedback/ToastContainer";
 
 function newSessionId() {
   return `session-${Date.now().toString(36)}`;
@@ -84,6 +85,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
       <AppRoutes />
+      <ToastContainer />
     </BrowserRouter>
   </StrictMode>
 );
