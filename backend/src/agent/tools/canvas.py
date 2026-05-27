@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 from agent.config import STORYBOARD_COLUMNS
+from agent.cascade.canvas_contract import CanvasNode
 
 
 NodeType = Literal["script", "image", "video", "composite"]
@@ -29,6 +30,18 @@ def set_thread_id(thread_id: str):
 
 def set_user_id(user_id: str):
     _current_user_id.set(user_id)
+
+
+def _resolve_ids(user_id: str | None, thread_id: str | None) -> tuple[str, str]:
+    """显式参数优先,缺省回退到 ContextVar。
+
+    W4D3 Claude-A2 加:worker pipeline 走显式参数,避免 ContextVar 在并发 task 间
+    被串改的隐式 bug;agent tools 和 handlers 仍可使用 set_user_id/set_thread_id。
+    """
+    return (
+        user_id if user_id is not None else _current_user_id.get(),
+        thread_id if thread_id is not None else _current_thread_id.get(),
+    )
 
 
 def _node_id(type: str) -> str:
@@ -120,44 +133,48 @@ def _row_to_node(row: sqlite3.Row) -> dict:
             d["result"] = json.loads(row["result"])
         except json.JSONDecodeError:
             d["result"] = None
-    return d
+    return CanvasNode.model_validate(d).model_dump(mode="json")
 
 
-def _load_node(node_id: str) -> dict | None:
+def _load_node(node_id: str, *, user_id: str | None = None, thread_id: str | None = None) -> dict | None:
+    uid, tid = _resolve_ids(user_id, thread_id)
     db = _db()
     row = db.execute(
         "SELECT * FROM canvas_nodes WHERE user_id=? AND thread_id=? AND node_id=?",
-        (_current_user_id.get(), _current_thread_id.get(), node_id),
+        (uid, tid, node_id),
     ).fetchone()
     db.close()
     return _row_to_node(row) if row else None
 
 
-def _load_all_nodes() -> dict[str, dict]:
+def _load_all_nodes(*, user_id: str | None = None, thread_id: str | None = None) -> dict[str, dict]:
+    uid, tid = _resolve_ids(user_id, thread_id)
     db = _db()
     rows = db.execute(
-        "SELECT * FROM canvas_nodes WHERE user_id=? AND thread_id=?", (_current_user_id.get(), _current_thread_id.get(),)
+        "SELECT * FROM canvas_nodes WHERE user_id=? AND thread_id=?", (uid, tid)
     ).fetchall()
     db.close()
     return {r["node_id"]: _row_to_node(r) for r in rows}
 
 
-def _load_all_edges() -> list[dict]:
+def _load_all_edges(*, user_id: str | None = None, thread_id: str | None = None) -> list[dict]:
+    uid, tid = _resolve_ids(user_id, thread_id)
     db = _db()
     rows = db.execute(
         "SELECT edge_id, source, target, position FROM canvas_edges WHERE user_id=? AND thread_id=? ORDER BY position",
-        (_current_user_id.get(), _current_thread_id.get()),
+        (uid, tid),
     ).fetchall()
     db.close()
     return [{"id": r["edge_id"], "source": r["source"], "target": r["target"], "position": r["position"]} for r in rows]
 
 
-def _upsert_node(node: dict):
+def _upsert_node(node: dict, *, user_id: str | None = None, thread_id: str | None = None):
     db = _db()
     r = node.get("result")
     result_json = json.dumps(r, ensure_ascii=False) if r is not None else None
-    user_id = _current_user_id.get()
-    thread_id = _current_thread_id.get()
+    uid, tid = _resolve_ids(user_id, thread_id)
+    user_id = uid
+    thread_id = tid
     values = (
         node["type"], node["title"], node.get("description", ""), node.get("status", "pending"),
         node.get("node_status", "reviewing"), node.get("asset_status", "idle"),
@@ -470,8 +487,8 @@ def create_canvas_node(
     return node
 
 
-def _update_node_result(node_id: str, updates: dict):
-    node = _load_node(node_id)
+def _update_node_result(node_id: str, updates: dict, *, user_id: str | None = None, thread_id: str | None = None):
+    node = _load_node(node_id, user_id=user_id, thread_id=thread_id)
     if node:
         existing = node.get("result") or {}
         if isinstance(existing, dict):
@@ -479,7 +496,7 @@ def _update_node_result(node_id: str, updates: dict):
         else:
             existing = updates
         node["result"] = existing
-        _upsert_node(node)
+        _upsert_node(node, user_id=user_id, thread_id=thread_id)
 
 
 def update_canvas_node(
@@ -729,9 +746,20 @@ def recover_generation_tasks(task_type: str | None = None) -> list[dict]:
     return tasks
 
 
-def update_generation_state(node_id: str, status: str, task_id: str | None = None, error: str | None = None):
-    """更新节点的生成队列状态。"""
-    node = _load_node(node_id)
+def update_generation_state(
+    node_id: str,
+    status: str,
+    task_id: str | None = None,
+    error: str | None = None,
+    *,
+    user_id: str | None = None,
+    thread_id: str | None = None,
+):
+    """更新节点的生成队列状态。
+
+    worker pipeline 必须显式传 user_id/thread_id;handler 调用可省略走 ContextVar。
+    """
+    node = _load_node(node_id, user_id=user_id, thread_id=thread_id)
     if not node:
         return
     node["generation_status"] = status
@@ -744,4 +772,4 @@ def update_generation_state(node_id: str, status: str, task_id: str | None = Non
     elif status == "failed":
         node["asset_status"] = "failed"
         node["generation_error"] = error
-    _upsert_node(node)
+    _upsert_node(node, user_id=user_id, thread_id=thread_id)

@@ -22,7 +22,6 @@ from agent.config import IMAGE_GEN_PROVIDER
 from agent.tools import canvas as canvas_tools
 from agent.tools.video_generation import get_video_provider
 from agent.transport.notify import notify_user
-from agent.workers.canvas_context import setup_canvas_context
 from agent.workers.composite_pipeline import process_composite_task
 from agent.workers.image_pipeline import make_image_provider, process_image_task
 from agent.workers.s3 import upload_bytes_to_s3
@@ -120,45 +119,49 @@ async def _run_with_sem(
     task: dict,
     label: str,
 ) -> None:
-    """semaphore-bounded 单任务执行。异常写回 canvas + notify。"""
+    """semaphore-bounded 单任务执行。异常写回 canvas + notify。
+
+    pipeline 自己显式传 user/thread,这里只兜底异常 → update_generation_state 也显式传。
+    """
     async with sem:
         t0 = time.time()
         nid = task.get("id", "?")
+        uid = task.get("user_id", "")
+        tid = task.get("thread_id", "")
         try:
-            setup_canvas_context(task)
             await process(task)
             dt = (time.time() - t0) * 1000
             print(f"[Worker:{label}] 完成 node={nid[:16]} 耗时={dt:.0f}ms")
         except Exception as e:
             dt = (time.time() - t0) * 1000
             print(f"[Worker:{label}] 任务异常 node={nid[:16]} 耗时={dt:.0f}ms error={e}")
-            canvas_tools.update_generation_state(task["id"], "failed", error=str(e))
-            notify_user(task.get("user_id", ""), task.get("thread_id", ""))
+            canvas_tools.update_generation_state(task["id"], "failed", error=str(e), user_id=uid, thread_id=tid)
+            notify_user(uid, tid)
 
 
 # ---------- recovery ----------
 
 
 async def _recover_one(task: dict, task_type: str) -> None:
-    """处理一个 submitted/polling 状态的中断任务。"""
+    """处理一个 submitted/polling 状态的中断任务。所有 canvas_tools 调用显式传 user/thread。"""
     nid = task["id"]
+    uid = task["user_id"]
+    tid = task["thread_id"]
     provider_name = task.get("image_gen_provider") or IMAGE_GEN_PROVIDER
     if task_type == "image" and provider_name == "google":
         # Google 用内存 task,重启后丢失 → 重新入队
         print(f"[Worker:recover] Google 任务重入队 node={nid[:16]}")
-        canvas_tools.update_generation_state(nid, "pending", error="服务重启,重新提交")
+        canvas_tools.update_generation_state(nid, "pending", error="服务重启,重新提交", user_id=uid, thread_id=tid)
         return
 
     print(f"[Worker:recover] 续轮询 node={nid[:16]} type={task_type} provider={provider_name}")
     try:
-        setup_canvas_context(task)
         provider = get_video_provider() if task_type == "video" else make_image_provider(provider_name)
-        tid = task.get("generation_task_id")
-        if not tid:
-            canvas_tools.update_generation_state(nid, "failed", error="缺少 task_id")
+        generation_tid = task.get("generation_task_id")
+        if not generation_tid:
+            canvas_tools.update_generation_state(nid, "failed", error="缺少 task_id", user_id=uid, thread_id=tid)
             return
-        result = await provider.poll(tid)
-        setup_canvas_context(task)
+        result = await provider.poll(generation_tid)
         _apply_poll_result(task, result)
     except Exception as e:
         print(f"[Worker:recover] 异常 node={nid[:16]}: {e}")
@@ -167,23 +170,25 @@ async def _recover_one(task: dict, task_type: str) -> None:
 def _apply_poll_result(task: dict, result: dict) -> None:
     """将续轮询结果写入节点。"""
     nid = task["id"]
+    uid = task["user_id"]
+    tid = task["thread_id"]
     if result.get("url"):
-        canvas_tools.update_generation_state(nid, "done")
-        canvas_tools._update_node_result(nid, {"url": result["url"], "actual_time": result.get("actual_time", 0)})
+        canvas_tools.update_generation_state(nid, "done", user_id=uid, thread_id=tid)
+        canvas_tools._update_node_result(nid, {"url": result["url"], "actual_time": result.get("actual_time", 0)}, user_id=uid, thread_id=tid)
         print(f"[Worker:recover] 完成 node={nid} url={result['url'][:60]}...")
     elif result.get("video_url"):
-        canvas_tools.update_generation_state(nid, "done")
+        canvas_tools.update_generation_state(nid, "done", user_id=uid, thread_id=tid)
         canvas_tools._update_node_result(
-            nid, {"url": result["video_url"], "actual_time": result.get("actual_time", 0)}
+            nid, {"url": result["video_url"], "actual_time": result.get("actual_time", 0)}, user_id=uid, thread_id=tid,
         )
         print(f"[Worker:recover] 完成 node={nid}")
     elif result.get("image_data"):
         s3_url = upload_bytes_to_s3(result["image_data"], f"{nid}.png")
         if s3_url:
-            canvas_tools.update_generation_state(nid, "done")
-            canvas_tools._update_node_result(nid, {"url": s3_url})
+            canvas_tools.update_generation_state(nid, "done", user_id=uid, thread_id=tid)
+            canvas_tools._update_node_result(nid, {"url": s3_url}, user_id=uid, thread_id=tid)
     else:
         is_timeout = result.get("error") == "timeout"
-        canvas_tools.update_generation_state(nid, "failed", error=result.get("error", ""))
+        canvas_tools.update_generation_state(nid, "failed", error=result.get("error", ""), user_id=uid, thread_id=tid)
         print(f"[Worker:recover] {'超时' if is_timeout else '失败'} node={nid}")
-    notify_user(task["user_id"], task["thread_id"])
+    notify_user(uid, tid)

@@ -1,4 +1,15 @@
-export type NodeType = "script" | "image" | "video" | "composite";
+import type { CanvasData, NodeType } from "./canvas";
+
+export type {
+  AssetStatus,
+  CanvasData,
+  CanvasEdge,
+  CanvasNode,
+  CanvasState,
+  GenerationStatus,
+  NodeStatus,
+  NodeType,
+} from "./canvas";
 
 export interface Shot {
   no: string;
@@ -8,30 +19,6 @@ export interface Shot {
   camera: string;
   transition: string;
   audio: string;
-}
-
-export type NodeStatus = "reviewing" | "confirmed";
-export type AssetStatus = "idle" | "generating" | "done" | "failed" | "timeout";
-
-export interface CanvasNode {
-  id: string;
-  type: NodeType;
-  title: string;
-  description: string;
-  status: string;  // 兼容旧数据
-  node_status: NodeStatus;
-  asset_status: AssetStatus;
-  result: Record<string, unknown> | null;
-  subtype?: string | null;
-  shot_no?: string | null;
-  image_gen_provider?: string | null;
-  x?: number;
-  y?: number;
-}
-
-export interface CanvasData {
-  nodes: Record<string, CanvasNode>;
-  edges: unknown[];
 }
 
 export interface ChatMessage {
