@@ -17,6 +17,7 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "volcengine-python-sdk>=5.0.27",
     "websockets>=16.0",
+    "yt-dlp>=2026.3.17",
 ]
 
 [build-system]

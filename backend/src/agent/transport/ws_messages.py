@@ -17,9 +17,13 @@ After Claude-A 拆分,所有 WS 消息走这里的 Pydantic 模型校验。前�
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
+
+# Reuse the canonical niche literal — single source of truth lives in the Cascade
+# rewrite service. Importing here keeps WS schema and rewrite prompts in lockstep.
+from agent.cascade.rewrite_service import Niche
 
 
 # ---------- inbound ----------
@@ -118,6 +122,10 @@ class UserMessageMsg(_Base):
     type: Literal["user_message"]
     thread_id: str = Field(min_length=1)
     content: str = Field(min_length=1)
+    # Creator's chosen niche; routes the Director to the matching `rewrite_<niche>.md`
+    # flavor and lets it skip the "which niche?" question. Optional → legacy clients
+    # without onboarding still work; unknown values are rejected by the Literal.
+    selected_niche: Optional[Niche] = None
 
 
 # tagged union by `type` field — Pydantic 2 用 Field(discriminator=...)
@@ -198,6 +206,62 @@ class AgentResponseEvent(_Base):
     canvas: dict[str, Any] | None = None
 
 
+class AnalysisReturnedEvent(_Base):
+    """Pushed by `cascade_analyze` tool after upstream analysis succeeds.
+
+    Carries the full `CascadeAnalysisContract.model_dump()` so the frontend
+    CardStack can render ScriptCard/ShotCard immediately without an extra
+    HTTP round-trip.
+    """
+
+    type: Literal["analysis_returned"]
+    thread_id: str
+    analysis: dict[str, Any]
+
+
+class RewriteReturnedEvent(_Base):
+    """Pushed by `cascade_rewrite` tool after niche rewrite succeeds.
+
+    Carries `RewriteResult.model_dump()` plus the originating analysis_id so
+    the frontend can correlate the rewrite back to its source analysis card.
+    """
+
+    type: Literal["rewrite_returned"]
+    thread_id: str
+    analysis_id: str
+    rewrite: dict[str, Any]
+
+
+class ShotFirstFrameReturnedEvent(_Base):
+    """Pushed by `cascade_generate_first_frame` after a per-shot image succeeds.
+
+    Frontend matches `shot_index` against `shots[].scene_index` and patches in
+    `image_url` so the matching ShotCard re-renders without a full payload
+    refresh.
+    """
+
+    type: Literal["shot_first_frame_returned"]
+    thread_id: str
+    rewrite_id: str
+    shot_index: int
+    image_url: str
+
+
+class AnalysisAnswerReturnedEvent(_Base):
+    """Pushed by `cascade_ask` after a free-form Q&A LLM call succeeds.
+
+    Carries the analysis_id + the user's question + the bounded (~300 char)
+    answer so the frontend chat panel can render a styled bubble (or, in
+    Phase 1, just chat-relay it via the Director's reply).
+    """
+
+    type: Literal["analysis_answer_returned"]
+    thread_id: str
+    analysis_id: str
+    question: str
+    answer: str
+
+
 WSOutbound = Annotated[
     Union[
         ErrorEvent,
@@ -208,6 +272,10 @@ WSOutbound = Annotated[
         ProcessingEvent,
         AgentStreamEvent,
         AgentResponseEvent,
+        AnalysisReturnedEvent,
+        RewriteReturnedEvent,
+        ShotFirstFrameReturnedEvent,
+        AnalysisAnswerReturnedEvent,
     ],
     Field(discriminator="type"),
 ]

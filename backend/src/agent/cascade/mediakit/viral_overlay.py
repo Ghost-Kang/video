@@ -39,6 +39,10 @@ _FIELD_LIMITS = {
     "engagement_levers": 80,
     "replicable_formula": 120,
 }
+# W4D5 additions — structured sub-objects. Passed through verbatim; adapter
+# downstream validates / falls back per `_normalize_audio_dim` and
+# `_normalize_production_dim` so we keep this layer thin.
+_STRUCTURED_KEYS = ("audio", "production")
 
 
 async def overlay_viral_dims(contract_dict: dict[str, Any], video_url: str) -> dict[str, Any]:
@@ -67,6 +71,10 @@ async def overlay_viral_dims(contract_dict: dict[str, Any], video_url: str) -> d
     for key, value in overlay.items():
         if key in _VIRAL_KEYS and isinstance(value, str) and value.strip():
             viral[key] = _truncate(value, _FIELD_LIMITS[key])
+        elif key in _STRUCTURED_KEYS and isinstance(value, dict):
+            # Pass through verbatim; adapter normalizers handle missing
+            # sub-fields + emit W15/W16 if anything is off.
+            viral[key] = value
     payload["viral_analysis"] = viral
     payload["model"] = _model_name(payload.get("model"))
     return payload
@@ -139,7 +147,7 @@ def _storyline_context(contract_dict: dict[str, Any]) -> str:
     return context[: limit - 32].rstrip() + "\n[truncated]"
 
 
-def _parse_overlay_response(response_json: dict[str, Any]) -> dict[str, str]:
+def _parse_overlay_response(response_json: dict[str, Any]) -> dict[str, Any]:
     choices = response_json.get("choices")
     if not isinstance(choices, list) or not choices:
         raise ValueError("choices missing")
@@ -149,11 +157,13 @@ def _parse_overlay_response(response_json: dict[str, Any]) -> dict[str, str]:
     parsed = json.loads(_extract_json_object(text))
     if not isinstance(parsed, dict):
         raise ValueError("overlay content is not an object")
-    return {
-        key: value.strip()
-        for key, value in parsed.items()
-        if key in _VIRAL_KEYS and isinstance(value, str) and value.strip()
-    }
+    out: dict[str, Any] = {}
+    for key, value in parsed.items():
+        if key in _VIRAL_KEYS and isinstance(value, str) and value.strip():
+            out[key] = value.strip()
+        elif key in _STRUCTURED_KEYS and isinstance(value, dict):
+            out[key] = value
+    return out
 
 
 def _content_text(content: Any) -> str:

@@ -30,6 +30,7 @@ _REQUIRED_FIELDS: dict[str, frozenset[str]] = {
     }),
     EventName.SCRIPT_REWRITTEN.value: frozenset({"shot_count", "script_char_len", "parser_warnings"}),
     EventName.SHOT_GENERATED.value: frozenset({"shot_index", "provider", "model", "outcome", "attempt", "latency_ms", "anchor_refs"}),
+    EventName.SHOT_FIRST_FRAME_RETURNED.value: frozenset({"rewrite_id", "shot_index", "cost_cny"}),
     EventName.PUBLISH_PACK_COPIED.value: frozenset(),
     EventName.ANCHOR_CREATED.value: frozenset({"anchor_id", "anchor_type", "source_run_id"}),
     EventName.ANCHOR_REUSED.value: frozenset({"anchor_id", "anchor_type", "source_run_id", "current_run_id", "days_since_created"}),
@@ -42,6 +43,7 @@ _REQUIRED_FIELDS: dict[str, frozenset[str]] = {
     EventName.CASCADE_CIRCUIT_OPEN.value: frozenset({"endpoint", "consecutive_failures", "cooldown_s"}),
     EventName.CASCADE_CACHE_HIT.value: frozenset({"source_url_hash", "ttl_remaining_s", "cache_layer"}),
     EventName.CASCADE_CACHE_MISS.value: frozenset({"source_url_hash"}),
+    EventName.NICHE_SELECTED.value: frozenset({"niche", "thread_id"}),
 }
 
 _lock = asyncio.Lock()

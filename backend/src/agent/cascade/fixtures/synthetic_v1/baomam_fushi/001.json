@@ -19,7 +19,20 @@
     "emotional_arc": "焦虑（喂不下）→ 尝试（换花样）→ 惊喜（吃下）→ 成就感",
     "target_audience": "0-3 岁宝宝妈妈，普通家庭厨房环境",
     "engagement_levers": "评论区抛「你家宝宝几个月开始吃辅食」诱导互动",
-    "replicable_formula": "悬念开场（拒食痛点） + 3 步解决方案（换花样/换温度/换工具） + 反差结尾（小孩抢勺子）"
+    "replicable_formula": "悬念开场（拒食痛点） + 3 步解决方案（换花样/换温度/换工具） + 反差结尾（小孩抢勺子）",
+    "audio": {
+      "bgm": "轻快童谣风钢琴，前 3s 起拍后保持稳定背景",
+      "voice_pace": "中速口播 200 字/分，亲和力女声，全程等长字幕",
+      "sound_effects": "切苹果 1 次切音强调，结尾 0.5s 留白"
+    },
+    "production": {
+      "cost_tier": "solo_phone",
+      "estimated_hours": 1.5,
+      "replaceable_anchors": [
+        "原片厨房 → 你的厨房早晨",
+        "原片苹果 → 你家宝宝爱吃的水果"
+      ]
+    }
   },
   "scenes": [
     {

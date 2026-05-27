@@ -18,7 +18,20 @@
     "emotional_arc": "紧张 → 上手 → 满足 → 自信",
     "target_audience": "目标人群明确,场景代入感强",
     "engagement_levers": "结尾抛问题诱导评论",
-    "replicable_formula": "新手友好定位 + 5 分钟操作 + 早餐场景"
+    "replicable_formula": "新手友好定位 + 5 分钟操作 + 早餐场景",
+    "audio": {
+      "bgm": "节奏感 house 鼓点，烹饪段加速时压紧",
+      "voice_pace": "口播 240 字/分快语速",
+      "sound_effects": "翻锅、拉丝、装盘各 1 次音效强调"
+    },
+    "production": {
+      "cost_tier": "small_team",
+      "estimated_hours": 4.0,
+      "replaceable_anchors": [
+        "原片米其林感摆盘 → 你的家常摆盘",
+        "原片预算价位 → 你的当地预算价位"
+      ]
+    }
   },
   "scenes": [
     {

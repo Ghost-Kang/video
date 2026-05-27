@@ -19,9 +19,11 @@ from pydantic import ValidationError
 
 from agent import config
 from agent.cascade.contract import (
+    AudioDim,
     CameraMovement,
     CascadeAnalysisContract,
     Platform,
+    ProductionDim,
     Scene,
     SCHEMA_VERSION,
     Severity,
@@ -42,6 +44,21 @@ _VIRAL_FALLBACKS: dict[str, str] = {
     "target_audience": "未识别目标人群",
     "engagement_levers": "未识别互动钩子",
     # NOTE: replicable_formula has no fallback — it is HARD-required (S3).
+}
+
+# W4D5 audio 3-axis fallbacks. Phrase mirrors the prompt's `<n/a — storyline 未呈现>`
+# fingerprint so dashboards filtering by W15 see consistent strings.
+_AUDIO_FALLBACK = {
+    "bgm": "n/a — storyline 未呈现",
+    "voice_pace": "n/a — storyline 未呈现",
+    "sound_effects": "n/a — storyline 未呈现",
+}
+# W4D5 production complexity fallback. solo_phone is the safe default for the
+# Phase 1 创作者画像 — when in doubt assume one person + a phone.
+_PRODUCTION_FALLBACK = {
+    "cost_tier": "solo_phone",
+    "estimated_hours": 1.0,
+    "replaceable_anchors": [],
 }
 
 _KNOWN_PII_KEYS = frozenset({
@@ -313,12 +330,97 @@ def _normalize_viral_analysis(data: dict[str, Any], warnings: list[Warning_]) ->
         else:
             va[key] = val.strip()[:80]
 
+    _normalize_audio_dim(va, warnings)
+    _normalize_production_dim(va, warnings)
+
     data["viral_analysis"] = va
     # validate now so we get a focused error rather than a top-level one
     try:
         ViralAnalysis(**va)
     except ValidationError as e:
         raise HardFailure(FailureCode.S5_INVALID_PAYLOAD, f"viral_analysis: {e}") from e
+
+
+def _normalize_audio_dim(va: dict[str, Any], warnings: list[Warning_]) -> None:
+    """Backfill ViralAnalysis.audio with W15 warning if upstream omits the block.
+
+    Three axes (bgm / voice_pace / sound_effects). Per-axis fallback when the
+    full block is present but a single field is missing — partial fallback
+    still emits W15 once with the offending axes listed.
+    """
+    raw = va.get("audio")
+    if not isinstance(raw, dict):
+        va["audio"] = dict(_AUDIO_FALLBACK)
+        warnings.append(
+            Warning_(
+                code=WarningCode.W15_AUDIO_FALLBACK.value,
+                field="viral_analysis.audio",
+                message="audio block missing; used default 3-axis fallback",
+                severity=Severity.WARN,
+            )
+        )
+        return
+    fixed: dict[str, str] = {}
+    missing: list[str] = []
+    for key, fallback in _AUDIO_FALLBACK.items():
+        val = raw.get(key)
+        if isinstance(val, str) and val.strip():
+            fixed[key] = val.strip()[:80]
+        else:
+            fixed[key] = fallback
+            missing.append(key)
+    va["audio"] = fixed
+    if missing:
+        warnings.append(
+            Warning_(
+                code=WarningCode.W15_AUDIO_FALLBACK.value,
+                field="viral_analysis.audio",
+                message=f"audio axes missing → fallback: {missing}",
+                severity=Severity.WARN,
+            )
+        )
+
+
+def _normalize_production_dim(va: dict[str, Any], warnings: list[Warning_]) -> None:
+    """Backfill ViralAnalysis.production with W16 warning when upstream omits it.
+
+    Unlike audio, we don't emit a partial warning for individual missing axes —
+    `replaceable_anchors` legitimately empties out (the prompt allows zero
+    anchors) and `cost_tier` has a hard Literal so any junk falls to default.
+    Only the whole-block-missing case warns.
+    """
+    raw = va.get("production")
+    if not isinstance(raw, dict):
+        va["production"] = dict(_PRODUCTION_FALLBACK)
+        warnings.append(
+            Warning_(
+                code=WarningCode.W16_PRODUCTION_FALLBACK.value,
+                field="viral_analysis.production",
+                message="production block missing; used solo_phone fallback",
+                severity=Severity.WARN,
+            )
+        )
+        return
+    fixed: dict[str, Any] = {}
+    tier = raw.get("cost_tier")
+    if isinstance(tier, str) and tier in {"solo_phone", "small_team", "post_heavy"}:
+        fixed["cost_tier"] = tier
+    else:
+        fixed["cost_tier"] = "solo_phone"
+    hours = raw.get("estimated_hours")
+    try:
+        hours_f = float(hours) if hours is not None else 1.0
+    except (TypeError, ValueError):
+        hours_f = 1.0
+    fixed["estimated_hours"] = max(0.0, min(100.0, hours_f))
+    anchors = raw.get("replaceable_anchors")
+    if isinstance(anchors, list):
+        # Keep only string items, trim, drop empties, cap at 10.
+        clean = [str(a).strip()[:200] for a in anchors if isinstance(a, str) and str(a).strip()]
+        fixed["replaceable_anchors"] = clean[:10]
+    else:
+        fixed["replaceable_anchors"] = []
+    va["production"] = fixed
 
 
 def _normalize_scenes(data: dict[str, Any], warnings: list[Warning_]) -> None:

@@ -34,6 +34,16 @@ from agent.cascade.storage import sum_generation_cost
 PREDICT_ANALYSIS_CNY = 1.2
 PREDICT_REWRITE_CNY = 1.0
 PREDICT_SHOT_IMAGE_CNY = 1.5
+# W4D5 additions
+# - Transcribe: MediaKit extract-audio-text per call ≈ ¥0.30
+# - Cascade ask: one LLM round-trip on capped context ≈ ¥0.05
+PREDICT_TRANSCRIBE_CNY = 0.30
+PREDICT_ASK_CNY = 0.05
+# 2026-05-27 doubao_direct upstream — single ARK Doubao seed-1.6 vision call
+# replacing MediaKit storyline+overlay+transcribe (which hangs). One chat
+# completion with fps=1/max_frames=60 video_url ≈ ¥0.50 (input video tokens
+# dominate; assistant JSON is ~1.5k tokens negligible).
+PREDICT_DOUBAO_DIRECT_CNY = 0.50
 
 
 def _run_cap() -> float:

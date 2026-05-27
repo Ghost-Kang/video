@@ -99,6 +99,21 @@ def _viral_analysis(
         "target_audience": _truncate(tag_text or "目标人群待补充", 80),
         "engagement_levers": _truncate("评论区围绕剧情细节与结果反馈互动", 80),
         "replicable_formula": _truncate(summary or highlight_text or first_scene or "故事线拆解后复刻开场、过程和结尾反差", 120),
+        # W4D5: audio + production are required at the contract level. We seed
+        # the storyline-derived payload with explicit "未呈现" placeholders so
+        # the ARK viral overlay step has a structure to fill in; if overlay
+        # doesn't fire (no API key, network failure) the adapter falls back to
+        # _AUDIO_FALLBACK / _PRODUCTION_FALLBACK and emits W15/W16.
+        "audio": {
+            "bgm": "n/a — storyline 未呈现",
+            "voice_pace": "n/a — storyline 未呈现",
+            "sound_effects": "n/a — storyline 未呈现",
+        },
+        "production": {
+            "cost_tier": "solo_phone",
+            "estimated_hours": 1.0,
+            "replaceable_anchors": [],
+        },
     }
 
 

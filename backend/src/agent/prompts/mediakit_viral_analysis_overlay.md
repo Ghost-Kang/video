@@ -11,7 +11,17 @@
   "emotional_arc":     "<≤ 80 字 · 情绪弧 patterns,例如 '疲惫 → 困惑 → 触动 → 治愈 共 4 拍'>",
   "target_audience":   "<≤ 80 字 · 受众画像,例如 '0-3 岁宝宝妈妈,有辅食制作经验但缺时间'>",
   "engagement_levers": "<≤ 80 字 · 互动机制,例如 '结尾抛 \"你家宝宝几月吃 X\" + 评论区扣 1 索要食谱'>",
-  "replicable_formula": "<≤ 120 字 · 可复刻公式,结构化 schema,例如 '钩子月龄+数字 → 4 步流程 → 反差成品 → 索要回复'>"
+  "replicable_formula": "<≤ 120 字 · 可复刻公式,结构化 schema,例如 '钩子月龄+数字 → 4 步流程 → 反差成品 → 索要回复'>",
+  "audio": {
+    "bgm":           "<≤ 80 字 · 节奏型 / 风格 / 情绪基调 / 是否原创, 例如 '舒缓钢琴+渐强弦乐,3 处转点强化情绪'>",
+    "voice_pace":    "<≤ 80 字 · 语速/口播质量/腔调/字幕, 例如 '中速口播 220 字/分,带亲和力女声,字幕等长拉满'>",
+    "sound_effects": "<≤ 80 字 · 转场音/强调音/原声留白, 例如 '关键节点 1 次 whoosh 转场,结尾 0.5s 原声留白'>"
+  },
+  "production": {
+    "cost_tier":           "<solo_phone | small_team | post_heavy 之一>",
+    "estimated_hours":     "<float · 单次完整生产预估小时数,0-100>",
+    "replaceable_anchors": ["<≤10 条 · 每条描述一个可替换元素,例如 '原片钓鱼场景 → 你的厨房早晨'>"]
+  }
 }
 ```
 
@@ -26,6 +36,11 @@
    - 具体商品 / 品牌 / IP / 餐厅 / 绘本名(用品类词,如 "毛绒玩偶" 不是 "安抚海马";"睡前绘本" 不是 "《晚安月亮》")
 5. 时间用秒("第 47 秒")或 mm:ss("00:47"),不用 ms,不用浮点 decimal
 6. 若 storyline 没明确某字段(例如无清晰高潮节点)→ 填 `"<n/a — storyline 未呈现>"`,**绝不瞎猜**;字数仍 ≤ 上限
+7. **`audio` 三轴**(bgm / voice_pace / sound_effects)必须全部输出,每条 ≤80 字;无该信息时填 `"<n/a — storyline 未呈现>"`(下游会兜底,但**不要省略整个 audio 对象**)
+8. **`production`**:
+   - `cost_tier` 必须严格是 `solo_phone` / `small_team` / `post_heavy` 之一(枚举,其他值会被拒)
+   - `estimated_hours` 是 float,范围 0-100;只算单次完整生产(拍摄 + 剪辑)
+   - `replaceable_anchors` 是字符串数组,每条描述一个**可被创作者替换**的具体元素(场景/道具/人物组合等),格式 `"原片<X> → 你的<Y>"`;最多 10 条;若没有明显可替换点,允许空数组 `[]`
 
 # Hook taxonomy H1-H9 速查
 

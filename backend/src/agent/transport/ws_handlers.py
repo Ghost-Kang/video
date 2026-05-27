@@ -13,6 +13,8 @@ import asyncio
 from typing import Any, Awaitable, Callable
 
 from agent import store  # 通过 module 访问,方便 test monkeypatch
+from agent.cascade import events as cascade_events  # module 访问,test 可 patch emit
+from agent.cascade.event_names import EventName
 from agent.config import IMAGE_GEN_PROVIDER
 from agent.tools import canvas as canvas_tools
 from agent.transport import agent_runner  # module 访问同理
@@ -160,8 +162,30 @@ async def handle_optimize_prompt(ctx: WSCtx, msg: OptimizePromptMsg) -> None:
 
 
 async def handle_user_message(ctx: WSCtx, msg: UserMessageMsg) -> None:
-    print(f"[用户] thread={msg.thread_id} {msg.content[:80]}...")
-    asyncio.create_task(agent_runner.run_agent(ctx.user_id, ctx.pool, msg.thread_id, msg.content, ctx.ws))
+    print(f"[用户] thread={msg.thread_id} niche={msg.selected_niche} {msg.content[:80]}...")
+    # 仅在用户带 niche 时记一条 telemetry — 让 /admin/events 能看到 WS 字段
+    # 真的端到端打通了(不依赖 LLM 走到 rewrite 才能验证)。emit 失败不应阻塞
+    # 用户消息流(telemetry 是 best-effort)。
+    if msg.selected_niche is not None:
+        try:
+            await cascade_events.emit(
+                EventName.NICHE_SELECTED,
+                user_id=ctx.user_id,
+                run_id=None,
+                payload={"niche": msg.selected_niche, "thread_id": msg.thread_id},
+            )
+        except Exception as exc:
+            print(f"[telemetry] niche_selected emit failed: {exc}")
+    asyncio.create_task(
+        agent_runner.run_agent(
+            ctx.user_id,
+            ctx.pool,
+            msg.thread_id,
+            msg.content,
+            ctx.ws,
+            selected_niche=msg.selected_niche,
+        )
+    )
     await send_json(ctx.ws, type="processing", thread_id=msg.thread_id)
 
 

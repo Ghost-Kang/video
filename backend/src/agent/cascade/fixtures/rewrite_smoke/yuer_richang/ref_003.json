@@ -18,7 +18,20 @@
     "emotional_arc": "崩溃 → 自我对话 → 走出来 → 拥抱",
     "target_audience": "目标人群明确,场景代入感强",
     "engagement_levers": "结尾抛问题诱导评论",
-    "replicable_formula": "妈妈崩溃 + 内心独白 + 孩子靠近修复"
+    "replicable_formula": "妈妈崩溃 + 内心独白 + 孩子靠近修复",
+    "audio": {
+      "bgm": "轻柔夜灯氛围 lo-fi，无明显主旋律",
+      "voice_pace": "贴耳低语口播 180 字/分，疲惫感",
+      "sound_effects": "关键反差点 1 次轻提示音"
+    },
+    "production": {
+      "cost_tier": "solo_phone",
+      "estimated_hours": 0.5,
+      "replaceable_anchors": [
+        "原片夜灯卧室 → 你的卧室夜灯",
+        "原片宝宝睡颜 → 你家宝宝"
+      ]
+    }
   },
   "scenes": [
     {

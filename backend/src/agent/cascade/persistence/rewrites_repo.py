@@ -25,6 +25,25 @@ async def save_rewrite(
         await db.close()
 
 
+async def load_rewrite_by_id(rewrite_id: str) -> str | None:
+    """Look up a stored rewrite by its `rewrite_id` (rw_xxx).
+
+    Returns the raw `result_json` string for the caller to
+    `RewriteResult.model_validate_json` — or None when not found.
+    Used by `cascade_generate_first_frame` to resolve the shot's `visual` prompt
+    given just the rewrite id from a previous chat turn.
+    """
+    db = await _connect()
+    try:
+        row = await db.execute_fetchall(
+            "SELECT result_json FROM rewrites WHERE rewrite_id = ? LIMIT 1",
+            (rewrite_id,),
+        )
+    finally:
+        await db.close()
+    return row[0][0] if row else None
+
+
 async def load_recent_rewrite(
     *,
     analysis_id: str,

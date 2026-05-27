@@ -11,7 +11,11 @@ from agent.cascade.persistence.analyses_repo import (
 )
 from agent.cascade.persistence.db import bootstrap_schema, db_path, session, utc_now_rfc3339
 from agent.cascade.persistence.events_repo import list_events, save_event, sum_generation_cost
-from agent.cascade.persistence.rewrites_repo import load_recent_rewrite, save_rewrite
+from agent.cascade.persistence.rewrites_repo import (
+    load_recent_rewrite,
+    load_rewrite_by_id,
+    save_rewrite,
+)
 from agent.cascade.persistence.toprador_cache_repo import (
     _load_toprador_cache_entry,
     cleanup_expired_toprador_cache,
@@ -31,6 +35,7 @@ __all__ = [
     "load_analysis",
     "load_analysis_for_source",
     "load_recent_rewrite",
+    "load_rewrite_by_id",
     "load_toprador_cache",
     "retention_sweep",
     "save_analysis",

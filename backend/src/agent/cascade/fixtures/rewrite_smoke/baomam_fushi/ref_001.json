@@ -18,7 +18,20 @@
     "emotional_arc": "焦虑 → 尝试 → 惊喜 → 成就",
     "target_audience": "目标人群明确,场景代入感强",
     "engagement_levers": "结尾抛问题诱导评论",
-    "replicable_formula": "悬念开场(拒食痛点) + 3 步解决(换花样) + 反差结尾(主动吃)"
+    "replicable_formula": "悬念开场(拒食痛点) + 3 步解决(换花样) + 反差结尾(主动吃)",
+    "audio": {
+      "bgm": "轻快童谣风钢琴，前 3s 起拍后保持稳定背景",
+      "voice_pace": "中速口播 200 字/分，亲和力女声",
+      "sound_effects": "关键操作 1 次切音强调，结尾 0.5s 留白"
+    },
+    "production": {
+      "cost_tier": "solo_phone",
+      "estimated_hours": 1.5,
+      "replaceable_anchors": [
+        "原片厨房 → 你的厨房",
+        "原片辅食食材 → 你家宝宝爱吃的水果"
+      ]
+    }
   },
   "scenes": [
     {

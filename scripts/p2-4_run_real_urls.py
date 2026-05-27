@@ -266,6 +266,19 @@ def synthesize_contract_from_entry(entry: URLEntry) -> CascadeAnalysisContract:
             "target_audience": f"{entry.niche} 受众",
             "engagement_levers": "结尾抛问题/抛对比/抛承诺",
             "replicable_formula": f"{hook_id} · {title[:60]}",
+            # W4D5: audio + production are required on the contract. p2-4 is
+            # founder-annotated synth — we seed with safe defaults; the
+            # adapter would fall back the same way if these were absent.
+            "audio": {
+                "bgm": "n/a — founder-annotated synth",
+                "voice_pace": "n/a — founder-annotated synth",
+                "sound_effects": "n/a — founder-annotated synth",
+            },
+            "production": {
+                "cost_tier": "solo_phone",
+                "estimated_hours": 1.0,
+                "replaceable_anchors": [],
+            },
         },
         "scenes": scenes,
         "warnings": [],

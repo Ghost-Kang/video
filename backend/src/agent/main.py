@@ -26,6 +26,12 @@ from agent.tools.canvas import (
     get_canvas_state,
     update_canvas_node,
 )
+from agent.tools.cascade import (
+    cascade_analyze,
+    cascade_ask,
+    cascade_generate_first_frame,
+    cascade_rewrite,
+)
 
 _prompts_dir = Path(__file__).resolve().parent / "prompts"
 _DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
@@ -56,6 +62,10 @@ def create_director_agent(checkpointer=None):
             create_canvas_node,
             update_canvas_node,
             delete_canvas_node,
+            cascade_analyze,
+            cascade_rewrite,
+            cascade_generate_first_frame,
+            cascade_ask,
         ],
         subagents=[
             {

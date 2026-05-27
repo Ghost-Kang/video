@@ -22,6 +22,11 @@ from agent.cascade.event_names import EventName
 from agent.cascade.events import emit
 from agent.cascade.failures import FailureCode, HardFailure, WarningCode
 from agent.cascade.mediakit import analyze_storyline, overlay_viral_dims, storyline_to_payload
+from agent.cascade.mediakit.doubao_direct_client import (
+    PREDICT_DOUBAO_DIRECT_CNY,
+    analyze_video_direct,
+)
+from agent.cascade.mediakit.transcribe_client import fetch_transcript
 from agent.cascade.mediakit.url_resolver import resolve_to_direct_media
 from agent.cascade.persistence.toprador_cache_repo import (
     _load_toprador_cache_entry,
@@ -43,6 +48,13 @@ _HAPPY_FIXTURES = (
 )
 _TOPRADOR_CACHE_TTL_S = 60.0
 _TOPRADOR_BREAKER = "toprador"
+
+# Upstream mode constants. Kept here so service-level branching matches
+# operator-facing env values verbatim.
+FIXTURE_MODE = "fixture"
+TOPRADOR_MODE = "toprador"
+MEDIAKIT_MODE = "mediakit"
+DOUBAO_DIRECT_MODE = "doubao_direct"
 
 # P4-3 storm-prevention: per-endpoint last cascade_circuit_open emit timestamp.
 # Same endpoint emits at most once per 60s even if many callers hit the open breaker.
@@ -112,12 +124,14 @@ async def _load_upstream_payload(
     run_id: str | None,
 ) -> dict[str, Any]:
     upstream = os.getenv("CASCADE_UPSTREAM", config.CASCADE_UPSTREAM).strip().lower() or config.CASCADE_UPSTREAM
-    if upstream == "fixture":
+    if upstream == FIXTURE_MODE:
         return _load_fixture(source_url)
-    if upstream == "toprador":
+    if upstream == TOPRADOR_MODE:
         return await _call_toprador(source_url, user_id=user_id, run_id=run_id)
-    if upstream == "mediakit":
+    if upstream == MEDIAKIT_MODE:
         return await _call_mediakit(source_url, user_id=user_id, run_id=run_id)
+    if upstream == DOUBAO_DIRECT_MODE:
+        return await _call_doubao_direct(source_url, user_id=user_id, run_id=run_id)
     raise ValueError(f"unsupported CASCADE_UPSTREAM: {upstream}")
 
 
@@ -244,7 +258,9 @@ async def _call_mediakit(
     run_id: str | None,
 ) -> dict[str, Any]:
     start = time.monotonic()
-    direct_url = await resolve_to_direct_media(source_url)
+    direct_url, resolver_metadata = await resolve_to_direct_media(source_url)
+    _enforce_duration_guard(resolver_metadata)
+
     storyline = await analyze_storyline(
         direct_url,
         user_id=user_id,
@@ -256,6 +272,82 @@ async def _call_mediakit(
         user_id=user_id,
     )
     payload = await overlay_viral_dims(payload, direct_url)
+
+    # W4D5: best-effort full transcript via MediaKit. Failure → empty string +
+    # W17 warning emitted by adapter via the warnings list. Never blocks.
+    transcript = await fetch_transcript(direct_url, user_id=user_id)
+    payload["full_transcript"] = transcript or ""
+    if not transcript:
+        upstream_warnings = list(payload.get("warnings") or [])
+        upstream_warnings.append({
+            "code": "W17_TRANSCRIBE_FAILED",
+            "field": "full_transcript",
+            "message": "transcribe unavailable; full_transcript left empty",
+            "severity": "warn",
+        })
+        payload["warnings"] = upstream_warnings
+
+    payload["_upstream_latency_ms"] = int((time.monotonic() - start) * 1000)
+    payload["_upstream_attempts"] = 1
+    return payload
+
+
+def _enforce_duration_guard(resolver_metadata: dict[str, Any]) -> None:
+    """W4D5 duration guard — refuse <5s and >180s sources before upstream spend.
+
+    Extracted from `_call_mediakit` so `_call_doubao_direct` can apply the
+    same gate. `duration_s` only surfaces when the resolver actually scraped
+    it (`douyin_share` mode); passthrough → empty dict → no-op (dev escape
+    hatch only).
+    """
+    duration_s = resolver_metadata.get("duration_s")
+    if not isinstance(duration_s, (int, float)) or duration_s <= 0:
+        return
+    if duration_s > 180:
+        raise HardFailure(
+            FailureCode.S10_DURATION_OUT_OF_RANGE,
+            f"这条 {int(round(duration_s))} 秒太长,建议先剪到 3 分钟以内再来分析。",
+        )
+    if duration_s < 5:
+        raise HardFailure(
+            FailureCode.S10_DURATION_OUT_OF_RANGE,
+            f"视频太短了 ({duration_s:.1f}s),没什么可分析的。",
+        )
+
+
+async def _call_doubao_direct(
+    source_url: str,
+    *,
+    user_id: str,
+    run_id: str | None,
+) -> dict[str, Any]:
+    """Single-shot ARK Doubao vision call → contract-shaped payload.
+
+    Bypass for MediaKit storyline hang. Resolver → duration guard → one
+    ARK chat completion that returns the entire CascadeAnalysisContract
+    JSON. Adapter normalizes downstream so audio/production fallbacks
+    (W15/W16) and confidence clamping (W11) still apply.
+    """
+    start = time.monotonic()
+    direct_url, resolver_metadata = await resolve_to_direct_media(source_url)
+    _enforce_duration_guard(resolver_metadata)
+
+    raw = await analyze_video_direct(direct_url, user_id=user_id, run_id=run_id)
+    payload: dict[str, Any] = dict(raw) if isinstance(raw, dict) else {}
+
+    # Inject contract envelope fields the model doesn't produce. Mirrors
+    # `_call_mediakit`'s storyline_to_payload + post-processing shape.
+    payload.setdefault("schema_version", "1.0")
+    payload["source_url"] = source_url
+    payload["analysis_id"] = _analysis_id(user_id, source_url)
+    payload.setdefault("created_at", None)  # adapter._ensure_created_at fills
+    payload["model"] = f"ark-{config.DOUBAO_MODEL}-direct"
+    payload["cost_cny"] = PREDICT_DOUBAO_DIRECT_CNY
+
+    duration_s = resolver_metadata.get("duration_s")
+    if isinstance(duration_s, (int, float)) and duration_s > 0:
+        payload["duration_s"] = max(1, int(round(float(duration_s))))
+
     payload["_upstream_latency_ms"] = int((time.monotonic() - start) * 1000)
     payload["_upstream_attempts"] = 1
     return payload

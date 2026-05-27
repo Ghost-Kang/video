@@ -19,7 +19,20 @@
     "emotional_arc": "好奇 → 跟着做 → 满足",
     "target_audience": "25-40 岁家庭主厨，预算敏感",
     "engagement_levers": "结尾让观众猜价格，评论区点燃讨论",
-    "replicable_formula": "强标价钩子（30 块）+ 食材逐一展示 + 烹饪过程压缩 + 拉丝/摆盘高光结尾 + 价格悬念互动"
+    "replicable_formula": "强标价钩子（30 块）+ 食材逐一展示 + 烹饪过程压缩 + 拉丝/摆盘高光结尾 + 价格悬念互动",
+    "audio": {
+      "bgm": "节奏感 house 鼓点，烹饪段加速时配合压紧",
+      "voice_pace": "口播 240 字/分快语速，配合食材切换",
+      "sound_effects": "翻锅、拉丝、装盘各 1 次音效强调"
+    },
+    "production": {
+      "cost_tier": "small_team",
+      "estimated_hours": 4.0,
+      "replaceable_anchors": [
+        "原片米其林感摆盘 → 你的家常摆盘",
+        "原片 30 块预算 → 你的当地预算价位"
+      ]
+    }
   },
   "scenes": [
     {

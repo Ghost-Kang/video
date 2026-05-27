@@ -117,6 +117,56 @@ def detect_hooks_in_text(text: str) -> list[str]:
     return [h for h in ("H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9") if HOOK_PATTERNS[h].search(text)]
 
 
+def infer_niche_from_hooks(detected: Iterable[str]) -> tuple[str | None, str]:
+    """Map detected H-ids → most-likely niche.
+
+    Used by the Director's Cascade auto-pilot: when the user pastes a link
+    without pre-selecting a niche, run hook detection on the analysis text and
+    map those hooks to the niche whose `P0_HOOKS_BY_NICHE` they best match.
+
+    Algorithm:
+      - For each (niche, p0_hooks): score = |detected ∩ p0_hooks|.
+      - If ANY hook in `NEGATIVE_HOOKS_BY_NICHE[niche]` is in `detected`,
+        the niche is disqualified (score = -inf), regardless of P0 matches.
+      - Pick the unique highest positive score. Ties → return (None, "tie:<...>").
+      - No positive matches → return (None, "no_match").
+
+    Tie-breaking honesty example: if (H1, H4) both detected,
+      - baomam_fushi has H1 (+1) but H4 ∈ neg → score = -inf
+      - jiating_chufang has H4 (+1), no neg fired → score = 1
+      → returns ("jiating_chufang", "score=1 hits=['H4']").
+
+    Returns:
+        (niche_id, reason) where niche_id is None when ambiguous/no match.
+        `reason` is a short telemetry/debug string — NOT for LLM consumption.
+    """
+    detected_set = set(detected)
+    if not detected_set:
+        return None, "no_match"
+
+    scores: dict[str, tuple[int, list[str]]] = {}
+    for niche, p0 in P0_HOOKS_BY_NICHE.items():
+        negatives = NEGATIVE_HOOKS_BY_NICHE.get(niche, ())
+        if any(h in detected_set for h in negatives):
+            # Disqualified by a forbidden hook — skip entirely.
+            continue
+        hits = [h for h in p0 if h in detected_set]
+        if hits:
+            scores[niche] = (len(hits), hits)
+
+    if not scores:
+        return None, "no_match"
+
+    best_score = max(score for score, _ in scores.values())
+    winners = [n for n, (s, _) in scores.items() if s == best_score]
+    if len(winners) > 1:
+        return None, f"tie:{sorted(winners)}"
+
+    winner = winners[0]
+    hits = scores[winner][1]
+    return winner, f"score={best_score} hits={hits}"
+
+
 def _tokens(text: str) -> set[str]:
     """Cheap tokenizer for visual-diversity comparison: 1-char CJK + ASCII words."""
     return set(re.findall(r"[一-龥]|[a-zA-Z]+", text or ""))

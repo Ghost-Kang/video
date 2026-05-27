@@ -12,6 +12,8 @@ from pydantic import TypeAdapter, ValidationError
 
 from agent.transport.ws_messages import (
     INBOUND_MODELS,
+    AnalysisAnswerReturnedEvent,
+    AnalysisReturnedEvent,
     AuthMsg,
     CreateEdgeMsg,
     DeleteEdgeMsg,
@@ -22,6 +24,8 @@ from agent.transport.ws_messages import (
     OptimizePromptMsg,
     ReorderEdgeMsg,
     ReviewNodeMsg,
+    RewriteReturnedEvent,
+    ShotFirstFrameReturnedEvent,
     UpdateNodeStatusMsg,
     UpdatePositionMsg,
     UserMessageMsg,
@@ -132,6 +136,8 @@ class TestUserMessageMsg:
             "content": "hi",
         })
         assert msg.content == "hi"
+        # 默认 None — 旧客户端不带字段也得通过
+        assert msg.selected_niche is None
 
     def test_empty_content_rejected(self):
         with pytest.raises(ValidationError):
@@ -139,6 +145,36 @@ class TestUserMessageMsg:
                 "type": "user_message",
                 "thread_id": "t1",
                 "content": "",
+            })
+
+    def test_with_selected_niche(self):
+        # 三个合法 niche 值都能通过
+        for niche in ("baomam_fushi", "yuer_richang", "jiating_chufang"):
+            msg = UserMessageMsg.model_validate({
+                "type": "user_message",
+                "thread_id": "t1",
+                "content": "hi",
+                "selected_niche": niche,
+            })
+            assert msg.selected_niche == niche
+
+    def test_without_selected_niche_backwards_compat(self):
+        # 字段缺失 → 不报错且 None(向后兼容老客户端,关键保证)
+        msg = UserMessageMsg.model_validate({
+            "type": "user_message",
+            "thread_id": "t1",
+            "content": "hi",
+        })
+        assert msg.selected_niche is None
+
+    def test_invalid_niche_rejected(self):
+        # Literal 兜底 — 未知 niche 应在 WS 边界就被拒掉,不该漏到下游
+        with pytest.raises(ValidationError):
+            UserMessageMsg.model_validate({
+                "type": "user_message",
+                "thread_id": "t1",
+                "content": "hi",
+                "selected_niche": "music_dance",
             })
 
 
@@ -350,6 +386,187 @@ class TestWSInboundDiscriminator:
     def test_missing_discriminator_rejected(self):
         with pytest.raises(ValidationError):
             _WSInboundAdapter.validate_python({"user_id": "u1"})
+
+
+# ---------- Cascade outbound events ----------
+
+
+class TestAnalysisReturnedEvent:
+    """Outbound frame from `cascade_analyze` tool — verifies wire schema sticks."""
+
+    def test_happy_path(self):
+        msg = AnalysisReturnedEvent.model_validate({
+            "type": "analysis_returned",
+            "thread_id": "t1",
+            "analysis": {"analysis_id": "ana_x", "scenes": []},
+        })
+        assert msg.type == "analysis_returned"
+        assert msg.analysis["analysis_id"] == "ana_x"
+
+    def test_serialize_round_trip(self):
+        msg = AnalysisReturnedEvent(
+            type="analysis_returned",
+            thread_id="t1",
+            analysis={"k": 1, "nested": {"v": 2}},
+        )
+        dumped = msg.model_dump()
+        assert dumped["type"] == "analysis_returned"
+        assert dumped["analysis"]["nested"]["v"] == 2
+        # round-trips back
+        AnalysisReturnedEvent.model_validate(dumped)
+
+    def test_missing_thread_id_rejected(self):
+        with pytest.raises(ValidationError):
+            AnalysisReturnedEvent.model_validate({
+                "type": "analysis_returned",
+                "analysis": {},
+            })
+
+    def test_missing_analysis_rejected(self):
+        with pytest.raises(ValidationError):
+            AnalysisReturnedEvent.model_validate({
+                "type": "analysis_returned",
+                "thread_id": "t1",
+            })
+
+    def test_wrong_type_rejected(self):
+        with pytest.raises(ValidationError):
+            AnalysisReturnedEvent.model_validate({
+                "type": "analysis_done",
+                "thread_id": "t1",
+                "analysis": {},
+            })
+
+
+class TestRewriteReturnedEvent:
+    def test_happy_path(self):
+        msg = RewriteReturnedEvent.model_validate({
+            "type": "rewrite_returned",
+            "thread_id": "t1",
+            "analysis_id": "ana_x",
+            "rewrite": {"rewrite_id": "rw_1", "shots": []},
+        })
+        assert msg.analysis_id == "ana_x"
+        assert msg.rewrite["rewrite_id"] == "rw_1"
+
+    def test_serialize_round_trip(self):
+        msg = RewriteReturnedEvent(
+            type="rewrite_returned",
+            thread_id="t1",
+            analysis_id="ana_x",
+            rewrite={"rewrite_id": "rw_x", "shots": [{"shot_index": 1}]},
+        )
+        dumped = msg.model_dump()
+        assert dumped["type"] == "rewrite_returned"
+        assert dumped["analysis_id"] == "ana_x"
+        RewriteReturnedEvent.model_validate(dumped)
+
+    def test_missing_analysis_id_rejected(self):
+        with pytest.raises(ValidationError):
+            RewriteReturnedEvent.model_validate({
+                "type": "rewrite_returned",
+                "thread_id": "t1",
+                "rewrite": {},
+            })
+
+
+class TestShotFirstFrameReturnedEvent:
+    """Outbound frame from `cascade_generate_first_frame` — per-shot image URL push."""
+
+    def test_happy_path(self):
+        msg = ShotFirstFrameReturnedEvent.model_validate({
+            "type": "shot_first_frame_returned",
+            "thread_id": "t1",
+            "rewrite_id": "rw_x",
+            "shot_index": 2,
+            "image_url": "https://cdn/img.png",
+        })
+        assert msg.shot_index == 2
+        assert msg.image_url == "https://cdn/img.png"
+        assert msg.rewrite_id == "rw_x"
+
+    def test_serialize_round_trip(self):
+        msg = ShotFirstFrameReturnedEvent(
+            type="shot_first_frame_returned",
+            thread_id="t1",
+            rewrite_id="rw_x",
+            shot_index=3,
+            image_url="https://cdn/img.png",
+        )
+        dumped = msg.model_dump()
+        assert dumped["type"] == "shot_first_frame_returned"
+        assert dumped["shot_index"] == 3
+        ShotFirstFrameReturnedEvent.model_validate(dumped)
+
+    def test_missing_image_url_rejected(self):
+        with pytest.raises(ValidationError):
+            ShotFirstFrameReturnedEvent.model_validate({
+                "type": "shot_first_frame_returned",
+                "thread_id": "t1",
+                "rewrite_id": "rw_x",
+                "shot_index": 1,
+            })
+
+    def test_extra_field_rejected(self):
+        with pytest.raises(ValidationError):
+            ShotFirstFrameReturnedEvent.model_validate({
+                "type": "shot_first_frame_returned",
+                "thread_id": "t1",
+                "rewrite_id": "rw_x",
+                "shot_index": 1,
+                "image_url": "https://cdn/img.png",
+                "bogus": "x",
+            })
+
+
+class TestAnalysisAnswerReturnedEvent:
+    """W4D5: cascade_ask outbound frame. Same `discriminator="type"` rails as
+    the other Cascade events, with an `analysis_id` correlator + the original
+    `question` echoed back so the frontend doesn't have to remember it."""
+
+    def test_happy_path(self):
+        msg = AnalysisAnswerReturnedEvent.model_validate({
+            "type": "analysis_answer_returned",
+            "thread_id": "t1",
+            "analysis_id": "ana_x",
+            "question": "为啥这条 BGM 让我想起 90s 港片",
+            "answer": "这条 BGM 用了大提琴下行 + 雨声，节拍接近 90s 港片配乐套路。",
+        })
+        assert msg.analysis_id == "ana_x"
+        assert "BGM" in msg.question
+        assert "大提琴" in msg.answer
+
+    def test_serialize_round_trip(self):
+        msg = AnalysisAnswerReturnedEvent(
+            type="analysis_answer_returned",
+            thread_id="t1",
+            analysis_id="ana_x",
+            question="q",
+            answer="a",
+        )
+        dumped = msg.model_dump()
+        assert dumped["type"] == "analysis_answer_returned"
+        AnalysisAnswerReturnedEvent.model_validate(dumped)
+
+    def test_missing_analysis_id_rejected(self):
+        with pytest.raises(ValidationError):
+            AnalysisAnswerReturnedEvent.model_validate({
+                "type": "analysis_answer_returned",
+                "thread_id": "t1",
+                "question": "q",
+                "answer": "a",
+            })
+
+    def test_extra_field_rejected(self):
+        with pytest.raises(ValidationError):
+            AnalysisAnswerReturnedEvent.model_validate({
+                "type": "analysis_answer_returned",
+                "thread_id": "t1",
+                "analysis_id": "ana_x",
+                "question": "q",
+                "answer": "a",
+                "bogus": "x",
+            })
 
 
 # ---------- INBOUND_MODELS registry ----------

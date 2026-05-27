@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
@@ -59,8 +59,39 @@ class Warning_(BaseModel):
     severity: Severity = Severity.WARN
 
 
+class AudioDim(BaseModel):
+    """Audio 3-axis breakdown (W4D5 addition).
+
+    Required on every analysis. Adapter supplies sensible fallbacks + a
+    W_AUDIO_FALLBACK warning when upstream omits the block, so old
+    fixtures and degraded LLM calls still parse.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    bgm: str = Field(..., max_length=80)               # 节奏/风格/情绪基调
+    voice_pace: str = Field(..., max_length=80)        # 语速/口播 vs 字幕/腔调
+    sound_effects: str = Field(..., max_length=80)     # 转场音/强调音/原声
+
+
+class ProductionDim(BaseModel):
+    """Production complexity breakdown (W4D5 addition).
+
+    Tells the creator how much effort the source video takes to replicate
+    and what concrete elements they can swap in. Required; adapter falls
+    back when upstream omits it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    cost_tier: Literal["solo_phone", "small_team", "post_heavy"] = "solo_phone"
+    estimated_hours: float = Field(..., ge=0.0, le=100.0)
+    replaceable_anchors: list[str] = Field(default_factory=list, max_length=10)
+
+
 class ViralAnalysis(BaseModel):
-    """The 'why-it-hit' block. All 8 dimensions required; replicable_formula is HARD."""
+    """The 'why-it-hit' block. All 8 text dimensions + audio + production required;
+    replicable_formula is HARD."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -72,6 +103,8 @@ class ViralAnalysis(BaseModel):
     target_audience: str = Field(..., max_length=80)
     engagement_levers: str = Field(..., max_length=80)
     replicable_formula: str = Field(..., min_length=1, max_length=120)
+    audio: AudioDim
+    production: ProductionDim
 
     @field_validator("replicable_formula")
     @classmethod
@@ -126,6 +159,9 @@ class CascadeAnalysisContract(BaseModel):
     duration_s: int = Field(..., ge=1, le=600)
     viral_analysis: ViralAnalysis
     scenes: list[Scene] = Field(..., min_length=3, max_length=12)
+    # W4D5: full逐字脚本 (MediaKit transcribe). Optional — may be empty when
+    # transcribe failed or wasn't called. Capped to keep WS frames sane.
+    full_transcript: str = Field("", max_length=20000)
     warnings: list[Warning_] = Field(default_factory=list)
     confidence: float = Field(..., ge=0.0, le=1.0)
 

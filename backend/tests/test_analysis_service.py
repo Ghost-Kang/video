@@ -248,9 +248,10 @@ def test_mediakit_happy_path_uses_resolver_storyline_and_overlay(
     db_path = _use_mediakit(monkeypatch, tmp_path)
     calls: dict[str, str] = {}
 
-    async def resolve(source_url: str) -> str:
+    async def resolve(source_url: str) -> tuple[str, dict]:
         calls["resolve"] = source_url
-        return "https://cdn.test/direct.mp4"
+        # 36s duration → middle of the duration guard's 5-180s window.
+        return "https://cdn.test/direct.mp4", {"duration_s": 36.0}
 
     async def storyline(video_url: str, *, user_id: str, run_id: str | None, **_kwargs) -> dict:
         calls["storyline"] = f"{video_url}|{user_id}|{run_id}"
@@ -264,9 +265,14 @@ def test_mediakit_happy_path_uses_resolver_storyline_and_overlay(
         payload["model"] = f"{payload['model']}+ark-test"
         return payload
 
+    async def transcribe(video_url: str, *, user_id: str, **_kwargs) -> str:
+        calls["transcribe"] = video_url
+        return "宝宝拒食一段\n妈妈换苹果一段\n宝宝主动抢勺子"
+
     monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
     monkeypatch.setattr("agent.cascade.analysis_service.analyze_storyline", storyline)
     monkeypatch.setattr("agent.cascade.analysis_service.overlay_viral_dims", overlay)
+    monkeypatch.setattr("agent.cascade.analysis_service.fetch_transcript", transcribe)
 
     contract = asyncio.run(
         request_shallow_analysis(
@@ -284,7 +290,10 @@ def test_mediakit_happy_path_uses_resolver_storyline_and_overlay(
         "resolve": "https://www.douyin.com/video/7385782607067335962",
         "storyline": "https://cdn.test/direct.mp4|user_1|run_mk",
         "overlay": "https://cdn.test/direct.mp4",
+        "transcribe": "https://cdn.test/direct.mp4",
     }
+    # W4D5: full_transcript flows from MediaKit transcribe call → contract.
+    assert "宝宝拒食一段" in contract.full_transcript
     payload = _event_payloads(db_path, "analysis_returned")[0]
     assert payload["model"] == "mediakit-storyline+ark-test"
     assert payload["upstream_attempts"] == 1
@@ -293,7 +302,7 @@ def test_mediakit_happy_path_uses_resolver_storyline_and_overlay(
 def test_mediakit_resolver_failure_emits_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     db_path = _use_mediakit(monkeypatch, tmp_path)
 
-    async def resolve(_source_url: str) -> str:
+    async def resolve(_source_url: str) -> tuple[str, dict]:
         raise HardFailure(FailureCode.S8_UPSTREAM_REFUSED, "resolver unavailable")
 
     monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
@@ -305,14 +314,145 @@ def test_mediakit_resolver_failure_emits_failure(monkeypatch: pytest.MonkeyPatch
     assert _event_payloads(db_path, "failure_emitted")[0]["failure_code"] == "S8_UPSTREAM_REFUSED"
 
 
+def test_mediakit_duration_guard_rejects_too_long(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """W4D5: source >180s → S10 raised BEFORE storyline / overlay / transcribe."""
+    db_path = _use_mediakit(monkeypatch, tmp_path)
+    calls: dict[str, int] = {"storyline": 0, "overlay": 0, "transcribe": 0}
+
+    async def resolve(_source_url: str) -> tuple[str, dict]:
+        return "https://cdn.test/long.mp4", {"duration_s": 240.0}  # 4 min
+
+    async def storyline(*_args, **_kwargs) -> dict:
+        calls["storyline"] += 1
+        return _mediakit_storyline()
+
+    async def overlay(payload: dict, _video_url: str) -> dict:
+        calls["overlay"] += 1
+        return payload
+
+    async def transcribe(*_args, **_kwargs) -> str:
+        calls["transcribe"] += 1
+        return ""
+
+    monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
+    monkeypatch.setattr("agent.cascade.analysis_service.analyze_storyline", storyline)
+    monkeypatch.setattr("agent.cascade.analysis_service.overlay_viral_dims", overlay)
+    monkeypatch.setattr("agent.cascade.analysis_service.fetch_transcript", transcribe)
+
+    with pytest.raises(HardFailure) as exc:
+        asyncio.run(request_shallow_analysis("https://example.com/long", user_id="user_1", run_id="run_long"))
+
+    assert exc.value.code == FailureCode.S10_DURATION_OUT_OF_RANGE
+    assert "240" in str(exc.value)
+    assert calls == {"storyline": 0, "overlay": 0, "transcribe": 0}
+    # Failure must be persisted as an event
+    payloads = _event_payloads(db_path, "failure_emitted")
+    assert payloads and payloads[0]["failure_code"] == "S10_DURATION_OUT_OF_RANGE"
+
+
+def test_mediakit_duration_guard_rejects_too_short(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """W4D5: source <5s → S10 raised BEFORE downstream spend."""
+    _use_mediakit(monkeypatch, tmp_path)
+    calls: dict[str, int] = {"storyline": 0}
+
+    async def resolve(_source_url: str) -> tuple[str, dict]:
+        return "https://cdn.test/tiny.mp4", {"duration_s": 2.5}
+
+    async def storyline(*_args, **_kwargs) -> dict:
+        calls["storyline"] += 1
+        return _mediakit_storyline()
+
+    monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
+    monkeypatch.setattr("agent.cascade.analysis_service.analyze_storyline", storyline)
+
+    with pytest.raises(HardFailure) as exc:
+        asyncio.run(request_shallow_analysis("https://example.com/tiny", user_id="user_1", run_id="run_tiny"))
+
+    assert exc.value.code == FailureCode.S10_DURATION_OUT_OF_RANGE
+    assert "2.5" in str(exc.value)
+    assert calls["storyline"] == 0
+
+
+def test_mediakit_duration_guard_passes_middle(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """W4D5: 5s ≤ duration ≤ 180s passes through to MediaKit (happy 30s probe)."""
+    _use_mediakit(monkeypatch, tmp_path)
+    calls: dict[str, int] = {"storyline": 0}
+
+    async def resolve(_source_url: str) -> tuple[str, dict]:
+        return "https://cdn.test/mid.mp4", {"duration_s": 30.0}
+
+    async def storyline(_video_url: str, **_kwargs) -> dict:
+        calls["storyline"] += 1
+        return _mediakit_storyline()
+
+    async def overlay(payload: dict, _video_url: str) -> dict:
+        return payload
+
+    async def transcribe(_video_url: str, **_kwargs) -> str:
+        return "x"
+
+    monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
+    monkeypatch.setattr("agent.cascade.analysis_service.analyze_storyline", storyline)
+    monkeypatch.setattr("agent.cascade.analysis_service.overlay_viral_dims", overlay)
+    monkeypatch.setattr("agent.cascade.analysis_service.fetch_transcript", transcribe)
+
+    contract = asyncio.run(request_shallow_analysis(
+        "https://example.com/mid", user_id="user_1", run_id="run_mid"
+    ))
+
+    assert calls["storyline"] == 1
+    assert contract.full_transcript == "x"
+
+
+def test_mediakit_duration_guard_skips_when_resolver_silent(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Passthrough resolver returns no duration_s → guard is a no-op (dev path)."""
+    _use_mediakit(monkeypatch, tmp_path)
+
+    async def resolve(source_url: str) -> tuple[str, dict]:
+        return source_url, {}  # empty metadata = no guard
+
+    async def storyline(_video_url: str, **_kwargs) -> dict:
+        return _mediakit_storyline()
+
+    async def overlay(payload: dict, _video_url: str) -> dict:
+        return payload
+
+    async def transcribe(_video_url: str, **_kwargs) -> str:
+        return ""
+
+    monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
+    monkeypatch.setattr("agent.cascade.analysis_service.analyze_storyline", storyline)
+    monkeypatch.setattr("agent.cascade.analysis_service.overlay_viral_dims", overlay)
+    monkeypatch.setattr("agent.cascade.analysis_service.fetch_transcript", transcribe)
+
+    contract = asyncio.run(request_shallow_analysis(
+        "https://example.com/no_dur", user_id="user_1", run_id="run_no_dur"
+    ))
+    # Reached the contract → guard didn't fire.
+    assert isinstance(contract, CascadeAnalysisContract)
+
+
 def test_mediakit_overlay_degrades_but_contract_persists(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     _use_mediakit(monkeypatch, tmp_path)
 
-    async def resolve(source_url: str) -> str:
-        return source_url
+    async def resolve(source_url: str) -> tuple[str, dict]:
+        # No duration_s → no guard fires (passthrough/dev shape)
+        return source_url, {}
 
     async def storyline(_video_url: str, **_kwargs) -> dict:
         return _mediakit_storyline()
@@ -329,9 +469,13 @@ def test_mediakit_overlay_degrades_but_contract_persists(
         ]
         return payload
 
+    async def transcribe(_video_url: str, **_kwargs) -> str:
+        return ""  # degraded transcribe path; emits W17 via service
+
     monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
     monkeypatch.setattr("agent.cascade.analysis_service.analyze_storyline", storyline)
     monkeypatch.setattr("agent.cascade.analysis_service.overlay_viral_dims", overlay)
+    monkeypatch.setattr("agent.cascade.analysis_service.fetch_transcript", transcribe)
 
     contract = asyncio.run(request_shallow_analysis("https://example.com/video.mp4", user_id="user_1"))
 
@@ -498,3 +642,166 @@ def test_toprador_circuit_half_open_closes_after_cooldown(monkeypatch: pytest.Mo
     contract = asyncio.run(request_shallow_analysis("https://example.com/half-open", user_id="user_1"))
 
     assert isinstance(contract, CascadeAnalysisContract)
+
+
+def _doubao_direct_payload() -> dict:
+    """Contract-shaped payload the doubao_direct client would return."""
+    return {
+        "viral_analysis": {
+            "hook": "H8 凌晨第三次醒了开场",
+            "pacing": "前 3s 钩子 → 中段两步 → 尾部反差",
+            "climax": "第 22 秒妈妈终于睡着",
+            "visual_style": "夜光居家自然记录",
+            "emotional_arc": "疲惫 → 崩溃 → 释然",
+            "target_audience": "0-1 岁宝妈,睡眠剥夺中",
+            "engagement_levers": "评论区抛'你家几月睡整觉'",
+            "replicable_formula": "钩子<凌晨情绪> → 中段<两步动作> → 结尾<反差成品>",
+            "audio": {
+                "bgm": "钢琴渐强 3 处转点",
+                "voice_pace": "中速口播 220 字/分",
+                "sound_effects": "结尾 0.5s 原声留白",
+            },
+            "production": {
+                "cost_tier": "solo_phone",
+                "estimated_hours": 1.5,
+                "replaceable_anchors": ["原片夜灯 → 你的晨光"],
+            },
+        },
+        "scenes": [
+            {
+                "scene_index": 1,
+                "timestamp_start": 0.0,
+                "timestamp_end": 10.0,
+                "scene": "妈妈在床边",
+                "dialogue_and_narration": "怎么又醒了。",
+                "visual_content": "妈妈在床边抱着宝宝。",
+                "subject": "妈妈+宝宝",
+                "shot_type": "medium",
+                "camera_movement": "static",
+                "first_frame_url": None,
+            },
+            {
+                "scene_index": 2,
+                "timestamp_start": 10.0,
+                "timestamp_end": 20.0,
+                "scene": "妈妈轻拍",
+                "dialogue_and_narration": "再哄一次。",
+                "visual_content": "妈妈轻拍宝宝。",
+                "subject": "妈妈",
+                "shot_type": "close_up",
+                "camera_movement": "static",
+                "first_frame_url": None,
+            },
+            {
+                "scene_index": 3,
+                "timestamp_start": 20.0,
+                "timestamp_end": 30.0,
+                "scene": "宝宝终于睡",
+                "dialogue_and_narration": "终于睡了。",
+                "visual_content": "宝宝闭眼,妈妈靠在墙上。",
+                "subject": "妈妈+宝宝",
+                "shot_type": "medium",
+                "camera_movement": "static",
+                "first_frame_url": None,
+            },
+        ],
+        "full_transcript": "怎么又醒了\n再哄一次\n终于睡了",
+        "confidence": 0.78,
+    }
+
+
+def test_doubao_direct_mode_routes_to_client(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """CASCADE_UPSTREAM=doubao_direct must hit the doubao_direct client end-to-end.
+
+    Mocks the resolver + client call; verifies MediaKit storyline / overlay /
+    transcribe paths are NOT touched and the resulting contract carries the
+    doubao_direct model tag.
+    """
+    db_path = _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_UPSTREAM", "doubao_direct")
+    calls: dict[str, object] = {}
+
+    async def resolve(source_url: str) -> tuple[str, dict]:
+        calls["resolve"] = source_url
+        return "https://cdn.test/direct.mp4", {"duration_s": 30.0}
+
+    async def client_call(direct_mp4_url: str, **kwargs) -> dict:
+        calls["client"] = (direct_mp4_url, kwargs.get("user_id"), kwargs.get("run_id"))
+        return _doubao_direct_payload()
+
+    # Tripwires: these must NOT be called in doubao_direct mode.
+    async def storyline(*_args, **_kwargs) -> dict:
+        calls["storyline"] = True
+        raise AssertionError("storyline must not be called in doubao_direct mode")
+
+    async def overlay(*_args, **_kwargs) -> dict:
+        calls["overlay"] = True
+        raise AssertionError("overlay must not be called in doubao_direct mode")
+
+    async def transcribe(*_args, **_kwargs) -> str:
+        calls["transcribe"] = True
+        raise AssertionError("transcribe must not be called in doubao_direct mode")
+
+    monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
+    monkeypatch.setattr("agent.cascade.analysis_service.analyze_video_direct", client_call)
+    monkeypatch.setattr("agent.cascade.analysis_service.analyze_storyline", storyline)
+    monkeypatch.setattr("agent.cascade.analysis_service.overlay_viral_dims", overlay)
+    monkeypatch.setattr("agent.cascade.analysis_service.fetch_transcript", transcribe)
+
+    contract = asyncio.run(
+        request_shallow_analysis(
+            "https://www.douyin.com/video/7385782607067335962",
+            user_id="user_1",
+            run_id="run_dd",
+        )
+    )
+
+    assert isinstance(contract, CascadeAnalysisContract)
+    assert contract.platform.value == "douyin"
+    assert "ark-" in contract.model and contract.model.endswith("-direct")
+    assert "storyline" not in calls and "overlay" not in calls and "transcribe" not in calls
+    assert calls["resolve"] == "https://www.douyin.com/video/7385782607067335962"
+    direct_url, user_id_arg, run_id_arg = calls["client"]
+    assert direct_url == "https://cdn.test/direct.mp4"
+    assert user_id_arg == "user_1"
+    assert run_id_arg == "run_dd"
+    # Duration from resolver metadata flows into the contract envelope.
+    assert contract.duration_s == 30
+    # Cost guard prediction surfaces on the contract too.
+    assert contract.cost_cny == pytest.approx(0.50)
+    payload = _event_payloads(db_path, "analysis_returned")[0]
+    assert payload["model"] == contract.model
+
+
+def test_doubao_direct_duration_guard_rejects_too_long(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """>180s source → S10 before any ARK spend."""
+    _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_UPSTREAM", "doubao_direct")
+    calls: dict[str, int] = {"client": 0}
+
+    async def resolve(_source_url: str) -> tuple[str, dict]:
+        return "https://cdn.test/long.mp4", {"duration_s": 240.0}
+
+    async def client_call(*_args, **_kwargs) -> dict:
+        calls["client"] += 1
+        return _doubao_direct_payload()
+
+    monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
+    monkeypatch.setattr("agent.cascade.analysis_service.analyze_video_direct", client_call)
+
+    with pytest.raises(HardFailure) as exc:
+        asyncio.run(
+            request_shallow_analysis(
+                "https://example.com/long-dd",
+                user_id="user_1",
+                run_id="run_long_dd",
+            )
+        )
+    assert exc.value.code == FailureCode.S10_DURATION_OUT_OF_RANGE
+    assert calls["client"] == 0

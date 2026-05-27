@@ -551,6 +551,100 @@ def test_phase0_gate_cost_under_5() -> None:
         )
 
 
+# ---------- W4D5: audio / production / full_transcript ----------
+
+
+def test_happy_fixtures_carry_audio_and_production() -> None:
+    """W4D5: happy fixtures backfilled with audio + production blocks must validate without W15/W16."""
+    for fp in HAPPY_FIXTURES:
+        contract = normalize_analysis_result(_load(fp))
+        # audio populated → no W15
+        assert contract.viral_analysis.audio.bgm
+        assert contract.viral_analysis.audio.voice_pace
+        assert contract.viral_analysis.audio.sound_effects
+        # production populated → no W16
+        assert contract.viral_analysis.production.cost_tier in {
+            "solo_phone", "small_team", "post_heavy",
+        }
+        for w in contract.warnings:
+            assert w.code != WarningCode.W15_AUDIO_FALLBACK.value, (
+                f"happy fixture {fp.name} unexpectedly emitted W15"
+            )
+            assert w.code != WarningCode.W16_PRODUCTION_FALLBACK.value, (
+                f"happy fixture {fp.name} unexpectedly emitted W16"
+            )
+
+
+def test_adapter_emits_w15_when_audio_block_missing() -> None:
+    """Upstream forgets `audio` → adapter backfills + emits W15."""
+    raw = _load(SYNTH / "baomam_fushi" / "001.json")
+    raw["viral_analysis"].pop("audio", None)
+    contract = normalize_analysis_result(raw)
+    assert contract.viral_analysis.audio.bgm == "n/a — storyline 未呈现"
+    assert any(w.code == WarningCode.W15_AUDIO_FALLBACK.value for w in contract.warnings)
+
+
+def test_adapter_emits_w16_when_production_block_missing() -> None:
+    """Upstream forgets `production` → adapter backfills + emits W16. cost_tier defaults solo_phone."""
+    raw = _load(SYNTH / "yuer_richang" / "001.json")
+    raw["viral_analysis"].pop("production", None)
+    contract = normalize_analysis_result(raw)
+    assert contract.viral_analysis.production.cost_tier == "solo_phone"
+    assert contract.viral_analysis.production.estimated_hours == 1.0
+    assert contract.viral_analysis.production.replaceable_anchors == []
+    assert any(w.code == WarningCode.W16_PRODUCTION_FALLBACK.value for w in contract.warnings)
+
+
+def test_adapter_emits_w15_for_partial_audio_axes() -> None:
+    """Single missing axis → adapter fills it + emits W15 once with axis list."""
+    raw = _load(SYNTH / "baomam_fushi" / "001.json")
+    raw["viral_analysis"]["audio"] = {
+        "bgm": "实际的 BGM 描述",
+        # voice_pace + sound_effects missing
+    }
+    contract = normalize_analysis_result(raw)
+    assert contract.viral_analysis.audio.bgm == "实际的 BGM 描述"
+    assert contract.viral_analysis.audio.voice_pace == "n/a — storyline 未呈现"
+    assert contract.viral_analysis.audio.sound_effects == "n/a — storyline 未呈现"
+    w15 = [w for w in contract.warnings if w.code == WarningCode.W15_AUDIO_FALLBACK.value]
+    assert len(w15) == 1
+    assert "voice_pace" in w15[0].message and "sound_effects" in w15[0].message
+
+
+def test_adapter_coerces_bad_cost_tier_to_solo_phone() -> None:
+    """Junk cost_tier → default solo_phone (no enum-blow-up at the boundary)."""
+    raw = _load(SYNTH / "jiating_chufang" / "001.json")
+    raw["viral_analysis"]["production"]["cost_tier"] = "totally-bogus"
+    contract = normalize_analysis_result(raw)
+    assert contract.viral_analysis.production.cost_tier == "solo_phone"
+
+
+def test_adapter_caps_replaceable_anchors_to_ten() -> None:
+    """Upstream may flood the list; adapter caps at 10 + drops non-strings."""
+    raw = _load(SYNTH / "baomam_fushi" / "001.json")
+    raw["viral_analysis"]["production"]["replaceable_anchors"] = (
+        [f"原片场景{i} → 你的场景{i}" for i in range(15)] + [None, 42]
+    )
+    contract = normalize_analysis_result(raw)
+    assert len(contract.viral_analysis.production.replaceable_anchors) == 10
+
+
+def test_full_transcript_defaults_empty() -> None:
+    """W4D5: contract.full_transcript defaults to "" when upstream omits it."""
+    raw = _load(SYNTH / "baomam_fushi" / "001.json")
+    raw.pop("full_transcript", None)
+    contract = normalize_analysis_result(raw)
+    assert contract.full_transcript == ""
+
+
+def test_full_transcript_passes_through_when_present() -> None:
+    raw = _load(SYNTH / "baomam_fushi" / "001.json")
+    raw["full_transcript"] = "第一段：宝宝拒食\n第二段：妈妈换苹果\n第三段：宝宝抢勺子"
+    contract = normalize_analysis_result(raw)
+    assert "宝宝拒食" in contract.full_transcript
+    assert contract.full_transcript.count("\n") == 2
+
+
 def test_phase0_gate_warning_codes_have_hints() -> None:
     """Every WarningCode in the catalog has a hint string (may be empty for silent codes)."""
     for code in WarningCode:
