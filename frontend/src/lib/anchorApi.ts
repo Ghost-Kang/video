@@ -15,11 +15,27 @@ const MOCK_ANCHORS: Anchor[] = [
   { id: "anc_kitchen", kind: "scene", label: "厨房", image_url: "", reuse_count: 5, created_at: "2026-05-18T00:00:00Z" },
 ];
 
+function parseAnchorList(payload: unknown): Anchor[] | null {
+  if (Array.isArray(payload)) return payload as Anchor[];
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "anchors" in payload &&
+    Array.isArray((payload as { anchors?: unknown }).anchors)
+  ) {
+    return (payload as { anchors: Anchor[] }).anchors;
+  }
+  return null;
+}
+
 export async function listAnchors(kind?: AnchorKind): Promise<Anchor[]> {
   try {
     const suffix = kind ? `?kind=${kind}` : "";
     const res = await fetch(`/api/anchors${suffix}`);
-    if (res.ok) return (await res.json()) as Anchor[];
+    if (res.ok) {
+      const anchors = parseAnchorList(await res.json());
+      if (anchors) return anchors;
+    }
   } catch {
     // dev fallback below
   }

@@ -9,6 +9,18 @@ describe("anchorApi", () => {
     fetchSpy.mockRestore();
   });
 
+  it("accepts wrapped anchor list responses", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ anchors: [{ id: "anc_1", kind: "character", label: "妈妈", image_url: "", reuse_count: 0, created_at: "2026-05-20T00:00:00Z" }] }), {
+        status: 200,
+      }),
+    );
+    await expect(listAnchors("character")).resolves.toEqual([
+      { id: "anc_1", kind: "character", label: "妈妈", image_url: "", reuse_count: 0, created_at: "2026-05-20T00:00:00Z" },
+    ]);
+    fetchSpy.mockRestore();
+  });
+
   it("creates and reuses with expected urls", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
     await createAnchor({ kind: "scene", label: "厨房", image_url: "" });
