@@ -22,6 +22,8 @@ from pathlib import Path
 import pytest
 
 from agent import server
+from agent.transport import notify
+from agent.workers import generation_worker
 
 
 class FakeWebSocket:
@@ -67,9 +69,12 @@ class FakeWebSocket:
 
 @pytest.fixture
 def isolated_ws(monkeypatch, tmp_path):
-    """每个 test 用独立 tmp DB + 干净 _ws_registry + 不启动 background worker。"""
+    """每个 test 用独立 tmp DB + 干净 _ws_registry + 不启动 background worker。
+
+    注:W4D3 重构后,_ws_registry 移到 agent.transport.notify;_start_worker 移到
+    agent.workers.generation_worker.start_workers。tests 直接 patch 那两个 module。
+    """
     db_path = tmp_path / "messages.db"
-    monkeypatch.setattr(server, "_DB_PATH", db_path, raising=False)
 
     # store.py 用 module-level _DB_PATH 常量,需要直接改它
     from agent import store
@@ -78,10 +83,10 @@ def isolated_ws(monkeypatch, tmp_path):
     monkeypatch.setattr(store, "_DB_DIR", tmp_path)
 
     # _ws_registry 是 module global dict,需要隔离避免 test 互相污染
-    monkeypatch.setattr(server, "_ws_registry", {})
+    monkeypatch.setattr(notify, "_ws_registry", {})
 
-    # _start_worker 启动 background task,test 里不需要
-    monkeypatch.setattr(server, "_start_worker", lambda: None)
+    # start_workers 启动 background tasks,test 里不需要
+    monkeypatch.setattr(generation_worker, "start_workers", lambda: None)
 
     yield
 
@@ -114,7 +119,7 @@ def test_auth_registers_user_during_call(isolated_ws):
 
     class HookedWS(FakeWebSocket):
         async def send(self, data):
-            captured["registry_keys"] = list(server._ws_registry.keys())
+            captured["registry_keys"] = list(notify._ws_registry.keys())
             await super().send(data)
 
     ws = HookedWS([json.dumps({"type": "auth", "user_id": "u1"})])
@@ -122,7 +127,7 @@ def test_auth_registers_user_during_call(isolated_ws):
 
     assert captured.get("registry_keys") == ["u1"]
     # handle 退出后会清理
-    assert "u1" not in server._ws_registry
+    assert "u1" not in notify._ws_registry
 
 
 def test_auth_missing_user_id_closes_4001(isolated_ws):

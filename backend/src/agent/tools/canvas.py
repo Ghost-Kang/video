@@ -672,13 +672,24 @@ def enqueue_generation(node_id: str) -> dict | None:
     return node
 
 
-def claim_pending_tasks() -> list[dict]:
-    """跨用户查询：获取所有 generation_status='pending' 的节点并原子认领。
-    仅在单 worker 场景下安全（asyncio 单线程）。"""
+def claim_pending_tasks(task_type: str | None = None) -> list[dict]:
+    """跨用户查询:获取所有 generation_status='pending' 的节点并原子认领。
+
+    Args:
+        task_type: 可选 node type 过滤。None = 所有 type;非 None 时 SQL 层过滤。
+                   配合 per-type worker(image/video/composite)使用,避免 worker 间互相认领。
+    asyncio 单线程下原子安全(sqlite3 同步调用,无 yield 点)。
+    """
     db = _db()
-    rows = db.execute(
-        "SELECT * FROM canvas_nodes WHERE generation_status='pending' ORDER BY rowid"
-    ).fetchall()
+    if task_type is None:
+        rows = db.execute(
+            "SELECT * FROM canvas_nodes WHERE generation_status='pending' ORDER BY rowid"
+        ).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT * FROM canvas_nodes WHERE generation_status='pending' AND type=? ORDER BY rowid",
+            (task_type,),
+        ).fetchall()
     tasks = [_row_to_node(r) for r in rows]
     # 批量标记为 submitted（中间态，避免被重复捡起）
     for t in tasks:
@@ -689,21 +700,32 @@ def claim_pending_tasks() -> list[dict]:
     db.commit()
     db.close()
     if tasks:
-        print(f"[队列] claim {len(tasks)} 个待生成任务")
+        label = task_type or "all"
+        print(f"[队列] claim {len(tasks)} 个待生成任务 (type={label})")
     return tasks
 
 
-def recover_generation_tasks() -> list[dict]:
-    """跨用户查询：获取所有未完成的生成任务（用于服务重启恢复）。
-    包括 submitted（已认领但未完成提交）和 polling（正在轮询）状态。"""
+def recover_generation_tasks(task_type: str | None = None) -> list[dict]:
+    """跨用户查询:获取所有未完成的生成任务(用于服务重启恢复)。
+
+    包括 submitted(已认领但未完成提交)和 polling(正在轮询)状态。
+    task_type 可选过滤,语义同 claim_pending_tasks。
+    """
     db = _db()
-    rows = db.execute(
-        "SELECT * FROM canvas_nodes WHERE generation_status IN ('submitted', 'polling') ORDER BY rowid"
-    ).fetchall()
+    if task_type is None:
+        rows = db.execute(
+            "SELECT * FROM canvas_nodes WHERE generation_status IN ('submitted', 'polling') ORDER BY rowid"
+        ).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT * FROM canvas_nodes WHERE generation_status IN ('submitted', 'polling') AND type=? ORDER BY rowid",
+            (task_type,),
+        ).fetchall()
     tasks = [_row_to_node(r) for r in rows]
     db.close()
     if tasks:
-        print(f"[队列] 恢复 {len(tasks)} 个未完成任务")
+        label = task_type or "all"
+        print(f"[队列] 恢复 {len(tasks)} 个未完成任务 (type={label})")
     return tasks
 
 

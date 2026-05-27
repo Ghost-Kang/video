@@ -4,7 +4,9 @@ import asyncio
 import json
 from typing import Iterable
 
-from agent import server
+from agent import server, store
+from agent.cascade import cost_guard
+from agent.workers import generation_worker
 
 
 class FakeWebSocket:
@@ -68,8 +70,8 @@ def _http_json_response(raw: bytes) -> tuple[int, dict]:
 
 
 def test_ws_list_sessions_without_thread_id(monkeypatch):
-    monkeypatch.setattr(server, "list_sessions", lambda user_id: [{"thread_id": f"{user_id}-t"}])
-    monkeypatch.setattr(server, "_start_worker", lambda: None)
+    monkeypatch.setattr(store, "list_sessions", lambda user_id: [{"thread_id": f"{user_id}-t"}])
+    monkeypatch.setattr(generation_worker, "start_workers", lambda: None)
     ws = FakeWebSocket([
         {"type": "auth", "user_id": "u1"},
         {"type": "list_sessions"},
@@ -92,9 +94,9 @@ def test_ws_delete_session_sends_refreshed_session_list(monkeypatch):
             return [{"thread_id": "t1"}]
         return []
 
-    monkeypatch.setattr(server, "list_sessions", list_sessions)
-    monkeypatch.setattr(server, "store_delete_session", lambda user_id, thread_id: deleted.append((user_id, thread_id)))
-    monkeypatch.setattr(server, "_start_worker", lambda: None)
+    monkeypatch.setattr(store, "list_sessions", list_sessions)
+    monkeypatch.setattr(store, "delete_session", lambda user_id, thread_id: deleted.append((user_id, thread_id)))
+    monkeypatch.setattr(generation_worker, "start_workers", lambda: None)
     ws = FakeWebSocket([
         {"type": "auth", "user_id": "u1"},
         {"type": "delete_session", "thread_id": "t1"},
@@ -121,7 +123,7 @@ def test_cost_status_accepts_user_id(monkeypatch):
     async def fake_cost_status(user_id: str, run_id: str):
         return {"user_id": user_id, "run_id": run_id, "run_cost_cny": 0.0, "user_pct": 0.0}
 
-    monkeypatch.setattr(server, "cost_status", fake_cost_status)
+    monkeypatch.setattr(cost_guard, "cost_status", fake_cost_status)
     reader = FakeReader(b"GET /api/cost/status?user_id=u1&run_id=r1 HTTP/1.1\r\nHost: test\r\n\r\n")
     writer = FakeWriter()
 

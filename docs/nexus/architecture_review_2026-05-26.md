@@ -302,23 +302,27 @@ canvas/node 域比 cascade contract 在 UI 里还核心,却是唯一没共享 sh
 
 ### Owner: Founder(决策点,本 cycle 必须回)
 
-#### Decision-1 · WS 类型镜像方式(影响 Claude-B / Codex-D / Codex-F)
-- **A** 手写镜像(cascade contract 已沿用此模式,零依赖)
-- **B** codegen(`datamodel-code-generator` + `make sync-ws-types`)
-- **推荐 A**:Phase 1 内测期手写够用;Phase 2 再考虑
-- **请回**:A / B / 其他
+#### Decision-1 · WS 类型镜像方式 → **B(codegen)** [2026-05-26]
+- **决策**:`datamodel-code-generator` + `make sync-ws-types`
+- **影响 task**:Claude-B 在写 Pydantic 时即开 codegen pipeline;Codex-D 消费 codegen 输出;Codex-F (canvas contract) 同走 codegen
+- **执行**:Claude-B 一并设置 `make sync-ws-types`(Pydantic → TS)
 
-#### Decision-2 · 生成 worker 拆分策略(P1-3)
-- 上下文:当前单 worker 串行处理 image/video/composite,60s 视频轮询卡所有图片提交。两个 creator 同跑视频 = 体感卡死。
-- 短期 S 修(必做):`asyncio.Semaphore` + 移除 `ContextVar`,加进 Claude-A 顺手做
-- 中期 L 决策:**现在按 task type 拆队列?还是挂"worker tick > 5s 持续"自动触发?**
-- **推荐**:短期修立即做;L 拆分挂触发条件(避免过度工程)
-- **请回**:短期修+挂触发条件 / 立刻拆 / 都不做
+#### Decision-2 · 生成 worker 拆分策略 → **立刻拆**(Update 2026-05-26)
+- **决策**:不挂触发条件,本 cycle 直接按 task type 拆 worker
+  - `image_worker`:轮询 image 类型 pending
+  - `video_worker`:轮询 video 类型 pending
+  - `composite_worker`:轮询 composite 类型 pending
+  - 每个 worker 独立 `asyncio.Task`,互不阻塞
+- **执行影响 Claude-A**:
+  - `agent/workers/generation_worker.py` 改为 orchestrator,启动 3 个 worker task
+  - `claim_pending_tasks` 加 `task_type` filter(canvas_tools 接口微改)
+  - Semaphore 在 image_worker 内做(image 多 + 快,需控并发);video/composite 单并发(慢任务自然串行)
+- **ContextVar 移除**仍走 **Claude-A2** 独立 commit(scope 太大,不绑入 Claude-A)
 
-#### Decision-3 · Codex 容量超载,要砍什么
-- Codex 本 cycle 5 task(C/D/E/F/G)+ 一份等 Claude-B
-- **推荐砍 G**(P3-1 StrEnum,纯洁癖,下 cycle 做)
-- **请回**:砍 G / 砍 F / 不动(让 Codex 加班)
+#### Decision-3 · Codex 容量超载 → **不动 (5 task 全做)** [2026-05-26]
+- **决策**:Codex C/D/E/F/G 本 cycle 全部交付
+- **风险**:G 是 S 但 C 是 M;若 cycle 末交不齐,优先级 C > E > F > D > G
+- **PM 跟进**:cycle 中段 checkin,看 Codex 进度;必要时 founder 重新决策延期项
 
 ---
 
