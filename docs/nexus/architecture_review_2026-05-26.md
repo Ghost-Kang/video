@@ -266,7 +266,7 @@ canvas/node 域比 cascade contract 在 UI 里还核心,却是唯一没共享 sh
 - 依赖:无
 - Effort:M
 
-#### Codex-D · P0-2 前端 WS 类型镜像(原 Cursor 任务)
+#### Codex-D · P0-2 前端 WS 类型镜像(原 Cursor 任务) ✅ `e7a94d6`
 - 范围:新增 `frontend/src/types/ws.ts`(镜像 Claude-B 的 Pydantic 模型)
 - 重写:`useWebSocket.ts` 的 12 个 `sendXxx` → `sendCommand<T extends WSInbound>(cmd: T)`
 - 验收:`grep -c "sendXxx" useWebSocket.ts` 收敛;类型错配会 tsc 编译错;smoke 全绿
