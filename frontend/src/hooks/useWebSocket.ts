@@ -76,12 +76,11 @@ export function useWebSocket(userId: string, onMessage: Handler) {
   }, [connect]);
 
   const sendCommand = useCallback(<T extends WSCommand>(payload: T) => {
+    // P3-2 cleanup: pendingRef 的 flush 只在 onopen 触发(单点),sendCommand 只决定
+    // "现发 vs 入队"。之前的双 flush(此处再迭代一次)在 OPEN 分支下 pendingRef 始终
+    // 为空,是 dead code + 误导;移除让 invariant 显式 — pendingRef 仅由 onopen 清空。
     const data = JSON.stringify(payload);
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      for (const msg of pendingRef.current) {
-        wsRef.current.send(msg);
-      }
-      pendingRef.current = [];
       wsRef.current.send(data);
     } else {
       console.log(`[WS] 排队 type=${payload.type}`);
