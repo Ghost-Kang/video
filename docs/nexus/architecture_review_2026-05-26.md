@@ -273,7 +273,7 @@ canvas/node 域比 cascade contract 在 UI 里还核心,却是唯一没共享 sh
 - 依赖:**等 Claude-B 出 Pydantic 模型**
 - Effort:S(半天,Claude-B 之后)
 
-#### Codex-E · P1-1 `cascade/storage.py` 增量拆分
+#### Codex-E · P1-1 `cascade/storage.py` 增量拆分 ✅ `95bf549`
 - 范围:`backend/src/agent/cascade/storage.py`(528 LOC)→
   ```
   cascade/persistence/{db, events_repo, analyses_repo, rewrites_repo, toprador_cache_repo}.py
@@ -284,14 +284,14 @@ canvas/node 域比 cascade contract 在 UI 里还核心,却是唯一没共享 sh
 - 依赖:无
 - Effort:M
 
-#### Codex-F · P2-2 Canvas node 跨端 contract
+#### Codex-F · P2-2 Canvas node 跨端 contract ✅ `a0da68c`
 - 范围:新增 `backend/src/agent/cascade/canvas_contract.py` + `frontend/src/types/canvas.ts`
 - 内容:Pydantic 定义 `CanvasNode` / `CanvasEdge` / `CanvasState`,镜像到 TS
 - 接入:`tools/canvas.py:_row_to_node` 返回模型;前端 `CanvasNode` 补齐 `feedback / generation_status / generation_task_id / generation_error`
 - 依赖:无
 - Effort:S
 
-#### Codex-G · P3-1 事件名 StrEnum(候选砍件)
+#### Codex-G · P3-1 事件名 StrEnum(候选砍件) ✅ `9433040`
 - 范围:`cascade/event_names.py` StrEnum;替换 `events.py` / `storage.py` / `analysis_service.py` 的字符串字面量
 - 验收:`grep "event_name = '"` 在 cascade 里返回 0
 - 依赖:无
