@@ -4,7 +4,13 @@ import type { WSCommand, WSEvent } from "../types/ws";
 
 type Handler = (res: WSEvent) => void;
 
-const WS_URL = `ws://${location.hostname}:8765`;
+// Dev (vite dev server): connect directly to backend :8765 (no proxy).
+// Prod (nginx behind https): same-origin /ws — nginx reverse-proxies to
+// backend:8765 with Upgrade header. Both Cloudflare Tunnel and direct
+// HTTPS deploys flow through this same /ws path.
+const WS_URL = import.meta.env.DEV
+  ? `ws://${location.hostname}:8765`
+  : `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 
@@ -38,7 +44,23 @@ export function useWebSocket(userId: string, onMessage: Handler) {
 
     ws.onopen = () => {
       console.log("[WS] 已连接, 发送 auth");
-      ws.send(JSON.stringify({ type: "auth", user_id: userId }));
+      // 邀请码从 localStorage 读取 — InviteCode page 写入后,所有 WS 重连
+      // 都自动携带。Backend 在 INVITE_CODES 非空时校验,空集放行。
+      let inviteCode: string | null = null;
+      try {
+        inviteCode =
+          localStorage.getItem("openrhtv_invite_code") ||
+          sessionStorage.getItem("openrhtv_invite_code");
+      } catch {
+        // private mode — fall through with null
+      }
+      ws.send(
+        JSON.stringify({
+          type: "auth",
+          user_id: userId,
+          ...(inviteCode ? { invite_code: inviteCode } : {}),
+        }),
+      );
       // W4D5-T1: 检测从 disconnected→connected 切回(retryRef>0 说明经历过断
       // 连),给宝妈一个正向反馈。第一次冷启 onopen 时 retryRef=0,不弹。
       const wasReconnect = retryRef.current > 0;

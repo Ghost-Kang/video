@@ -1,0 +1,53 @@
+# OpenRHTV Cascade — W5D2 deploy compose
+#
+# Single-host topology for cohort 内测 (5-10 creators).
+# Backend SQLite persisted on host volume; restart unless-stopped both.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cascade-backend
+    restart: unless-stopped
+    env_file:
+      - .env  # ARK_API_KEY, INVITE_CODES, CASCADE_UPSTREAM, etc.
+    environment:
+      # Sane prod defaults — override via .env if needed
+      CASCADE_UPSTREAM: ${CASCADE_UPSTREAM:-doubao_direct}
+      TOPRADOR_RESOLVER_MODE: ${TOPRADOR_RESOLVER_MODE:-douyin_share}
+    volumes:
+      - ./data:/app/data
+    # Backend binds 0.0.0.0:8765 + 0.0.0.0:8766 internally; we do NOT
+    # publish ports to host — nginx is the only ingress.
+    expose:
+      - "8765"
+      - "8766"
+    networks:
+      - cascade
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8766/api/events?limit=1', timeout=2)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cascade-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      # nginx listens on 80; cf tunnel / caddy points here.
+      # If running standalone with TLS, swap for 443 + mount cert volume.
+      - "80:80"
+    networks:
+      - cascade
+
+networks:
+  cascade:
+    driver: bridge

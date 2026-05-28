@@ -5,6 +5,7 @@ import "./index.css";
 import App from "./App";
 import { Login } from "./components/Login";
 import { Landing } from "./pages/Landing";
+import { InviteCode, readInviteCode } from "./pages/InviteCode";
 import { AnchorAnalytics } from "./pages/AnchorAnalytics";
 import { AdminCreators } from "./pages/AdminCreators";
 import { AdminEvents } from "./pages/AdminEvents";
@@ -33,6 +34,13 @@ function getChatRedirect(userId: string): string {
 
 function AppRoutes() {
   const [user, setUser] = useState<string | null>(() => localStorage.getItem("rhtv_user"));
+  // 内测准入门 — 全局,在 Landing 之前。一旦输入,localStorage 持久,后续 WS
+  // auth 自动带。真正准入判定在 backend 的 INVITE_CODES 集合,这里只是 UX。
+  const [inviteCode, setInviteCode] = useState<string | null>(() => readInviteCode());
+
+  if (!inviteCode) {
+    return <InviteCode onAccept={setInviteCode} />;
+  }
 
   // Phase 1 anon-consent bridge: useConsent.accept() writes rhtv_user
   // then dispatches this event so /chat becomes accessible without an

@@ -50,6 +50,14 @@ VOLC_MEDIAKIT_AK = os.getenv("VOLC_MEDIAKIT_AK", "")
 STRICT_CROSS_BORDER_REJECT = os.getenv("STRICT_CROSS_BORDER_REJECT", "1") == "1"
 
 # -------- S3 --------
+# -------- 内测准入 --------
+# Comma-separated list of valid invite codes. Empty = open access (dev mode).
+# Production deploy must set this; the WS auth handler rejects unknown codes
+# with close(4003) before any LangGraph spend.
+INVITE_CODES = frozenset(
+    c.strip() for c in os.getenv("INVITE_CODES", "").split(",") if c.strip()
+)
+
 S3_AK = os.getenv("S3_AK", "")
 S3_SK = os.getenv("S3_SK", "")
 S3_ENDPOINT = os.getenv("S3_ENDPOINT", "")

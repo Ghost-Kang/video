@@ -38,6 +38,9 @@ class _Base(BaseModel):
 class AuthMsg(_Base):
     type: Literal["auth"]
     user_id: str = Field(min_length=1)
+    # 内测准入码;production 部署时 backend 校验 in `config.INVITE_CODES`。
+    # Optional 因为 dev (INVITE_CODES 空) 不强制;backend gate 决定是否拒。
+    invite_code: str | None = None
 
 
 class ListSessionsMsg(_Base):

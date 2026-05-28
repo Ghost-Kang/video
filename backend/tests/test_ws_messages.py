@@ -62,6 +62,17 @@ class TestAuthMsg:
         with pytest.raises(ValidationError):
             AuthMsg.model_validate({"type": "not_auth", "user_id": "u1"})
 
+    def test_invite_code_optional(self):
+        # invite_code 可不传 — dev 模式无 gate;production gate 在 ws_server 层
+        msg = AuthMsg.model_validate({"type": "auth", "user_id": "u1"})
+        assert msg.invite_code is None
+
+    def test_invite_code_parsed(self):
+        msg = AuthMsg.model_validate(
+            {"type": "auth", "user_id": "u1", "invite_code": "CASCADE-2026"}
+        )
+        assert msg.invite_code == "CASCADE-2026"
+
 
 # ---------- ListSessionsMsg ----------
 

@@ -15,7 +15,7 @@ import json
 from pydantic import ValidationError
 from websockets.exceptions import ConnectionClosedOK
 
-from agent import store  # 通过 module 访问,方便 test monkeypatch
+from agent import config, store  # 通过 module 访问,方便 test monkeypatch
 from agent.pool import AgentPool
 from agent.tools import canvas as canvas_tools
 from agent.transport import notify
@@ -61,6 +61,12 @@ async def handle(websocket) -> None:
                 except ValidationError:
                     # 空 user_id / missing user_id / 多余字段 — 关闭(test 期望 4001)
                     await websocket.close(4001, "user_id required")
+                    return
+                # 内测准入码 gate — 仅在 INVITE_CODES 非空时强制 (production)。
+                # Dev/test 默认空集 = 任何 user 可接入,保留原行为。
+                if config.INVITE_CODES and auth.invite_code not in config.INVITE_CODES:
+                    print(f"[连接] 拒 user={auth.user_id} 无效 invite_code={auth.invite_code!r}")
+                    await websocket.close(4003, "invite code required")
                     return
                 user_id = auth.user_id
                 canvas_tools.set_user_id(user_id)
