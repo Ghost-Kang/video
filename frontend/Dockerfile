@@ -25,8 +25,11 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 # W5D3 — npm cache mount: keeps node_modules tarballs cached between builds,
 # so package-lock change only re-downloads incremental deltas.
+# 淘宝 mirror(registry.npmmirror.com)是阿里运维的官方 npm 镜像,跟腾讯云同
+# 网络区,首次 npm ci 也快。海外 CI 用 --build-arg NPM_REGISTRY= 覆盖回空。
+ARG NPM_REGISTRY=https://registry.npmmirror.com
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --no-audit --no-fund
+    npm ci --no-audit --no-fund --registry=${NPM_REGISTRY}
 
 COPY frontend/ ./
 RUN npm run build

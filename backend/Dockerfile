@@ -18,8 +18,15 @@ FROM python:3.12-slim AS builder
 # uv = fastest Python package manager. We pin to a known good version.
 # apt cache mount: rm of /var/lib/apt/lists is no longer needed since BuildKit
 # manages it via the cache mount; we still skip recommends to keep image small.
+# W5D3 — Debian apt 走 Aliyun 镜像(Tencent Cloud 同区,首次 build 也快)。
+# python:3.12-slim 当前基于 Debian Trixie,sources 用 Deb822 格式
+# (/etc/apt/sources.list.d/debian.sources)。老版本 Debian 用 sources.list,
+# 都 sed 一遍以兼容。`|| true` 保证 sources 文件不存在时不挂。
+ARG DEBIAN_MIRROR=https://mirrors.aliyun.com
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    (sed -i "s|http://deb.debian.org|${DEBIAN_MIRROR}|g" /etc/apt/sources.list.d/debian.sources 2>/dev/null || true) && \
+    (sed -i "s|http://deb.debian.org|${DEBIAN_MIRROR}|g" /etc/apt/sources.list 2>/dev/null || true) && \
     apt-get update && apt-get install -y --no-install-recommends \
       curl ca-certificates ffmpeg
 ADD https://astral.sh/uv/install.sh /uv-install.sh
