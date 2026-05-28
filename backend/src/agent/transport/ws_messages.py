@@ -265,6 +265,24 @@ class AnalysisAnswerReturnedEvent(_Base):
     answer: str
 
 
+class AnalysisFailedEvent(_Base):
+    """W5D3 — structured failure push (replaces fragile chat-message heuristic).
+
+    Whenever the agent runner / cascade tool catches a HardFailure or unhandled
+    exception in the analysis path, push this frame so the frontend can flip
+    ChatPanel into `failed` state directly. `payload` mirrors FailurePayload
+    in frontend/src/types/cascade.ts (code / hint / actions / request_id).
+    """
+
+    type: Literal["analysis_failed"]
+    thread_id: str
+    code: str  # FailureCode str value, e.g. "S4_SCENES_LEN_OUT_OF_RANGE"
+    hint: str  # human-readable Chinese, ≤200 chars
+    actions: list[str] = Field(default_factory=list)  # RecoveryAction enum values
+    request_id: str = ""
+    stage: str = "analysis"  # "analysis" | "rewrite" | "first_frame" | "ask"
+
+
 WSOutbound = Annotated[
     Union[
         ErrorEvent,
@@ -279,6 +297,7 @@ WSOutbound = Annotated[
         RewriteReturnedEvent,
         ShotFirstFrameReturnedEvent,
         AnalysisAnswerReturnedEvent,
+        AnalysisFailedEvent,
     ],
     Field(discriminator="type"),
 ]

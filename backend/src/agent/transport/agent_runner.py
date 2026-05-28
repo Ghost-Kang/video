@@ -107,6 +107,7 @@ async def run_agent(
         import traceback as _tb
         from agent.cascade.event_names import EventName as _EN
         from agent.cascade.events import emit as _emit
+        from agent.cascade.failures import HardFailure as _HF, FailureCode as _FC, RECOVERY_HINTS as _HINTS, RECOVERY_ACTIONS as _ACTIONS
         try:
             await _emit(
                 _EN.UNCAUGHT_EXCEPTION,
@@ -122,6 +123,37 @@ async def run_agent(
             )
         except Exception:
             pass  # never let observability error swallow the real error
+
+        # W5D3 — push structured `analysis_failed` WS frame so frontend
+        # ChatPanel flips into `failed` state directly (replaces fragile
+        # chat-message heuristic). Best-effort: failure of this push must
+        # not raise (founder may have already closed the WS).
+        try:
+            if isinstance(e, _HF):
+                code_val = e.code.value
+                hint_val = e.hint
+                actions_val = e.actions
+                request_id_val = e.request_id
+            else:
+                if type(e).__name__ == "TimeoutError" or "timeout" in str(e).lower():
+                    code_val = _FC.S7_UPSTREAM_TIMEOUT.value
+                else:
+                    code_val = _FC.S8_UPSTREAM_REFUSED.value
+                hint_val = _HINTS.get(code_val, "处理出错,请重试或换一条链接。")
+                actions_val = _ACTIONS.get(code_val, ["REPORT"])
+                request_id_val = ""
+            await send_json(
+                ws,
+                type="analysis_failed",
+                thread_id=thread_id,
+                code=code_val,
+                hint=hint_val,
+                actions=actions_val,
+                request_id=request_id_val,
+                stage="analysis",
+            )
+        except Exception:
+            pass
 
     try:
         await send_json(

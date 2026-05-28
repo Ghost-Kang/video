@@ -596,6 +596,10 @@ def _normalize_scenes(data: dict[str, Any], warnings: list[Warning_]) -> None:
     #  4. if any bump pushes a scene's end past the next scene's start, re-sort + warn
     duration_s = float(data.get("duration_s") or 0)
     any_clamped = False
+    # W5D2 fix: collect scenes that fail timestamp clamping and drop them at
+    # the end, instead of hard-failing the whole analysis. Live cohort hit
+    # this when Doubao emitted a scene at start >= duration_s.
+    drop_indices: list[int] = []
     for i, s in enumerate(normalized):
         try:
             start = float(s.get("timestamp_start", 0.0))
@@ -637,11 +641,21 @@ def _normalize_scenes(data: dict[str, Any], warnings: list[Warning_]) -> None:
             if duration_s > 0:
                 bumped = min(bumped, duration_s)
             if bumped <= new_start:
-                # Even the bump cannot produce a valid interval (start is at/beyond duration_s).
-                raise HardFailure(
-                    FailureCode.S4_SCENES_LEN_OUT_OF_RANGE,
-                    f"scenes[{i}] cannot produce non-zero duration within video length {duration_s}",
+                # W5D2: start >= duration_s — scene unsalvageable. Drop it
+                # instead of hard-failing the whole analysis. If after all
+                # drops we end up with < 3 scenes, the pad pass at the head
+                # will have already padded; if more scenes drop after pad,
+                # we re-pad at the end of this function.
+                warnings.append(
+                    Warning_(
+                        code=WarningCode.W18_SCENES_PADDED.value,
+                        field=f"scenes[{i}]",
+                        message=f"dropped: start {new_start} >= duration_s {duration_s}",
+                        severity=Severity.WARN,
+                    )
                 )
+                drop_indices.append(i)
+                continue
             warnings.append(
                 Warning_(
                     code=WarningCode.W12_TIMESTAMP_CLAMPED.value,
@@ -671,17 +685,46 @@ def _normalize_scenes(data: dict[str, Any], warnings: list[Warning_]) -> None:
                     severity=Severity.INFO,
                 )
             )
-        # If the clamped/bumped scenes still overlap, signal explicitly rather than letting
-        # Pydantic catch this as S5_INVALID_PAYLOAD.
+        # W5D2: instead of hard-failing on lingering overlap, snap scene i's
+        # start to scene i-1's end. Cohort beats correctness here — UI can
+        # render slightly-skewed timestamps fine, contract still validates.
         for i in range(1, len(normalized)):
-            if normalized[i]["timestamp_start"] < normalized[i - 1]["timestamp_end"]:
-                raise HardFailure(
-                    FailureCode.S4_SCENES_LEN_OUT_OF_RANGE,
-                    f"scenes[{i}] still overlaps after clamp; upstream timestamps inconsistent",
+            prev_end = normalized[i - 1]["timestamp_end"]
+            if normalized[i]["timestamp_start"] < prev_end:
+                warnings.append(
+                    Warning_(
+                        code=WarningCode.W12_TIMESTAMP_CLAMPED.value,
+                        field=f"scenes[{i}].timestamp_start",
+                        message=f"snapped from {normalized[i]['timestamp_start']} to prev end {prev_end}",
+                        severity=Severity.WARN,
+                    )
                 )
+                normalized[i]["timestamp_start"] = prev_end
+                if normalized[i]["timestamp_end"] <= prev_end:
+                    normalized[i]["timestamp_end"] = prev_end + 0.1
         # Re-index 1..N after sort
         for idx, s in enumerate(normalized, start=1):
             s["scene_index"] = idx
+
+    # Drop the unsalvageable scenes collected during the timestamp pass.
+    if drop_indices:
+        normalized = [s for i, s in enumerate(normalized) if i not in set(drop_indices)]
+        # Re-index 1..N after drop
+        for idx, s in enumerate(normalized, start=1):
+            s["scene_index"] = idx
+        # Post-drop pad — if drops left us below 3, clone last scene to hit min.
+        while len(normalized) < 3 and normalized:
+            clone = dict(normalized[-1])
+            clone["scene_index"] = len(normalized) + 1
+            normalized.append(clone)
+            warnings.append(
+                Warning_(
+                    code=WarningCode.W18_SCENES_PADDED.value,
+                    field="scenes",
+                    message=f"post-drop pad: added clone of last scene to reach min 3",
+                    severity=Severity.WARN,
+                )
+            )
 
     data["scenes"] = normalized
 
