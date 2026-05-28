@@ -17,10 +17,12 @@ RUN sh /uv-install.sh && rm /uv-install.sh
 ENV PATH="/root/.local/bin:$PATH"
 
 WORKDIR /app
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
-
+# COPY src BEFORE uv sync — uv sync builds the local "agent" package
+# (file:///app) and needs src/agent/__init__.py to exist before resolving.
+# Trades layer cache (any src edit invalidates uv sync) for correctness.
+COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
+RUN uv sync --frozen --no-dev
 
 # Persistent volume for SQLite + run logs
 VOLUME ["/app/data"]
