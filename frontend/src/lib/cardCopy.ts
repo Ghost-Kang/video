@@ -117,6 +117,25 @@ export const COPY = {
 
   // 状态 5(refine)输入框 placeholder — 替换原「想改哪里,直接说」
   side_refine_placeholder: "想改哪儿就告诉我,比如「开头再短一点」",
+
+  // ── 95% pin escape(W5D3 founder feedback)─────────────────────
+  // 进度条卡 95% 超过 90s 时,顶出来一段软提示。
+  pin_escape_warning: "比预期慢,要不要换一条试试?",
+  pin_escape_switch: "换一条",
+  pin_escape_wait: "继续等",
+
+  // ── 底部 dock(W5D3 layout reform)─────────────────────────────
+  dock_collapse_label: "收起对话",
+  dock_expand_label: "展开对话",
+  dock_history_label: "历史",
+  messages_overlay_title: "对话历史",
+  messages_overlay_close: "收起历史",
+  url_show_full: "展开完整链接",
+  url_show_short: "收起完整链接",
+
+  // 超时/系统繁忙的同义 hint — 用在前端启发式合成的 FailurePayload 上。
+  synth_failure_timeout_hint: "拆解超时了,刚才那条视频上游没响应。换一条样本试试,或者 1 分钟后再来一次。",
+  synth_failure_refused_hint: "上游暂时繁忙拒绝了这条,换一条样本试试。",
 } as const;
 
 /** Terms that must never appear in card-stack UI copy or DOM. */

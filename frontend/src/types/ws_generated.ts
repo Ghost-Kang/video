@@ -2,6 +2,7 @@
 
 export type Type = "auth";
 export type UserId = string;
+export type InviteCode = string | null;
 export type Type1 = "list_sessions";
 export type Type2 = "delete_session";
 export type ThreadId = string;
@@ -104,6 +105,13 @@ export type ThreadId20 = string;
 export type AnalysisId1 = string;
 export type Question = string;
 export type Answer = string;
+export type Type25 = "analysis_failed";
+export type ThreadId21 = string;
+export type Code1 = string;
+export type Hint = string;
+export type Actions = string[];
+export type RequestId = string;
+export type Stage = string;
 
 export interface WSMessages {
   WSInbound?:
@@ -132,12 +140,14 @@ export interface WSMessages {
     | AnalysisReturnedEvent
     | RewriteReturnedEvent
     | ShotFirstFrameReturnedEvent
-    | AnalysisAnswerReturnedEvent;
+    | AnalysisAnswerReturnedEvent
+    | AnalysisFailedEvent;
   [k: string]: unknown;
 }
 export interface AuthMsg {
   type: Type;
   user_id: UserId;
+  invite_code?: InviteCode;
 }
 export interface ListSessionsMsg {
   type: Type1;
@@ -313,4 +323,21 @@ export interface AnalysisAnswerReturnedEvent {
   analysis_id: AnalysisId1;
   question: Question;
   answer: Answer;
+}
+/**
+ * W5D3 — structured failure push (replaces fragile chat-message heuristic).
+ *
+ * Whenever the agent runner / cascade tool catches a HardFailure or unhandled
+ * exception in the analysis path, push this frame so the frontend can flip
+ * ChatPanel into `failed` state directly. `payload` mirrors FailurePayload
+ * in frontend/src/types/cascade.ts (code / hint / actions / request_id).
+ */
+export interface AnalysisFailedEvent {
+  type: Type25;
+  thread_id: ThreadId21;
+  code: Code1;
+  hint: Hint;
+  actions?: Actions;
+  request_id?: RequestId;
+  stage?: Stage;
 }

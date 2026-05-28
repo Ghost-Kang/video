@@ -4,6 +4,31 @@ import { useSessionStore } from "./sessionStore";
 import { useToastStore, type ToastAction } from "./toastStore";
 import type { WSEvent } from "../types/ws";
 import { mapRewriteShotsToScenes } from "../lib/cascadeMapper";
+import { COPY } from "../lib/cardCopy";
+import type { FailurePayload } from "../types/cascade";
+
+// W5D3 — agent_response 启发式:后端 HardFailure 现在落到一条普通 agent 消息
+// 里,前端拿不到 FailurePayload,ChatPanel 留在 running,导致 founder 看到的
+// "95% 进度 + 错误气泡 共存" 反模式。这里把内容匹配上"请求超时/处理出错/系统
+// 暂时繁忙"的 agent_response 合成一个 FailurePayload 推到 canvasStore,顺手
+// 把 loading 翻掉。后端零改动。
+//
+// 风险:正常 agent 回答里若包含这些关键词会被误判。所以加 `loading=true` 守卫
+// (只有在等响应时才合成,refine 阶段的 agent 回答不会被吃)。
+const TIMEOUT_PATTERN = /请求超时|处理出错|系统暂时繁忙/;
+const REFUSED_PATTERN = /系统暂时繁忙/;
+
+export function synthesizeFailureFromContent(content: string): FailurePayload {
+  const isRefused = REFUSED_PATTERN.test(content);
+  return {
+    code: isRefused ? "S8_UPSTREAM_REFUSED" : "S7_UPSTREAM_TIMEOUT",
+    hint: isRefused
+      ? COPY.synth_failure_refused_hint
+      : COPY.synth_failure_timeout_hint,
+    actions: ["RETRY_SAME_URL_AFTER_60S", "PICK_FROM_FEATURED"],
+    request_id: "(client-synth)",
+  };
+}
 
 
 // 把后端 invalid_command code 映射成宝妈看得懂的中文标题。
@@ -93,7 +118,19 @@ export const useWSStore = create<WSStore>((set, get) => ({
 
     switch (event.type) {
       case "agent_response": {
+        // W5D3 — 启发式合成 FailurePayload:仅当此前正在等响应(loading=true)
+        // 且内容命中超时/繁忙关键词时,推 setFailure 而非落到聊天历史。这样
+        // ChatPanel 立刻切到 failed 状态,不会和 95% 进度共存。
+        const wasLoading = get().loading;
         set({ loading: false, thinking: [] });
+        if (wasLoading && TIMEOUT_PATTERN.test(event.content)) {
+          queueMicrotask(() => {
+            useCanvasStore.getState().setFailure(synthesizeFailureFromContent(event.content));
+            useCanvasStore.setState({ streamingContent: "" });
+          });
+          if (event.canvas) queueMicrotask(() => canvas.setCanvas(event.canvas!));
+          break;
+        }
         const last = get();
         if (
           last.lastAnswerAt !== null &&
@@ -153,6 +190,25 @@ export const useWSStore = create<WSStore>((set, get) => ({
           thinking: [],
           lastAnswerAt: Date.now(),
           lastAnswerSnippet: event.answer.slice(0, 50),
+        });
+        break;
+      case "analysis_failed":
+        // W5D3 Risk 1 fix — structured failure push (replaces fragile
+        // chat-message heuristic). Backend agent_runner pushes this in
+        // exception handler with code + hint + actions + request_id.
+        // ChatPanel's `failed` state derives from canvasStore.failure being
+        // non-null,so this drives the UI directly without keyword matching.
+        set({ loading: false, thinking: [] });
+        queueMicrotask(() => {
+          useCanvasStore.getState().setFailure({
+            code: event.code as FailurePayload["code"],
+            hint: event.hint,
+            actions: event.actions as FailurePayload["actions"],
+            request_id: event.request_id || "",
+          });
+          // Clear any in-flight streaming so it doesn't visually compete
+          // with the failure banner.
+          useCanvasStore.setState({ streamingContent: "" });
         });
         break;
       case "prompt_optimized":

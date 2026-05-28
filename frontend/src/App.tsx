@@ -14,7 +14,7 @@ import { shouldHideProToggle, isAdminUser } from "./lib/proViewAccess";
 import { useCanvasStore } from "./store/canvasStore";
 import { useNicheStore, type NicheId } from "./store/nicheStore";
 import { useSessionStore } from "./store/sessionStore";
-import { useWSStore } from "./store/wsStore";
+import { useWSStore, synthesizeFailureFromContent } from "./store/wsStore";
 import type { WSEvent } from "./types/ws";
 function newSessionId() {
   return `session-${Date.now().toString(36)}`;
@@ -40,6 +40,7 @@ export default function App({ userId, onLogout }: AppProps) {
   const addMessage = useCanvasStore((s) => s.addMessage);
   const clearCanvas = useCanvasStore((s) => s.clear);
   const setCanvas = useCanvasStore((s) => s.setCanvas);
+  const setFailure = useCanvasStore((s) => s.setFailure);
   const thinking = useWSStore((s) => s.thinking);
   const loading = useWSStore((s) => s.loading);
   const dispatchWSEvent = useWSStore((s) => s.dispatch);
@@ -63,9 +64,12 @@ export default function App({ userId, onLogout }: AppProps) {
     setLoading(true);
     timerRef.current = setTimeout(() => {
       setLoading(false);
-      addMessage("agent", "请求超时，请检查后端是否正常运行");
+      // W5D3 — 把 App 级 300s 超时也走 setFailure,跟 wsStore 启发式保持一致。
+      // 用户看到的是 ChatPanel 的 failed 状态(banner + 重试样本),不会和
+      // 95% 进度条共存。
+      setFailure(synthesizeFailureFromContent("请求超时,请检查后端是否正常运行"));
     }, 300_000);
-  }, [addMessage, sendCommand, setLoading, tid]);
+  }, [addMessage, sendCommand, setFailure, setLoading, tid]);
   const actions = useNodeActions(tid, sendCommand, sendChatMessage);
   // Per-shot first-frame trigger. The bracket-prefix convention mirrors
   // `[selected_niche: ...]` — Director's §0.6 prompt picks up the cue and
@@ -137,23 +141,32 @@ export default function App({ userId, onLogout }: AppProps) {
     });
   }, [setSearchParams]);
   const proToggle = useMemo(() => isAdminUser(userId) ? toggleProView : undefined, [toggleProView, userId]);
+  // W5D3 layout reform — chat from right rail → bottom dock.
+  // Pro view (`?view=pro`) skips the dock entirely: it has its own Canvas
+  // and the dock would just stuff the screen. Mobile keeps the dock at
+  // bottom (full-width, collapsed-by-default toggle via `chatOpen`).
+  const showDock = !isProView;
   return (
     <div className="relative flex flex-col h-screen bg-[var(--color-paper)] dark:bg-stone-950 text-stone-900 dark:text-stone-100 transition-colors duration-500">
       <DarkModeToggle />
       <Header userId={userId} sessionName={names[tid] || "新会话"} connected={connected} connecting={connecting} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((v) => !v)} onNewSession={() => navigate(`/chat/${newSessionId()}`)} onLogout={onLogout} isProView={isProView} onToggleProView={proToggle} hideProToggle={shouldHideProToggle(userId)} />
-      <div className="flex flex-1 overflow-hidden">
-        {sidebarOpen && <Sidebar sessions={sessions} current={tid} names={names} onSwitch={switchSession} onRename={renameSession} onDelete={deleteSession} />}
-        {isProView ? (
-          <>
-            <Canvas onPositionChange={(pos) => sendCommand({ ...pos, thread_id: tid })} onCreateEdge={actions.handleCreateEdge} onDeleteEdge={actions.handleDeleteEdge} />
-            {selectedNodeId && <NodeDetail actions={actions} />}
-          </>
-        ) : <CardStack onGenerateFirstFrame={onGenerateFirstFrame} onTriggerRewrite={onTriggerRewrite} />}
-        {chatOpen ? <ChatPanel messages={messages} streaming={streaming} thinking={thinking} onSend={sendChatMessage} loading={loading} onToggleCollapse={() => setChatOpen(false)} /> : (
-          <button onClick={() => setChatOpen(true)} className="absolute bottom-6 right-6 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 dark:bg-[#7c2d12] text-[#faf8f3] shadow-[0_6px_20px_-4px_rgba(28,25,23,0.25)] dark:shadow-[0_6px_20px_-4px_rgba(124,45,18,0.5)] hover:scale-105 active:scale-95 transition-transform duration-200" title="问导演" type="button">
+      <div className="flex flex-1 overflow-hidden flex-col" data-testid="app-shell">
+        <div className="flex flex-1 overflow-hidden" data-testid="app-main-row">
+          {sidebarOpen && <Sidebar sessions={sessions} current={tid} names={names} onSwitch={switchSession} onRename={renameSession} onDelete={deleteSession} />}
+          {isProView ? (
+            <>
+              <Canvas onPositionChange={(pos) => sendCommand({ ...pos, thread_id: tid })} onCreateEdge={actions.handleCreateEdge} onDeleteEdge={actions.handleDeleteEdge} />
+              {selectedNodeId && <NodeDetail actions={actions} />}
+            </>
+          ) : <CardStack onGenerateFirstFrame={onGenerateFirstFrame} onTriggerRewrite={onTriggerRewrite} />}
+        </div>
+        {showDock && (chatOpen ? (
+          <ChatPanel messages={messages} streaming={streaming} thinking={thinking} onSend={sendChatMessage} loading={loading} onToggleCollapse={() => setChatOpen(false)} />
+        ) : (
+          <button onClick={() => setChatOpen(true)} className="absolute bottom-6 right-6 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 dark:bg-[#7c2d12] text-[#faf8f3] shadow-[0_6px_20px_-4px_rgba(28,25,23,0.25)] dark:shadow-[0_6px_20px_-4px_rgba(124,45,18,0.5)] hover:scale-105 active:scale-95 transition-transform duration-200" title="问导演" aria-label="问导演" type="button" data-testid="dock-fab">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 4h12M3 9h12M3 14h8" strokeLinecap="round" /></svg>
           </button>
-        )}
+        ))}
       </div>
     </div>
   );

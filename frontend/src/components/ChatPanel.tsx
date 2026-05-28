@@ -1,6 +1,4 @@
-import { useState, useRef, useEffect } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useState, useEffect } from "react";
 import { COPY } from "../lib/cardCopy";
 import { extractThreadId } from "../lib/errorReporter";
 import { useToastStore } from "../store/toastStore";
@@ -12,6 +10,7 @@ import {
   type ChatPanelState,
 } from "../lib/chatPanelState";
 import type { CascadeAnalysisContract, FailurePayload } from "../types/cascade";
+import { MessagesOverlay } from "./chat/MessagesOverlay";
 
 /**
  * W5D2-B: 内测期诊断 chip。点 → 把 user_id / thread_id / 最近一条 messages
@@ -75,13 +74,14 @@ export function ChatPanel({
   const [input, setInput] = useState("");
   const [askOpen, setAskOpen] = useState(false);
   const [askInput, setAskInput] = useState("");
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [messagesOverlayOpen, setMessagesOverlayOpen] = useState(false);
 
   // Store subscriptions — selector form keeps re-renders narrow. Test props,
   // when provided, fully replace the store values for that field.
   const storeAnalysis = useCanvasStore((s) => s.analysis);
   const storeScript = useCanvasStore((s) => s.script);
   const storeFailure = useCanvasStore((s) => s.failure);
+  const setFailure = useCanvasStore((s) => s.setFailure);
   const analysis = analysisProp !== undefined ? analysisProp : storeAnalysis;
   const script = scriptProp !== undefined ? scriptProp : storeScript;
   const failure = failureProp !== undefined ? failureProp : storeFailure;
@@ -95,8 +95,18 @@ export function ChatPanel({
   });
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "instant" });
-  }, [messages, streaming, thinking]);
+    const onKey = (event: KeyboardEvent) => {
+      const active = document.activeElement;
+      const typing =
+        active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
+      if (event.key === "Escape" && !typing) {
+        if (messagesOverlayOpen) setMessagesOverlayOpen(false);
+        else onToggleCollapse();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [messagesOverlayOpen, onToggleCollapse]);
 
   const handleSend = () => {
     if (!input.trim() || loading) return;
@@ -106,6 +116,8 @@ export function ChatPanel({
 
   const handleSampleUrl = (url: string) => {
     if (loading) return;
+    setFailure(null);
+    setMessagesOverlayOpen(false);
     onSend(url);
   };
 
@@ -136,13 +148,24 @@ export function ChatPanel({
   // refinement requests; every other state would either be useless or
   // confusing (e.g. typing during analysis).
   const showInput = state === "refine";
-  // Whether to render the running chat history. State 1 (idle) hides it —
-  // pre-paste there's nothing useful to show. States 2..5 all render history.
-  const showHistory = state !== "idle";
+  const hasHistory = messages.length > 0 || Boolean(streaming);
 
   return (
-    <div className="flex w-[360px] flex-col border-l border-stone-200/70 dark:border-stone-800/70 bg-[var(--color-paper)]/60 dark:bg-stone-950/60 backdrop-blur-md">
-      <div className="flex items-center justify-between border-b border-stone-200/70 dark:border-stone-800/70 px-5 py-4">
+    <>
+      {messagesOverlayOpen && (
+        <MessagesOverlay
+          messages={messages}
+          streaming={streaming}
+          onClose={() => setMessagesOverlayOpen(false)}
+        />
+      )}
+      <div
+        className="dock-chat flex w-full flex-col border-t border-stone-200/70 dark:border-stone-800/70 bg-[var(--color-paper)]/80 dark:bg-stone-950/80 backdrop-blur-md max-h-[50vh]"
+        data-testid="dock-chat"
+        data-state={state}
+        onMouseDown={() => setMessagesOverlayOpen(false)}
+      >
+      <div className="flex items-center justify-between border-b border-stone-200/70 dark:border-stone-800/70 px-5 py-2.5">
         <span
           className="font-serif-cn font-medium text-[14px] tracking-[-0.01em] text-stone-900 dark:text-stone-50"
           data-testid="side-title"
@@ -150,19 +173,35 @@ export function ChatPanel({
         >
           {TITLE_BY_STATE[state]}
         </span>
-        <button
-          onClick={onToggleCollapse}
-          className="flex h-6 w-6 items-center justify-center rounded text-stone-400 dark:text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
-          title="收起"
-          type="button"
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M5.5 3.5L11 8l-5.5 4.5" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-2">
+          {hasHistory && (
+            <button
+              type="button"
+              data-testid="history-toggle"
+              aria-expanded={messagesOverlayOpen}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => setMessagesOverlayOpen((open) => !open)}
+              className="rounded-full border border-stone-300 dark:border-stone-700 px-3 py-1 text-[11px] text-stone-600 dark:text-stone-400 hover:border-[#7c2d12] dark:hover:border-[#ea580c] hover:text-[#7c2d12] dark:hover:text-[#ea580c] transition-colors font-inherit"
+            >
+              {COPY.dock_history_label} ▲ ({messages.length})
+            </button>
+          )}
+          <button
+            onClick={onToggleCollapse}
+            onDoubleClick={onToggleCollapse}
+            className="flex h-6 w-6 items-center justify-center rounded text-stone-400 dark:text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 transition-colors cursor-grab active:cursor-grabbing"
+            title={COPY.dock_collapse_label}
+            aria-label={COPY.dock_collapse_label}
+            type="button"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M3.5 10.5L8 6l4.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 overflow-auto p-5">
+      <div className="flex flex-1 flex-col gap-3 overflow-hidden px-5 py-3">
         {/* State 1 — 等待粘链接。隐藏聊天历史(本来也是空的),给一段引导文案 + sample chips。 */}
         {state === "idle" && (
           <div
@@ -179,34 +218,8 @@ export function ChatPanel({
           </div>
         )}
 
-        {/* States 2..5 都显示聊天历史(分析答疑、refine 对话都在这里)。 */}
-        {showHistory &&
-          messages.map((m, i) => (
-            <div
-              key={i}
-              className={
-                m.role === "user"
-                  ? "self-end max-w-[85%] rounded-2xl rounded-br-sm bg-stone-900 dark:bg-[#7c2d12] px-3.5 py-2.5 text-[13px] leading-[1.55] text-[#faf8f3]"
-                  : "agent-msg self-start max-w-[85%] rounded-2xl rounded-bl-sm border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3 text-[13px] leading-[1.65] text-stone-900 dark:text-stone-100"
-              }
-            >
-              {m.role === "agent" ? (
-                <Markdown remarkPlugins={[remarkGfm]}>{m.content}</Markdown>
-              ) : (
-                m.content
-              )}
-            </div>
-          ))}
-
-        {/* Streaming bubble — Director text stream while still cooking. */}
-        {showHistory && streaming && (
-          <div className="agent-msg self-start max-w-[85%] rounded-2xl rounded-bl-sm border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3 text-[13px] leading-[1.65] text-stone-900 dark:text-stone-100">
-            <Markdown remarkPlugins={[remarkGfm]}>{streaming}</Markdown>
-          </div>
-        )}
-
         {/* State 2 — 拆解中。进度条 + 阶段 + 剩余秒。无输入框(中断没意义)。 */}
-        {state === "running" && !streaming && <AnalysisProgress thinking={thinking} />}
+        {state === "running" && <AnalysisProgress thinking={thinking} />}
 
         {/* State 3 — 出错了。banner + 「再试一条样本」+ 「告诉客服这条」。 */}
         {state === "failed" && failure && (
@@ -257,8 +270,6 @@ export function ChatPanel({
             </p>
           </div>
         )}
-
-        <div ref={bottomRef} />
       </div>
 
       <style>{`
@@ -396,6 +407,7 @@ export function ChatPanel({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
