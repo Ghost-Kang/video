@@ -17,6 +17,11 @@ RUN sh /uv-install.sh && rm /uv-install.sh
 ENV PATH="/root/.local/bin:$PATH"
 
 WORKDIR /app
+# W5D3 — 国内构建 PyPI 直连 50KB/s 且大量超时,切清华镜像后稳定 10MB/s+。
+# `UV_INDEX_URL` 是 uv 0.5+ / 老版本都认的环境变量。海外构建保持空字符串
+# 走默认 PyPI 即可(`UV_INDEX_URL_OVERRIDE` 设了优先级最高,留给海外 CI)。
+ARG UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ENV UV_INDEX_URL=${UV_INDEX_URL}
 # COPY src BEFORE uv sync — uv sync builds the local "agent" package
 # (file:///app) and needs src/agent/__init__.py to exist before resolving.
 # Trades layer cache (any src edit invalidates uv sync) for correctness.
