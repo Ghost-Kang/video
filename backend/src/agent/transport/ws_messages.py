@@ -265,6 +265,22 @@ class AnalysisAnswerReturnedEvent(_Base):
     answer: str
 
 
+class AnalysisProgressEvent(_Base):
+    """W5D3-T1 — push from _call_doubao_direct at stage boundaries so the
+    frontend AnalysisProgress can snap to real percent instead of estimating
+    from elapsed seconds. 4 stages cover the doubao_direct path:
+    resolve_url (5%) → ark_overlay (15→85%) → transcribe (90%) → done (100%).
+    Frontend falls back to time-based ramp when no events arrive (mediakit
+    path or older clients)."""
+
+    type: Literal["analysis_progress"]
+    thread_id: str
+    stage: str  # "resolve_url" | "ark_overlay" | "transcribe" | "done"
+    percent: int = Field(..., ge=0, le=100)
+    eta_seconds: int = Field(..., ge=0, le=300)
+    detail: str = Field("", max_length=120)
+
+
 class AnalysisFailedEvent(_Base):
     """W5D3 — structured failure push (replaces fragile chat-message heuristic).
 
@@ -298,6 +314,7 @@ WSOutbound = Annotated[
         ShotFirstFrameReturnedEvent,
         AnalysisAnswerReturnedEvent,
         AnalysisFailedEvent,
+        AnalysisProgressEvent,
     ],
     Field(discriminator="type"),
 ]

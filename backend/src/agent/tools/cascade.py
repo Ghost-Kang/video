@@ -59,6 +59,44 @@ async def _push_ws(payload: dict[str, Any]) -> None:
         pass
 
 
+async def _push_failure_frame(
+    code: str,
+    hint: str,
+    actions: list[str],
+    request_id: str = "",
+    stage: str = "analysis",
+) -> None:
+    """W5D3 Bug #2 — push structured analysis_failed WS frame from tool
+    HardFailure paths. Lets frontend setFailure cleanly without relying on
+    the agent_runner outer except (which only fires for uncaught exceptions,
+    not tools that catch HardFailure and return error dicts to the LLM)."""
+    ctx = get_run_ctx()
+    thread_id = ctx.get("thread_id")
+    if not thread_id:
+        return
+    await _push_ws(
+        {
+            "type": "analysis_failed",
+            "thread_id": thread_id,
+            "code": code,
+            "hint": hint,
+            "actions": actions,
+            "request_id": request_id,
+            "stage": stage,
+        }
+    )
+
+
+def _hardfailure_payload(exc: HardFailure) -> dict[str, Any]:
+    """Pack a HardFailure into the shape AnalysisFailedEvent expects."""
+    return {
+        "code": exc.code.value,
+        "hint": exc.hint,
+        "actions": list(exc.actions),
+        "request_id": exc.request_id,
+    }
+
+
 def _viral_text_for_niche_inference(contract: Any) -> str:
     """Concatenate the viral_analysis fields most likely to carry niche-signal hooks.
 
@@ -154,6 +192,10 @@ async def cascade_analyze(source_url: str) -> dict:
             run_id=run_id,
         )
     except HardFailure as exc:
+        # W5D3 Bug #2: also push structured WS frame so frontend setFailure
+        # fires (Director chat reply alone doesn't trigger failed state).
+        p = _hardfailure_payload(exc)
+        await _push_failure_frame(p["code"], p["hint"], p["actions"], p["request_id"], stage="analysis")
         return {
             "error": exc.code.value,
             "message": exc.hint or "分析失败，请稍后重试",
@@ -226,6 +268,8 @@ async def cascade_rewrite(analysis_id: str, niche: str) -> dict:
             "message": f"找不到 analysis_id={analysis_id}，请先 cascade_analyze",
         }
     except HardFailure as exc:
+        p = _hardfailure_payload(exc)
+        await _push_failure_frame(p["code"], p["hint"], p["actions"], p["request_id"], stage="rewrite")
         return {
             "error": exc.code.value,
             "message": exc.hint or "改写失败，请稍后重试",
@@ -324,6 +368,8 @@ async def cascade_generate_first_frame(rewrite_id: str, shot_index: int) -> dict
     try:
         await cost_guard(user_id=user_id, run_id=run_id or "anonymous", predicted_cost_cny=PREDICT_SHOT_IMAGE_CNY)
     except HardFailure as exc:
+        p = _hardfailure_payload(exc)
+        await _push_failure_frame(p["code"], p["hint"], p["actions"], p["request_id"], stage="first_frame")
         return {
             "error": exc.code.value,
             "message": exc.hint or "本轮额度不足，先把已生成的内容用起来",
@@ -490,6 +536,8 @@ async def cascade_ask(analysis_id: str, question: str) -> dict:
             predicted_cost_cny=PREDICT_ASK_CNY,
         )
     except HardFailure as exc:
+        p = _hardfailure_payload(exc)
+        await _push_failure_frame(p["code"], p["hint"], p["actions"], p["request_id"], stage="ask")
         return {
             "error": exc.code.value,
             "message": exc.hint or "本轮额度不足，先把已生成的内容用起来",

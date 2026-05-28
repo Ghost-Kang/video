@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useWSStore } from "../../store/wsStore";
 import { COPY } from "../../lib/cardCopy";
 import { useCanvasStore } from "../../store/canvasStore";
 import { synthesizeFailureFromContent } from "../../store/wsStore";
@@ -45,6 +46,15 @@ function stageFromThinking(thinking: string[], elapsed: number): Stage {
   return "finalize";
 }
 
+// W5D3-T1 — map backend stage string (analysis_progress.stage) to local Stage enum.
+function stageFromBackend(stage: string | null): Stage | null {
+  if (!stage) return null;
+  if (stage === "resolve_url") return "fetch";
+  if (stage === "ark_overlay") return "analyze";
+  if (stage === "transcribe" || stage === "done") return "finalize";
+  return null;
+}
+
 const STAGE_ORDER: Stage[] = ["fetch", "analyze", "finalize"];
 
 const STAGE_LABEL: Record<Stage, string> = {
@@ -72,18 +82,29 @@ export function AnalysisProgress({ thinking, startedAtMs }: Props) {
     return () => clearInterval(id);
   }, [reduced, startedAtMs]);
 
-  // 0..80% over TOTAL_ETA_SEC, then 80..95% asymptotic over next 60s.
+  // W5D3-T1 — prefer real backend progress when available; fall back to
+  // time-based ramp for older deploys / mediakit upstream / WS reconnect mid-run.
+  const realPercent = useWSStore((s) => s.progressPercent);
+  const realEta = useWSStore((s) => s.progressEta);
+  const realStageStr = useWSStore((s) => s.progressStage);
+  const realDetail = useWSStore((s) => s.progressDetail);
+
   let percent: number;
-  if (elapsed <= TOTAL_ETA_SEC) {
+  if (realPercent !== null && realPercent > 0) {
+    percent = Math.max(2, Math.min(100, realPercent));
+  } else if (elapsed <= TOTAL_ETA_SEC) {
     percent = (elapsed / TOTAL_ETA_SEC) * 80;
   } else {
     const extra = elapsed - TOTAL_ETA_SEC;
     percent = 80 + Math.min(15, (extra / 60) * 15);
   }
-  percent = Math.max(2, Math.min(95, percent));
+  percent = Math.max(2, Math.min(100, percent));
 
-  const remaining = Math.max(0, Math.round(TOTAL_ETA_SEC - elapsed));
-  const stage = stageFromThinking(thinking, elapsed);
+  const remaining =
+    realEta !== null && realEta >= 0
+      ? realEta
+      : Math.max(0, Math.round(TOTAL_ETA_SEC - elapsed));
+  const stage = stageFromBackend(realStageStr) ?? stageFromThinking(thinking, elapsed);
   const stageIdx = STAGE_ORDER.indexOf(stage);
 
   // 95% pin escape — 已经走到上限 % 且总耗时超阈值,且未在 snooze 窗口内。
@@ -188,6 +209,11 @@ export function AnalysisProgress({ thinking, startedAtMs }: Props) {
                 {done ? COPY.side_running_done_mark : COPY.side_running_pending_mark}
               </span>
               {STAGE_LABEL[s]}
+              {active && realDetail && (
+                <span className="ml-1.5 text-[11px] text-stone-500 dark:text-stone-400">
+                  · {realDetail}
+                </span>
+              )}
             </li>
           );
         })}

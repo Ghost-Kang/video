@@ -63,10 +63,15 @@ export default function App({ userId, onLogout }: AppProps) {
     sendCommand({ type: "user_message", thread_id: tid, content: text, selected_niche: niche ?? undefined });
     setLoading(true);
     timerRef.current = setTimeout(() => {
+      // W5D3 Bug #6 — 超时时必须同时清掉 loading 和 progress 残留,否则
+      // ChatPanel 收到 failed banner 后,后台还在播 "85% running..."。
       setLoading(false);
-      // W5D3 — 把 App 级 300s 超时也走 setFailure,跟 wsStore 启发式保持一致。
-      // 用户看到的是 ChatPanel 的 failed 状态(banner + 重试样本),不会和
-      // 95% 进度条共存。
+      useWSStore.setState({
+        progressStage: null,
+        progressPercent: null,
+        progressEta: null,
+        progressDetail: "",
+      });
       setFailure(synthesizeFailureFromContent("请求超时,请检查后端是否正常运行"));
     }, 300_000);
   }, [addMessage, sendCommand, setFailure, setLoading, tid]);

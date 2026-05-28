@@ -57,6 +57,19 @@ STRICT_CROSS_BORDER_REJECT = os.getenv("STRICT_CROSS_BORDER_REJECT", "1") == "1"
 INVITE_CODES = frozenset(
     c.strip() for c in os.getenv("INVITE_CODES", "").split(",") if c.strip()
 )
+# W5D3 Bug-smaller — if INVITE_CODES is empty *and* we look like a prod deploy
+# (ENV=prod or HOSTNAME contains "prod"), shout in stderr so an ops-by-mistake
+# open server gets caught at boot rather than after the first leaked WS auth.
+if not INVITE_CODES and (
+    os.getenv("ENV", "").lower() == "prod"
+    or "prod" in os.getenv("HOSTNAME", "").lower()
+):
+    import sys as _sys
+    print(
+        "[WARN] INVITE_CODES is empty in a prod-looking env — WS auth gate is OFF.",
+        file=_sys.stderr,
+        flush=True,
+    )
 
 S3_AK = os.getenv("S3_AK", "")
 S3_SK = os.getenv("S3_SK", "")

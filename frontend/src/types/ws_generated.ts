@@ -112,6 +112,12 @@ export type Hint = string;
 export type Actions = string[];
 export type RequestId = string;
 export type Stage = string;
+export type Type26 = "analysis_progress";
+export type ThreadId22 = string;
+export type Stage1 = string;
+export type Percent = number;
+export type EtaSeconds = number;
+export type Detail = string;
 
 export interface WSMessages {
   WSInbound?:
@@ -141,7 +147,8 @@ export interface WSMessages {
     | RewriteReturnedEvent
     | ShotFirstFrameReturnedEvent
     | AnalysisAnswerReturnedEvent
-    | AnalysisFailedEvent;
+    | AnalysisFailedEvent
+    | AnalysisProgressEvent;
   [k: string]: unknown;
 }
 export interface AuthMsg {
@@ -340,4 +347,20 @@ export interface AnalysisFailedEvent {
   actions?: Actions;
   request_id?: RequestId;
   stage?: Stage;
+}
+/**
+ * W5D3-T1 — push from _call_doubao_direct at stage boundaries so the
+ * frontend AnalysisProgress can snap to real percent instead of estimating
+ * from elapsed seconds. 4 stages cover the doubao_direct path:
+ * resolve_url (5%) → ark_overlay (15→85%) → transcribe (90%) → done (100%).
+ * Frontend falls back to time-based ramp when no events arrive (mediakit
+ * path or older clients).
+ */
+export interface AnalysisProgressEvent {
+  type: Type26;
+  thread_id: ThreadId22;
+  stage: Stage1;
+  percent: Percent;
+  eta_seconds: EtaSeconds;
+  detail?: Detail;
 }

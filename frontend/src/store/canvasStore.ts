@@ -111,12 +111,26 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
   setFailure: (failure) => set({ failure }),
 
   loadFromAnalysis: (analysis) =>
-    set({
-      analysis,
-      script: buildDefaultScript(analysis),
-      shots: analysis.scenes,
-      rewriteShots: [],
-      failure: null,
+    set((state) => {
+      // W5D3 Bug #7 — re-applying the same analysis (e.g. duplicate WS frame
+      // on reconnect, or a snapshot replay) must not nuke the rewrite the
+      // user just spent 60s producing. Only reset script/rewriteShots when
+      // the analysis_id actually changed.
+      const sameAnalysis =
+        state.analysis !== null && state.analysis.analysis_id === analysis.analysis_id;
+      return sameAnalysis
+        ? {
+            analysis,
+            shots: analysis.scenes,
+            failure: null,
+          }
+        : {
+            analysis,
+            script: buildDefaultScript(analysis),
+            shots: analysis.scenes,
+            rewriteShots: [],
+            failure: null,
+          };
     }),
 
   clear: () =>

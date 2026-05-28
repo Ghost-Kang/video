@@ -315,6 +315,34 @@ def _enforce_duration_guard(resolver_metadata: dict[str, Any]) -> None:
         )
 
 
+async def _emit_progress(stage: str, percent: int, eta: int, detail: str) -> None:
+    """W5D3-T1 — best-effort progress push. Reads ws/thread_id from
+    ContextVar (set by agent_runner before invoking the analyze tool).
+    Silent on any failure: progress is decoration, never the critical
+    path."""
+    try:
+        from agent.transport.runtime_ctx import get_run_ctx
+        from agent.transport.context import send_json
+        ctx = get_run_ctx()
+        if not ctx:
+            return
+        ws = ctx.get("ws")
+        thread_id = ctx.get("thread_id")
+        if ws is None or not thread_id:
+            return
+        await send_json(
+            ws,
+            type="analysis_progress",
+            thread_id=thread_id,
+            stage=stage,
+            percent=percent,
+            eta_seconds=eta,
+            detail=detail,
+        )
+    except Exception:
+        pass
+
+
 async def _call_doubao_direct(
     source_url: str,
     *,
@@ -329,10 +357,13 @@ async def _call_doubao_direct(
     (W15/W16) and confidence clamping (W11) still apply.
     """
     start = time.monotonic()
+    await _emit_progress("resolve_url", 5, 55, "拉抖音 CDN 直链")
     direct_url, resolver_metadata = await resolve_to_direct_media(source_url)
     _enforce_duration_guard(resolver_metadata)
 
+    await _emit_progress("ark_overlay", 15, 50, "送豆包视觉模型")
     raw = await analyze_video_direct(direct_url, user_id=user_id, run_id=run_id)
+    await _emit_progress("ark_overlay", 85, 8, "模型已返回")
     payload: dict[str, Any] = dict(raw) if isinstance(raw, dict) else {}
 
     # Inject contract envelope fields the model doesn't produce. Mirrors
@@ -350,6 +381,7 @@ async def _call_doubao_direct(
 
     payload["_upstream_latency_ms"] = int((time.monotonic() - start) * 1000)
     payload["_upstream_attempts"] = 1
+    await _emit_progress("done", 100, 0, "整理完成")
     return payload
 
 

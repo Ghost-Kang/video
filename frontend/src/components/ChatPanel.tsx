@@ -81,7 +81,6 @@ export function ChatPanel({
   const storeAnalysis = useCanvasStore((s) => s.analysis);
   const storeScript = useCanvasStore((s) => s.script);
   const storeFailure = useCanvasStore((s) => s.failure);
-  const setFailure = useCanvasStore((s) => s.setFailure);
   const analysis = analysisProp !== undefined ? analysisProp : storeAnalysis;
   const script = scriptProp !== undefined ? scriptProp : storeScript;
   const failure = failureProp !== undefined ? failureProp : storeFailure;
@@ -116,7 +115,10 @@ export function ChatPanel({
 
   const handleSampleUrl = (url: string) => {
     if (loading) return;
-    setFailure(null);
+    // W5D3 Bug #5: clear stale analysis/script/shots before a fresh
+    // sample run, else CardStack keeps rendering the PREVIOUS analysis's
+    // cards under the new running progress bar.
+    useCanvasStore.getState().clear();
     setMessagesOverlayOpen(false);
     onSend(url);
   };

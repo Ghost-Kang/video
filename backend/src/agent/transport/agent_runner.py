@@ -17,7 +17,7 @@ from agent.pool import AgentPool
 from agent.store import save_message
 from agent.tools import canvas as canvas_tools
 from agent.transport.context import canvas_data, send_json
-from agent.transport.runtime_ctx import set_run_ctx
+from agent.transport.runtime_ctx import RUN_CTX, set_run_ctx
 
 
 def extract_text(content) -> str:
@@ -48,18 +48,19 @@ async def run_agent(
     解析这个标记并跳过 "你想选哪个赛道?" 的追问。保留原文给画布消息历史,
     所以 store 里仍存原始 user_content,标记只进 agent stream。
     """
+    # W5D3 Bug #8 — capture Token so we can RUN_CTX.reset() in finally;
+    # otherwise concurrent WS sessions would leak ctx across turns. We must
+    # call set_run_ctx BEFORE the try so the token is in scope for finally.
+    _ctx_token = set_run_ctx({
+        "user_id": user_id,
+        "thread_id": thread_id,
+        "ws": ws,
+        "run_id": None,
+    })
     try:
         # agent 的 tool call 通过 ContextVar 读写正确的用户/会话数据
         canvas_tools.set_user_id(user_id)
         canvas_tools.set_thread_id(thread_id)
-        # Cascade tools (cascade_analyze / cascade_rewrite) 也通过 ContextVar 读
-        # ws/user_id/thread_id —— 见 transport/runtime_ctx.py 的 contract 注释。
-        set_run_ctx({
-            "user_id": user_id,
-            "thread_id": thread_id,
-            "ws": ws,
-            "run_id": None,
-        })
         save_message(user_id, thread_id, "user", user_content)
         entry = await pool.get(thread_id)
 
@@ -99,8 +100,12 @@ async def run_agent(
         reply = full_reply or "（未生成回复）"
         save_message(user_id, thread_id, "agent", reply)
     except Exception as e:
-        reply = f"处理出错: {e}"
-        save_message(user_id, thread_id, "agent", reply)
+        # W5D3 Bug #4: don't leak raw exception str (may contain file paths /
+        # internal URLs) into chat history. Push structured analysis_failed
+        # frame below; suppress the trailing agent_response by setting a
+        # sentinel that the post-except send block detects.
+        reply = "__cascade_failed_sentinel__"
+        save_message(user_id, thread_id, "agent", f"处理出错: {e}")  # persist for /admin/events
         print(f"[错误] thread={thread_id} {e}")
         # W5D2 observability — persist the traceback to events.db so
         # /admin/events can surface it (don't only rely on docker logs).
@@ -154,17 +159,40 @@ async def run_agent(
             )
         except Exception:
             pass
+    finally:
+        # W5D3 Bug #8 — reset the ContextVar so it doesn't leak into the next
+        # asyncio task on the same WS connection. Without this, two
+        # concurrent run_agent calls (e.g. founder hitting send twice fast)
+        # would observe stale ws/thread_id in tools.
+        try:
+            RUN_CTX.reset(_ctx_token)
+        except Exception:
+            pass
 
-    try:
-        await send_json(
-            ws,
-            type="agent_response",
-            thread_id=thread_id,
-            content=reply,
-            canvas=canvas_data(thread_id),
-        )
-    except (ConnectionClosedOK, Exception):
-        pass
+    # W5D3 Bug #4: when reply is the failure sentinel, skip agent_response;
+    # frontend already got the structured analysis_failed frame above. Still
+    # push canvas snapshot so anchor/canvas state stays consistent.
+    if reply == "__cascade_failed_sentinel__":
+        try:
+            await send_json(
+                ws,
+                type="canvas_updated",
+                thread_id=thread_id,
+                canvas=canvas_data(thread_id),
+            )
+        except Exception:
+            pass
+    else:
+        try:
+            await send_json(
+                ws,
+                type="agent_response",
+                thread_id=thread_id,
+                content=reply,
+                canvas=canvas_data(thread_id),
+            )
+        except (ConnectionClosedOK, Exception):
+            pass
 
 
 async def optimize_prompt(node_id: str, prompt: str, feedback: str) -> str:

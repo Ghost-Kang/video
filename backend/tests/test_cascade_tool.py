@@ -228,8 +228,14 @@ class TestCascadeAnalyze:
 
         assert result["error"] == "S8_UPSTREAM_REFUSED"
         assert "繁忙" in result["message"]
-        # No WS push on failure
-        assert ws.sent == []
+        # W5D3 Bug #2 — HardFailure now pushes a structured `analysis_failed`
+        # frame so frontend ChatPanel can flip into `failed` state without
+        # waiting for the Director's text reply.
+        assert len(ws.sent) == 1
+        frame = ws.sent[0]
+        assert frame["type"] == "analysis_failed"
+        assert frame["code"] == "S8_UPSTREAM_REFUSED"
+        assert frame["stage"] == "analysis"
 
     def test_no_ws_in_ctx_returns_data_without_push(self, monkeypatch):
         # ws missing → tool should still return data, just no push
@@ -506,7 +512,11 @@ class TestCascadeGenerateFirstFrame:
 
         assert result["error"] == "S8_UPSTREAM_REFUSED"
         assert provider.calls == []
-        assert ws.sent == []
+        # W5D3 Bug #2 — cost-guard HardFailure now pushes analysis_failed
+        # (stage="first_frame") so ChatPanel can surface the refusal directly.
+        assert len(ws.sent) == 1
+        assert ws.sent[0]["type"] == "analysis_failed"
+        assert ws.sent[0]["stage"] == "first_frame"
 
 
 # ---------- cascade_ask (W4D5) ----------
@@ -634,7 +644,11 @@ class TestCascadeAsk:
 
         assert result["error"] == "S8_UPSTREAM_REFUSED"
         assert llm_called["hit"] is False
-        assert ws.sent == []
+        # W5D3 Bug #2 — HardFailure pushes structured analysis_failed frame
+        # (stage="ask") even when cost guard blocks before LLM spend.
+        assert len(ws.sent) == 1
+        assert ws.sent[0]["type"] == "analysis_failed"
+        assert ws.sent[0]["stage"] == "ask"
 
     def test_llm_failure_maps_s8(self, monkeypatch):
         ws = FakeWS()

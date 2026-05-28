@@ -26,7 +26,7 @@ export function synthesizeFailureFromContent(content: string): FailurePayload {
       ? COPY.synth_failure_refused_hint
       : COPY.synth_failure_timeout_hint,
     actions: ["RETRY_SAME_URL_AFTER_60S", "PICK_FROM_FEATURED"],
-    request_id: "(client-synth)",
+    request_id: "",
   };
 }
 
@@ -70,6 +70,12 @@ interface WSStore {
   reconnectAttempt: number;
   lastAnswerAt: number | null;
   lastAnswerSnippet: string | null;
+  // W5D3-T1 — real progress from backend `analysis_progress` WS frame.
+  // Null = no event yet,前端 fall back to time-based ramp。
+  progressStage: string | null;
+  progressPercent: number | null;
+  progressEta: number | null;
+  progressDetail: string;
   setCurrentThreadId: (threadId: string) => void;
   setLoading: (loading: boolean) => void;
   resetThinking: () => void;
@@ -86,9 +92,27 @@ export const useWSStore = create<WSStore>((set, get) => ({
   reconnectAttempt: 0,
   lastAnswerAt: null,
   lastAnswerSnippet: null,
+  progressStage: null,
+  progressPercent: null,
+  progressEta: null,
+  progressDetail: "",
 
   setCurrentThreadId: (threadId) => set({ currentThreadId: threadId }),
-  setLoading: (loading) => set({ loading }),
+  setLoading: (loading) => {
+    // W5D3 Bug #1: starting a new run must reset stale progress state
+    // from prior analysis (else AnalysisProgress paints 100% instantly).
+    if (loading) {
+      set({
+        loading: true,
+        progressStage: null,
+        progressPercent: null,
+        progressEta: null,
+        progressDetail: "",
+      });
+    } else {
+      set({ loading: false });
+    }
+  },
   resetThinking: () => set({ thinking: [] }),
   setConnectionStatus: (status) =>
     set((state) => ({
@@ -164,13 +188,34 @@ export const useWSStore = create<WSStore>((set, get) => ({
         }
         break;
       case "analysis_returned":
-        // cascade_analyze tool 完成 → 装上分析卡。脚本/分镜先不动,等 rewrite 才覆盖。
+        // cascade_analyze tool 完成 → 装上分析卡 + 清 loading 让 ChatPanel
+        // 切到 ready 状态。W5D3 bug: 之前没清 loading,dock 永远卡 95%
+        // 进度条 + pin escape 误触发。
+        set({
+          loading: false,
+          thinking: [],
+          progressStage: "done",
+          progressPercent: 100,
+          progressEta: 0,
+          progressDetail: "",
+        });
         queueMicrotask(() => {
           useCanvasStore.getState().loadFromAnalysis(event.analysis);
         });
         break;
       case "rewrite_returned":
         // cascade_rewrite 完成 → 只替换改写结果,保留源视频每一幕。
+        // W5D3 Bug #3: 清 loading + progress, 否则 ChatPanel 卡 running
+        // (loading > refine 优先级), AnalysisProgress 用 stale 100%
+        // 触发 pin escape 误报。
+        set({
+          loading: false,
+          thinking: [],
+          progressStage: null,
+          progressPercent: null,
+          progressEta: null,
+          progressDetail: "",
+        });
         queueMicrotask(() => {
           const { setScript, setRewriteShots } = useCanvasStore.getState();
           setScript(event.rewrite.script_markdown);
@@ -190,6 +235,19 @@ export const useWSStore = create<WSStore>((set, get) => ({
           thinking: [],
           lastAnswerAt: Date.now(),
           lastAnswerSnippet: event.answer.slice(0, 50),
+        });
+        break;
+      case "analysis_progress":
+        // W5D3-T1 — replaces fake progress estimation in AnalysisProgress.
+        // backend pushes 4 stages: resolve_url (5%) → ark_overlay (15→85%)
+        // → transcribe (90% — currently not emitted by doubao_direct path,
+        // reserved) → done (100%). When stage="done", clear loading so the
+        // pin escape doesn't fire.
+        set({
+          progressStage: event.stage,
+          progressPercent: event.percent,
+          progressEta: event.eta_seconds,
+          progressDetail: event.detail,
         });
         break;
       case "analysis_failed":

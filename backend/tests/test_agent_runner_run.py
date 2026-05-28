@@ -207,8 +207,9 @@ class TestEmptyAndErrorPaths:
         final = [m for m in ws.sent if m.get("type") == "agent_response"][0]
         assert final["content"] == "hello world"
 
-    def test_stream_exception_still_sends_agent_response(self, saved_messages, stub_canvas_data):
-        """astream 抛异常时不应让前端 hang — 应回 agent_response 带错误描述。"""
+    def test_stream_exception_pushes_structured_failure(self, saved_messages, stub_canvas_data):
+        """W5D3 Bug #4 — astream 抛异常时,改推 analysis_failed + canvas_updated,
+        不再把 raw exception 灌进 agent_response chat 历史(怕泄漏文件路径/内部 URL)。"""
 
         class ExplodingAgent:
             async def astream(self, _input, *, config, stream_mode, version):
@@ -220,12 +221,19 @@ class TestEmptyAndErrorPaths:
         # run_agent 内部 try/except 接住,不应冒泡
         asyncio.run(run_agent("u1", pool, "t1", "hi", ws))
 
+        # 新契约:不再发 agent_response,而是发 analysis_failed + canvas_updated。
         finals = [m for m in ws.sent if m.get("type") == "agent_response"]
-        assert len(finals) == 1
-        assert "处理出错" in finals[0]["content"]
-        assert "upstream gone" in finals[0]["content"]
+        assert finals == []
 
-        # save_message 仍写了 agent 错误回复(便于历史展示)
+        failed = [m for m in ws.sent if m.get("type") == "analysis_failed"]
+        assert len(failed) == 1
+        # raw exc message 不该出现在用户可见的 hint 里
+        assert "upstream gone" not in failed[0]["hint"]
+
+        canvases = [m for m in ws.sent if m.get("type") == "canvas_updated"]
+        assert len(canvases) == 1
+
+        # save_message 仍写了 agent 错误回复(便于 /admin/events 检索)
         agent_save = [c for c in saved_messages if c[2] == "agent"]
         assert "处理出错" in agent_save[0][3]
 

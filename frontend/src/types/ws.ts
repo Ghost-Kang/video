@@ -36,6 +36,7 @@ export type {
   ShotFirstFrameReturnedEvent,
   AnalysisAnswerReturnedEvent,
   AnalysisFailedEvent,
+  AnalysisProgressEvent,
 } from "./ws_generated";
 
 import type {
@@ -65,6 +66,7 @@ import type {
   ShotFirstFrameReturnedEvent,
   AnalysisAnswerReturnedEvent,
   AnalysisFailedEvent,
+  AnalysisProgressEvent,
 } from "./ws_generated";
 import type { CanvasData } from "./canvas";
 import type { CascadeAnalysisContract } from "./cascade";
@@ -148,4 +150,5 @@ export type WSEvent =
   | RewriteReturnedEventTyped
   | ShotFirstFrameReturnedEvent
   | AnalysisAnswerReturnedEvent
-  | AnalysisFailedEvent;
+  | AnalysisFailedEvent
+  | AnalysisProgressEvent;
