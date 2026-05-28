@@ -10,9 +10,48 @@ import { AnchorAnalytics } from "./pages/AnchorAnalytics";
 import { AdminCreators } from "./pages/AdminCreators";
 import { AdminEvents } from "./pages/AdminEvents";
 import { AdminCost } from "./pages/AdminCost";
+import { AdminHealth } from "./pages/AdminHealth";
 import { LegalDoc } from "./pages/LegalDoc";
 import { ConnectionBanner } from "./components/feedback/ConnectionBanner";
+import { ErrorBoundary } from "./components/feedback/ErrorBoundary";
 import { ToastContainer } from "./components/feedback/ToastContainer";
+import { reportClientError, extractThreadId } from "./lib/errorReporter";
+
+// W5D2-E: 浏览器端 Sentry-lite。在所有 React tree 挂载前装好,捕获:
+//   - window 'error' — script 抛出的 sync error / asset load 失败
+//   - window 'unhandledrejection' — Promise reject 无 catch
+// 失败静默(reporter 自身保证),不阻塞主线程,1 分钟内同 (kind+msg) 去重。
+if (typeof window !== "undefined") {
+  window.addEventListener("error", (e: ErrorEvent) => {
+    reportClientError({
+      kind: "window_error",
+      message: e.message || "(no message)",
+      stack: e.error?.stack,
+      filename: e.filename,
+      lineno: e.lineno,
+      colno: e.colno,
+      url: location.href,
+      user_id: localStorage.getItem("rhtv_user"),
+      thread_id: extractThreadId(location.pathname),
+      ua: navigator.userAgent.slice(0, 200),
+    });
+  });
+  window.addEventListener("unhandledrejection", (e: PromiseRejectionEvent) => {
+    const reason = e.reason;
+    const message =
+      reason instanceof Error ? reason.message : String(reason ?? "(no reason)");
+    const stack = reason instanceof Error ? reason.stack : undefined;
+    reportClientError({
+      kind: "unhandled_rejection",
+      message,
+      stack,
+      url: location.href,
+      user_id: localStorage.getItem("rhtv_user"),
+      thread_id: extractThreadId(location.pathname),
+      ua: navigator.userAgent.slice(0, 200),
+    });
+  });
+}
 
 function newSessionId() {
   return `session-${Date.now().toString(36)}`;
@@ -70,6 +109,7 @@ function AppRoutes() {
       <Route path="/admin/creators" element={<AdminCreators />} />
       <Route path="/admin/events" element={<AdminEvents />} />
       <Route path="/admin/cost" element={<AdminCost />} />
+      <Route path="/admin/health" element={<AdminHealth />} />
 
       {/* Authed routes (upstream 66758bd: WS auth + multi-user isolation) */}
       <Route
@@ -93,7 +133,9 @@ function AppRoutes() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
-      <AppRoutes />
+      <ErrorBoundary>
+        <AppRoutes />
+      </ErrorBoundary>
       <ConnectionBanner />
       <ToastContainer />
     </BrowserRouter>

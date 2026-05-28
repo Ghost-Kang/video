@@ -83,6 +83,40 @@ export const COPY = {
   ask_placeholder: "比如:这条 BGM 给人什么感觉?",
   ask_submit: "发问",
   ask_hint: "针对刚才的分析提任何问题",
+
+  // ── 右侧面板 5 状态(W5D3 重设计)─────────────────────────────
+  // 状态标题 — 替换原来的「问导演」,告诉用户「右侧现在能干什么」
+  side_title_idle: "先发一条链接",
+  side_title_running: "正在拆解…",
+  side_title_failed: "这条没拿下,换一条试试",
+  side_title_ready: "分析好了 →",
+  side_title_refine: "想改哪儿就告诉我",
+
+  // 状态 1:等待粘链接
+  side_idle_hint: "贴一条爆款链接,我先帮你拆解为什么火",
+  side_idle_sample_label: "或者直接挑一条试试",
+
+  // 状态 2:拆解中(进度可视化)
+  side_running_eta_prefix: "约 ",
+  side_running_eta_suffix: " 秒",
+  side_running_finishing: "马上好了…",
+  side_running_stage_fetch: "解析链接",
+  side_running_stage_analyze: "拆解视频",
+  side_running_stage_finalize: "整理输出",
+  side_running_done_mark: "✓",
+  side_running_pending_mark: "○",
+
+  // 状态 3:出错了
+  side_failed_retry_sample: "再试一条样本",
+  side_failed_report: "告诉客服这条",
+  side_failed_code_prefix: "错误代码 ",
+
+  // 状态 4:分析好了,等用户决定改写方向
+  side_ready_headline: "分析好了,要改成你自己的吗?",
+  side_ready_hint: "去左侧卡片底部挑一个方向(宝妈辅食 / 育儿日常 / 家庭厨房),我帮你改",
+
+  // 状态 5(refine)输入框 placeholder — 替换原「想改哪里,直接说」
+  side_refine_placeholder: "想改哪儿就告诉我,比如「开头再短一点」",
 } as const;
 
 /** Terms that must never appear in card-stack UI copy or DOM. */

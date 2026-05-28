@@ -2,7 +2,43 @@ import { useState, useRef, useEffect } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { COPY } from "../lib/cardCopy";
+import { extractThreadId } from "../lib/errorReporter";
+import { useToastStore } from "../store/toastStore";
+import { useCanvasStore } from "../store/canvasStore";
 import { SampleUrlChips } from "./onboarding/SampleUrlChips";
+import { AnalysisProgress } from "./chat/AnalysisProgress";
+import {
+  deriveChatPanelState,
+  type ChatPanelState,
+} from "../lib/chatPanelState";
+import type { CascadeAnalysisContract, FailurePayload } from "../types/cascade";
+
+/**
+ * W5D2-B: 内测期诊断 chip。点 → 把 user_id / thread_id / 最近一条 messages
+ * 前 80 字 / UA / URL / 时间打包到剪贴板,创作者发给客服,founder 就能在
+ * events.db 里精准检索。**不抢视觉**:输入框下方,跟「发送」一行右边的小
+ * 灰链接,字号小一档,无 border。
+ */
+function buildDiagnostic(lastUserVisibleMessage: string | undefined): string {
+  const userId =
+    typeof localStorage !== "undefined" ? localStorage.getItem("rhtv_user") : null;
+  const threadId =
+    typeof location !== "undefined" ? extractThreadId(location.pathname) : null;
+  const ua =
+    typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 80) : "";
+  const url = typeof location !== "undefined" ? location.href : "";
+  const lastMsg = (lastUserVisibleMessage ?? "").slice(0, 80);
+  return [
+    "=== Cascade 诊断信息 ===",
+    `user_id: ${userId ?? "(未登录)"}`,
+    `thread_id: ${threadId ?? "(非对话页)"}`,
+    `最近消息: ${lastMsg}`,
+    `浏览器: ${ua}`,
+    `URL: ${url}`,
+    `时间: ${new Date().toISOString()}`,
+    "=========================",
+  ].join("\n");
+}
 
 interface Props {
   messages: { role: "user" | "agent"; content: string }[];
@@ -11,47 +47,56 @@ interface Props {
   onSend: (text: string) => void;
   loading: boolean;
   onToggleCollapse: () => void;
+  /** Optional overrides for tests; default to canvasStore values. */
+  analysis?: CascadeAnalysisContract | null;
+  script?: string;
+  failure?: FailurePayload | null;
 }
 
-function CascadeLoading({ thinking }: { thinking: string[] }) {
-  const recent = thinking.slice(-3);
-  return (
-    <div className="self-start rounded-2xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 px-4 py-3 max-w-[90%] shadow-soft">
-      <div className="flex items-center gap-1.5 mb-2" aria-hidden>
-        <span className="inline-block h-1.5 w-1.5 rounded-full bg-stone-400 dark:bg-stone-500 animate-bounce [animation-delay:-0.3s]" />
-        <span className="inline-block h-1.5 w-1.5 rounded-full bg-stone-400 dark:bg-stone-500 animate-bounce [animation-delay:-0.15s]" />
-        <span className="inline-block h-1.5 w-1.5 rounded-full bg-stone-400 dark:bg-stone-500 animate-bounce" />
-      </div>
-      <p className="font-serif-cn text-sm text-stone-900 dark:text-stone-100 mb-1">
-        Cascade 正在拆解…
-      </p>
-      {recent.length > 0 ? (
-        <ul className="text-xs space-y-1 mt-2 text-stone-600 dark:text-stone-400">
-          {recent.map((t, i) => (
-            <li key={i} className={i === recent.length - 1 ? "text-stone-500 dark:text-stone-500" : "text-stone-700 dark:text-stone-300"}>
-              <span className="text-stone-400 dark:text-stone-600 mr-1.5">{i === recent.length - 1 ? "○" : "✓"}</span>
-              {t}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">大约 30 秒</p>
-      )}
-    </div>
-  );
-}
+const TITLE_BY_STATE: Record<ChatPanelState, string> = {
+  idle: COPY.side_title_idle,
+  running: COPY.side_title_running,
+  failed: COPY.side_title_failed,
+  ready: COPY.side_title_ready,
+  refine: COPY.side_title_refine,
+};
 
-export function ChatPanel({ messages, streaming, thinking, onSend, loading, onToggleCollapse }: Props) {
+export function ChatPanel({
+  messages,
+  streaming,
+  thinking,
+  onSend,
+  loading,
+  onToggleCollapse,
+  analysis: analysisProp,
+  script: scriptProp,
+  failure: failureProp,
+}: Props) {
   const [input, setInput] = useState("");
   const [askOpen, setAskOpen] = useState(false);
   const [askInput, setAskInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Store subscriptions — selector form keeps re-renders narrow. Test props,
+  // when provided, fully replace the store values for that field.
+  const storeAnalysis = useCanvasStore((s) => s.analysis);
+  const storeScript = useCanvasStore((s) => s.script);
+  const storeFailure = useCanvasStore((s) => s.failure);
+  const analysis = analysisProp !== undefined ? analysisProp : storeAnalysis;
+  const script = scriptProp !== undefined ? scriptProp : storeScript;
+  const failure = failureProp !== undefined ? failureProp : storeFailure;
+
+  const state = deriveChatPanelState({
+    analysis,
+    script,
+    loading,
+    failure,
+    messagesLength: messages.length,
+  });
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "instant" });
   }, [messages, streaming, thinking]);
-
-  const isEmpty = messages.length === 0;
 
   const handleSend = () => {
     if (!input.trim() || loading) return;
@@ -62,6 +107,17 @@ export function ChatPanel({ messages, streaming, thinking, onSend, loading, onTo
   const handleSampleUrl = (url: string) => {
     if (loading) return;
     onSend(url);
+  };
+
+  const handleCopyDiagnostic = async () => {
+    const lastContent = messages.length > 0 ? messages[messages.length - 1].content : "";
+    const text = buildDiagnostic(lastContent);
+    try {
+      await navigator.clipboard.writeText(text);
+      useToastStore.getState().push({ kind: "info", title: "已复制,可发给客服" });
+    } catch {
+      useToastStore.getState().push({ kind: "error", title: "复制失败,手动选中再复制" });
+    }
   };
 
   const handleAskSubmit = () => {
@@ -76,11 +132,23 @@ export function ChatPanel({ messages, streaming, thinking, onSend, loading, onTo
   const quickBtnCls =
     "rounded-full border border-stone-300 dark:border-stone-700 bg-transparent px-3 py-1 text-xs text-stone-600 dark:text-stone-400 hover:border-[#7c2d12] dark:hover:border-[#ea580c] hover:text-[#7c2d12] dark:hover:text-[#ea580c] transition-all font-inherit";
 
+  // Whether the bottom input box is visible. Only `refine` lets the user type
+  // refinement requests; every other state would either be useless or
+  // confusing (e.g. typing during analysis).
+  const showInput = state === "refine";
+  // Whether to render the running chat history. State 1 (idle) hides it —
+  // pre-paste there's nothing useful to show. States 2..5 all render history.
+  const showHistory = state !== "idle";
+
   return (
     <div className="flex w-[360px] flex-col border-l border-stone-200/70 dark:border-stone-800/70 bg-[var(--color-paper)]/60 dark:bg-stone-950/60 backdrop-blur-md">
       <div className="flex items-center justify-between border-b border-stone-200/70 dark:border-stone-800/70 px-5 py-4">
-        <span className="font-serif-cn font-medium text-[14px] tracking-[-0.01em] text-stone-900 dark:text-stone-50">
-          问导演
+        <span
+          className="font-serif-cn font-medium text-[14px] tracking-[-0.01em] text-stone-900 dark:text-stone-50"
+          data-testid="side-title"
+          data-state={state}
+        >
+          {TITLE_BY_STATE[state]}
         </span>
         <button
           onClick={onToggleCollapse}
@@ -95,36 +163,101 @@ export function ChatPanel({ messages, streaming, thinking, onSend, loading, onTo
       </div>
 
       <div className="flex flex-1 flex-col gap-3 overflow-auto p-5">
-        {isEmpty && !streaming && !loading && (
-          <div className="anim-fade-in rounded-2xl border border-dashed border-stone-300/70 dark:border-stone-700/70 px-4 py-4 text-[12.5px] leading-[1.7] text-stone-600 dark:text-stone-400">
-            <p className="font-serif-cn text-[13px] text-stone-900 dark:text-stone-100 mb-1.5">
-              第一次来?
+        {/* State 1 — 等待粘链接。隐藏聊天历史(本来也是空的),给一段引导文案 + sample chips。 */}
+        {state === "idle" && (
+          <div
+            className="anim-fade-in rounded-2xl border border-dashed border-stone-300/70 dark:border-stone-700/70 px-4 py-4 text-[12.5px] leading-[1.7] text-stone-600 dark:text-stone-400"
+            data-testid="side-idle"
+          >
+            <p className="font-serif-cn text-[13px] text-stone-900 dark:text-stone-100 mb-2">
+              {COPY.side_idle_hint}
             </p>
-            <p>把抖音 / 小红书爆款链接 ↓ 粘到下面输入框,或直接点下面任一条样本。</p>
+            <p className="mb-3 text-stone-500 dark:text-stone-400">
+              {COPY.side_idle_sample_label}
+            </p>
+            <SampleUrlChips onPick={handleSampleUrl} disabled={loading} variant="inline" />
           </div>
         )}
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={
-              m.role === "user"
-                ? "self-end max-w-[85%] rounded-2xl rounded-br-sm bg-stone-900 dark:bg-[#7c2d12] px-3.5 py-2.5 text-[13px] leading-[1.55] text-[#faf8f3]"
-                : "agent-msg self-start max-w-[85%] rounded-2xl rounded-bl-sm border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3 text-[13px] leading-[1.65] text-stone-900 dark:text-stone-100"
-            }
-          >
-            {m.role === "agent" ? (
-              <Markdown remarkPlugins={[remarkGfm]}>{m.content}</Markdown>
-            ) : (
-              m.content
-            )}
-          </div>
-        ))}
-        {streaming && (
+
+        {/* States 2..5 都显示聊天历史(分析答疑、refine 对话都在这里)。 */}
+        {showHistory &&
+          messages.map((m, i) => (
+            <div
+              key={i}
+              className={
+                m.role === "user"
+                  ? "self-end max-w-[85%] rounded-2xl rounded-br-sm bg-stone-900 dark:bg-[#7c2d12] px-3.5 py-2.5 text-[13px] leading-[1.55] text-[#faf8f3]"
+                  : "agent-msg self-start max-w-[85%] rounded-2xl rounded-bl-sm border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3 text-[13px] leading-[1.65] text-stone-900 dark:text-stone-100"
+              }
+            >
+              {m.role === "agent" ? (
+                <Markdown remarkPlugins={[remarkGfm]}>{m.content}</Markdown>
+              ) : (
+                m.content
+              )}
+            </div>
+          ))}
+
+        {/* Streaming bubble — Director text stream while still cooking. */}
+        {showHistory && streaming && (
           <div className="agent-msg self-start max-w-[85%] rounded-2xl rounded-bl-sm border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3 text-[13px] leading-[1.65] text-stone-900 dark:text-stone-100">
             <Markdown remarkPlugins={[remarkGfm]}>{streaming}</Markdown>
           </div>
         )}
-        {loading && !streaming && <CascadeLoading thinking={thinking} />}
+
+        {/* State 2 — 拆解中。进度条 + 阶段 + 剩余秒。无输入框(中断没意义)。 */}
+        {state === "running" && !streaming && <AnalysisProgress thinking={thinking} />}
+
+        {/* State 3 — 出错了。banner + 「再试一条样本」+ 「告诉客服这条」。 */}
+        {state === "failed" && failure && (
+          <div
+            className="anim-fade-in rounded-2xl border border-red-300/70 dark:border-red-900/70 bg-red-50/60 dark:bg-red-950/30 p-4"
+            data-testid="side-failed"
+            role="alert"
+          >
+            <p className="text-[13px] leading-[1.6] text-stone-800 dark:text-stone-100 mb-3">
+              {failure.hint}
+            </p>
+            <div className="mb-3">
+              <p className="mb-2 text-[11px] text-stone-500 dark:text-stone-400">
+                {COPY.side_failed_retry_sample}
+              </p>
+              <SampleUrlChips
+                onPick={handleSampleUrl}
+                disabled={loading}
+                variant="inline"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyDiagnostic}
+              data-testid="side-failed-report"
+              className="text-[11px] text-stone-500 dark:text-stone-400 hover:text-[#7c2d12] dark:hover:text-[#ea580c] underline underline-offset-4 decoration-dotted transition-colors font-inherit"
+            >
+              📋 {COPY.side_failed_report}
+            </button>
+            <p className="mt-3 text-[10px] text-stone-400 dark:text-stone-600 tabular">
+              {COPY.side_failed_code_prefix}
+              {failure.code} · {failure.request_id}
+            </p>
+          </div>
+        )}
+
+        {/* State 4 — 分析好了,等用户决定改写方向(左侧 ScriptCard 选 niche)。 */}
+        {state === "ready" && (
+          <div
+            className="anim-fade-in rounded-2xl border border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-900/70 p-4 shadow-soft"
+            data-testid="side-ready"
+          >
+            <p className="font-serif-cn text-[14px] text-stone-900 dark:text-stone-50 mb-1.5">
+              {COPY.side_ready_headline}
+            </p>
+            <p className="text-[12px] leading-[1.6] text-stone-600 dark:text-stone-400">
+              {COPY.side_ready_hint}
+            </p>
+          </div>
+        )}
+
         <div ref={bottomRef} />
       </div>
 
@@ -146,116 +279,123 @@ export function ChatPanel({ messages, streaming, thinking, onSend, loading, onTo
         .dark .agent-msg th { background: #292524; }
       `}</style>
 
-      <div className="border-t border-stone-200/70 dark:border-stone-800/70 bg-[var(--color-paper)]/40 dark:bg-stone-950/40 px-5 py-4">
-        {isEmpty ? (
-          <div className="mb-3">
-            <SampleUrlChips onPick={handleSampleUrl} disabled={loading} />
+      {/* Refine state owns the entire input/chip footer. Other states drop it
+          entirely — that's the whole point of the redesign: no input when
+          there's nothing useful to type. */}
+      {showInput && (
+        <div className="border-t border-stone-200/70 dark:border-stone-800/70 bg-[var(--color-paper)]/40 dark:bg-stone-950/40 px-5 py-4">
+          <div className="mb-2.5 flex flex-wrap gap-1.5">
+            <button
+              disabled={loading}
+              onClick={() => onSend(COPY.chat_quick_continue)}
+              className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
+              type="button"
+            >
+              {COPY.chat_quick_continue}
+            </button>
+            <button
+              disabled={loading}
+              onClick={() => onSend("开头再吸引人点")}
+              className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
+              type="button"
+            >
+              {COPY.chat_quick_hook}
+            </button>
+            <button
+              disabled={loading}
+              onClick={() => onSend("再口语化一点")}
+              className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
+              type="button"
+            >
+              {COPY.chat_quick_oral}
+            </button>
+            <button
+              disabled={loading}
+              onClick={() => setAskOpen((v) => !v)}
+              className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""} ${askOpen ? "border-[#7c2d12] dark:border-[#ea580c] text-[#7c2d12] dark:text-[#ea580c]" : ""}`}
+              type="button"
+              aria-expanded={askOpen}
+              data-testid="ask-chip"
+            >
+              💡 {COPY.ask_chip_label}
+            </button>
           </div>
-        ) : (
-          <>
-            <div className="mb-2.5 flex flex-wrap gap-1.5">
-              <button
+          {askOpen && (
+            <div className="mb-2.5 anim-fade-in rounded-xl border border-[#7c2d12]/40 dark:border-[#ea580c]/50 bg-white/50 dark:bg-stone-900/50 p-3">
+              <p className="text-[11px] text-stone-500 dark:text-stone-400 mb-2">
+                {COPY.ask_hint}
+              </p>
+              <textarea
+                value={askInput}
+                onChange={(e) => setAskInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAskSubmit();
+                  }
+                }}
+                placeholder={COPY.ask_placeholder}
+                rows={2}
                 disabled={loading}
-                onClick={() => onSend(COPY.chat_quick_continue)}
-                className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
-                type="button"
-              >
-                {COPY.chat_quick_continue}
-              </button>
+                aria-label={COPY.ask_placeholder}
+                data-testid="ask-textarea"
+                className="w-full rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-950 px-2.5 py-2 text-[13px] leading-[1.5] text-stone-900 dark:text-stone-100 outline-none placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:border-[#7c2d12] dark:focus:border-[#ea580c] resize-y font-inherit"
+              />
               <button
-                disabled={loading}
-                onClick={() => onSend("开头再吸引人点")}
-                className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
                 type="button"
+                onClick={handleAskSubmit}
+                disabled={loading || !askInput.trim()}
+                data-testid="ask-submit"
+                className={`mt-2 w-full rounded-lg bg-[#7c2d12] dark:bg-[#ea580c] py-2 text-[12px] font-medium text-[#faf8f3] transition-colors hover:bg-[#9a3412] dark:hover:bg-[#c2410c] font-inherit ${
+                  loading || !askInput.trim() ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+                }`}
               >
-                {COPY.chat_quick_hook}
-              </button>
-              <button
-                disabled={loading}
-                onClick={() => onSend("再口语化一点")}
-                className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""}`}
-                type="button"
-              >
-                {COPY.chat_quick_oral}
-              </button>
-              <button
-                disabled={loading}
-                onClick={() => setAskOpen((v) => !v)}
-                className={`${quickBtnCls} ${loading ? "opacity-40 cursor-not-allowed" : ""} ${askOpen ? "border-[#7c2d12] dark:border-[#ea580c] text-[#7c2d12] dark:text-[#ea580c]" : ""}`}
-                type="button"
-                aria-expanded={askOpen}
-                data-testid="ask-chip"
-              >
-                💡 {COPY.ask_chip_label}
+                {COPY.ask_submit}
               </button>
             </div>
-            {askOpen && (
-              <div className="mb-2.5 anim-fade-in rounded-xl border border-[#7c2d12]/40 dark:border-[#ea580c]/50 bg-white/50 dark:bg-stone-900/50 p-3">
-                <p className="text-[11px] text-stone-500 dark:text-stone-400 mb-2">
-                  {COPY.ask_hint}
-                </p>
-                <textarea
-                  value={askInput}
-                  onChange={(e) => setAskInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleAskSubmit();
-                    }
-                  }}
-                  placeholder={COPY.ask_placeholder}
-                  rows={2}
-                  disabled={loading}
-                  aria-label={COPY.ask_placeholder}
-                  data-testid="ask-textarea"
-                  className="w-full rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-950 px-2.5 py-2 text-[13px] leading-[1.5] text-stone-900 dark:text-stone-100 outline-none placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:border-[#7c2d12] dark:focus:border-[#ea580c] resize-y font-inherit"
-                />
-                <button
-                  type="button"
-                  onClick={handleAskSubmit}
-                  disabled={loading || !askInput.trim()}
-                  data-testid="ask-submit"
-                  className={`mt-2 w-full rounded-lg bg-[#7c2d12] dark:bg-[#ea580c] py-2 text-[12px] font-medium text-[#faf8f3] transition-colors hover:bg-[#9a3412] dark:hover:bg-[#c2410c] font-inherit ${
-                    loading || !askInput.trim() ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-                  }`}
-                >
-                  {COPY.ask_submit}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSend();
-            }
-          }}
-          placeholder={isEmpty ? COPY.chat_placeholder_empty : COPY.chat_placeholder_followup}
-          rows={3}
-          disabled={loading}
-          aria-label={isEmpty ? COPY.chat_placeholder_empty : COPY.chat_placeholder_followup}
-          className={
-            "w-full rounded-xl border bg-white dark:bg-stone-900 px-3.5 py-2.5 text-[13px] leading-[1.55] text-stone-900 dark:text-stone-100 outline-none placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:border-stone-900 dark:focus:border-stone-100 transition-colors resize-y font-inherit " +
-            (isEmpty && !input
-              ? "border-[#7c2d12]/30 dark:border-[#ea580c]/40 anim-input-glow"
-              : "border-stone-300 dark:border-stone-700")
-          }
-        />
-        <button
-          onClick={handleSend}
-          disabled={loading}
-          className={`mt-2.5 w-full rounded-xl bg-stone-900 dark:bg-[#7c2d12] py-2.5 text-[13px] font-medium tracking-[0.01em] text-[#faf8f3] transition-colors hover:bg-stone-800 dark:hover:bg-[#9a3412] font-inherit ${
-            loading ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-          }`}
-          type="button"
-        >
-          发送
-        </button>
-      </div>
+          )}
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder={COPY.side_refine_placeholder}
+            rows={3}
+            disabled={loading}
+            aria-label={COPY.side_refine_placeholder}
+            data-testid="refine-textarea"
+            className="w-full rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-[13px] leading-[1.55] text-stone-900 dark:text-stone-100 outline-none placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:border-stone-900 dark:focus:border-stone-100 transition-colors resize-y font-inherit"
+          />
+          <div className="mt-2.5 flex items-center gap-2">
+            <button
+              onClick={handleSend}
+              disabled={loading}
+              className={`flex-1 rounded-xl bg-stone-900 dark:bg-[#7c2d12] py-2.5 text-[13px] font-medium tracking-[0.01em] text-[#faf8f3] transition-colors hover:bg-stone-800 dark:hover:bg-[#9a3412] font-inherit ${
+                loading ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+              }`}
+              type="button"
+            >
+              发送
+            </button>
+            {/* W5D2-B: 诊断信息复制 chip。视觉降级 — 灰文 + 无 border + 小字号,
+                不抢「发送」按钮的注意力,但有需要时就在那里。 */}
+            <button
+              onClick={handleCopyDiagnostic}
+              type="button"
+              data-testid="diagnostic-copy-btn"
+              aria-label="复制诊断信息"
+              title="把 user_id / 会话 ID / UA 一键复制,发给客服好定位问题"
+              className="shrink-0 text-[11px] text-stone-400 dark:text-stone-500 hover:text-[#7c2d12] dark:hover:text-[#ea580c] underline underline-offset-4 decoration-dotted transition-colors font-inherit px-1.5 py-1"
+            >
+              📋 复制诊断
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

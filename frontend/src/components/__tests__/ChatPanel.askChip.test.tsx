@@ -24,10 +24,13 @@ describe("ChatPanel ask chip", () => {
   });
 
   it("shows ask chip after user has sent a message + opens textarea on click", () => {
+    // W5D3: ask chip lives in refine state (state 5) which fires when
+    // `script` is non-empty (i.e. rewrite has happened).
     render(
       <ChatPanel
         {...baseProps}
         messages={[{ role: "user", content: "https://www.douyin.com/video/123" }]}
+        script="改完的版本"
         onSend={() => {}}
       />
     );
@@ -47,6 +50,7 @@ describe("ChatPanel ask chip", () => {
       <ChatPanel
         {...baseProps}
         messages={[{ role: "user", content: "first" }]}
+        script="改完的版本"
         onSend={onSend}
       />
     );
