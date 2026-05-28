@@ -44,6 +44,8 @@ _REQUIRED_FIELDS: dict[str, frozenset[str]] = {
     EventName.CASCADE_CACHE_HIT.value: frozenset({"source_url_hash", "ttl_remaining_s", "cache_layer"}),
     EventName.CASCADE_CACHE_MISS.value: frozenset({"source_url_hash"}),
     EventName.NICHE_SELECTED.value: frozenset({"niche", "thread_id"}),
+    EventName.UNCAUGHT_EXCEPTION.value: frozenset({"site", "exc_type", "message"}),
+    EventName.CLIENT_ERROR.value: frozenset({"kind", "message"}),
 }
 
 _lock = asyncio.Lock()

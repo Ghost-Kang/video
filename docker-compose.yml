@@ -10,6 +10,14 @@ services:
       dockerfile: Dockerfile
     container_name: cascade-backend
     restart: unless-stopped
+    # W5D2 log rotation — prevent unbounded json-file logs from filling
+    # the 80G lighthouse disk. 10MB × 5 rotated files = ~50MB cap per svc.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
     env_file:
       - .env  # ARK_API_KEY, INVITE_CODES, CASCADE_UPSTREAM, etc.
     environment:
@@ -38,6 +46,12 @@ services:
       dockerfile: frontend/Dockerfile
     container_name: cascade-frontend
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     depends_on:
       backend:
         condition: service_healthy

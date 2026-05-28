@@ -79,6 +79,9 @@ class WarningCode(str, Enum):
     W16_PRODUCTION_FALLBACK = "W16_PRODUCTION_FALLBACK"
     # W4D5: MediaKit transcribe call failed → full_transcript left empty.
     W17_TRANSCRIBE_FAILED = "W17_TRANSCRIBE_FAILED"
+    # W5D2: Doubao 视觉模型偶尔输出 < 3 scenes (短视频 / 模型懒)。
+    # adapter 复制最后一帧 pad 到 3 并保留原 timestamps,质量退化但流程可继续。
+    W18_SCENES_PADDED = "W18_SCENES_PADDED"
 
 
 # UI-facing 人话 recovery hints. Brand Guardian §4 rule: no English jargon, no
@@ -121,6 +124,7 @@ RECOVERY_HINTS: dict[str, str] = {
     WarningCode.W1_AUTO_ID.value: "（系统已自动编号）",
     WarningCode.W2_FALLBACK_USED.value: "这部分系统没完全看懂，用了通用判断，可能不太准。",
     WarningCode.W3_SCENES_TRUNCATED.value: "这条视频镜头较多，系统只取了前 12 个。",
+    WarningCode.W18_SCENES_PADDED.value: "这条视频镜头数偏少，系统补齐了一下，最后几段可能会重复。",
     WarningCode.W4_GENERIC_SCENE_LABEL.value: "这一段画面描述较弱，你可能想自己改一下。",
     WarningCode.W5_TIMESTAMPS_SORTED.value: "（系统帮你把镜头顺序对齐了）",
     WarningCode.W6_FIRST_FRAME_UNREACHABLE.value: "原视频的画面读不到了，但文字分析还在。",

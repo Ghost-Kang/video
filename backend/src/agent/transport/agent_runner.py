@@ -102,6 +102,26 @@ async def run_agent(
         reply = f"处理出错: {e}"
         save_message(user_id, thread_id, "agent", reply)
         print(f"[错误] thread={thread_id} {e}")
+        # W5D2 observability — persist the traceback to events.db so
+        # /admin/events can surface it (don't only rely on docker logs).
+        import traceback as _tb
+        from agent.cascade.event_names import EventName as _EN
+        from agent.cascade.events import emit as _emit
+        try:
+            await _emit(
+                _EN.UNCAUGHT_EXCEPTION,
+                user_id=user_id,
+                run_id=None,
+                payload={
+                    "site": "agent_runner.run_agent",
+                    "exc_type": type(e).__name__,
+                    "message": str(e)[:500],
+                    "traceback": _tb.format_exc()[:4000],
+                    "thread_id": thread_id,
+                },
+            )
+        except Exception:
+            pass  # never let observability error swallow the real error
 
     try:
         await send_json(

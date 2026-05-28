@@ -48,11 +48,13 @@ HAPPY_FIXTURES = [
 
 EDGE_HARD_FAIL = {
     "edge_no_formula.json": FailureCode.S3_NO_FORMULA,
-    "edge_scenes_too_short.json": FailureCode.S4_SCENES_LEN_OUT_OF_RANGE,
+    # W5D2: edge_scenes_too_short (1-2 scenes) moved to RECOVERABLE — adapter
+    # now pads to 3 with a W18_SCENES_PADDED warning. Only 0 scenes is hard fail.
 }
 
 EDGE_RECOVERABLE = [
     "edge_scenes_too_long.json",
+    "edge_scenes_too_short.json",  # W5D2: padded via W18_SCENES_PADDED
     "edge_non_monotonic.json",
     "edge_low_confidence.json",
 ]

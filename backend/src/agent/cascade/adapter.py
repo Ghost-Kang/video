@@ -428,10 +428,31 @@ def _normalize_scenes(data: dict[str, Any], warnings: list[Warning_]) -> None:
     if not isinstance(scenes_raw, list):
         raise HardFailure(FailureCode.S4_SCENES_LEN_OUT_OF_RANGE, "scenes not a list")
 
-    if len(scenes_raw) < 3:
+    # W5D2: 0-scene 仍然 hard fail — 说明上游完全没分析出内容,继续没意义。
+    if len(scenes_raw) == 0:
         raise HardFailure(
             FailureCode.S4_SCENES_LEN_OUT_OF_RANGE,
-            f"scenes length {len(scenes_raw)} < 3",
+            "scenes length 0",
+        )
+    # 1-2 scene 时复制最后一帧 pad 到 3,emit warning。豆包视觉模型偶尔在
+    # 短/单镜视频上只返回 1-2 段,但下游 contract 需要 ≥3。pad 后用户看到
+    # 的分析略冗余但流程不中断;UI 可以选择不显示重复段。
+    original_count = len(scenes_raw)
+    if original_count < 3:
+        pad_source = dict(scenes_raw[-1])
+        while len(scenes_raw) < 3:
+            clone = dict(pad_source)
+            # 调 scene_index 避免后续验证报重复;timestamp 沿用原值,前端
+            # 渲染时按 scene_index 排序仍然合理。
+            clone["scene_index"] = len(scenes_raw) + 1
+            scenes_raw.append(clone)
+        warnings.append(
+            Warning_(
+                code=WarningCode.W18_SCENES_PADDED.value,
+                field="scenes",
+                message=f"upstream returned {original_count} scenes; padded to 3",
+                severity=Severity.WARN,
+            )
         )
 
     if len(scenes_raw) > 12:

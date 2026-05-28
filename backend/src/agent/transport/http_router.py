@@ -17,6 +17,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import time
+from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable
 from urllib.parse import parse_qs, urlparse
 
@@ -210,6 +213,174 @@ async def handle_analysis_shallow(qs: dict, body: dict) -> tuple[int, dict, str]
     return 200, contract.model_dump(mode="json"), "OK"
 
 
+_SERVER_START_TIME = time.monotonic()
+
+
+async def handle_health_summary(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """W5D2-D — single endpoint for /admin/health dashboard. Combines:
+    - server stats (CPU/mem/disk/uptime) from stdlib (no psutil dep)
+    - events 5min aggregate
+    - upstream success rate over 1h (analysis + rewrite)
+    - last 10 failure_emitted events
+    """
+    import shutil
+
+    # server stats — stdlib only (avoid psutil add to deps)
+    try:
+        cpu_percent = _cpu_percent_proc()
+    except Exception:
+        cpu_percent = 0.0
+    try:
+        mem_total_mb, mem_used_mb = _meminfo_proc()
+    except Exception:
+        mem_total_mb, mem_used_mb = (0, 0)
+    try:
+        du = shutil.disk_usage("/")
+        disk_total_gb = round(du.total / 1024 / 1024 / 1024, 2)
+        disk_used_gb = round(du.used / 1024 / 1024 / 1024, 2)
+    except Exception:
+        disk_total_gb, disk_used_gb = (0.0, 0.0)
+    uptime = int(time.monotonic() - _SERVER_START_TIME)
+
+    # events_5min aggregate
+    five_min_ago = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+    one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    recent_failures: list[dict] = []
+    by_type: dict[str, int] = {}
+    total_5min = 0
+    upstream: dict[str, float | None] = {
+        EventName.ANALYSIS_RETURNED.value: None,
+        EventName.SCRIPT_REWRITTEN.value: None,
+    }
+
+    try:
+        # 5min events grouped by event_name
+        five = await list_events(limit=500, since_ts=five_min_ago)
+        for e in five.get("events", []):
+            by_type[e["event_name"]] = by_type.get(e["event_name"], 0) + 1
+            total_5min += 1
+
+        # 1h upstream success rate
+        hour = await list_events(limit=1000, since_ts=one_hour_ago)
+        an_done = sum(1 for e in hour.get("events", []) if e["event_name"] == EventName.ANALYSIS_RETURNED.value)
+        an_fail = sum(
+            1 for e in hour.get("events", [])
+            if e["event_name"] == EventName.FAILURE_EMITTED.value
+            and isinstance(e.get("payload"), dict)
+            and e["payload"].get("stage") == "analysis"
+        )
+        if an_done + an_fail > 0:
+            upstream[EventName.ANALYSIS_RETURNED.value] = round(an_done / (an_done + an_fail), 3)
+        rw_done = sum(1 for e in hour.get("events", []) if e["event_name"] == EventName.SCRIPT_REWRITTEN.value)
+        rw_fail = sum(
+            1 for e in hour.get("events", [])
+            if e["event_name"] == EventName.FAILURE_EMITTED.value
+            and isinstance(e.get("payload"), dict)
+            and e["payload"].get("stage") == "rewrite"
+        )
+        if rw_done + rw_fail > 0:
+            upstream[EventName.SCRIPT_REWRITTEN.value] = round(rw_done / (rw_done + rw_fail), 3)
+
+        # recent 10 failures
+        fails = await list_events(limit=10, event_name=EventName.FAILURE_EMITTED.value)
+        recent_failures = fails.get("events", [])[:10]
+    except Exception:
+        pass  # health endpoint must not crash — return what we have
+
+    return 200, {
+        "server": {
+            "cpu_percent": cpu_percent,
+            "mem_used_mb": mem_used_mb,
+            "mem_total_mb": mem_total_mb,
+            "disk_used_gb": disk_used_gb,
+            "disk_total_gb": disk_total_gb,
+            "uptime_seconds": uptime,
+        },
+        "events_5min": {"total": total_5min, "by_type": by_type},
+        "upstream_success_rate": upstream,
+        "recent_failures": recent_failures,
+    }, "OK"
+
+
+def _cpu_percent_proc() -> float:
+    """Coarse CPU usage without psutil.
+
+    Linux reads /proc/stat. Dev machines without /proc fall back to loadavg
+    scaled by CPU count so the health contract still returns a number.
+    """
+    try:
+        with open("/proc/stat", "r") as f:
+            line = f.readline()
+        parts = [int(x) for x in line.split()[1:]]
+        if len(parts) < 4:
+            return 0.0
+        idle = parts[3]
+        total = sum(parts)
+        if total == 0:
+            return 0.0
+        return round(100.0 * (total - idle) / total, 2)
+    except FileNotFoundError:
+        load_1m = os.getloadavg()[0] if hasattr(os, "getloadavg") else 0.0
+        cpus = os.cpu_count() or 1
+        return round(min(100.0, max(0.0, 100.0 * load_1m / cpus)), 2)
+
+
+def _meminfo_proc() -> tuple[int, int]:
+    """Returns (total_mb, used_mb) without psutil."""
+    try:
+        with open("/proc/meminfo", "r") as f:
+            info = {}
+            for line in f:
+                k, _, v = line.partition(":")
+                info[k.strip()] = v.strip()
+        total_kb = int(info["MemTotal"].split()[0])
+        avail_kb = int(info.get("MemAvailable", info.get("MemFree", "0 kB")).split()[0])
+        total_mb = total_kb // 1024
+        used_mb = (total_kb - avail_kb) // 1024
+        return total_mb, used_mb
+    except FileNotFoundError:
+        if hasattr(os, "sysconf"):
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            phys_pages = os.sysconf("SC_PHYS_PAGES")
+            total_mb = int(page_size * phys_pages / 1024 / 1024)
+            return total_mb, total_mb
+        return 0, 0
+
+
+async def handle_client_error(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """W5D2 — frontend Sentry-lite. Browser JS errors POST here; we strip
+    PII (truncate UA/stack/message), emit a `client_error` event into the
+    same events.db pipeline /admin/events reads. No auth: anonymous cohort
+    creators must be able to report errors before invite/login resolves.
+    Rate limiting is handled implicitly by the frontend dedup (1 min)."""
+    kind = str(body.get("kind") or "unknown")[:40]
+    message = str(body.get("message") or "")[:500]
+    if not message:
+        return 400, {"error": "message required"}, "Bad Request"
+    # Truncate everything aggressively — events.db row is best kept < 8KB
+    payload = {
+        "kind": kind,
+        "message": message,
+        "stack": str(body.get("stack") or "")[:4000],
+        "filename": str(body.get("filename") or "")[:200],
+        "lineno": body.get("lineno") if isinstance(body.get("lineno"), int) else None,
+        "colno": body.get("colno") if isinstance(body.get("colno"), int) else None,
+        "url": str(body.get("url") or "")[:500],
+        "ua": str(body.get("ua") or "")[:200],
+        "thread_id": str(body.get("thread_id") or "")[:80] or None,
+    }
+    try:
+        await emit(
+            EventName.CLIENT_ERROR,
+            user_id=str(body.get("user_id") or "anonymous")[:80],
+            run_id=None,
+            payload=payload,
+        )
+    except ValueError as exc:
+        return 400, {"error": f"invalid event: {exc}"}, "Bad Request"
+    return 200, {"ok": True}, "OK"
+
+
 # ---------- routing ----------
 
 
@@ -222,6 +393,8 @@ EXACT_ROUTES: dict[tuple[str, str], HandlerFn] = {
     ("POST", "/api/anchors"): handle_anchors_post,
     ("POST", "/api/rewrite"): handle_rewrite,
     ("POST", "/api/analysis/shallow"): handle_analysis_shallow,
+    ("POST", "/api/client_error"): handle_client_error,
+    ("GET", "/api/health/summary"): handle_health_summary,
 }
 
 # (method, prefix, suffix, param_name, handler) — 路径里的可变段会作为 path_param 传入。

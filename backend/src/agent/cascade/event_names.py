@@ -30,3 +30,13 @@ class EventName(StrEnum):
     # Fired when a user sends a chat message tagged with their onboarding-picked niche.
     # Lets /admin/events confirm the WS field actually wires through end-to-end.
     NICHE_SELECTED = "niche_selected"
+    # W5D2 observability — backend Python uncaught exception escape into a
+    # request/agent handler. Captured by run_agent / ws_server / http_router
+    # global try/except. Carries truncated traceback so /admin/events can
+    # surface server-side bugs without ssh'ing into the container.
+    UNCAUGHT_EXCEPTION = "uncaught_exception"
+    # W5D2 observability — browser-side JS error caught by window.onerror /
+    # unhandledrejection / React ErrorBoundary, POSTed back to backend via
+    # /api/client_error. Lets founder see cohort 创作者 JS issues without
+    # asking the user to paste console output.
+    CLIENT_ERROR = "client_error"
