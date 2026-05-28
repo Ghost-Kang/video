@@ -1,17 +1,27 @@
-# OpenRHTV Cascade — backend (W5D2 deploy)
+# syntax=docker/dockerfile:1.7
+# OpenRHTV Cascade — backend (W5D2 deploy, W5D3 cache optimization)
 #
 # Image: python:3.12-slim + uv + ffmpeg (yt-dlp dep)
 # Entry: python -m agent.server  (WS :8765 + HTTP :8766)
 # Volume: /data → SQLite + ARK cache
 # Env:    see .env.example — at minimum ARK_API_KEY, INVITE_CODES,
 #         CASCADE_UPSTREAM=doubao_direct, TOPRADOR_RESOLVER_MODE=douyin_share
+#
+# Cache strategy (W5D3):
+#   1. apt cache mount    — apt-get fast on rebuild
+#   2. uv cache mount     — wheels survive between builds
+#   3. deps layer SPLIT   — src/ change does NOT re-download 70MB of deps,
+#                           only re-installs the local `agent` package (~5s)
 
 FROM python:3.12-slim AS builder
 
 # uv = fastest Python package manager. We pin to a known good version.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+# apt cache mount: rm of /var/lib/apt/lists is no longer needed since BuildKit
+# manages it via the cache mount; we still skip recommends to keep image small.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+      curl ca-certificates ffmpeg
 ADD https://astral.sh/uv/install.sh /uv-install.sh
 RUN sh /uv-install.sh && rm /uv-install.sh
 ENV PATH="/root/.local/bin:$PATH"
@@ -22,12 +32,21 @@ WORKDIR /app
 # 走默认 PyPI 即可(`UV_INDEX_URL_OVERRIDE` 设了优先级最高,留给海外 CI)。
 ARG UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 ENV UV_INDEX_URL=${UV_INDEX_URL}
-# COPY src BEFORE uv sync — uv sync builds the local "agent" package
-# (file:///app) and needs src/agent/__init__.py to exist before resolving.
-# Trades layer cache (any src edit invalidates uv sync) for correctness.
+
+# ---- Layer A: 3rd-party deps (HEAVY, rarely changes) ----
+# `--no-install-project` 跳过本地 agent 包(下一层装),所以这一层只依赖
+# pyproject.toml + uv.lock。改 src 不会让这层失效;只有 pyproject 改动才会。
+# Cache mount: /root/.cache/uv 把 wheel 缓存留到下一次 build,加新 dep 只下增量。
 COPY pyproject.toml uv.lock README.md ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+
+# ---- Layer B: 本地 agent 包(LIGHT, src 每改必跑) ----
+# 只复制 src/,然后 uv sync 在 deps 都装好的前提下只装 file:///app 本地包。
+# 实测 ~3-5s。
 COPY src ./src
-RUN uv sync --frozen --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
 # Persistent volume for SQLite + run logs
 VOLUME ["/app/data"]

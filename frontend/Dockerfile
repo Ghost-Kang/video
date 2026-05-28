@@ -1,4 +1,5 @@
-# OpenRHTV Cascade — frontend (W5D2 deploy)
+# syntax=docker/dockerfile:1.7
+# OpenRHTV Cascade — frontend (W5D2 deploy, W5D3 cache optimization)
 #
 # Stage 1: npm build → static dist/
 # Stage 2: nginx 反代 + 静态托管
@@ -22,7 +23,10 @@ COPY docs/legal /app/docs/legal
 
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# W5D3 — npm cache mount: keeps node_modules tarballs cached between builds,
+# so package-lock change only re-downloads incremental deltas.
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund
 
 COPY frontend/ ./
 RUN npm run build
