@@ -28,3 +28,14 @@ build-backend = "uv_build"
 dev = [
     "pytest>=9.0.3",
 ]
+
+# W5D3 — 中国大陆构建环境(腾讯云轻量服务器)直连 PyPI / Fastly CDN 不稳,
+# 卡在 retry loop 几十分钟。Tsinghua TUNA 是全镜像(含 wheel),且 uv.lock
+# 里的 source URL 跟着这里走 — 所以 `uv sync --frozen` 也会从镜像下载。
+# `default = true` 把 Tsinghua 设为主索引,PyPI 不再被查询。
+# 海外 CI / 开发机不受影响:`uv lock --upgrade` 重新生成时,只要 [[tool.uv.index]]
+# 仍是 Tsinghua,lock 就持续指向镜像;切回 PyPI 直连只需删掉这段并 re-lock。
+[[tool.uv.index]]
+name = "tuna"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
