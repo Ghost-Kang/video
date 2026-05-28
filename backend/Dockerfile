@@ -40,23 +40,31 @@ WORKDIR /app
 # Aliyun 跟腾讯云同区,wheel 也在 Aliyun 自己 CDN,不会回源 Fastly(清华
 # mirror 只 mirror index、wheel 还是从 Fastly 拿,腾讯云出口到 Fastly 抽风
 # 会让 uv sync 卡在 retry loop)。海外 CI 用 --build-arg 覆盖。
-ARG UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
-ENV UV_INDEX_URL=${UV_INDEX_URL}
+# W5D3 — uv 0.11+ 用 UV_DEFAULT_INDEX(主 index),UV_INDEX_URL 是 pip 兼容
+# 的别名(同效)。两个都 set,确保任意版本 uv 都 honor。Tsinghua TUNA 自己
+# host wheel 文件(不像 Aliyun 只 mirror index),从腾讯云直连快且稳。
+ARG UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ENV UV_DEFAULT_INDEX=${UV_INDEX_URL} \
+    UV_INDEX_URL=${UV_INDEX_URL}
 
 # ---- Layer A: 3rd-party deps (HEAVY, rarely changes) ----
 # `--no-install-project` 跳过本地 agent 包(下一层装),所以这一层只依赖
 # pyproject.toml + uv.lock。改 src 不会让这层失效;只有 pyproject 改动才会。
 # Cache mount: /root/.cache/uv 把 wheel 缓存留到下一次 build,加新 dep 只下增量。
+# CLI flag `--default-index` 显式传 — 最强保险,即使 env var 因某种原因被
+# 吃掉,CLI 也会 override lockfile 里硬编码的 https://pypi.org/simple URL。
 COPY pyproject.toml uv.lock README.md ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+    uv sync --frozen --no-dev --no-install-project \
+        --default-index ${UV_INDEX_URL}
 
 # ---- Layer B: 本地 agent 包(LIGHT, src 每改必跑) ----
 # 只复制 src/,然后 uv sync 在 deps 都装好的前提下只装 file:///app 本地包。
 # 实测 ~3-5s。
 COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev \
+        --default-index ${UV_INDEX_URL}
 
 # Persistent volume for SQLite + run logs
 VOLUME ["/app/data"]
