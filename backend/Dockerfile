@@ -30,7 +30,10 @@ WORKDIR /app
 # W5D3 — 国内构建 PyPI 直连 50KB/s 且大量超时,切清华镜像后稳定 10MB/s+。
 # `UV_INDEX_URL` 是 uv 0.5+ / 老版本都认的环境变量。海外构建保持空字符串
 # 走默认 PyPI 即可(`UV_INDEX_URL_OVERRIDE` 设了优先级最高,留给海外 CI)。
-ARG UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+# Aliyun 跟腾讯云同区,wheel 也在 Aliyun 自己 CDN,不会回源 Fastly(清华
+# mirror 只 mirror index、wheel 还是从 Fastly 拿,腾讯云出口到 Fastly 抽风
+# 会让 uv sync 卡在 retry loop)。海外 CI 用 --build-arg 覆盖。
+ARG UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
 ENV UV_INDEX_URL=${UV_INDEX_URL}
 
 # ---- Layer A: 3rd-party deps (HEAVY, rarely changes) ----
