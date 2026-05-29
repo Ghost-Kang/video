@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useWSStore } from "../../store/wsStore";
 import { COPY } from "../../lib/cardCopy";
 import { useCanvasStore } from "../../store/canvasStore";
-import { synthesizeFailureFromContent } from "../../store/wsStore";
+import { synthesizeClientTimeout } from "../../store/wsStore";
 
 /**
  * W5D3 — 进度可视化。后端没给真实百分比(那需要新 WS 事件,本轮 out of scope),
@@ -94,7 +94,7 @@ export function AnalysisProgress({ thinking, startedAtMs }: Props) {
   useEffect(() => {
     if (!hardFailedRef.current && elapsed >= HARD_TIMEOUT_SEC) {
       hardFailedRef.current = true;
-      useCanvasStore.getState().setFailure(synthesizeFailureFromContent("请求超时"));
+      useCanvasStore.getState().setFailure(synthesizeClientTimeout());
     }
   }, [elapsed]);
 
@@ -133,7 +133,7 @@ export function AnalysisProgress({ thinking, startedAtMs }: Props) {
     // 主动跳出 — 合成 failure(超时同义),让 ChatPanel 切到 failed 状态、给样本 chips。
     useCanvasStore
       .getState()
-      .setFailure(synthesizeFailureFromContent("请求超时"));
+      .setFailure(synthesizeClientTimeout());
   };
 
   const handleWait = () => {

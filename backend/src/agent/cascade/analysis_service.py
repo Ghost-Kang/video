@@ -373,28 +373,36 @@ def _enforce_duration_guard(resolver_metadata: dict[str, Any]) -> None:
 
 
 async def _emit_progress(stage: str, percent: int, eta: int, detail: str) -> None:
-    """W5D3-T1 — best-effort progress push. Reads ws/thread_id from
+    """W5D3-T1 — best-effort progress push. Reads user_id/thread_id from
     ContextVar (set by agent_runner before invoking the analyze tool).
     Silent on any failure: progress is decoration, never the critical
-    path."""
+    path.
+
+    W5D4 P0-A — route through `notify.send_to_user` (live-registry lookup) so a
+    reconnect mid-run still receives progress, instead of pushing to the ws
+    captured at run-start (which may be dead). `fallback_ws` covers the no-registry
+    test path."""
     try:
         from agent.transport.runtime_ctx import get_run_ctx
-        from agent.transport.context import send_json
+        from agent.transport import notify
         ctx = get_run_ctx()
         if not ctx:
             return
-        ws = ctx.get("ws")
+        user_id = ctx.get("user_id")
         thread_id = ctx.get("thread_id")
-        if ws is None or not thread_id:
+        if not user_id or not thread_id:
             return
-        await send_json(
-            ws,
-            type="analysis_progress",
-            thread_id=thread_id,
-            stage=stage,
-            percent=percent,
-            eta_seconds=eta,
-            detail=detail,
+        await notify.send_to_user(
+            user_id,
+            {
+                "type": "analysis_progress",
+                "thread_id": thread_id,
+                "stage": stage,
+                "percent": percent,
+                "eta_seconds": eta,
+                "detail": detail,
+            },
+            fallback_ws=ctx.get("ws"),
         )
     except Exception:
         pass

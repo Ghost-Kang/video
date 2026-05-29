@@ -14,7 +14,7 @@ import { shouldHideProToggle, isAdminUser } from "./lib/proViewAccess";
 import { useCanvasStore } from "./store/canvasStore";
 import { useNicheStore, type NicheId } from "./store/nicheStore";
 import { useSessionStore } from "./store/sessionStore";
-import { useWSStore, synthesizeFailureFromContent } from "./store/wsStore";
+import { useWSStore, synthesizeClientTimeout } from "./store/wsStore";
 import type { WSEvent } from "./types/ws";
 function newSessionId() {
   return `session-${Date.now().toString(36)}`;
@@ -72,7 +72,7 @@ export default function App({ userId, onLogout }: AppProps) {
         progressEta: null,
         progressDetail: "",
       });
-      setFailure(synthesizeFailureFromContent("请求超时,请检查后端是否正常运行"));
+      setFailure(synthesizeClientTimeout());
     }, 300_000);
   }, [addMessage, sendCommand, setFailure, setLoading, tid]);
   const actions = useNodeActions(tid, sendCommand, sendChatMessage);

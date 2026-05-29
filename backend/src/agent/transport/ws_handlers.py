@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import Any, Awaitable, Callable
 
 from agent import store  # 通过 module 访问,方便 test monkeypatch
@@ -96,21 +97,30 @@ async def handle_delete_session(ctx: WSCtx, msg: DeleteSessionMsg) -> None:
     await send_json(ctx.ws, type="session_list", sessions=sessions)
 
 
-def _resolve_run_status(thread_id: str, msgs: list[dict]) -> tuple[str, dict | None]:
-    """Best-effort run lifecycle for reconnect resume (W5D4).
+async def _resolve_run_status(thread_id: str, msgs: list[dict]) -> tuple[str, dict | None]:
+    """Authoritative run lifecycle for reconnect resume (W5D4 P0-B).
 
-    The in-process registry is authoritative when present (same backend
-    process). After a restart it's empty, so we infer from chat history: an
-    agent message at the tail means the turn already produced a terminal reply
-    (done); otherwise nothing is in flight (a run live at restart is dead — we
-    report `idle` so the client stops spinning instead of waiting forever on a
-    frame that will never arrive)."""
-    st = run_state.get(thread_id)
-    if st is not None:
-        return st["status"], st["failure"]
-    if msgs and msgs[-1].get("role") == "agent":
-        return "done", None
-    return "idle", None
+    Reads the persisted `run_lifecycle` row (DB-backed, survives restart) — no
+    more inferring from the chat-history tail. Boot-time reconciliation already
+    flipped any process-death `running` rows to `failed`, so a `running` we see
+    here is genuinely in-flight in THIS process. As a last-resort defense against
+    a task that died without marking, a `running` row older than the run ceiling
+    is reported `stale` so the client stops spinning. No row → `idle`."""
+    st = await run_state.load(thread_id)
+    if st is None:
+        return "idle", None
+    if st["status"] == "running":
+        # Defensive: a same-process run shows in the cache with a real monotonic
+        # updated_at; if it's wall-clock-older than the ceiling, treat as stale.
+        age = time.time() - st.get("updated_at", time.time())
+        if age > agent_runner.RUN_TURN_TIMEOUT_S + 30:
+            return "stale", {
+                "code": "S11_INTERNAL_ERROR",
+                "hint": "上次处理像是中断了,重试一下或换一条链接。",
+                "actions": ["RETRY_SAME_URL", "RETRY_WITH_NEW_URL"],
+                "request_id": "",
+            }
+    return st["status"], st["failure"]
 
 
 async def handle_get_session_state(ctx: WSCtx, msg: GetSessionStateMsg) -> None:
@@ -123,7 +133,7 @@ async def handle_get_session_state(ctx: WSCtx, msg: GetSessionStateMsg) -> None:
         return msgs, canvas
 
     msgs, canvas = await asyncio.to_thread(_work)
-    run_status, failure = _resolve_run_status(msg.thread_id, msgs)
+    run_status, failure = await _resolve_run_status(msg.thread_id, msgs)
     print(f"[请求] 返回 msgs={len(msgs)} canvas={canvas is not None} run_status={run_status}")
     await send_json(
         ctx.ws,

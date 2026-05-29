@@ -120,7 +120,9 @@ async def handle(websocket) -> None:
         pass
     finally:
         if user_id:
-            notify.unregister(user_id)
+            # W5D4 P0-A — unregister THIS socket only (registry is now a set);
+            # a concurrent reconnect on a new ws must not be evicted.
+            notify.unregister(user_id, websocket)
         # W5D3 P0-3 — drop the send-lock pin so closed ws objects don't keep
         # a stale Lock alive (weak dict GCs the entry once the ws is collected).
         try:

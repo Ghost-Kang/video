@@ -139,6 +139,22 @@ async def bootstrap_schema(db: aiosqlite.Connection | None = None) -> None:
               PRIMARY KEY (user_id, thread_id)
             )"""
         )
+        # W5D4 P0-B — single authoritative, persisted run-lifecycle record per
+        # thread. Replaces the in-memory run_state dict (lost on restart, which
+        # forced get_session_state to *infer* status from chat-history tail).
+        # Written through on every mark_*; reconciled on boot (stale 'running'
+        # rows → 'failed') so a restart mid-run yields a deterministic answer.
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS run_lifecycle (
+              thread_id   TEXT PRIMARY KEY,
+              user_id     TEXT NOT NULL,
+              run_seq     INTEGER NOT NULL DEFAULT 0,
+              status      TEXT NOT NULL,
+              failure     TEXT,
+              started_at  TEXT NOT NULL,
+              updated_at  TEXT NOT NULL
+            )"""
+        )
         await db.commit()
         _BOOTSTRAPPED_PATHS.add(str(path))
     finally:

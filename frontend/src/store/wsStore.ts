@@ -7,17 +7,6 @@ import { mapRewriteShotsToScenes } from "../lib/cascadeMapper";
 import { COPY } from "../lib/cardCopy";
 import type { FailurePayload } from "../types/cascade";
 
-// W5D3 — agent_response 启发式:后端 HardFailure 现在落到一条普通 agent 消息
-// 里,前端拿不到 FailurePayload,ChatPanel 留在 running,导致 founder 看到的
-// "95% 进度 + 错误气泡 共存" 反模式。这里把内容匹配上"请求超时/处理出错/系统
-// 暂时繁忙"的 agent_response 合成一个 FailurePayload 推到 canvasStore,顺手
-// 把 loading 翻掉。后端零改动。
-//
-// 风险:正常 agent 回答里若包含这些关键词会被误判。所以加 `loading=true` 守卫
-// (只有在等响应时才合成,refine 阶段的 agent 回答不会被吃)。
-const TIMEOUT_PATTERN = /请求超时|处理出错|系统暂时繁忙/;
-const REFUSED_PATTERN = /系统暂时繁忙/;
-
 // W5D3 P2 — runtime guard for the analysis_failed payload.
 // Backend Pydantic typing is wider than the frontend FailurePayload union
 // (the WS contract uses `str`, not an enum). If the backend ever ships a new
@@ -51,13 +40,17 @@ const KNOWN_ACTIONS: ReadonlySet<FailurePayload["actions"][number]> = new Set([
 // fallback from a real backend failure (which always has a real hex request_id).
 export const CLIENT_SYNTH_REQUEST_ID = "__client_synth__";
 
-export function synthesizeFailureFromContent(content: string): FailurePayload {
-  const isRefused = REFUSED_PATTERN.test(content);
+// W5D4 P1 — client-side timeout failure. Used ONLY when the *client* decides a
+// run took too long (App.tsx 300s safety timer, AnalysisProgress hard-timeout,
+// or the user's "换一条" pin-escape) — never to parse backend content. The old
+// `synthesizeFailureFromContent` regex-matched agent_response text ("处理出错"
+// etc.) and falsely flipped legitimate answers to `failed`; with P0-A delivering
+// structured analysis_failed frames reliably + P0-B persisting failure for
+// replay, that heuristic is gone. This is a plain literal, no content parsing.
+export function synthesizeClientTimeout(): FailurePayload {
   return {
-    code: isRefused ? "S8_UPSTREAM_REFUSED" : "S7_UPSTREAM_TIMEOUT",
-    hint: isRefused
-      ? COPY.synth_failure_refused_hint
-      : COPY.synth_failure_timeout_hint,
+    code: "S7_UPSTREAM_TIMEOUT",
+    hint: COPY.synth_failure_timeout_hint,
     actions: ["RETRY_SAME_URL_AFTER_60S", "PICK_FROM_FEATURED"],
     request_id: CLIENT_SYNTH_REQUEST_ID,
   };
@@ -136,6 +129,12 @@ interface WSStore {
   progressPercent: number | null;
   progressEta: number | null;
   progressDetail: string;
+  // W5D4 P0-C — frames whose thread_id != currentThreadId are BUFFERED here
+  // (per thread, bounded) instead of being silently dropped. Drained in order
+  // when the user switches to that thread (setCurrentThreadId). This makes a
+  // mid-run redirect/session-switch survivable: the running thread's frames are
+  // kept, not lost, even before P0-A guarantees they keep arriving server-side.
+  pendingByThread: Record<string, WSEvent[]>;
   setCurrentThreadId: (threadId: string) => void;
   setLoading: (loading: boolean) => void;
   resetThinking: () => void;
@@ -156,8 +155,24 @@ export const useWSStore = create<WSStore>((set, get) => ({
   progressPercent: null,
   progressEta: null,
   progressDetail: "",
+  pendingByThread: {},
 
-  setCurrentThreadId: (threadId) => set({ currentThreadId: threadId }),
+  setCurrentThreadId: (threadId) => {
+    set({ currentThreadId: threadId });
+    // W5D4 P0-C — drain any frames buffered while this thread wasn't current,
+    // in arrival order, then clear the bucket. Re-dispatch runs them through the
+    // normal reducer now that the guard will accept them (rid === currentThreadId).
+    const buffered = get().pendingByThread[threadId];
+    if (buffered && buffered.length) {
+      set((s) => {
+        const next = { ...s.pendingByThread };
+        delete next[threadId];
+        return { pendingByThread: next };
+      });
+      const userId = useSessionStore.getState().userId;
+      for (const ev of buffered) get().dispatch(ev, userId);
+    }
+  },
   setLoading: (loading) => {
     // W5D3 Bug #1: starting a new run must reset stale progress state
     // from prior analysis (else AnalysisProgress paints 100% instantly).
@@ -215,23 +230,29 @@ export const useWSStore = create<WSStore>((set, get) => ({
     }
 
     const rid = "thread_id" in event ? event.thread_id : undefined;
-    if (rid && rid !== get().currentThreadId) return;
+    if (rid && rid !== get().currentThreadId) {
+      // W5D4 P0-C — buffer (don't drop) frames for a non-current thread. A
+      // mid-run redirect/session-switch used to silently discard the running
+      // thread's analysis_progress/analysis_returned here → blank/卡死. Keep them
+      // bounded per thread (drop-oldest past cap) and replay on switch.
+      const CAP = 200;
+      set((s) => {
+        const bucket = s.pendingByThread[rid] ?? [];
+        const nextBucket = bucket.length >= CAP ? [...bucket.slice(1), event] : [...bucket, event];
+        return { pendingByThread: { ...s.pendingByThread, [rid]: nextBucket } };
+      });
+      return;
+    }
 
     switch (event.type) {
       case "agent_response": {
-        // W5D3 — 启发式合成 FailurePayload:仅当此前正在等响应(loading=true)
-        // 且内容命中超时/繁忙关键词时,推 setFailure 而非落到聊天历史。这样
-        // ChatPanel 立刻切到 failed 状态,不会和 95% 进度共存。
-        const wasLoading = get().loading;
+        // W5D4 P1 — the old content-regex heuristic (flip to `failed` when the
+        // reply text contained "请求超时/处理出错/系统暂时繁忙") is GONE. It
+        // false-positived on legitimate answers mentioning those words. The
+        // backend now delivers a structured `analysis_failed` frame for every
+        // terminal failure (via the live registry, P0-A) and persists it for
+        // replay (run_lifecycle, P0-B), so agent_response is always a success.
         set({ loading: false, thinking: [] });
-        if (wasLoading && TIMEOUT_PATTERN.test(event.content)) {
-          queueMicrotask(() => {
-            useCanvasStore.getState().setFailure(synthesizeFailureFromContent(event.content));
-            useCanvasStore.setState({ streamingContent: "" });
-          });
-          if (event.canvas) queueMicrotask(() => canvas.setCanvas(event.canvas!));
-          break;
-        }
         const last = get();
         if (
           last.lastAnswerAt !== null &&

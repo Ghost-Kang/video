@@ -17,8 +17,8 @@ from agent.llm_factory import get_chat_model
 from agent.pool import AgentPool
 from agent.store import save_message
 from agent.tools import canvas as canvas_tools
-from agent.transport import run_state
-from agent.transport.context import canvas_data, send_json
+from agent.transport import notify, run_state
+from agent.transport.context import canvas_data
 from agent.transport.runtime_ctx import RUN_CTX, set_run_ctx
 
 # W5D4 — hard ceiling on a single Director turn (seconds). A hung upstream model
@@ -69,7 +69,7 @@ async def run_agent(
     })
     reply = ""
     failed = False  # W5D3 CR-P1: explicit flag replaces magic-string sentinel.
-    run_state.mark_running(thread_id)  # W5D4 — lifecycle for reconnect resume
+    await run_state.mark_running(user_id, thread_id)  # W5D4 P0-B — persisted lifecycle
     try:
         # agent 的 tool call 通过 ContextVar 读写正确的用户/会话数据
         canvas_tools.set_user_id(user_id)
@@ -100,24 +100,31 @@ async def run_agent(
 
                 if isinstance(msg, AIMessageChunk) and msg.tool_calls:
                     for tc in msg.tool_calls:
-                        await send_json(
-                            ws,
-                            type="agent_stream",
-                            thread_id=thread_id,
-                            event="tool_call",
-                            name=tc.get("name", ""),
-                            args=str(tc.get("args", {})),
+                        await notify.send_to_user(
+                            user_id,
+                            {
+                                "type": "agent_stream",
+                                "thread_id": thread_id,
+                                "event": "tool_call",
+                                "name": tc.get("name", ""),
+                                "args": str(tc.get("args", {})),
+                            },
+                            fallback_ws=ws,
                         )
 
                 elif isinstance(msg, AIMessageChunk) and msg.content and not isinstance(msg, ToolMessage):
                     token = extract_text(msg.content)
                     if token and not full_reply.endswith(token):
                         full_reply += token
-                        await send_json(ws, type="agent_stream", thread_id=thread_id, event="text", content=token)
+                        await notify.send_to_user(
+                            user_id,
+                            {"type": "agent_stream", "thread_id": thread_id, "event": "text", "content": token},
+                            fallback_ws=ws,
+                        )
 
         reply = full_reply or "（未生成回复）"
         await asyncio.to_thread(save_message, user_id, thread_id, "agent", reply)
-        run_state.mark_done(thread_id)  # W5D4 — terminal success, reconnect-visible
+        await run_state.mark_done(thread_id)  # W5D4 — terminal success, reconnect-visible
     except Exception as e:
         # W5D3 — don't leak raw exception string into the WS push, AND don't
         # persist it verbatim into the chat history. The persisted line is
@@ -154,7 +161,7 @@ async def run_agent(
         # get_session_state) can replay it. The live analysis_failed frame
         # pushed below often never lands — the WS that died is usually what
         # triggered this failure in the first place.
-        run_state.mark_failed(thread_id, {
+        await run_state.mark_failed(thread_id, {
             "code": code_val,
             "hint": hint_val or "处理出错,请重试",
             "actions": actions_val,
@@ -186,18 +193,21 @@ async def run_agent(
             pass
 
         # Push structured analysis_failed WS frame so frontend ChatPanel flips
-        # into `failed` state directly. Narrow the catch so programming errors
-        # (TypeError / KeyError) still surface in tests instead of being eaten.
+        # into `failed` state directly. W5D4 P0-A — via live registry so a
+        # reconnect during the failing run still receives it.
         try:
-            await send_json(
-                ws,
-                type="analysis_failed",
-                thread_id=thread_id,
-                code=code_val,
-                hint=hint_val,
-                actions=actions_val,
-                request_id=request_id_val,
-                stage="analysis",
+            await notify.send_to_user(
+                user_id,
+                {
+                    "type": "analysis_failed",
+                    "thread_id": thread_id,
+                    "code": code_val,
+                    "hint": hint_val,
+                    "actions": actions_val,
+                    "request_id": request_id_val,
+                    "stage": "analysis",
+                },
+                fallback_ws=ws,
             )
         except (ConnectionClosed, ConnectionClosedOK, RuntimeError, OSError):
             pass
@@ -217,22 +227,19 @@ async def run_agent(
     snapshot = await asyncio.to_thread(canvas_data, thread_id)
     if failed:
         try:
-            await send_json(
-                ws,
-                type="canvas_updated",
-                thread_id=thread_id,
-                canvas=snapshot,
+            await notify.send_to_user(
+                user_id,
+                {"type": "canvas_updated", "thread_id": thread_id, "canvas": snapshot},
+                fallback_ws=ws,
             )
         except (ConnectionClosed, ConnectionClosedOK, RuntimeError, OSError):
             pass
     else:
         try:
-            await send_json(
-                ws,
-                type="agent_response",
-                thread_id=thread_id,
-                content=reply,
-                canvas=snapshot,
+            await notify.send_to_user(
+                user_id,
+                {"type": "agent_response", "thread_id": thread_id, "content": reply, "canvas": snapshot},
+                fallback_ws=ws,
             )
         except (ConnectionClosed, ConnectionClosedOK, RuntimeError, OSError):
             pass

@@ -87,6 +87,16 @@ async def main(host: str = "0.0.0.0", port: int = 8765, http_port: int = 8766) -
     # Codex-E 后:schema bootstrap 在 startup 一次性完成,而不是每个 _connect() 里反复
     # CREATE TABLE IF NOT EXISTS。lazy-init pattern 仍由 repo 内部支持兜底(冷启动安全)。
     await bootstrap_schema()
+    # W5D4 P0-B — flip any run_lifecycle row left 'running' by a previous process
+    # (died mid-run) to 'failed', so reconnecting clients get a deterministic
+    # terminal state instead of an infinite "整理输出 95%" spinner.
+    try:
+        from agent.transport import run_state
+        n = await run_state.reconcile_stale_runs()
+        if n:
+            print(f"[boot] reconciled {n} stale 'running' run(s) → failed")
+    except Exception as exc:
+        print(f"[boot] run reconcile skipped: {exc}")
     generation_worker.start_workers()
 
     stop_event = asyncio.Event()

@@ -54,22 +54,23 @@ from agent.transport.runtime_ctx import get_run_ctx
 
 
 async def _push_ws(payload: dict[str, Any]) -> None:
-    """Best-effort WS frame push.
+    """Best-effort WS frame push for tool-emitted frames (analysis_returned /
+    rewrite_returned / analysis_failed / shot_first_frame_returned).
 
-    Swallows *connection-related* errors only — the connection may have
-    closed mid-tool and that's expected. Programming errors (TypeError /
-    KeyError from a malformed payload) must propagate so they surface in
-    tests and dev logs rather than being silently dropped.
+    W5D4 P0-A — route through `notify.send_to_user` (live-registry lookup) instead
+    of the ws captured into RUN_CTX at run-start. A run lives 20–50s; if its
+    socket died and the browser reconnected on a new ws, the old code pushed
+    these (the *result* frames!) to the dead socket and they vanished — the
+    dominant "卡 95% / 拆解空白" cause. The registry resolves the current live
+    socket at send time. `fallback_ws` keeps the no-registry test path working.
     """
+    from agent.transport import notify
+
     ctx = get_run_ctx()
-    ws = ctx.get("ws")
-    if ws is None:
+    user_id = ctx.get("user_id")
+    if not user_id:
         return
-    try:
-        await ws.send(json.dumps(payload, ensure_ascii=False))
-    except (ConnectionClosed, ConnectionClosedOK, RuntimeError, OSError):
-        # WS may have closed mid-tool — don't bring down the agent turn.
-        pass
+    await notify.send_to_user(user_id, payload, fallback_ws=ctx.get("ws"))
 
 
 async def _push_failure_frame(
