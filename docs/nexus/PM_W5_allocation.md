@@ -76,6 +76,18 @@ PM 在 W5D1 早盘读以下信号决定本周节奏:
 
 **Total founder load**:~1.5 h/w(同 W4 设计)。
 
+### 3.5 Security review follow-ups(2026-05-28 Opus 4.8 review)
+
+来源:`docs/nexus/architecture_review_2026-05-28_opus.md`。P0–P3 **已修复并上线**(commit `20f34f1`,公网实测 auth gap 已堵死)。以下为遗留 follow-up,**非阻塞**,按 gating 排入合适周期 —— 不要在 W5 提前拉起 SR-2/SR-3。
+
+| Ticket | Owner | Brief | Done-signal | Gating |
+|---|---|---|---|---|
+| SR-1 轮换 `CASCADE_ADMIN_TOKEN` | Founder | 现 token 出现在 2026-05-28 session transcript;`openssl rand -hex 24` 重生,更新 prod `.env` + admin 页重填一次 | 新 token 生效 + 旧 token 失效(`curl -H 'X-Admin-Token: <旧>' /api/creators` → 401) | 即时(凭证卫生);与 `reference_prod_server` 轮换清单合并 |
+| SR-2 cost_guard 服务端身份 | Codex / Claude | cost_guard 现按 **client 自报** `user_id`/`run_id` 计额度,cohort 内可轮换绕过 per-user 日额度。改为服务端验证身份(invite → 服务端发会话 token,额度绑定该身份) | 同一 invite 下轮换 user_id 不能突破 per-user 日额度 | **gate:cohort 扩到 > 10 人前**(W6 scaling 决策时重评);公网无上限 DoS 已堵死,当前 10 人熟人可接受 |
+| SR-3 FastAPI/Starlette transport 迁移 | Claude | 退掉手写 HTTP parser;`_check_auth` 已抽好,迁移时映射成 typed route deps + OpenAPI | 见 `architecture_transport_storage_P2_plan.md` done-signal | **gate:measured contention OR > 30 creator**(per perf review)—— 非 W5 |
+
+> PM 注:SR-1 是唯一需要本周期内动作的项(founder lane,凭证卫生)。SR-2/SR-3 在 §6 W6+ 重评时按 cohort 规模 gating 决定是否拉起。
+
 ---
 
 ## 4. AI 数字员工 W5 dispatch table
@@ -126,6 +138,7 @@ PM 在 W5D7 重评:
 - 真实 first-run 显示产品 fit 弱?→ W6 暂停 cohort,先 prompt iteration + 锚点系统优化
 - founder load 实际 ≤ 1.5 h/w?→ 节奏 sustainable;> 3 h/w?→ inventory R1 重审
 - agent 产出质量?→ catalog 里挑替补 OR 自建更多 cascade custom
+- **若 W6 决定 scaling cohort → 同时拉起 §3.5 SR-2(cost_guard 服务端身份),它的 gate 正是 "cohort > 10 人前"**;SR-3 transport 迁移仍按 contention/30-creator gating,通常晚于 W6
 
 ---
 
