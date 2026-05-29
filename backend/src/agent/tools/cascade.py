@@ -42,7 +42,12 @@ from agent.cascade.rewrite_service import (
     RewriteResult,
     request_rewrite,
 )
-from agent.cascade.storage import load_analysis, load_rewrite_by_id
+from agent.cascade.storage import (
+    load_analysis,
+    load_rewrite_by_id,
+    record_analysis,
+    record_rewrite,
+)
 from agent.llm_factory import current_model_name, get_chat_model
 from agent.tools.generation import ApimartProvider
 from agent.transport.runtime_ctx import get_run_ctx
@@ -227,6 +232,12 @@ async def cascade_analyze(source_url: str) -> dict:
         }
 
     if thread_id:
+        # W5D4 — record the thread→analysis pointer BEFORE the push so a reload
+        # right after completion can replay it even if the WS frame is lost.
+        try:
+            await record_analysis(user_id, thread_id, contract.analysis_id)
+        except Exception:  # persistence is best-effort; never block the result
+            pass
         await _push_ws({
             "type": "analysis_returned",
             "thread_id": thread_id,
@@ -303,6 +314,11 @@ async def cascade_rewrite(analysis_id: str, niche: str) -> dict:
         }
 
     if thread_id:
+        # W5D4 — persist thread→rewrite pointer before push (reload replay).
+        try:
+            await record_rewrite(user_id, thread_id, result.rewrite_id)
+        except Exception:
+            pass
         await _push_ws({
             "type": "rewrite_returned",
             "thread_id": thread_id,

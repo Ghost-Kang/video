@@ -10,10 +10,12 @@ handler 签名:`async def handle_xxx(ctx: WSCtx, msg: XxxMsg) -> None`
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any, Awaitable, Callable
 
 from agent import store  # 通过 module 访问,方便 test monkeypatch
 from agent.cascade import events as cascade_events  # module 访问,test 可 patch emit
+from agent.cascade import storage as cascade_storage  # module 访问,test 可 patch
 from agent.cascade.event_names import EventName
 from agent.config import IMAGE_GEN_PROVIDER
 from agent.tools import canvas as canvas_tools
@@ -132,6 +134,50 @@ async def handle_get_session_state(ctx: WSCtx, msg: GetSessionStateMsg) -> None:
         run_status=run_status,
         failure=failure,
     )
+    # W5D4 — replay this thread's analysis/rewrite so a reloaded finished
+    # session shows its cards instead of an empty panel. analysis_returned /
+    # rewrite_returned are the same frames the cascade tool pushes live, so the
+    # frontend renders them through its existing handlers (zero UI change).
+    await _replay_results(ctx, msg.thread_id)
+
+
+async def _replay_results(ctx: WSCtx, thread_id: str) -> None:
+    """Re-push stored analysis_returned / rewrite_returned for a thread."""
+    try:
+        analysis_id, rewrite_id = await cascade_storage.load_pointers(
+            ctx.user_id, thread_id
+        )
+    except Exception as exc:  # best-effort; replay never blocks session_state
+        print(f"[replay] load_pointers failed thread={thread_id}: {exc}")
+        return
+
+    if analysis_id:
+        try:
+            contract = await cascade_storage.load_analysis(analysis_id)
+            if contract is not None:
+                await send_json(
+                    ctx.ws,
+                    type="analysis_returned",
+                    thread_id=thread_id,
+                    analysis=contract.model_dump(mode="json"),
+                )
+        except Exception as exc:
+            print(f"[replay] analysis {analysis_id} failed: {exc}")
+
+    if rewrite_id:
+        try:
+            result_json = await cascade_storage.load_rewrite_by_id(rewrite_id)
+            if result_json:
+                rewrite = json.loads(result_json)
+                await send_json(
+                    ctx.ws,
+                    type="rewrite_returned",
+                    thread_id=thread_id,
+                    analysis_id=rewrite.get("analysis_id", analysis_id or ""),
+                    rewrite=rewrite,
+                )
+        except Exception as exc:
+            print(f"[replay] rewrite {rewrite_id} failed: {exc}")
 
 
 # ---------- canvas edges ----------

@@ -219,6 +219,66 @@ def test_get_session_state_returns_messages_and_canvas(isolated_ws):
     assert "canvas" in state
 
 
+def test_get_session_state_replays_analysis_and_rewrite(isolated_ws, monkeypatch):
+    """W5D4: a finished thread with stored results re-pushes analysis_returned +
+    rewrite_returned after session_state, so a reload renders the cards."""
+    from agent.transport import ws_handlers
+
+    class _FakeContract:
+        analysis_id = "ana_test123"
+
+        def model_dump(self, mode="json"):
+            return {"analysis_id": self.analysis_id, "scenes": []}
+
+    async def _fake_pointers(user_id, thread_id):
+        assert thread_id == "t1"
+        return "ana_test123", "rw_test456"
+
+    async def _fake_load_analysis(analysis_id):
+        assert analysis_id == "ana_test123"
+        return _FakeContract()
+
+    async def _fake_load_rewrite(rewrite_id):
+        assert rewrite_id == "rw_test456"
+        return json.dumps({"rewrite_id": rewrite_id, "analysis_id": "ana_test123", "shots": []})
+
+    monkeypatch.setattr(ws_handlers.cascade_storage, "load_pointers", _fake_pointers)
+    monkeypatch.setattr(ws_handlers.cascade_storage, "load_analysis", _fake_load_analysis)
+    monkeypatch.setattr(ws_handlers.cascade_storage, "load_rewrite_by_id", _fake_load_rewrite)
+
+    ws = FakeWebSocket([
+        json.dumps({"type": "auth", "user_id": "u1"}),
+        json.dumps({"type": "get_session_state", "thread_id": "t1"}),
+    ])
+    _run(server.handle(ws))
+
+    # auth→session_list, then session_state + analysis_returned + rewrite_returned
+    types = [m.get("type") for m in ws.sent]
+    assert types == ["session_list", "session_state", "analysis_returned", "rewrite_returned"]
+    assert ws.sent[2]["analysis"]["analysis_id"] == "ana_test123"
+    assert ws.sent[3]["analysis_id"] == "ana_test123"
+    assert ws.sent[3]["rewrite"]["rewrite_id"] == "rw_test456"
+
+
+def test_get_session_state_no_results_no_replay(isolated_ws, monkeypatch):
+    """W5D4: a thread with no stored results sends only session_state (no replay)."""
+    from agent.transport import ws_handlers
+
+    async def _no_pointers(user_id, thread_id):
+        return None, None
+
+    monkeypatch.setattr(ws_handlers.cascade_storage, "load_pointers", _no_pointers)
+
+    ws = FakeWebSocket([
+        json.dumps({"type": "auth", "user_id": "u1"}),
+        json.dumps({"type": "get_session_state", "thread_id": "t1"}),
+    ])
+    _run(server.handle(ws))
+
+    types = [m.get("type") for m in ws.sent]
+    assert types == ["session_list", "session_state"]
+
+
 def test_delete_session_sends_session_list_ack(isolated_ws):
     """P2 fix verify:delete_session 之后应 push 新的 session_list 作为 ACK,
     且被删除的 session 不再出现在列表中。"""

@@ -123,6 +123,22 @@ async def bootstrap_schema(db: aiosqlite.Connection | None = None) -> None:
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_toprador_cache_expires ON toprador_cache(expires_at)"
         )
+        # W5D4 — per-(user, thread) pointer to the latest analysis + rewrite a
+        # thread produced. analysis_returned / rewrite_returned are transient WS
+        # pushes; without this map, get_session_state can't tell which stored
+        # analysis/rewrite belongs to a thread, so a reloaded finished session
+        # came back empty (and the dock mis-rendered "running" — see
+        # chatPanelState fix). Upsert on each push; replay on reconnect.
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS session_results (
+              user_id     TEXT NOT NULL,
+              thread_id   TEXT NOT NULL,
+              analysis_id TEXT,
+              rewrite_id  TEXT,
+              updated_at  TEXT NOT NULL,
+              PRIMARY KEY (user_id, thread_id)
+            )"""
+        )
         await db.commit()
         _BOOTSTRAPPED_PATHS.add(str(path))
     finally:

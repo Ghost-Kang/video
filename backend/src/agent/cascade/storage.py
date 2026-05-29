@@ -17,6 +17,11 @@ from agent.cascade.persistence.rewrites_repo import (
     load_rewrite_by_id,
     save_rewrite,
 )
+from agent.cascade.persistence.session_results_repo import (
+    load_pointers,
+    record_analysis,
+    record_rewrite,
+)
 from agent.cascade.persistence.toprador_cache_repo import (
     _load_toprador_cache_entry,
     cleanup_expired_toprador_cache,
@@ -36,9 +41,12 @@ __all__ = [
     "load_analysis",
     "load_analysis_for_source",
     "load_latest_analysis_for_source",
+    "load_pointers",
     "load_recent_rewrite",
     "load_rewrite_by_id",
     "load_toprador_cache",
+    "record_analysis",
+    "record_rewrite",
     "retention_sweep",
     "save_analysis",
     "save_event",
