@@ -17,7 +17,7 @@ from agent.cascade import events as cascade_events  # module 访问,test 可 pat
 from agent.cascade.event_names import EventName
 from agent.config import IMAGE_GEN_PROVIDER
 from agent.tools import canvas as canvas_tools
-from agent.transport import agent_runner  # module 访问同理
+from agent.transport import agent_runner, run_state  # module 访问同理
 from agent.transport.context import WSCtx, canvas_data, send_json
 from agent.transport.ws_messages import (
     INBOUND_MODELS,
@@ -94,6 +94,23 @@ async def handle_delete_session(ctx: WSCtx, msg: DeleteSessionMsg) -> None:
     await send_json(ctx.ws, type="session_list", sessions=sessions)
 
 
+def _resolve_run_status(thread_id: str, msgs: list[dict]) -> tuple[str, dict | None]:
+    """Best-effort run lifecycle for reconnect resume (W5D4).
+
+    The in-process registry is authoritative when present (same backend
+    process). After a restart it's empty, so we infer from chat history: an
+    agent message at the tail means the turn already produced a terminal reply
+    (done); otherwise nothing is in flight (a run live at restart is dead — we
+    report `idle` so the client stops spinning instead of waiting forever on a
+    frame that will never arrive)."""
+    st = run_state.get(thread_id)
+    if st is not None:
+        return st["status"], st["failure"]
+    if msgs and msgs[-1].get("role") == "agent":
+        return "done", None
+    return "idle", None
+
+
 async def handle_get_session_state(ctx: WSCtx, msg: GetSessionStateMsg) -> None:
     print(f"[请求] get_session_state thread={msg.thread_id}")
 
@@ -104,13 +121,16 @@ async def handle_get_session_state(ctx: WSCtx, msg: GetSessionStateMsg) -> None:
         return msgs, canvas
 
     msgs, canvas = await asyncio.to_thread(_work)
-    print(f"[请求] 返回 msgs={len(msgs)} canvas={canvas is not None}")
+    run_status, failure = _resolve_run_status(msg.thread_id, msgs)
+    print(f"[请求] 返回 msgs={len(msgs)} canvas={canvas is not None} run_status={run_status}")
     await send_json(
         ctx.ws,
         type="session_state",
         thread_id=msg.thread_id,
         messages=msgs,
         canvas=canvas,
+        run_status=run_status,
+        failure=failure,
     )
 
 

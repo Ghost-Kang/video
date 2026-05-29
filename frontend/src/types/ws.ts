@@ -88,6 +88,17 @@ export interface SessionListEventTyped extends Omit<SessionListEvent, "sessions"
 export interface SessionStateEventTyped extends Omit<SessionStateEvent, "messages" | "canvas"> {
   messages: ChatMessageEvent[];
   canvas?: CanvasData | null;
+  // W5D4 — run lifecycle for reconnect resume. Mirrors backend
+  // ws_messages.SessionStateEvent (run `scripts/sync-ws-types.sh` to also pick
+  // these up in the generated ws_generated.ts). Lets the client stop an orphaned
+  // 95% spinner when the terminal frame was lost to a mid-run disconnect.
+  run_status?: "running" | "done" | "failed" | "idle";
+  failure?: {
+    code: string;
+    hint: string;
+    actions: string[];
+    request_id: string;
+  } | null;
 }
 
 export interface CanvasUpdatedEventTyped extends Omit<CanvasUpdatedEvent, "canvas"> {

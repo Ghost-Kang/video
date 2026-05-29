@@ -67,6 +67,10 @@ export type Messages = {
 export type Canvas = {
   [k: string]: unknown;
 } | null;
+export type RunStatus = string;
+export type Failure = {
+  [k: string]: unknown;
+} | null;
 export type Type16 = "canvas_updated";
 export type ThreadId12 = string;
 export type Canvas1 = {
@@ -243,6 +247,8 @@ export interface SessionStateEvent {
   thread_id: ThreadId11;
   messages: Messages;
   canvas?: Canvas;
+  run_status?: RunStatus;
+  failure?: Failure;
 }
 export interface CanvasUpdatedEvent {
   type: Type16;

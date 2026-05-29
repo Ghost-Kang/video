@@ -17,8 +17,15 @@ from agent.llm_factory import get_chat_model
 from agent.pool import AgentPool
 from agent.store import save_message
 from agent.tools import canvas as canvas_tools
+from agent.transport import run_state
 from agent.transport.context import canvas_data, send_json
 from agent.transport.runtime_ctx import RUN_CTX, set_run_ctx
+
+# W5D4 — hard ceiling on a single Director turn (seconds). A hung upstream model
+# call otherwise leaves the run task — and the thread run-state — pending forever
+# (the "stuck at 95%" root cause). asyncio.timeout raises TimeoutError on expiry,
+# which the handler below classifies as S7_UPSTREAM_TIMEOUT.
+RUN_TURN_TIMEOUT_S = 180
 
 
 def extract_text(content) -> str:
@@ -62,6 +69,7 @@ async def run_agent(
     })
     reply = ""
     failed = False  # W5D3 CR-P1: explicit flag replaces magic-string sentinel.
+    run_state.mark_running(thread_id)  # W5D4 — lifecycle for reconnect resume
     try:
         # agent 的 tool call 通过 ContextVar 读写正确的用户/会话数据
         canvas_tools.set_user_id(user_id)
@@ -77,33 +85,39 @@ async def run_agent(
         )
 
         full_reply = ""
-        async for chunk in entry["agent"].astream(
-            {"messages": [{"role": "user", "content": agent_input_content}]},
-            config=entry["config"],
-            stream_mode="messages",
-            version="v2",
-        ):
-            msg, meta = chunk["data"]
+        # W5D4 — bound the whole streamed turn. If the upstream model stalls,
+        # asyncio.timeout fires TimeoutError instead of hanging this task (and
+        # the thread's run-state) indefinitely; the except below classifies it
+        # as S7_UPSTREAM_TIMEOUT and pushes a recoverable failure.
+        async with asyncio.timeout(RUN_TURN_TIMEOUT_S):
+            async for chunk in entry["agent"].astream(
+                {"messages": [{"role": "user", "content": agent_input_content}]},
+                config=entry["config"],
+                stream_mode="messages",
+                version="v2",
+            ):
+                msg, meta = chunk["data"]
 
-            if isinstance(msg, AIMessageChunk) and msg.tool_calls:
-                for tc in msg.tool_calls:
-                    await send_json(
-                        ws,
-                        type="agent_stream",
-                        thread_id=thread_id,
-                        event="tool_call",
-                        name=tc.get("name", ""),
-                        args=str(tc.get("args", {})),
-                    )
+                if isinstance(msg, AIMessageChunk) and msg.tool_calls:
+                    for tc in msg.tool_calls:
+                        await send_json(
+                            ws,
+                            type="agent_stream",
+                            thread_id=thread_id,
+                            event="tool_call",
+                            name=tc.get("name", ""),
+                            args=str(tc.get("args", {})),
+                        )
 
-            elif isinstance(msg, AIMessageChunk) and msg.content and not isinstance(msg, ToolMessage):
-                token = extract_text(msg.content)
-                if token and not full_reply.endswith(token):
-                    full_reply += token
-                    await send_json(ws, type="agent_stream", thread_id=thread_id, event="text", content=token)
+                elif isinstance(msg, AIMessageChunk) and msg.content and not isinstance(msg, ToolMessage):
+                    token = extract_text(msg.content)
+                    if token and not full_reply.endswith(token):
+                        full_reply += token
+                        await send_json(ws, type="agent_stream", thread_id=thread_id, event="text", content=token)
 
         reply = full_reply or "（未生成回复）"
         await asyncio.to_thread(save_message, user_id, thread_id, "agent", reply)
+        run_state.mark_done(thread_id)  # W5D4 — terminal success, reconnect-visible
     except Exception as e:
         # W5D3 — don't leak raw exception string into the WS push, AND don't
         # persist it verbatim into the chat history. The persisted line is
@@ -135,6 +149,17 @@ async def run_agent(
             hint_val = _HINTS.get(code_val, "处理出错,请重试或换一条链接。")
             actions_val = _ACTIONS.get(code_val, ["REPORT"])
             request_id_val = ""
+
+        # W5D4 — record terminal failure so a reconnecting client (via
+        # get_session_state) can replay it. The live analysis_failed frame
+        # pushed below often never lands — the WS that died is usually what
+        # triggered this failure in the first place.
+        run_state.mark_failed(thread_id, {
+            "code": code_val,
+            "hint": hint_val or "处理出错,请重试",
+            "actions": actions_val,
+            "request_id": request_id_val,
+        })
 
         # Persist sanitized hint (raw traceback still lands in events.db below).
         await asyncio.to_thread(

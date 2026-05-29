@@ -1,0 +1,139 @@
+- generic [ref=e3]:
+  - button "切换主题" [ref=e5]:
+    - img [ref=e6]
+  - generic [ref=e8]:
+    - generic [ref=e9]: 🔑 管理令牌已设置
+    - button "修改" [ref=e10]
+  - main [ref=e12]:
+    - generic [ref=e13]:
+      - paragraph [ref=e14]: Admin · Events
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - heading "事件直播流" [level=1] [ref=e17]
+          - paragraph [ref=e18]: 最近 15 条事件 · 每 30s 自动刷新
+        - button "手动刷新" [ref=e19]
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - text: 事件类型
+            - combobox "event type filter" [ref=e23]:
+              - option "全部类型" [selected]
+              - option "run_started"
+              - option "analysis_returned"
+              - option "script_rewritten"
+              - option "shot_generated"
+              - option "publish_pack_copied"
+              - option "anchor_created"
+              - option "anchor_reused"
+              - option "failure_emitted"
+              - option "failure_recovered"
+              - option "generation_cost"
+              - option "interview_logged"
+              - option "consent_accepted"
+          - generic [ref=e24]:
+            - text: user_id
+            - searchbox "user_id filter" [ref=e25]
+        - generic [ref=e26]:
+          - 'generic "analysis_returned: 3" [ref=e27]': analysis_returned:3
+          - 'generic "cascade_cache_hit: 1" [ref=e28]': cascade_cache_hit:1
+          - 'generic "consent_accepted: 3" [ref=e29]': consent_accepted:3
+          - 'generic "client_error: 8" [ref=e30]': client_error:8
+        - table [ref=e32]:
+          - rowgroup [ref=e33]:
+            - row "时间 事件 user_id run_id payload" [ref=e34]:
+              - columnheader "时间" [ref=e35]
+              - columnheader "事件" [ref=e36]
+              - columnheader "user_id" [ref=e37]
+              - columnheader "run_id" [ref=e38]
+              - columnheader "payload" [ref=e39]
+          - rowgroup [ref=e40]:
+            - row "2026/5/28 19:08:41 analysis_returned anon-qypmv4vpmpqa8v2n — analysis_id=ana_0eccb4c60add5f4ac6b80989 confidence=0.85 cost_cny=0.5" [ref=e41] [cursor=pointer]:
+              - cell "2026/5/28 19:08:41" [ref=e42]
+              - cell "analysis_returned" [ref=e43]
+              - cell "anon-qypmv4vpmpqa8v2n" [ref=e44]
+              - cell "—" [ref=e45]
+              - cell "analysis_id=ana_0eccb4c60add5f4ac6b80989 confidence=0.85 cost_cny=0.5" [ref=e46]
+            - row "2026/5/28 19:08:41 cascade_cache_hit anon-qypmv4vpmpqa8v2n — cache_layer=sqlite source_url_hash=d7c04409be95 ttl_remaining_s=60" [ref=e47] [cursor=pointer]:
+              - cell "2026/5/28 19:08:41" [ref=e48]
+              - cell "cascade_cache_hit" [ref=e49]
+              - cell "anon-qypmv4vpmpqa8v2n" [ref=e50]
+              - cell "—" [ref=e51]
+              - cell "cache_layer=sqlite source_url_hash=d7c04409be95 ttl_remaining_s=60" [ref=e52]
+            - row "2026/5/28 19:08:19 consent_accepted anon-qypmv4vpmpqa8v2n — accepted_at=2026-05-29T02:08:18.766Z documents=[\"user_agreement_v0\",\"privacy_v0 version=v0" [ref=e53] [cursor=pointer]:
+              - cell "2026/5/28 19:08:19" [ref=e54]
+              - cell "consent_accepted" [ref=e55]
+              - cell "anon-qypmv4vpmpqa8v2n" [ref=e56]
+              - cell "—" [ref=e57]
+              - cell "accepted_at=2026-05-29T02:08:18.766Z documents=[\"user_agreement_v0\",\"privacy_v0 version=v0" [ref=e58]
+            - row "2026/5/28 18:22:56 analysis_returned anon-tuhlvh9kmpq8kfnj — analysis_id=ana_72a39915c4251cbe6a1c8286 confidence=0.85 cost_cny=0.5" [ref=e59] [cursor=pointer]:
+              - cell "2026/5/28 18:22:56" [ref=e60]
+              - cell "analysis_returned" [ref=e61]
+              - cell "anon-tuhlvh9kmpq8kfnj" [ref=e62]
+              - cell "—" [ref=e63]
+              - cell "analysis_id=ana_72a39915c4251cbe6a1c8286 confidence=0.85 cost_cny=0.5" [ref=e64]
+            - row "2026/5/28 18:21:19 consent_accepted anon-tuhlvh9kmpq8kfnj — accepted_at=2026-05-29T01:21:19.421Z documents=[\"user_agreement_v0\",\"privacy_v0 version=v0" [ref=e65] [cursor=pointer]:
+              - cell "2026/5/28 18:21:19" [ref=e66]
+              - cell "consent_accepted" [ref=e67]
+              - cell "anon-tuhlvh9kmpq8kfnj" [ref=e68]
+              - cell "—" [ref=e69]
+              - cell "accepted_at=2026-05-29T01:21:19.421Z documents=[\"user_agreement_v0\",\"privacy_v0 version=v0" [ref=e70]
+            - row "2026/5/28 16:54:53 analysis_returned anon-qhwk5ndvmpq5f67j — analysis_id=ana_201dacdafe7133eec488b466 confidence=0.85 cost_cny=0.5" [ref=e71] [cursor=pointer]:
+              - cell "2026/5/28 16:54:53" [ref=e72]
+              - cell "analysis_returned" [ref=e73]
+              - cell "anon-qhwk5ndvmpq5f67j" [ref=e74]
+              - cell "—" [ref=e75]
+              - cell "analysis_id=ana_201dacdafe7133eec488b466 confidence=0.85 cost_cny=0.5" [ref=e76]
+            - row "2026/5/28 16:53:15 consent_accepted anon-qhwk5ndvmpq5f67j — accepted_at=2026-05-28T23:53:15.054Z documents=[\"user_agreement_v0\",\"privacy_v0 version=v0" [ref=e77] [cursor=pointer]:
+              - cell "2026/5/28 16:53:15" [ref=e78]
+              - cell "consent_accepted" [ref=e79]
+              - cell "anon-qhwk5ndvmpq5f67j" [ref=e80]
+              - cell "—" [ref=e81]
+              - cell "accepted_at=2026-05-28T23:53:15.054Z documents=[\"user_agreement_v0\",\"privacy_v0 version=v0" [ref=e82]
+            - row "2026/5/28 16:53:06 client_error anonymous — colno=— filename= kind=react_error_boundary" [ref=e83] [cursor=pointer]:
+              - cell "2026/5/28 16:53:06" [ref=e84]
+              - cell "client_error" [ref=e85]
+              - cell "anonymous" [ref=e86]
+              - cell "—" [ref=e87]
+              - cell "colno=— filename= kind=react_error_boundary" [ref=e88]
+            - row "2026/5/28 16:47:25 client_error anonymous — colno=— filename= kind=react_error_boundary" [ref=e89] [cursor=pointer]:
+              - cell "2026/5/28 16:47:25" [ref=e90]
+              - cell "client_error" [ref=e91]
+              - cell "anonymous" [ref=e92]
+              - cell "—" [ref=e93]
+              - cell "colno=— filename= kind=react_error_boundary" [ref=e94]
+            - row "2026/5/28 16:42:27 client_error anonymous — colno=— filename= kind=react_error_boundary" [ref=e95] [cursor=pointer]:
+              - cell "2026/5/28 16:42:27" [ref=e96]
+              - cell "client_error" [ref=e97]
+              - cell "anonymous" [ref=e98]
+              - cell "—" [ref=e99]
+              - cell "colno=— filename= kind=react_error_boundary" [ref=e100]
+            - row "2026/5/28 16:41:14 client_error anonymous — colno=— filename= kind=react_error_boundary" [ref=e101] [cursor=pointer]:
+              - cell "2026/5/28 16:41:14" [ref=e102]
+              - cell "client_error" [ref=e103]
+              - cell "anonymous" [ref=e104]
+              - cell "—" [ref=e105]
+              - cell "colno=— filename= kind=react_error_boundary" [ref=e106]
+            - row "2026/5/28 16:41:01 client_error anonymous — colno=— filename= kind=react_error_boundary" [ref=e107] [cursor=pointer]:
+              - cell "2026/5/28 16:41:01" [ref=e108]
+              - cell "client_error" [ref=e109]
+              - cell "anonymous" [ref=e110]
+              - cell "—" [ref=e111]
+              - cell "colno=— filename= kind=react_error_boundary" [ref=e112]
+            - row "2026/5/28 16:40:50 client_error anonymous — colno=— filename= kind=react_error_boundary" [ref=e113] [cursor=pointer]:
+              - cell "2026/5/28 16:40:50" [ref=e114]
+              - cell "client_error" [ref=e115]
+              - cell "anonymous" [ref=e116]
+              - cell "—" [ref=e117]
+              - cell "colno=— filename= kind=react_error_boundary" [ref=e118]
+            - row "2026/5/28 16:39:35 client_error anonymous — colno=— filename= kind=react_error_boundary" [ref=e119] [cursor=pointer]:
+              - cell "2026/5/28 16:39:35" [ref=e120]
+              - cell "client_error" [ref=e121]
+              - cell "anonymous" [ref=e122]
+              - cell "—" [ref=e123]
+              - cell "colno=— filename= kind=react_error_boundary" [ref=e124]
+            - row "2026/5/28 16:38:35 client_error anonymous — colno=— filename= kind=react_error_boundary" [ref=e125] [cursor=pointer]:
+              - cell "2026/5/28 16:38:35" [ref=e126]
+              - cell "client_error" [ref=e127]
+              - cell "anonymous" [ref=e128]
+              - cell "—" [ref=e129]
+              - cell "colno=— filename= kind=react_error_boundary" [ref=e130]

@@ -63,6 +63,33 @@ export function synthesizeFailureFromContent(content: string): FailurePayload {
   };
 }
 
+// W5D3/W5D4 — coerce a backend failure (analysis_failed frame OR session_state
+// resume) into a frontend-safe FailurePayload. The WS contract types code/actions
+// as plain strings; map anything the union doesn't know to a stable fallback so a
+// newly-shipped backend code never renders an undefined hint title.
+export function normalizeFailurePayload(
+  code: string,
+  hint: string,
+  actions: readonly string[] | undefined,
+  request_id: string | undefined,
+): FailurePayload {
+  const normalizedCode: FailurePayload["code"] = KNOWN_CODES.has(
+    code as FailurePayload["code"],
+  )
+    ? (code as FailurePayload["code"])
+    : "S5_INVALID_PAYLOAD";
+  const normalizedActions: FailurePayload["actions"] = (actions || []).filter(
+    (a): a is FailurePayload["actions"][number] =>
+      KNOWN_ACTIONS.has(a as FailurePayload["actions"][number]),
+  );
+  return {
+    code: normalizedCode,
+    hint,
+    actions: normalizedActions.length > 0 ? normalizedActions : ["REPORT"],
+    request_id: request_id || "",
+  };
+}
+
 
 // 把后端 invalid_command code 映射成宝妈看得懂的中文标题。
 // 未列的 code 一律 fallback 到通用 "请求出错"。
@@ -209,10 +236,31 @@ export const useWSStore = create<WSStore>((set, get) => ({
         break;
       case "processing":
         break;
-      case "session_state":
+      case "session_state": {
         canvas.setMessages(event.messages);
         if (event.canvas) queueMicrotask(() => canvas.setCanvas(event.canvas!));
+        // W5D4 — resume terminal run state on reconnect. Without this, a run
+        // whose terminal frame (agent_response / analysis_failed) was lost to a
+        // mid-run disconnect leaves the dock spinning at 95% forever.
+        // run_status: "running" | "done" | "failed" | "idle".
+        const rs = event.run_status;
+        if (rs === "failed" && event.failure) {
+          const f = event.failure;
+          set({ loading: false, thinking: [] });
+          queueMicrotask(() => {
+            useCanvasStore
+              .getState()
+              .setFailure(
+                normalizeFailurePayload(f.code, f.hint, f.actions, f.request_id),
+              );
+            useCanvasStore.setState({ streamingContent: "" });
+          });
+        } else if (rs && rs !== "running") {
+          // done / idle — nothing in flight; stop any orphaned spinner.
+          set({ loading: false, thinking: [] });
+        }
         break;
+      }
       case "agent_stream":
         if (event.event === "tool_call") {
           set((state) => ({ thinking: [...state.thinking, labelToolCall(event.name ?? undefined)] }));
@@ -291,27 +339,19 @@ export const useWSStore = create<WSStore>((set, get) => ({
         // non-null,so this drives the UI directly without keyword matching.
         set({ loading: false, thinking: [] });
         queueMicrotask(() => {
-          // W5D3 P2 — runtime-validate the code/actions before downcasting.
-          // The backend Pydantic AnalysisFailedEvent allows any string for
-          // `code` and `actions[]`. If a backend deploy adds a new code the
-          // frontend type union doesn't know about, casting silently produces
-          // an undefined hint title. Map unknown codes to a stable fallback.
-          const normalizedCode: FailurePayload["code"] = KNOWN_CODES.has(
-            event.code as FailurePayload["code"],
-          )
-            ? (event.code as FailurePayload["code"])
-            : "S5_INVALID_PAYLOAD";
-          const normalizedActions: FailurePayload["actions"] = (event.actions || [])
-            .filter((a): a is FailurePayload["actions"][number] =>
-              KNOWN_ACTIONS.has(a as FailurePayload["actions"][number]),
+          // W5D3 P2 / W5D4 — runtime-validate code/actions before downcasting
+          // (the WS contract types them as plain strings). Shared with the
+          // session_state reconnect resume via normalizeFailurePayload.
+          useCanvasStore
+            .getState()
+            .setFailure(
+              normalizeFailurePayload(
+                event.code,
+                event.hint,
+                event.actions,
+                event.request_id,
+              ),
             );
-          useCanvasStore.getState().setFailure({
-            code: normalizedCode,
-            hint: event.hint,
-            actions:
-              normalizedActions.length > 0 ? normalizedActions : ["REPORT"],
-            request_id: event.request_id || "",
-          });
           // Clear any in-flight streaming so it doesn't visually compete
           // with the failure banner.
           useCanvasStore.setState({ streamingContent: "" });

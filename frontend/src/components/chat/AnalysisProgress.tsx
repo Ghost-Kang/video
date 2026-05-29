@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWSStore } from "../../store/wsStore";
 import { COPY } from "../../lib/cardCopy";
 import { useCanvasStore } from "../../store/canvasStore";
@@ -25,6 +25,12 @@ const PIN_ESCAPE_THRESHOLD_SEC = 90;
 const PIN_ESCAPE_PERCENT = 95;
 // 用户点「继续等」后,沉默 60 秒再考虑下一次弹警告。
 const PIN_ESCAPE_SNOOZE_SEC = 60;
+// W5D4 — last-resort auto-fail. If nothing terminal arrives by here, flip the
+// run to failed so a walked-away user never stares at a frozen 95% spinner. Set
+// ABOVE the backend run ceiling (RUN_TURN_TIMEOUT_S=180s) so a legitimately slow
+// run that does finish — or a reconnect that resumes terminal state via
+// get_session_state — always wins first.
+const HARD_TIMEOUT_SEC = 210;
 
 function prefersReducedMotion(): boolean {
   if (typeof window === "undefined" || !window.matchMedia) return false;
@@ -81,6 +87,16 @@ export function AnalysisProgress({ thinking, startedAtMs }: Props) {
     }, 500);
     return () => clearInterval(id);
   }, [reduced, startedAtMs]);
+
+  // W5D4 — auto-fail backstop (see HARD_TIMEOUT_SEC). Ref-guarded so it fires
+  // once; setFailure flips ChatPanel out of `loading`, unmounting this card.
+  const hardFailedRef = useRef(false);
+  useEffect(() => {
+    if (!hardFailedRef.current && elapsed >= HARD_TIMEOUT_SEC) {
+      hardFailedRef.current = true;
+      useCanvasStore.getState().setFailure(synthesizeFailureFromContent("请求超时"));
+    }
+  }, [elapsed]);
 
   // W5D3-T1 — prefer real backend progress when available; fall back to
   // time-based ramp for older deploys / mediakit upstream / WS reconnect mid-run.

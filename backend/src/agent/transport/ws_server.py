@@ -14,7 +14,7 @@ import asyncio
 import json
 
 from pydantic import ValidationError
-from websockets.exceptions import ConnectionClosedOK
+from websockets.exceptions import ConnectionClosed
 
 from agent import config, store  # 通过 module 访问,方便 test monkeypatch
 from agent.pool import SHARED_POOL
@@ -110,7 +110,13 @@ async def handle(websocket) -> None:
                 continue
             await handler(ctx, typed_msg)
 
-    except ConnectionClosedOK:
+    except ConnectionClosed:
+        # W5D4 — catch the abnormal close too (ConnectionClosedError: 1011
+        # keepalive ping timeout from proxy stalls / idle cuts), not just the
+        # clean ConnectionClosedOK. Letting ConnectionClosedError propagate made
+        # the websockets lib log a full "connection handler failed" traceback on
+        # every dropped client — pure noise. The detached run task keeps running;
+        # cleanup happens in `finally`.
         pass
     finally:
         if user_id:

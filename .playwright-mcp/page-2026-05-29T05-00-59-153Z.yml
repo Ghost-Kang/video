@@ -1,0 +1,9 @@
+- generic [ref=e4]:
+  - paragraph [ref=e5]: Cascade · 内测中
+  - heading "输入邀请码" [level=1] [ref=e6]
+  - paragraph [ref=e7]: 内测期间,需要邀请码才能开始。没有? 找朋友要一个。
+  - generic [ref=e8]:
+    - textbox "邀请码" [active] [ref=e9]:
+      - /placeholder: 粘到这里
+    - button "进去看看" [disabled] [ref=e10]
+  - paragraph [ref=e11]: 填错码也能进 — 实际拒收发生在后台连接时

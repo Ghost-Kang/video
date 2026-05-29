@@ -172,6 +172,13 @@ class SessionStateEvent(_Base):
     thread_id: str
     messages: list[dict[str, Any]]
     canvas: dict[str, Any] | None = None
+    # W5D4 — run lifecycle for reconnect resume:
+    # "running" | "done" | "failed" | "idle". Lets the client stop an orphaned
+    # 95% spinner when the terminal WS frame was lost to a mid-run disconnect.
+    run_status: str = "idle"
+    # Present (FailurePayload-shaped: code/hint/actions/request_id) when
+    # run_status == "failed", so the client can replay the failure UI.
+    failure: dict[str, Any] | None = None
 
 
 class CanvasUpdatedEvent(_Base):

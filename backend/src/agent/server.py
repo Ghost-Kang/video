@@ -93,7 +93,20 @@ async def main(host: str = "0.0.0.0", port: int = 8765, http_port: int = 8766) -
     _install_signal_handlers(stop_event)
 
     http_server = await asyncio.start_server(handle_http, host, http_port)
-    async with serve(handle, host, port), http_server:
+    # W5D4 — explicit keepalive tuning. The websockets default ping_timeout=20s
+    # is too tight for clients behind corporate proxies / VPNs that briefly stall
+    # ping/pong frames; in prod this surfaced as repeated `1011 keepalive ping
+    # timeout` drops that killed runs mid-pipeline. A wider timeout tolerates
+    # transient stalls while still detecting a truly dead peer within
+    # ping_interval + ping_timeout.
+    async with serve(
+        handle,
+        host,
+        port,
+        ping_interval=20,
+        ping_timeout=60,
+        close_timeout=10,
+    ), http_server:
         # Block until either the HTTP server returns (it won't on its own) or
         # the shutdown handler fires.
         await stop_event.wait()

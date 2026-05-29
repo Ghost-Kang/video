@@ -1,11 +1,31 @@
 """消息持久化存储（SQLite）"""
 
+import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-_DB_DIR = Path(__file__).resolve().parent.parent.parent / "data"
-_DB_PATH = _DB_DIR / "messages.db"
+
+def _resolve_db_path() -> Path:
+    """Chat-history DB location.
+
+    W5D4 — fixes the persistence split-brain. In the container the old
+    ``__file__.parent×3 / data`` walked to ``/app/src/data`` (the ephemeral image
+    layer, wiped on every redeploy) instead of the mounted ``/app/data`` volume,
+    so chat history silently vanished on each deploy. Mirror the Cascade
+    persistence resolver (agent/cascade/persistence/db.py): detect the image via
+    the ``/app/src`` marker and use the volume; keep the repo-relative path for
+    local dev. ``MESSAGES_DB_PATH`` overrides (tests / non-standard layouts)."""
+    override = os.getenv("MESSAGES_DB_PATH")
+    if override:
+        return Path(override)
+    if Path("/app/src").exists():  # Dockerfile: WORKDIR /app, COPY src ./src
+        return Path("/app/data/messages.db")
+    return Path(__file__).resolve().parent.parent.parent / "data" / "messages.db"
+
+
+_DB_PATH = _resolve_db_path()
+_DB_DIR = _DB_PATH.parent
 
 # Paths whose ALTER migration has already run this process (see canvas db.py).
 _MIGRATED_PATHS: set[str] = set()
