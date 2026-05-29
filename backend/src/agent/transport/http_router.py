@@ -433,6 +433,23 @@ async def handle_health_live(qs: dict, body: dict) -> tuple[int, dict, str]:
     return 200, {"ok": True, "uptime_seconds": int(time.monotonic() - _SERVER_START_TIME)}, "OK"
 
 
+async def handle_invite_verify(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """W5D4 — pre-flight invite-code check for the invite gate (OPEN, no auth).
+
+    The gate used to accept any input and only let the WS auth reject a bad code
+    afterward — which (before the 4003 loop-breaker) trapped users like the one
+    who entered 'ee' in a connect→4003→reconnect death loop. Now the gate calls
+    this first and only advances on `valid: true`, so a wrong code is blocked at
+    the door with a clear message. When INVITE_CODES is empty (dev/test) the gate
+    is disabled, so any code is valid — matching the WS auth behavior.
+    """
+    code = (qs.get("code", [""])[0] or "").strip()
+    if not config.INVITE_CODES:
+        return 200, {"valid": True, "gate": "open"}, "OK"
+    valid = code in config.INVITE_CODES
+    return 200, {"valid": valid, "gate": "cohort"}, "OK"
+
+
 async def handle_public_stats(qs: dict, body: dict) -> tuple[int, dict, str]:
     """Aggregate-only public counters for the landing page (OPEN, no auth).
 
@@ -504,6 +521,7 @@ EXACT_ROUTES: dict[tuple[str, str], HandlerFn] = {
     ("GET", "/api/health"): handle_health_live,
     ("GET", "/api/health/summary"): handle_health_summary,
     ("GET", "/api/stats/public"): handle_public_stats,
+    ("GET", "/api/invite/verify"): handle_invite_verify,
 }
 
 # (method, prefix, suffix, param_name, handler) — 路径里的可变段会作为 path_param 传入。
@@ -525,6 +543,7 @@ OPEN_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("POST", "/api/client_error"),
     ("GET", "/api/health"),
     ("GET", "/api/stats/public"),
+    ("GET", "/api/invite/verify"),  # pre-flight gate check; must be reachable pre-auth
 })
 ADMIN_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("GET", "/api/events"),

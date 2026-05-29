@@ -163,6 +163,28 @@ def test_open_routes_need_no_auth(monkeypatch):
     assert status == 200 and "runs" in body and "creators" in body
 
 
+def test_invite_verify_open_and_validates_code(monkeypatch):
+    # W5D4 — pre-flight gate check. OPEN (no auth header), returns valid:bool.
+    monkeypatch.setattr(config, "INVITE_CODES", frozenset({"cascade"}))
+    monkeypatch.setattr(config, "ADMIN_TOKEN", "secret")
+    # Correct code → valid:true, reachable WITHOUT any auth header.
+    status, body = _drive(_req("GET", "/api/invite/verify?code=cascade"))
+    assert status == 200 and body == {"valid": True, "gate": "cohort"}
+    # Wrong code → valid:false (still 200; the gate reads the flag).
+    status, body = _drive(_req("GET", "/api/invite/verify?code=ee"))
+    assert status == 200 and body["valid"] is False
+    # Missing code → invalid.
+    status, body = _drive(_req("GET", "/api/invite/verify"))
+    assert status == 200 and body["valid"] is False
+
+
+def test_invite_verify_open_gate_when_codes_empty(monkeypatch):
+    # Dev/test: empty INVITE_CODES → gate disabled → any code valid.
+    monkeypatch.setattr(config, "INVITE_CODES", frozenset())
+    status, body = _drive(_req("GET", "/api/invite/verify?code=whatever"))
+    assert status == 200 and body == {"valid": True, "gate": "open"}
+
+
 def test_admin_route_requires_token_when_configured(monkeypatch):
     monkeypatch.setattr(config, "ADMIN_TOKEN", "secret")
     monkeypatch.setattr(config, "INVITE_CODES", frozenset())

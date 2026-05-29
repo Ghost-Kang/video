@@ -12,28 +12,58 @@ interface Props {
 export function InviteCode({ onAccept }: Props) {
   const [input, setInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  // W5D4 — true when we landed here because the backend rejected the stored
-  // invite code (WS close 4003). useWebSocket cleared the bad code and fired
-  // `rhtv-invite-rejected`, which dropped AppRoutes back to this gate. Show a
-  // clear "码不对" hint instead of the old "填错也能进" lie.
-  const [rejected] = useState(() => {
+  // W5D4 — error shown when the entered code fails the pre-flight check, or we
+  // arrived here because the backend rejected the stored code (WS close 4003).
+  // Seeded from the rejection flag set by useWebSocket so a code that somehow
+  // got past the gate (e.g. went stale) still surfaces a clear message.
+  const [error, setError] = useState<string | null>(() => {
     try {
-      return sessionStorage.getItem("openrhtv_invite_rejected") === "1";
+      return sessionStorage.getItem("openrhtv_invite_rejected") === "1"
+        ? "刚才那个邀请码后台没认出来,换一个有效的再试。"
+        : null;
     } catch {
-      return false;
+      return null;
     }
   });
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const code = input.trim();
     if (!code || submitting) return;
     setSubmitting(true);
+    setError(null);
     try {
       sessionStorage.removeItem("openrhtv_invite_rejected");
     } catch {
       // ignore
     }
+
+    // W5D4 — verify BEFORE letting the user in. Previously the gate accepted any
+    // input and only the WS auth rejected a bad code afterward, briefly flashing
+    // the main UI (and, pre-loop-breaker, trapping wrong codes like 'ee' in a
+    // reconnect loop). Now a wrong code is blocked at the door with a message.
+    let valid = false;
+    try {
+      const res = await fetch(`/api/invite/verify?code=${encodeURIComponent(code)}`);
+      if (res.ok) {
+        const data = await res.json();
+        valid = data?.valid === true;
+      } else {
+        // Server reachable but errored — don't hard-block; fall back to letting
+        // WS auth be the source of truth (it will reject if truly invalid).
+        valid = true;
+      }
+    } catch {
+      // Network/offline: can't verify. Fall back to admitting; WS auth still gates.
+      valid = true;
+    }
+
+    if (!valid) {
+      setError("邀请码不对,进不去。确认一下有没有多余空格,或找发码的人再要一个。");
+      setSubmitting(false);
+      return; // ← stay on the gate; do NOT persist the bad code or advance
+    }
+
     try {
       localStorage.setItem(STORAGE_KEY, code);
     } catch {
@@ -56,10 +86,8 @@ export function InviteCode({ onAccept }: Props) {
         <h1 className="font-serif-cn text-3xl text-stone-900 dark:text-stone-50 text-center mb-3 tracking-[-0.02em]">
           输入邀请码
         </h1>
-        <p className={`text-center text-sm mb-8 ${rejected ? "text-[#9a3412] dark:text-[#ea580c]" : "text-stone-500 dark:text-stone-400"}`}>
-          {rejected
-            ? "刚才那个邀请码后台没认出来,换一个有效的再试。"
-            : "内测期间,需要邀请码才能开始。没有? 找朋友要一个。"}
+        <p className={`text-center text-sm mb-8 ${error ? "text-[#9a3412] dark:text-[#ea580c]" : "text-stone-500 dark:text-stone-400"}`}>
+          {error ?? "内测期间,需要邀请码才能开始。没有? 找朋友要一个。"}
         </p>
 
         <form onSubmit={submit} className="space-y-3">
