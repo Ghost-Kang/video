@@ -104,6 +104,16 @@ function AppRoutes() {
     return () => window.removeEventListener("rhtv-auth-changed", refresh);
   }, []);
 
+  // W5D4 — when the WS is closed with a terminal auth code (4003 invalid invite
+  // / 4001 unauth), useWebSocket clears the stored code and fires this event.
+  // Drop back to the invite gate instead of letting the reconnect loop spin
+  // forever (the "拆解 95% + 网络已恢复 狂闪" symptom).
+  useEffect(() => {
+    const onRejected = () => setInviteCode(null);
+    window.addEventListener("rhtv-invite-rejected", onRejected);
+    return () => window.removeEventListener("rhtv-invite-rejected", onRejected);
+  }, []);
+
   const handleLogin = useCallback((uid: string) => {
     setUser(uid);
   }, []);

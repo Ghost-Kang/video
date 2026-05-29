@@ -15,6 +15,16 @@ const WS_URL = import.meta.env.DEV
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 
+// W5D4 — terminal auth close codes the backend sends in ws_server.handle():
+//   4001 = missing/invalid user_id, 4003 = invalid invite code.
+// These are NOT transient: reconnecting with the same bad credential just gets
+// rejected again. The old onclose ignored the code and always reconnected, so a
+// user whose stored invite_code was wrong (e.g. "ee") entered a connect→4003→
+// reconnect death loop — the dock spun "整理输出 95%" forever (no user_message
+// ever reached the backend) and the "网络已恢复" toast flashed every cycle.
+// On these codes we stop reconnecting and surface the auth gate instead.
+const AUTH_FATAL_CODES = new Set([4001, 4003]);
+
 export function useWebSocket(userId: string, onMessage: Handler) {
   const wsRef = useRef<WebSocket | null>(null);
   const pendingRef = useRef<string[]>([]);
@@ -96,11 +106,36 @@ export function useWebSocket(userId: string, onMessage: Handler) {
       onMessage(res);
     };
 
-    ws.onclose = () => {
-      console.log("[WS] 已断开");
+    ws.onclose = (e: CloseEvent) => {
+      console.log(`[WS] 已断开 code=${e.code} reason=${e.reason || "(none)"}`);
       setConnected(false);
       setConnecting(false);
       wsRef.current = null;
+      // W5D4 — terminal auth rejection: do NOT reconnect (would loop forever).
+      // Clear the bad invite code and signal the app to re-show the invite gate.
+      if (AUTH_FATAL_CODES.has(e.code)) {
+        console.warn(`[WS] auth rejected (code=${e.code}) — stopping reconnect`);
+        try {
+          localStorage.removeItem("openrhtv_invite_code");
+          sessionStorage.removeItem("openrhtv_invite_code");
+          // Flag read by the InviteCode gate to show a "码不对" hint.
+          if (e.code === 4003) sessionStorage.setItem("openrhtv_invite_rejected", "1");
+        } catch {
+          // private mode — best effort
+        }
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+        retryRef.current = 0;
+        setReconnectAttempt(0);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("rhtv-invite-rejected", { detail: { code: e.code } }),
+          );
+        }
+        return; // ← the loop-breaker
+      }
       scheduleReconnect();
     };
 

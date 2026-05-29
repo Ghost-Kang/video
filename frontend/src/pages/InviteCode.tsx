@@ -12,12 +12,28 @@ interface Props {
 export function InviteCode({ onAccept }: Props) {
   const [input, setInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // W5D4 — true when we landed here because the backend rejected the stored
+  // invite code (WS close 4003). useWebSocket cleared the bad code and fired
+  // `rhtv-invite-rejected`, which dropped AppRoutes back to this gate. Show a
+  // clear "码不对" hint instead of the old "填错也能进" lie.
+  const [rejected] = useState(() => {
+    try {
+      return sessionStorage.getItem("openrhtv_invite_rejected") === "1";
+    } catch {
+      return false;
+    }
+  });
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const code = input.trim();
     if (!code || submitting) return;
     setSubmitting(true);
+    try {
+      sessionStorage.removeItem("openrhtv_invite_rejected");
+    } catch {
+      // ignore
+    }
     try {
       localStorage.setItem(STORAGE_KEY, code);
     } catch {
@@ -40,8 +56,10 @@ export function InviteCode({ onAccept }: Props) {
         <h1 className="font-serif-cn text-3xl text-stone-900 dark:text-stone-50 text-center mb-3 tracking-[-0.02em]">
           输入邀请码
         </h1>
-        <p className="text-center text-sm text-stone-500 dark:text-stone-400 mb-8">
-          内测期间,需要邀请码才能开始。没有? 找朋友要一个。
+        <p className={`text-center text-sm mb-8 ${rejected ? "text-[#9a3412] dark:text-[#ea580c]" : "text-stone-500 dark:text-stone-400"}`}>
+          {rejected
+            ? "刚才那个邀请码后台没认出来,换一个有效的再试。"
+            : "内测期间,需要邀请码才能开始。没有? 找朋友要一个。"}
         </p>
 
         <form onSubmit={submit} className="space-y-3">
@@ -65,7 +83,7 @@ export function InviteCode({ onAccept }: Props) {
         </form>
 
         <p className="mt-6 text-center text-[11px] text-stone-400 dark:text-stone-500">
-          填错码也能进 — 实际拒收发生在后台连接时
+          码不对会连不上 — 后台校验,填对才能开始
         </p>
       </div>
     </div>
