@@ -158,15 +158,12 @@ def test_concurrent_same_url_emits_once(monkeypatch: pytest.MonkeyPatch, tmp_pat
     raw = json.loads((SYNTH / "baomam_fushi" / "001.json").read_text(encoding="utf-8"))
 
     async def run_two() -> None:
-        ready = asyncio.Event()
         calls = 0
 
         async def loader(source_url: str, **_kwargs) -> dict:
             nonlocal calls
             calls += 1
-            if calls == 2:
-                ready.set()
-            await ready.wait()
+            await asyncio.sleep(0.01)
             return dict(raw)
 
         monkeypatch.setattr("agent.cascade.analysis_service._load_upstream_payload", loader)
@@ -174,6 +171,7 @@ def test_concurrent_same_url_emits_once(monkeypatch: pytest.MonkeyPatch, tmp_pat
             request_shallow_analysis("https://example.com/race", user_id="user_1", run_id="run_a"),
             request_shallow_analysis("https://example.com/race", user_id="user_1", run_id="run_b"),
         )
+        assert calls == 1
 
     asyncio.run(run_two())
     assert len(_event_payloads(db_path, "analysis_returned")) == 1
@@ -188,9 +186,37 @@ def test_different_urls_same_user_emit_twice(monkeypatch: pytest.MonkeyPatch, tm
 
 def test_different_users_same_url_emit_twice(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     db_path = _use_tmp_db(monkeypatch, tmp_path)
-    asyncio.run(request_shallow_analysis("https://example.com/shared", user_id="user_1"))
-    asyncio.run(request_shallow_analysis("https://example.com/shared", user_id="user_2"))
+    first = asyncio.run(request_shallow_analysis("https://example.com/shared", user_id="user_1"))
+    second = asyncio.run(request_shallow_analysis("https://example.com/shared", user_id="user_2"))
+
+    assert first.analysis_id != second.analysis_id
+    assert first.scenes == second.scenes
     assert len(_event_payloads(db_path, "analysis_returned")) == 2
+    db = sqlite3.connect(str(db_path))
+    count = db.execute("SELECT COUNT(*) FROM analyses").fetchone()[0]
+    db.close()
+    assert count == 2
+
+
+def test_different_users_same_url_reuses_upstream_once(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _use_tmp_db(monkeypatch, tmp_path)
+    raw = json.loads((SYNTH / "baomam_fushi" / "001.json").read_text(encoding="utf-8"))
+    calls = 0
+
+    async def loader(source_url: str, **_kwargs) -> dict:
+        nonlocal calls
+        calls += 1
+        return dict(raw)
+
+    monkeypatch.setattr("agent.cascade.analysis_service._load_upstream_payload", loader)
+
+    asyncio.run(request_shallow_analysis("https://example.com/shared2", user_id="user_1"))
+    asyncio.run(request_shallow_analysis("https://example.com/shared2", user_id="user_2"))
+
+    assert calls == 1
 
 
 def _mediakit_storyline() -> dict:

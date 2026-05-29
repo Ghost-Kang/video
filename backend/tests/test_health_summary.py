@@ -9,30 +9,33 @@ from agent.transport.http_router import handle_health_summary
 
 
 def test_health_summary_happy_path(monkeypatch):
-    async def fake_list_events(*, limit=200, offset=0, event_name=None, user_id=None, since_ts=None):
-        if event_name == EventName.FAILURE_EMITTED.value:
-            return {
-                "events": [
-                    {
-                        "id": 76,
-                        "ts": "2026-05-28T08:11:43+00:00",
-                        "event_name": EventName.FAILURE_EMITTED.value,
-                        "user_id": "anon-xxx",
-                        "run_id": None,
-                        "payload": {"failure_code": "S5_INVALID_PAYLOAD", "stage": "analysis"},
-                    }
-                ]
-            }
-        return {
-            "events": [
-                {"event_name": EventName.ANALYSIS_RETURNED.value, "payload": {}},
-                {"event_name": EventName.ANALYSIS_RETURNED.value, "payload": {}},
-                {"event_name": EventName.SCRIPT_REWRITTEN.value, "payload": {}},
-                {"event_name": EventName.FAILURE_EMITTED.value, "payload": {"stage": "analysis"}},
-            ]
-        }
+    async def fake_stats(*, five_min_ago, one_hour_ago):
+        return (
+            {
+                "total": 4,
+                "by_type": {
+                    EventName.ANALYSIS_RETURNED.value: 2,
+                    EventName.SCRIPT_REWRITTEN.value: 1,
+                    EventName.FAILURE_EMITTED.value: 1,
+                },
+            },
+            {
+                EventName.ANALYSIS_RETURNED.value: 0.667,
+                EventName.SCRIPT_REWRITTEN.value: 1.0,
+            },
+            [
+                {
+                    "id": 76,
+                    "ts": "2026-05-28T08:11:43+00:00",
+                    "event_name": EventName.FAILURE_EMITTED.value,
+                    "user_id": "anon-xxx",
+                    "run_id": None,
+                    "payload": {"failure_code": "S5_INVALID_PAYLOAD", "stage": "analysis"},
+                }
+            ],
+        )
 
-    monkeypatch.setattr("agent.transport.http_router.list_events", fake_list_events)
+    monkeypatch.setattr("agent.transport.http_router._health_event_stats", fake_stats)
 
     status, body, reason = asyncio.run(handle_health_summary(qs={}, body={}))
 
@@ -47,10 +50,17 @@ def test_health_summary_happy_path(monkeypatch):
 
 
 def test_health_summary_empty_events(monkeypatch):
-    async def fake_list_events(*, limit=200, offset=0, event_name=None, user_id=None, since_ts=None):
-        return {"events": []}
+    async def fake_stats(*, five_min_ago, one_hour_ago):
+        return (
+            {"total": 0, "by_type": {}},
+            {
+                EventName.ANALYSIS_RETURNED.value: None,
+                EventName.SCRIPT_REWRITTEN.value: None,
+            },
+            [],
+        )
 
-    monkeypatch.setattr("agent.transport.http_router.list_events", fake_list_events)
+    monkeypatch.setattr("agent.transport.http_router._health_event_stats", fake_stats)
 
     status, body, _ = asyncio.run(handle_health_summary(qs={}, body={}))
 
@@ -64,10 +74,17 @@ def test_health_summary_empty_events(monkeypatch):
 
 
 def test_health_summary_server_section_types(monkeypatch):
-    async def fake_list_events(*, limit=200, offset=0, event_name=None, user_id=None, since_ts=None):
-        return {"events": []}
+    async def fake_stats(*, five_min_ago, one_hour_ago):
+        return (
+            {"total": 0, "by_type": {}},
+            {
+                EventName.ANALYSIS_RETURNED.value: None,
+                EventName.SCRIPT_REWRITTEN.value: None,
+            },
+            [],
+        )
 
-    monkeypatch.setattr("agent.transport.http_router.list_events", fake_list_events)
+    monkeypatch.setattr("agent.transport.http_router._health_event_stats", fake_stats)
 
     _, body, _ = asyncio.run(handle_health_summary(qs={}, body={}))
     server = body["server"]

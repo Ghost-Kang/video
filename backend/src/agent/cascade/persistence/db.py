@@ -31,6 +31,9 @@ async def bootstrap_schema(db: aiosqlite.Connection | None = None) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         db = await aiosqlite.connect(str(path))
     try:
+        await db.execute("PRAGMA journal_mode=WAL")
+        await db.execute("PRAGMA synchronous=NORMAL")
+        await db.execute("PRAGMA busy_timeout=5000")
         await db.execute(
             """CREATE TABLE IF NOT EXISTS analyses (
               analysis_id TEXT PRIMARY KEY,
@@ -101,6 +104,7 @@ async def _connect() -> aiosqlite.Connection:
     path = db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     db = await aiosqlite.connect(str(path))
+    await db.execute("PRAGMA busy_timeout=5000")
     await bootstrap_schema(db)
     return db
 

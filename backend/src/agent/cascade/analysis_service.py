@@ -35,6 +35,7 @@ from agent.cascade.persistence.toprador_cache_repo import (
 from agent.cascade.storage import (
     load_analysis,
     load_analysis_for_source,
+    load_latest_analysis_for_source,
     save_analysis,
     set_analysis_context,
 )
@@ -60,6 +61,7 @@ DOUBAO_DIRECT_MODE = "doubao_direct"
 # Same endpoint emits at most once per 60s even if many callers hit the open breaker.
 _CIRCUIT_OPEN_EMIT_WINDOW_S = 60.0
 _last_circuit_open_emit: dict[str, float] = {}
+_source_analysis_locks: dict[str, asyncio.Lock] = {}
 
 
 def _hash_source_url(source_url: str) -> str:
@@ -73,48 +75,82 @@ async def request_shallow_analysis(
     run_id: str | None = None,
 ) -> CascadeAnalysisContract:
     """Entry point. Calls upstream or fixture, normalizes, persists, emits event."""
-    existing = await load_analysis_for_source(user_id, source_url)
-    if existing is not None:
-        return existing
+    source_url_hash = _hash_source_url(source_url)
+    lock = _source_analysis_locks.setdefault(source_url_hash, asyncio.Lock())
+    async with lock:
+        existing = await load_analysis_for_source(user_id, source_url)
+        if existing is not None:
+            return existing
 
-    try:
-        raw = await _load_upstream_payload(source_url, user_id=user_id, run_id=run_id)
-        raw = copy.deepcopy(raw)
-        upstream_latency_ms = int(raw.pop("_upstream_latency_ms", 0) or 0)
-        upstream_attempts = int(raw.pop("_upstream_attempts", 0) or 0)
-        raw["source_url"] = source_url
-        raw["analysis_id"] = _analysis_id(user_id, source_url)
-        contract = normalize_analysis_result(raw)
-    except HardFailure as exc:
-        await emit(
-            EventName.FAILURE_EMITTED,
-            user_id=user_id,
-            run_id=run_id,
-            payload={
-                "failure_code": exc.code.value,
-                "stage": "analysis",
-                "recovery_path_id": _recovery_path_id(exc),
-            },
-        )
-        raise
+        global_existing = await load_latest_analysis_for_source(source_url)
+        if global_existing is not None:
+            await emit(
+                EventName.CASCADE_CACHE_HIT,
+                user_id=user_id,
+                run_id=run_id,
+                payload={
+                    "source_url_hash": source_url_hash,
+                    "ttl_remaining_s": 60.0,
+                    "cache_layer": "sqlite",
+                },
+            )
+            contract = global_existing.model_copy(
+                update={"analysis_id": _analysis_id(user_id, source_url)}
+            )
+            set_analysis_context(user_id, run_id)
+            inserted = await save_analysis(contract)
+            if inserted:
+                await emit(
+                    EventName.ANALYSIS_RETURNED,
+                    user_id=user_id,
+                    run_id=run_id,
+                    payload=_analysis_returned_payload(
+                        contract,
+                        upstream_latency_ms=0,
+                        upstream_attempts=0,
+                    ),
+                )
+            stored = await load_analysis(contract.analysis_id)
+            return stored or contract
 
-    set_analysis_context(user_id, run_id)
-    inserted = await save_analysis(contract)
-    if inserted:
-        await emit(EventName.ANALYSIS_RETURNED,
-            user_id=user_id,
-            run_id=run_id,
-            payload=_analysis_returned_payload(
-                contract,
-                upstream_latency_ms=upstream_latency_ms,
-                upstream_attempts=upstream_attempts,
-            ),
-        )
-    else:
-        stored = await load_analysis(contract.analysis_id)
-        if stored is not None:
-            return stored
-    return contract
+        try:
+            raw = await _load_upstream_payload(source_url, user_id=user_id, run_id=run_id)
+            raw = copy.deepcopy(raw)
+            upstream_latency_ms = int(raw.pop("_upstream_latency_ms", 0) or 0)
+            upstream_attempts = int(raw.pop("_upstream_attempts", 0) or 0)
+            raw["source_url"] = source_url
+            raw["analysis_id"] = _analysis_id(user_id, source_url)
+            contract = normalize_analysis_result(raw)
+        except HardFailure as exc:
+            await emit(
+                EventName.FAILURE_EMITTED,
+                user_id=user_id,
+                run_id=run_id,
+                payload={
+                    "failure_code": exc.code.value,
+                    "stage": "analysis",
+                    "recovery_path_id": _recovery_path_id(exc),
+                },
+            )
+            raise
+
+        set_analysis_context(user_id, run_id)
+        inserted = await save_analysis(contract)
+        if inserted:
+            await emit(EventName.ANALYSIS_RETURNED,
+                user_id=user_id,
+                run_id=run_id,
+                payload=_analysis_returned_payload(
+                    contract,
+                    upstream_latency_ms=upstream_latency_ms,
+                    upstream_attempts=upstream_attempts,
+                ),
+            )
+        else:
+            stored = await load_analysis(contract.analysis_id)
+            if stored is not None:
+                return stored
+        return contract
 
 
 async def _load_upstream_payload(

@@ -31,6 +31,7 @@ from agent.cascade.anchors import create_anchor, list_anchors, list_reuses, reus
 from agent.cascade.event_names import EventName
 from agent.cascade.events import emit
 from agent.cascade.failures import HardFailure
+from agent.cascade.persistence.db import _connect
 from agent.cascade.rewrite_service import error_payload, request_rewrite
 from agent.cascade.storage import list_creators, list_events
 
@@ -245,47 +246,19 @@ async def handle_health_summary(qs: dict, body: dict) -> tuple[int, dict, str]:
     # events_5min aggregate
     five_min_ago = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
     one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
-    recent_failures: list[dict] = []
-    by_type: dict[str, int] = {}
-    total_5min = 0
-    upstream: dict[str, float | None] = {
-        EventName.ANALYSIS_RETURNED.value: None,
-        EventName.SCRIPT_REWRITTEN.value: None,
-    }
-
     try:
-        # 5min events grouped by event_name
-        five = await list_events(limit=500, since_ts=five_min_ago)
-        for e in five.get("events", []):
-            by_type[e["event_name"]] = by_type.get(e["event_name"], 0) + 1
-            total_5min += 1
-
-        # 1h upstream success rate
-        hour = await list_events(limit=1000, since_ts=one_hour_ago)
-        an_done = sum(1 for e in hour.get("events", []) if e["event_name"] == EventName.ANALYSIS_RETURNED.value)
-        an_fail = sum(
-            1 for e in hour.get("events", [])
-            if e["event_name"] == EventName.FAILURE_EMITTED.value
-            and isinstance(e.get("payload"), dict)
-            and e["payload"].get("stage") == "analysis"
+        events_5min, upstream, recent_failures = await _health_event_stats(
+            five_min_ago=five_min_ago,
+            one_hour_ago=one_hour_ago,
         )
-        if an_done + an_fail > 0:
-            upstream[EventName.ANALYSIS_RETURNED.value] = round(an_done / (an_done + an_fail), 3)
-        rw_done = sum(1 for e in hour.get("events", []) if e["event_name"] == EventName.SCRIPT_REWRITTEN.value)
-        rw_fail = sum(
-            1 for e in hour.get("events", [])
-            if e["event_name"] == EventName.FAILURE_EMITTED.value
-            and isinstance(e.get("payload"), dict)
-            and e["payload"].get("stage") == "rewrite"
-        )
-        if rw_done + rw_fail > 0:
-            upstream[EventName.SCRIPT_REWRITTEN.value] = round(rw_done / (rw_done + rw_fail), 3)
-
-        # recent 10 failures
-        fails = await list_events(limit=10, event_name=EventName.FAILURE_EMITTED.value)
-        recent_failures = fails.get("events", [])[:10]
     except Exception:
-        pass  # health endpoint must not crash — return what we have
+        # health endpoint must not crash; return what we have
+        events_5min = {"total": 0, "by_type": {}}
+        upstream = {
+            EventName.ANALYSIS_RETURNED.value: None,
+            EventName.SCRIPT_REWRITTEN.value: None,
+        }
+        recent_failures = []
 
     return 200, {
         "server": {
@@ -296,10 +269,102 @@ async def handle_health_summary(qs: dict, body: dict) -> tuple[int, dict, str]:
             "disk_total_gb": disk_total_gb,
             "uptime_seconds": uptime,
         },
-        "events_5min": {"total": total_5min, "by_type": by_type},
+        "events_5min": events_5min,
         "upstream_success_rate": upstream,
         "recent_failures": recent_failures,
     }, "OK"
+
+
+async def _health_event_stats(
+    *,
+    five_min_ago: str,
+    one_hour_ago: str,
+) -> tuple[dict, dict[str, float | None], list[dict]]:
+    db = await _connect()
+    try:
+        grouped = await db.execute_fetchall(
+            """SELECT event_name, COUNT(*)
+               FROM events
+               WHERE created_at > ?
+               GROUP BY event_name""",
+            (five_min_ago,),
+        )
+        by_type = {str(name): int(count or 0) for name, count in grouped}
+        events_5min = {"total": sum(by_type.values()), "by_type": by_type}
+
+        counts = dict(
+            await db.execute_fetchall(
+                """SELECT event_name, COUNT(*)
+                   FROM events
+                   WHERE created_at > ?
+                     AND event_name IN (?, ?)
+                   GROUP BY event_name""",
+                (
+                    one_hour_ago,
+                    EventName.ANALYSIS_RETURNED.value,
+                    EventName.SCRIPT_REWRITTEN.value,
+                ),
+            )
+        )
+        failure_rows = await db.execute_fetchall(
+            """SELECT payload_json
+               FROM events
+               WHERE created_at > ? AND event_name = ?""",
+            (one_hour_ago, EventName.FAILURE_EMITTED.value),
+        )
+        analysis_fail = 0
+        rewrite_fail = 0
+        for (payload_json,) in failure_rows:
+            try:
+                payload = json.loads(payload_json) if payload_json else {}
+            except json.JSONDecodeError:
+                continue
+            if payload.get("stage") == "analysis":
+                analysis_fail += 1
+            elif payload.get("stage") == "rewrite":
+                rewrite_fail += 1
+
+        analysis_done = int(counts.get(EventName.ANALYSIS_RETURNED.value, 0) or 0)
+        rewrite_done = int(counts.get(EventName.SCRIPT_REWRITTEN.value, 0) or 0)
+        upstream: dict[str, float | None] = {
+            EventName.ANALYSIS_RETURNED.value: None,
+            EventName.SCRIPT_REWRITTEN.value: None,
+        }
+        if analysis_done + analysis_fail > 0:
+            upstream[EventName.ANALYSIS_RETURNED.value] = round(
+                analysis_done / (analysis_done + analysis_fail), 3
+            )
+        if rewrite_done + rewrite_fail > 0:
+            upstream[EventName.SCRIPT_REWRITTEN.value] = round(
+                rewrite_done / (rewrite_done + rewrite_fail), 3
+            )
+
+        rows = await db.execute_fetchall(
+            """SELECT id, event_name, user_id, run_id, payload_json, created_at
+               FROM events
+               WHERE event_name = ?
+               ORDER BY created_at DESC, id DESC
+               LIMIT 10""",
+            (EventName.FAILURE_EMITTED.value,),
+        )
+    finally:
+        await db.close()
+
+    recent_failures = []
+    for row_id, name, uid, rid, payload_json, created_at in rows:
+        try:
+            payload = json.loads(payload_json) if payload_json else {}
+        except json.JSONDecodeError:
+            payload = {"_raw": payload_json}
+        recent_failures.append({
+            "id": int(row_id),
+            "ts": created_at,
+            "event_name": name,
+            "user_id": uid,
+            "run_id": rid,
+            "payload": payload,
+        })
+    return events_5min, upstream, recent_failures
 
 
 def _cpu_percent_proc() -> float:

@@ -1,21 +1,36 @@
-import { StrictMode, useState, useCallback, useEffect } from "react";
+import { StrictMode, Suspense, lazy, useState, useCallback, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
-import App from "./App";
 import { Login } from "./components/Login";
 import { Landing } from "./pages/Landing";
 import { InviteCode, readInviteCode } from "./pages/InviteCode";
-import { AnchorAnalytics } from "./pages/AnchorAnalytics";
-import { AdminCreators } from "./pages/AdminCreators";
-import { AdminEvents } from "./pages/AdminEvents";
-import { AdminCost } from "./pages/AdminCost";
-import { AdminHealth } from "./pages/AdminHealth";
 import { LegalDoc } from "./pages/LegalDoc";
 import { ConnectionBanner } from "./components/feedback/ConnectionBanner";
 import { ErrorBoundary } from "./components/feedback/ErrorBoundary";
 import { ToastContainer } from "./components/feedback/ToastContainer";
 import { reportClientError, extractThreadId } from "./lib/errorReporter";
+
+const App = lazy(() => import("./App"));
+const AnchorAnalytics = lazy(() =>
+  import("./pages/AnchorAnalytics").then((mod) => ({ default: mod.AnchorAnalytics })),
+);
+const AdminCreators = lazy(() =>
+  import("./pages/AdminCreators").then((mod) => ({ default: mod.AdminCreators })),
+);
+const AdminEvents = lazy(() =>
+  import("./pages/AdminEvents").then((mod) => ({ default: mod.AdminEvents })),
+);
+const AdminCost = lazy(() =>
+  import("./pages/AdminCost").then((mod) => ({ default: mod.AdminCost })),
+);
+const AdminHealth = lazy(() =>
+  import("./pages/AdminHealth").then((mod) => ({ default: mod.AdminHealth })),
+);
+
+function RouteFallback() {
+  return <div className="min-h-screen bg-[var(--color-paper)] dark:bg-stone-950" />;
+}
 
 // W5D2-E: 浏览器端 Sentry-lite。在所有 React tree 挂载前装好,捕获:
 //   - window 'error' — script 抛出的 sync error / asset load 失败
@@ -103,33 +118,35 @@ function AppRoutes() {
   }
 
   return (
-    <Routes>
-      {/* Phase 1 public routes — accessible without login (legal docs must
-          be readable pre-login per user_agreement_v0 §11.1 click-through). */}
-      <Route path="/" element={<Landing />} />
-      <Route path="/legal/:slug" element={<LegalDoc />} />
-      <Route path="/analytics/anchors" element={<AnchorAnalytics />} />
-      <Route path="/admin/creators" element={<AdminCreators />} />
-      <Route path="/admin/events" element={<AdminEvents />} />
-      <Route path="/admin/cost" element={<AdminCost />} />
-      <Route path="/admin/health" element={<AdminHealth />} />
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        {/* Phase 1 public routes — accessible without login (legal docs must
+            be readable pre-login per user_agreement_v0 §11.1 click-through). */}
+        <Route path="/" element={<Landing />} />
+        <Route path="/legal/:slug" element={<LegalDoc />} />
+        <Route path="/analytics/anchors" element={<AnchorAnalytics />} />
+        <Route path="/admin/creators" element={<AdminCreators />} />
+        <Route path="/admin/events" element={<AdminEvents />} />
+        <Route path="/admin/cost" element={<AdminCost />} />
+        <Route path="/admin/health" element={<AdminHealth />} />
 
-      {/* Authed routes (upstream 66758bd: WS auth + multi-user isolation) */}
-      <Route
-        path="/login"
-        element={user ? <Navigate to={getChatRedirect(user)} replace /> : <Login onLogin={handleLogin} />}
-      />
-      <Route
-        path="/chat/:threadId"
-        element={user ? <App userId={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
-      />
+        {/* Authed routes (upstream 66758bd: WS auth + multi-user isolation) */}
+        <Route
+          path="/login"
+          element={user ? <Navigate to={getChatRedirect(user)} replace /> : <Login onLogin={handleLogin} />}
+        />
+        <Route
+          path="/chat/:threadId"
+          element={user ? <App userId={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+        />
 
-      {/* Legacy redirect */}
-      <Route path="/canvas" element={<Navigate to={`/chat/${newSessionId()}?view=pro`} replace />} />
+        {/* Legacy redirect */}
+        <Route path="/canvas" element={<Navigate to={`/chat/${newSessionId()}?view=pro`} replace />} />
 
-      {/* Catch-all: anon users land on Landing first, can opt to login */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Catch-all: anon users land on Landing first, can opt to login */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 

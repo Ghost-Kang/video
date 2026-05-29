@@ -11,6 +11,9 @@ _DB_PATH = _DB_DIR / "messages.db"
 def _conn() -> sqlite3.Connection:
     _DB_DIR.mkdir(parents=True, exist_ok=True)
     c = sqlite3.connect(str(_DB_PATH))
+    c.execute("PRAGMA journal_mode=WAL")
+    c.execute("PRAGMA synchronous=NORMAL")
+    c.execute("PRAGMA busy_timeout=5000")
     c.execute(
         """CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

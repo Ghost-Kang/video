@@ -72,3 +72,25 @@ async def load_analysis_for_source(user_id: str, source_url: str) -> CascadeAnal
     if not row:
         return None
     return CascadeAnalysisContract.model_validate_json(row[0][0])
+
+
+async def load_latest_analysis_for_source(source_url: str) -> CascadeAnalysisContract | None:
+    """Load the newest analysis for a public source URL, regardless of user.
+
+    Used as a cost/perf cache: the source video analysis is independent from
+    the creator's later niche rewrite, so we can reuse the normalized contract
+    and persist a user-scoped clone with a fresh analysis_id.
+    """
+    db = await _connect()
+    try:
+        row = await db.execute_fetchall(
+            """SELECT contract_json FROM analyses
+               WHERE source_url = ?
+               ORDER BY created_at DESC LIMIT 1""",
+            (source_url,),
+        )
+    finally:
+        await db.close()
+    if not row:
+        return None
+    return CascadeAnalysisContract.model_validate_json(row[0][0])

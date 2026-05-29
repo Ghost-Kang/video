@@ -35,6 +35,27 @@ from agent.transport.ws_messages import (
     UserMessageMsg,
 )
 
+_THREAD_RUN_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+async def _run_agent_serialized(ctx: WSCtx, msg: UserMessageMsg) -> None:
+    """Run one Director turn at a time per thread.
+
+    Users can double-send or reconnect/autosend quickly. Without this guard,
+    two `run_agent` tasks for the same thread race over the same LangGraph
+    checkpoint and can duplicate expensive upstream analysis calls.
+    """
+    lock = _THREAD_RUN_LOCKS.setdefault(msg.thread_id, asyncio.Lock())
+    async with lock:
+        await agent_runner.run_agent(
+            ctx.user_id,
+            ctx.pool,
+            msg.thread_id,
+            msg.content,
+            ctx.ws,
+            selected_niche=msg.selected_niche,
+        )
+
 
 # ---------- session ----------
 
@@ -176,16 +197,7 @@ async def handle_user_message(ctx: WSCtx, msg: UserMessageMsg) -> None:
             )
         except Exception as exc:
             print(f"[telemetry] niche_selected emit failed: {exc}")
-    asyncio.create_task(
-        agent_runner.run_agent(
-            ctx.user_id,
-            ctx.pool,
-            msg.thread_id,
-            msg.content,
-            ctx.ws,
-            selected_niche=msg.selected_niche,
-        )
-    )
+    asyncio.create_task(_run_agent_serialized(ctx, msg))
     await send_json(ctx.ws, type="processing", thread_id=msg.thread_id)
 
 

@@ -4,6 +4,7 @@ New code should import from agent.cascade.persistence.* or agent.cascade.service
 """
 
 from agent.cascade.persistence.analyses_repo import (
+    load_latest_analysis_for_source,
     load_analysis,
     load_analysis_for_source,
     save_analysis,
@@ -34,6 +35,7 @@ __all__ = [
     "list_events",
     "load_analysis",
     "load_analysis_for_source",
+    "load_latest_analysis_for_source",
     "load_recent_rewrite",
     "load_rewrite_by_id",
     "load_toprador_cache",

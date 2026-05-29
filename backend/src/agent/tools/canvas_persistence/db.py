@@ -42,6 +42,8 @@ def _db() -> sqlite3.Connection:
     db = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA journal_mode=WAL")
+    db.execute("PRAGMA synchronous=NORMAL")
+    db.execute("PRAGMA busy_timeout=5000")
     db.execute(
         """CREATE TABLE IF NOT EXISTS canvas_nodes (
             user_id TEXT NOT NULL DEFAULT 'default',
