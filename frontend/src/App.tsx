@@ -105,8 +105,17 @@ export default function App({ userId, onLogout }: AppProps) {
     sendCommand({ type: "get_session_state", thread_id: tid });
   }, [addSession, clearCanvas, sendCommand, setCanvas, setCurrentThreadId, tid]);
   useEffect(() => {
+    // Redirect to the newest session only when the current thread is genuinely
+    // unknown AND nothing is running on it. W5D4: the old unconditional version
+    // fired mid-run — a freshly-created session (landing → 拆解) isn't in the
+    // backend session_list yet, so `!sessions.includes(tid)` was briefly true,
+    // and navigating away changed currentThreadId, causing the running session's
+    // WS frames to be discarded (blank 拆解中 screen). The session_list handler
+    // now unions local sessions in, but we also hard-guard here: never yank the
+    // user off a session that is actively loading.
+    if (loading) return;
     if (sessions.length > 0 && !sessions.includes(tid)) navigate(`/chat/${sessions[0]}`);
-  }, [navigate, sessions, tid]);
+  }, [navigate, sessions, tid, loading]);
   useEffect(() => {
     if (!loading) clearTimeout(timerRef.current ?? undefined);
   }, [loading]);

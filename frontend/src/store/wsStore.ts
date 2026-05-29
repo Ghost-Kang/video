@@ -186,14 +186,31 @@ export const useWSStore = create<WSStore>((set, get) => ({
     const sessions = useSessionStore.getState();
 
     if (event.type === "session_list") {
-      const ids = event.sessions.map((s) => s.thread_id);
+      const backendIds = event.sessions.map((s) => s.thread_id);
+      // W5D4 — UNION, don't overwrite. The backend list only contains sessions
+      // that already have persisted messages. A session the user JUST created
+      // (landing → 拆解) has no messages yet, so it's absent from this list.
+      // Overwriting `sessions` with the backend list dropped it, and App's
+      // redirect effect then navigated away to sessions[0] — mid-run — which
+      // changed currentThreadId and made the dispatch thread-guard discard all
+      // of the running session's analysis_progress/analysis_returned frames
+      // (symptom: 拆解中界面完全空白). Merge so locally-known sessions survive;
+      // backend order leads (most-recent-active first), local-only ones append.
+      //
+      // setUserId first — it hydrates `sessions` from this user's localStorage
+      // (which addSession already persisted) — then re-read fresh state so the
+      // union sees the just-created session regardless of hydrate timing.
+      sessions.setUserId(userId);
+      const fresh = useSessionStore.getState();
+      const localOnly = fresh.sessions.filter((id) => !backendIds.includes(id));
+      const ids = [...backendIds, ...localOnly];
+      // Preserve any local names we already had for these threads.
       const mergedNames: Record<string, string> = {};
       for (const id of ids) {
-        if (sessions.names[id]) mergedNames[id] = sessions.names[id];
+        if (fresh.names[id]) mergedNames[id] = fresh.names[id];
       }
-      sessions.setUserId(userId);
-      sessions.setSessions(ids);
-      sessions.setNames(mergedNames);
+      fresh.setSessions(ids);
+      fresh.setNames(mergedNames);
       return;
     }
 
