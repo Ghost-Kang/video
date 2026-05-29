@@ -1,0 +1,75 @@
+[   21467ms] [LOG] [WS] 排队 type=get_session_state @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[   22356ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[   22356ms] [LOG] [WS] onopen 发送排队消息 x1 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[  305868ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[  305868ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[  308022ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2335944ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2335945ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2336954ms] [ERROR] WebSocket connection to 'wss://cascade.herwin.top/ws' failed: Establishing a tunnel via proxy server failed. @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2336954ms] [LOG] [WS] 连接错误 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2336955ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2336955ms] [LOG] [WS] 2s 后重连 (第2次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2475830ms] [ERROR] WebSocket connection to 'wss://cascade.herwin.top/ws' failed: Establishing a tunnel via proxy server failed. @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2475830ms] [LOG] [WS] 连接错误 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2475830ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2475830ms] [LOG] [WS] 4s 后重连 (第3次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2479835ms] [ERROR] WebSocket connection to 'wss://cascade.herwin.top/ws' failed: Establishing a tunnel via proxy server failed. @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2479835ms] [LOG] [WS] 连接错误 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2479835ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2479835ms] [LOG] [WS] 8s 后重连 (第4次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2489053ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2607119ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2607119ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2611722ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2920992ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2920992ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 2922720ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3047147ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3047150ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3048877ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3150307ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3150307ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3152698ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3278831ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3278831ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3281263ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3371785ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3371785ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3374315ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3496514ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3496514ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3499142ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3622966ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3622966ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3624977ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3751412ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3751412ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 3753584ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4003928ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4003928ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4005758ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4130690ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4130690ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4146757ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4241518ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4241518ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4243588ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4367799ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4367799ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4370884ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4494358ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4494358ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4496521ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4620738ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4620738ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4622569ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4729950ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4729950ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4731890ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4856438ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4856438ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4858276ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4957132ms] [LOG] [WS] 已断开 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4957132ms] [LOG] [WS] 1s 后重连 (第1次) @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[ 4959153ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45

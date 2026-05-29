@@ -57,6 +57,24 @@ describe("deriveChatPanelState", () => {
   });
 
   it("running when messagesLength>0 but no analysis/script/failure yet (post-send pre-ack)", () => {
+    // Trailing user message = we just sent and are awaiting the first ack.
+    expect(
+      deriveChatPanelState(inputs({ messagesLength: 1, lastMessageRole: "user" }))
+    ).toBe("running");
+  });
+
+  it("running when last message role is unknown but messages exist (legacy/no role info)", () => {
+    // Back-compat: callers that don't pass lastMessageRole still get running.
     expect(deriveChatPanelState(inputs({ messagesLength: 1 }))).toBe("running");
+  });
+
+  it("W5D4: idle (NOT running) when a completed turn reloads with no persisted analysis", () => {
+    // Reload of a finished session: messages=[user, agent] but canvas/analysis
+    // was never persisted, so analysis/script are null. A trailing AGENT message
+    // means the turn is done — must not fall through to the old
+    // `messagesLength>0 → running` trap that spun "整理输出 95%" forever.
+    expect(
+      deriveChatPanelState(inputs({ messagesLength: 2, lastMessageRole: "agent" }))
+    ).toBe("idle");
   });
 });

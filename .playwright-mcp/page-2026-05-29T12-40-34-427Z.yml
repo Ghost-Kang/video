@@ -1,0 +1,60 @@
+- generic [ref=e237]:
+  - button "切换主题" [ref=e238]:
+    - img [ref=e239]
+  - generic [ref=e241]:
+    - button "收起侧栏" [ref=e242]:
+      - img [ref=e243]
+    - generic [ref=e245]: Cascade
+    - generic [ref=e247]: 新会话
+    - button "+" [ref=e248]
+    - generic [ref=e249]: anon-e7bo8oidmpqwtwf0
+    - button "退出" [ref=e250]
+  - generic [ref=e251]:
+    - generic [ref=e252]:
+      - generic [ref=e253]:
+        - generic [ref=e254]: 历史
+        - generic [ref=e256]:
+          - button "新会话" [ref=e257] [cursor=pointer]
+          - button "重命名" [ref=e258]:
+            - img [ref=e259]
+      - main [ref=e261]:
+        - region "开始步骤" [ref=e263]:
+          - generic [ref=e264]:
+            - heading "粘条爆款链接,把它改成你自己的" [level=1] [ref=e265]
+            - paragraph [ref=e266]: 粘一条链接,几十秒后看到分析 + 改好的版本
+          - list [ref=e267]:
+            - listitem [ref=e268]:
+              - generic [ref=e269]:
+                - generic [ref=e270]: "1"
+                - generic [ref=e271]: 🔗
+              - heading "粘条爆款链接" [level=2] [ref=e272]
+              - paragraph [ref=e273]: 抖音 / 小红书都行,直接复制视频链接
+            - listitem [ref=e274]:
+              - generic [ref=e275]:
+                - generic [ref=e276]: "2"
+                - generic [ref=e277]: ✨
+              - heading "看分析 + 改完的版本" [level=2] [ref=e278]
+              - paragraph [ref=e279]: 拆解这条为什么火,顺手给你一份能直接发的版本
+              - generic [ref=e280]: 未开始
+    - generic [ref=e281]:
+      - generic [ref=e282]:
+        - generic [ref=e283]: 正在拆解…
+        - generic [ref=e284]:
+          - button "历史 ▲ (1)" [ref=e285]
+          - button "收起对话" [ref=e286]:
+            - img [ref=e287]
+      - status [ref=e290]:
+        - generic [ref=e291]:
+          - generic [ref=e292]: 约 60 秒
+          - generic [ref=e293]: 2%
+        - progressbar [ref=e294]
+        - list [ref=e296]:
+          - listitem [ref=e297]:
+            - generic [ref=e298]: ○
+            - text: 解析链接
+          - listitem [ref=e299]:
+            - generic [ref=e300]: ○
+            - text: 拆解视频
+          - listitem [ref=e301]:
+            - generic [ref=e302]: ○
+            - text: 整理输出

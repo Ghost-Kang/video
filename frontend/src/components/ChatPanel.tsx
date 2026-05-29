@@ -91,6 +91,8 @@ export function ChatPanel({
     loading,
     failure,
     messagesLength: messages.length,
+    lastMessageRole:
+      messages.length > 0 ? messages[messages.length - 1].role : null,
   });
 
   useEffect(() => {

@@ -1,0 +1,229 @@
+- generic [ref=e237]:
+  - button "切换主题" [ref=e238]:
+    - img [ref=e239]
+  - generic [ref=e241]:
+    - button "收起侧栏" [ref=e242]:
+      - img [ref=e243]
+    - generic [ref=e245]: Cascade
+    - generic [ref=e247]: 新会话
+    - button "+" [ref=e248]
+    - generic [ref=e249]: anon-e7bo8oidmpqwtwf0
+    - button "退出" [ref=e250]
+  - generic [ref=e251]:
+    - generic [ref=e252]:
+      - generic [ref=e253]:
+        - generic [ref=e254]: 历史
+        - generic [ref=e303]: 还没有记录
+      - main [ref=e261]:
+        - generic [ref=e262]:
+          - generic [ref=e318]:
+            - generic [ref=e319]:
+              - heading "为什么这条会火" [level=2] [ref=e320]
+              - list [ref=e321]:
+                - listitem [ref=e322]:
+                  - generic [ref=e323]: 开头怎么抓人
+                  - paragraph [ref=e324]: H4 发现孩子落水的危机场景
+                - listitem [ref=e325]:
+                  - generic [ref=e326]: 中间为什么不快进
+                  - paragraph [ref=e327]: 0-5秒危机发现→5-15秒救援行动→15-20秒救起孩子→20-55秒后续处理,节奏紧凑
+                - listitem [ref=e328]:
+                  - generic [ref=e329]: 结尾为什么忍不住点赞
+                  - paragraph [ref=e330]: 15秒男子抱起落水儿童
+              - region "改写方向选择" [ref=e331]:
+                - heading "改成你自己的版本" [level=2] [ref=e332]
+                - paragraph [ref=e333]: 选一个方向, 我帮你改成你自己的
+                - generic [ref=e334]:
+                  - button "宝妈辅食" [ref=e335]:
+                    - generic [ref=e336]: 🍼
+                    - generic [ref=e337]: 宝妈辅食
+                  - button "育儿日常" [ref=e338]:
+                    - generic [ref=e339]: 👶
+                    - generic [ref=e340]: 育儿日常
+                  - button "家庭厨房" [ref=e341]:
+                    - generic [ref=e342]: 🍳
+                    - generic [ref=e343]: 家庭厨房
+              - heading "改完的版本" [level=2] [ref=e344]
+              - paragraph [ref=e345]: 一男子钓完鱼回家路上发现一名孩子落水 岸上一个小女孩不断在哭 男子不会游泳 便顺着铁链爬下救人 这怎么会掉下去的 快快快 最终将孩子救起 交回到赶来的母亲手中 快快快 快报个警 快送医院 母亲:谢谢 送医院 没事没事 我从这过来装点水 我看小女孩在哭 低头一看 一个小孩在水里面 路人:钓鱼啦 嗯 “钓鱼侠”刘胜,为你点赞!
+              - button "改一改" [ref=e346]
+            - generic [ref=e347]:
+              - heading "音频拆解" [level=2] [ref=e348]
+              - list [ref=e349]:
+                - listitem [ref=e350]:
+                  - generic [ref=e351]: BGM
+                  - paragraph [ref=e352]: 无明显BGM,环境音(水声、人声)为主
+                - listitem [ref=e353]:
+                  - generic [ref=e354]: 口播 / 语速
+                  - paragraph [ref=e355]: 字幕配合画面,语速中等,突出关键信息
+                - listitem [ref=e356]:
+                  - generic [ref=e357]: 音效
+                  - paragraph [ref=e358]: 落水声、铁链摩擦声、人声呼喊等环境音
+            - generic [ref=e359]:
+              - heading "拍这条要花多少" [level=2] [ref=e360]
+              - generic [ref=e361]:
+                - generic [ref=e362]: 一个人 + 手机
+                - generic [ref=e363]: 1.5h
+              - heading "能换成你自己的" [level=3] [ref=e364]
+              - list [ref=e365]:
+                - listitem [ref=e366]: <n/a — 视频未呈现>
+            - generic [ref=e367]:
+              - generic [ref=e368]:
+                - heading "完整原片台词" [level=2] [ref=e369]
+                - generic [ref=e370]:
+                  - button "复制" [ref=e371]
+                  - button "展开" [ref=e372]
+              - paragraph [ref=e373]: 一男子钓完鱼回家路上发现一名孩子落水 岸上一个小女孩不断在哭 男子不会游泳 便顺着铁链爬下救人 这怎么会掉下去的 快快快…
+            - heading "源视频每一幕" [level=2] [ref=e374]
+            - generic [ref=e375]:
+              - button "生成首帧" [ref=e377]:
+                - img [ref=e378]
+                - text: 生成首帧
+              - heading "第1段" [level=3] [ref=e382]
+              - paragraph [ref=e383]: 一男子钓完鱼回家路上发现一名孩子落水
+              - paragraph [ref=e384]: 石质河岸,铁链,绿水,水中穿粉色衣服的孩子,男子戴手套的手
+              - generic [ref=e385]:
+                - button "换个角色" [ref=e386]
+                - button "用我之前的场景" [ref=e387]
+            - generic [ref=e388]:
+              - button "生成首帧" [ref=e390]:
+                - img [ref=e391]
+                - text: 生成首帧
+              - heading "第2段" [level=3] [ref=e395]
+              - paragraph [ref=e396]: 岸上一个小女孩不断在哭 男子不会游泳 便顺着铁链爬下救人
+              - paragraph [ref=e397]: 男子攀爬铁链的动作,水面孩子状态,石墙背景
+              - generic [ref=e398]:
+                - button "换个角色" [ref=e399]
+                - button "用我之前的场景" [ref=e400]
+            - generic [ref=e401]:
+              - button "生成首帧" [ref=e403]:
+                - img [ref=e404]
+                - text: 生成首帧
+              - heading "第3段" [level=3] [ref=e408]
+              - paragraph [ref=e409]: （这段没有台词，是画面）
+              - paragraph [ref=e410]: 水中木杆,男子下半身入水,抓住孩子手臂,抱起孩子上半身
+              - generic [ref=e411]:
+                - button "换个角色" [ref=e412]
+                - button "用我之前的场景" [ref=e413]
+            - generic [ref=e414]:
+              - button "生成首帧" [ref=e416]:
+                - img [ref=e417]
+                - text: 生成首帧
+              - heading "第4段" [level=3] [ref=e421]
+              - paragraph [ref=e422]: 这怎么会掉下去的 快快快
+              - paragraph [ref=e423]: 孩子的手臂,男子的腿部,石质河岸,水面
+              - generic [ref=e424]:
+                - button "换个角色" [ref=e425]
+                - button "用我之前的场景" [ref=e426]
+            - generic [ref=e427]:
+              - button "生成首帧" [ref=e429]:
+                - img [ref=e430]
+                - text: 生成首帧
+              - heading "第5段" [level=3] [ref=e434]
+              - paragraph [ref=e435]: 最终将孩子救起 交回到赶来的母亲手中
+              - paragraph [ref=e436]: 孩子的腿部和衣服,母亲的手,石地
+              - generic [ref=e437]:
+                - button "换个角色" [ref=e438]
+                - button "用我之前的场景" [ref=e439]
+            - generic [ref=e440]:
+              - button "生成首帧" [ref=e442]:
+                - img [ref=e443]
+                - text: 生成首帧
+              - heading "第6段" [level=3] [ref=e447]
+              - paragraph [ref=e448]: 快快快 快报个警
+              - paragraph [ref=e449]: 石质地面,男子的脚,周围环境
+              - generic [ref=e450]:
+                - button "换个角色" [ref=e451]
+                - button "用我之前的场景" [ref=e452]
+            - generic [ref=e453]:
+              - button "生成首帧" [ref=e455]:
+                - img [ref=e456]
+                - text: 生成首帧
+              - heading "第7段" [level=3] [ref=e460]
+              - paragraph [ref=e461]: 快送医院 母亲:谢谢 送医院 没事没事
+              - paragraph [ref=e462]: 水面,石墙,男子离开的背影
+              - generic [ref=e463]:
+                - button "换个角色" [ref=e464]
+                - button "用我之前的场景" [ref=e465]
+            - generic [ref=e466]:
+              - button "生成首帧" [ref=e468]:
+                - img [ref=e469]
+                - text: 生成首帧
+              - heading "第8段" [level=3] [ref=e473]
+              - paragraph [ref=e474]: 我从这过来装点水
+              - paragraph [ref=e475]: 公路护栏,男子的摩托车把手,周围建筑
+              - generic [ref=e476]:
+                - button "换个角色" [ref=e477]
+                - button "用我之前的场景" [ref=e478]
+            - generic [ref=e479]:
+              - button "生成首帧" [ref=e481]:
+                - img [ref=e482]
+                - text: 生成首帧
+              - heading "第9段" [level=3] [ref=e486]
+              - paragraph [ref=e487]: 我看小女孩在哭 低头一看 一个小孩在水里面
+              - paragraph [ref=e488]: 公路,护栏外的水面,过往车辆
+              - generic [ref=e489]:
+                - button "换个角色" [ref=e490]
+                - button "用我之前的场景" [ref=e491]
+            - generic [ref=e492]:
+              - button "生成首帧" [ref=e494]:
+                - img [ref=e495]
+                - text: 生成首帧
+              - heading "第10段" [level=3] [ref=e499]
+              - paragraph [ref=e500]: 路人:钓鱼啦 嗯
+              - paragraph [ref=e501]: 地面上的渔具包,男子的脚,公路
+              - generic [ref=e502]:
+                - button "换个角色" [ref=e503]
+                - button "用我之前的场景" [ref=e504]
+            - generic [ref=e505]:
+              - button "生成首帧" [ref=e507]:
+                - img [ref=e508]
+                - text: 生成首帧
+              - heading "第11段" [level=3] [ref=e512]
+              - paragraph [ref=e513]: “钓鱼侠”刘胜,为你点赞!
+              - paragraph [ref=e514]: 公路远景,男子骑车离开的背影,人民日报logo及搜索提示
+              - generic [ref=e515]:
+                - button "换个角色" [ref=e516]
+                - button "用我之前的场景" [ref=e517]
+            - generic [ref=e518]:
+              - heading "准备发出去" [level=2] [ref=e519]
+              - paragraph [ref=e520]: 标题备选
+              - list [ref=e521]:
+                - listitem [ref=e522]: H4 发现孩子落水的危机场景
+                - listitem [ref=e523]: 15秒男子抱起落水儿童
+                - listitem [ref=e524]: 关注社会新闻的普通大众也能直接照着拍
+              - paragraph [ref=e525]: 话题标签
+              - generic [ref=e526]:
+                - generic [ref=e527]: "##辅食"
+                - generic [ref=e528]: "##辅食教程"
+                - generic [ref=e529]: "##宝妈日常"
+                - generic [ref=e530]: "##育儿干货"
+                - generic [ref=e531]: "##关注社会新闻的普通大众"
+                - generic [ref=e532]: "##尤其是家长群体"
+              - button "一键复制，去发" [ref=e533]:
+                - img [ref=e534]
+                - text: 一键复制，去发
+          - complementary [ref=e537]:
+            - generic [ref=e538]:
+              - heading "你之前用过的" [level=2] [ref=e539]
+              - button "收起" [ref=e540]: x
+            - radiogroup "排序方式" [ref=e541]:
+              - radio "按使用次数" [checked] [ref=e542]
+              - radio "按时间" [ref=e543]
+            - heading "你的角色" [level=3] [ref=e545]
+            - heading "你的场景" [level=3] [ref=e547]
+    - generic [ref=e281]:
+      - generic [ref=e282]:
+        - generic [ref=e283]: 想改哪儿就告诉我
+        - generic [ref=e284]:
+          - button "历史 ▲ (1)" [ref=e548]
+          - button "收起对话" [ref=e286]:
+            - img [ref=e287]
+      - generic [ref=e549]:
+        - generic [ref=e550]:
+          - button "继续下一步" [ref=e551]
+          - button "开头再抓" [ref=e552]
+          - button "更口语" [ref=e553]
+          - button "💡 问点别的" [ref=e554]
+        - textbox "想改哪儿就告诉我,比如「开头再短一点」" [ref=e555]
+        - generic [ref=e556]:
+          - button "发送" [ref=e557] [cursor=pointer]
+          - button "复制诊断信息" [ref=e558]: 📋 复制诊断

@@ -1,0 +1,3 @@
+[    2031ms] [LOG] [WS] 排队 type=get_session_state @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[    3552ms] [LOG] [WS] 已连接, 发送 auth @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
+[    3553ms] [LOG] [WS] onopen 发送排队消息 x1 @ https://cascade.herwin.top/assets/App-B7OJ-Q1h.js:45
