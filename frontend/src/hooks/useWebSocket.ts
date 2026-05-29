@@ -1,5 +1,6 @@
 import { useRef, useCallback, useState } from "react";
 import { useToastStore } from "../store/toastStore";
+import { useWSStore } from "../store/wsStore";
 import type { WSCommand, WSEvent } from "../types/ws";
 
 type Handler = (res: WSEvent) => void;
@@ -70,6 +71,16 @@ export function useWebSocket(userId: string, onMessage: Handler) {
       setReconnectAttempt(0);
       if (wasReconnect) {
         useToastStore.getState().push({ kind: "info", title: "网络已恢复", ttlMs: 2000 });
+        // W5D4 Fix B — after a reconnect (e.g. a corporate proxy that cuts the
+        // WS on a fixed ~120s idle timer, ignoring ping/pong), re-request the
+        // current thread's state so the backend replays run_status + any
+        // analysis/rewrite that completed during the gap. Without this the
+        // client silently waited for live frames that already came and went.
+        // Cold start (retryRef===0) skips this — App's tid effect already asks.
+        const tid = useWSStore.getState().currentThreadId;
+        if (tid) {
+          ws.send(JSON.stringify({ type: "get_session_state", thread_id: tid }));
+        }
       }
       if (pendingRef.current.length) {
         console.log(`[WS] onopen 发送排队消息 x${pendingRef.current.length}`);
