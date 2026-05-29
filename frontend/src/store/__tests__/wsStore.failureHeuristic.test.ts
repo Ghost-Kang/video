@@ -40,9 +40,10 @@ describe("wsStore agent_response → synthetic failure heuristic", () => {
       const failure = useCanvasStore.getState().failure;
       expect(failure).not.toBeNull();
       expect(failure?.code).toBe("S7_UPSTREAM_TIMEOUT");
-      // W5D3 — client-synthesized failures now carry empty request_id
-      // (the "(client-synth)" sentinel was leaking into the diagnostic chip UI).
-      expect(failure?.request_id).toBe("");
+      // W5D3 P2 — client-synth failures carry the stable sentinel
+      // CLIENT_SYNTH_REQUEST_ID so diagnostic chip can hide it. Real backend
+      // frames have a hex request_id (or empty string).
+      expect(failure?.request_id).toBe("__client_synth__");
       expect(failure?.actions).toContain("RETRY_SAME_URL_AFTER_60S");
       expect(failure?.actions).toContain("PICK_FROM_FEATURED");
       expect(useWSStore.getState().loading).toBe(false);

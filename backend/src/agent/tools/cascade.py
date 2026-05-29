@@ -21,9 +21,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any
+import sys
+from typing import Any, Sequence
 
 from langchain_core.tools import tool
+from websockets.exceptions import ConnectionClosed, ConnectionClosedOK
 
 from agent.cascade.analysis_service import request_shallow_analysis
 from agent.cascade.cost_guard import (
@@ -47,14 +49,20 @@ from agent.transport.runtime_ctx import get_run_ctx
 
 
 async def _push_ws(payload: dict[str, Any]) -> None:
-    """Best-effort WS frame push. Swallows send errors (connection may be gone)."""
+    """Best-effort WS frame push.
+
+    Swallows *connection-related* errors only — the connection may have
+    closed mid-tool and that's expected. Programming errors (TypeError /
+    KeyError from a malformed payload) must propagate so they surface in
+    tests and dev logs rather than being silently dropped.
+    """
     ctx = get_run_ctx()
     ws = ctx.get("ws")
     if ws is None:
         return
     try:
         await ws.send(json.dumps(payload, ensure_ascii=False))
-    except Exception:
+    except (ConnectionClosed, ConnectionClosedOK, RuntimeError, OSError):
         # WS may have closed mid-tool — don't bring down the agent turn.
         pass
 
@@ -62,17 +70,29 @@ async def _push_ws(payload: dict[str, Any]) -> None:
 async def _push_failure_frame(
     code: str,
     hint: str,
-    actions: list[str],
+    actions: Sequence[str],
     request_id: str = "",
     stage: str = "analysis",
 ) -> None:
     """W5D3 Bug #2 — push structured analysis_failed WS frame from tool
     HardFailure paths. Lets frontend setFailure cleanly without relying on
     the agent_runner outer except (which only fires for uncaught exceptions,
-    not tools that catch HardFailure and return error dicts to the LLM)."""
+    not tools that catch HardFailure and return error dicts to the LLM).
+
+    Empty thread_id means RUN_CTX was never set — that's always a programming
+    bug (tool called outside a WS turn). Log to stderr so the next CI / dev
+    run catches it; we still return without raising so we don't break the
+    agent loop on this kind of misuse.
+    """
     ctx = get_run_ctx()
     thread_id = ctx.get("thread_id")
     if not thread_id:
+        print(
+            f"[BUG] _push_failure_frame called outside RUN_CTX "
+            f"(code={code}, stage={stage}) — silently dropping frame",
+            file=sys.stderr,
+            flush=True,
+        )
         return
     await _push_ws(
         {
@@ -80,7 +100,7 @@ async def _push_failure_frame(
             "thread_id": thread_id,
             "code": code,
             "hint": hint,
-            "actions": actions,
+            "actions": list(actions),  # copy — caller may mutate
             "request_id": request_id,
             "stage": stage,
         }

@@ -712,8 +712,21 @@ def _normalize_scenes(data: dict[str, Any], warnings: list[Warning_]) -> None:
         # Re-index 1..N after drop
         for idx, s in enumerate(normalized, start=1):
             s["scene_index"] = idx
+        # W5D3 CR-P0 — degenerate case: ALL scenes had timestamp_start >=
+        # duration_s, so the drop pass emptied the list. The original pad
+        # loop's `and normalized` guard is correct to prevent IndexError but
+        # silently no-ops, leaving the contract to hard-fail later at
+        # `scenes: list[Scene] = Field(..., min_length=3)` validation. That's
+        # the *same failure* W5D2's recovery was supposed to prevent. Raise an
+        # explicit HardFailure so the user gets a real hint instead of a
+        # silent S5_INVALID_PAYLOAD.
+        if not normalized:
+            raise HardFailure(
+                FailureCode.S5_INVALID_PAYLOAD,
+                "all scenes had timestamp_start >= duration_s; nothing to pad from",
+            )
         # Post-drop pad — if drops left us below 3, clone last scene to hit min.
-        while len(normalized) < 3 and normalized:
+        while len(normalized) < 3:
             clone = dict(normalized[-1])
             clone["scene_index"] = len(normalized) + 1
             normalized.append(clone)

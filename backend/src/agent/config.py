@@ -15,6 +15,9 @@ load_dotenv(_project_root / ".env")
 # -------- LLM --------
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "doubao").strip().lower()
+# W5D3 — ARK_API_KEY / ARK_BASE_URL were previously declared twice (once here
+# and once under "视频生成" further down). Single declaration here is the canon;
+# the duplicate was leftover from a refactor. Removed.
 ARK_API_KEY = os.getenv("ARK_API_KEY", "")
 ARK_BASE_URL = os.getenv("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")
 DOUBAO_MODEL = os.getenv("DOUBAO_MODEL", "doubao-seed-2-0-pro")
@@ -30,8 +33,8 @@ IMAGE_GEN_GOOGLE_MODEL = os.getenv("IMAGE_GEN_GOOGLE_MODEL", "gemini-3.1-flash-i
 # -------- 视频生成 --------
 VIDEO_GEN_API_KEY = os.getenv("VIDEO_GEN_API_KEY")
 VIDEO_GEN_BASE_URL = os.getenv("VIDEO_GEN_BASE_URL")
-ARK_API_KEY = os.getenv("ARK_API_KEY", "")
-ARK_BASE_URL = os.getenv("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")
+# ARK_API_KEY + ARK_BASE_URL are declared once under "LLM" above — shared with
+# the video generation path (same ARK gateway, same key).
 ARK_VIDEO_MODEL = os.getenv("ARK_VIDEO_MODEL", "doubao-seedance-2-0-260128")
 
 # -------- TTS --------
@@ -57,16 +60,27 @@ STRICT_CROSS_BORDER_REJECT = os.getenv("STRICT_CROSS_BORDER_REJECT", "1") == "1"
 INVITE_CODES = frozenset(
     c.strip() for c in os.getenv("INVITE_CODES", "").split(",") if c.strip()
 )
-# W5D3 Bug-smaller — if INVITE_CODES is empty *and* we look like a prod deploy
-# (ENV=prod or HOSTNAME contains "prod"), shout in stderr so an ops-by-mistake
-# open server gets caught at boot rather than after the first leaked WS auth.
-if not INVITE_CODES and (
+# W5D3 P1 — fail CLOSED in prod. Previously a misconfigured deploy with
+# `INVITE_CODES=""` shipped wide-open and only a stderr WARN appeared in docker
+# logs (easy to miss). Now: if ENV=prod and INVITE_CODES is empty, raise on
+# import. The only way to deliberately run prod with no gate is to set
+# `CASCADE_AUTH_MODE=open` explicitly (opt-in, documented).
+_AUTH_MODE = os.getenv("CASCADE_AUTH_MODE", "").strip().lower()
+_LOOKS_PROD = (
     os.getenv("ENV", "").lower() == "prod"
     or "prod" in os.getenv("HOSTNAME", "").lower()
-):
+)
+if not INVITE_CODES and _LOOKS_PROD and _AUTH_MODE != "open":
+    raise RuntimeError(
+        "INVITE_CODES is empty in a prod env. Either set INVITE_CODES "
+        "(comma-separated) or explicitly opt-in to open access with "
+        "CASCADE_AUTH_MODE=open. Boot aborted to prevent silently shipping "
+        "an open server."
+    )
+if not INVITE_CODES and _LOOKS_PROD and _AUTH_MODE == "open":
     import sys as _sys
     print(
-        "[WARN] INVITE_CODES is empty in a prod-looking env — WS auth gate is OFF.",
+        "[WARN] INVITE_CODES empty + CASCADE_AUTH_MODE=open — WS auth gate is OFF.",
         file=_sys.stderr,
         flush=True,
     )

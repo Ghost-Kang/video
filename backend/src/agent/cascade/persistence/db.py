@@ -11,13 +11,32 @@ from typing import AsyncIterator
 import aiosqlite
 
 
-_DB_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data"
-_DB_PATH = _DB_DIR / "messages.db"
+# W5D3 P0-4 — Path resolution is context-sensitive:
+#   - Container layout (/app/src/agent/cascade/persistence/db.py):
+#     `/app/data/cascade.db` is the volume-mounted location. Before this fix,
+#     `parent.parent.parent.parent` walked to `/app/src` and resulted in
+#     `/app/src/data/...` (ephemeral container layer, wiped on redeploy).
+#   - Local dev (.../backend/src/agent/cascade/persistence/db.py):
+#     `.parent ×4 / data` correctly resolves to `<repo>/backend/data`.
+# We detect the container by checking for /app/src and use the right default.
+# Filename also renamed from `messages.db` (collided with agent/store.py's
+# chat-history DB at the same name) to `cascade.db`.
+_DEFAULT_LOCAL_PATH = (
+    Path(__file__).resolve().parent.parent.parent.parent / "data" / "cascade.db"
+)
+_DEFAULT_CONTAINER_PATH = Path("/app/data/cascade.db")
 
 
 def db_path() -> Path:
     override = os.getenv("CASCADE_DB_PATH")
-    return Path(override) if override else _DB_PATH
+    if override:
+        return Path(override)
+    # /app/src is the canonical marker that we're running inside the Docker image
+    # (the Dockerfile WORKDIR /app and COPY src ./src). Filesystem check at
+    # import time is cheap enough (single stat).
+    if Path("/app/src").exists():
+        return _DEFAULT_CONTAINER_PATH
+    return _DEFAULT_LOCAL_PATH
 
 
 def utc_now_rfc3339() -> str:

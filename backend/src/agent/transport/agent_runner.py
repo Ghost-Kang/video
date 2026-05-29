@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Optional
 
 from langchain_core.messages import AIMessageChunk, ToolMessage
-from websockets.exceptions import ConnectionClosedOK
+from websockets.exceptions import ConnectionClosed, ConnectionClosedOK
 
 from agent.cascade.rewrite_service import Niche
 from agent.llm_factory import get_chat_model
@@ -41,28 +41,32 @@ async def run_agent(
     ws,
     selected_niche: Optional[Niche] = None,
 ) -> None:
-    """后台执行 agent。出错也会回 agent_response 帧避免前端 hang。
+    """后台执行 agent。出错时推 analysis_failed + canvas_updated 而非 raw exception。
 
     `selected_niche` 来自前端 onboarding 选择;非 None 时,我们在 user content
     最前面注入一行 `[selected_niche: <id>]` 标记,Director prompt 已经知道如何
     解析这个标记并跳过 "你想选哪个赛道?" 的追问。保留原文给画布消息历史,
     所以 store 里仍存原始 user_content,标记只进 agent stream。
     """
-    # W5D3 Bug #8 — capture Token so we can RUN_CTX.reset() in finally;
-    # otherwise concurrent WS sessions would leak ctx across turns. We must
-    # call set_run_ctx BEFORE the try so the token is in scope for finally.
+    # W5D3 — defensive ContextVar cleanup. PEP 567 + asyncio.create_task each
+    # snapshot the parent Context, so two concurrent run_agent tasks already
+    # see isolated RUN_CTX values without this reset. The reset is hygiene
+    # (avoids holding the ws reference for one extra GC cycle), not concurrency
+    # safety. We capture the token before try so it's in scope for finally.
     _ctx_token = set_run_ctx({
         "user_id": user_id,
         "thread_id": thread_id,
         "ws": ws,
         "run_id": None,
     })
+    reply = ""
+    failed = False  # W5D3 CR-P1: explicit flag replaces magic-string sentinel.
     try:
         # agent 的 tool call 通过 ContextVar 读写正确的用户/会话数据
         canvas_tools.set_user_id(user_id)
         canvas_tools.set_thread_id(thread_id)
         save_message(user_id, thread_id, "user", user_content)
-        entry = await pool.get(thread_id)
+        entry = await pool.get(user_id, thread_id)
 
         # 注入 niche 标记 — 不污染存储,只在喂给 LLM 的 turn 加 prefix。
         agent_input_content = (
@@ -100,19 +104,38 @@ async def run_agent(
         reply = full_reply or "（未生成回复）"
         save_message(user_id, thread_id, "agent", reply)
     except Exception as e:
-        # W5D3 Bug #4: don't leak raw exception str (may contain file paths /
-        # internal URLs) into chat history. Push structured analysis_failed
-        # frame below; suppress the trailing agent_response by setting a
-        # sentinel that the post-except send block detects.
-        reply = "__cascade_failed_sentinel__"
-        save_message(user_id, thread_id, "agent", f"处理出错: {e}")  # persist for /admin/events
+        # W5D3 — don't leak raw exception string into the WS push, AND don't
+        # persist it verbatim into the chat history. The persisted line is
+        # sanitized so a future session_state replay shows a friendly hint
+        # instead of an internal stack trace fragment.
+        failed = True
         print(f"[错误] thread={thread_id} {e}")
-        # W5D2 observability — persist the traceback to events.db so
-        # /admin/events can surface it (don't only rely on docker logs).
         import traceback as _tb
         from agent.cascade.event_names import EventName as _EN
         from agent.cascade.events import emit as _emit
         from agent.cascade.failures import HardFailure as _HF, FailureCode as _FC, RECOVERY_HINTS as _HINTS, RECOVERY_ACTIONS as _ACTIONS
+
+        # Compute the sanitized user-facing hint from the failure taxonomy.
+        if isinstance(e, _HF):
+            code_val = e.code.value
+            hint_val = e.hint
+            actions_val = e.actions
+            request_id_val = e.request_id
+        else:
+            if type(e).__name__ == "TimeoutError" or "timeout" in str(e).lower():
+                code_val = _FC.S7_UPSTREAM_TIMEOUT.value
+            else:
+                code_val = _FC.S8_UPSTREAM_REFUSED.value
+            hint_val = _HINTS.get(code_val, "处理出错,请重试或换一条链接。")
+            actions_val = _ACTIONS.get(code_val, ["REPORT"])
+            request_id_val = ""
+
+        # Persist sanitized hint (raw traceback still lands in events.db below).
+        save_message(user_id, thread_id, "agent", hint_val or "处理出错,请重试")
+
+        # W5D2 observability — persist the full traceback to events.db so
+        # /admin/events can surface it. Best-effort; observability errors
+        # never swallow the real error.
         try:
             await _emit(
                 _EN.UNCAUGHT_EXCEPTION,
@@ -127,26 +150,12 @@ async def run_agent(
                 },
             )
         except Exception:
-            pass  # never let observability error swallow the real error
+            pass
 
-        # W5D3 — push structured `analysis_failed` WS frame so frontend
-        # ChatPanel flips into `failed` state directly (replaces fragile
-        # chat-message heuristic). Best-effort: failure of this push must
-        # not raise (founder may have already closed the WS).
+        # Push structured analysis_failed WS frame so frontend ChatPanel flips
+        # into `failed` state directly. Narrow the catch so programming errors
+        # (TypeError / KeyError) still surface in tests instead of being eaten.
         try:
-            if isinstance(e, _HF):
-                code_val = e.code.value
-                hint_val = e.hint
-                actions_val = e.actions
-                request_id_val = e.request_id
-            else:
-                if type(e).__name__ == "TimeoutError" or "timeout" in str(e).lower():
-                    code_val = _FC.S7_UPSTREAM_TIMEOUT.value
-                else:
-                    code_val = _FC.S8_UPSTREAM_REFUSED.value
-                hint_val = _HINTS.get(code_val, "处理出错,请重试或换一条链接。")
-                actions_val = _ACTIONS.get(code_val, ["REPORT"])
-                request_id_val = ""
             await send_json(
                 ws,
                 type="analysis_failed",
@@ -157,22 +166,21 @@ async def run_agent(
                 request_id=request_id_val,
                 stage="analysis",
             )
-        except Exception:
+        except (ConnectionClosed, ConnectionClosedOK, RuntimeError, OSError):
             pass
     finally:
-        # W5D3 Bug #8 — reset the ContextVar so it doesn't leak into the next
-        # asyncio task on the same WS connection. Without this, two
-        # concurrent run_agent calls (e.g. founder hitting send twice fast)
-        # would observe stale ws/thread_id in tools.
+        # Defensive cleanup (see top-of-function note about ContextVar semantics).
         try:
             RUN_CTX.reset(_ctx_token)
-        except Exception:
+        except (ValueError, LookupError):
             pass
 
-    # W5D3 Bug #4: when reply is the failure sentinel, skip agent_response;
-    # frontend already got the structured analysis_failed frame above. Still
-    # push canvas snapshot so anchor/canvas state stays consistent.
-    if reply == "__cascade_failed_sentinel__":
+    # W5D3 CR-P1 — explicit failed flag replaces the magic-string sentinel.
+    # When the agent failed, frontend already got `analysis_failed`; we still
+    # push canvas snapshot to keep canvas/anchor state consistent, then return
+    # without sending `agent_response` (which would carry the failure hint
+    # again and confuse the chat history).
+    if failed:
         try:
             await send_json(
                 ws,
@@ -180,7 +188,7 @@ async def run_agent(
                 thread_id=thread_id,
                 canvas=canvas_data(thread_id),
             )
-        except Exception:
+        except (ConnectionClosed, ConnectionClosedOK, RuntimeError, OSError):
             pass
     else:
         try:
@@ -191,7 +199,7 @@ async def run_agent(
                 content=reply,
                 canvas=canvas_data(thread_id),
             )
-        except (ConnectionClosedOK, Exception):
+        except (ConnectionClosed, ConnectionClosedOK, RuntimeError, OSError):
             pass
 
 

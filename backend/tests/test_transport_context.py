@@ -120,3 +120,49 @@ class TestCanvasData:
         canvas_data(tid)
         # 内部已经 set;再调一次 _load_all_nodes 应该用同 thread_id
         assert canvas_tools._current_thread_id.get() == tid
+
+
+# ---------- W5D3 P0-3 — per-WS send lock ----------
+
+
+class TestSendJsonLock:
+    def test_concurrent_sends_are_serialized(self):
+        """W5D3 P0-3: send_json must serialize concurrent writes per connection.
+
+        Without the lock, two `await ws.send(...)` calls scheduled on different
+        asyncio tasks could interleave bytes in the underlying socket buffer.
+        We model this by recording start+end of each send and asserting they
+        don't overlap.
+        """
+        import asyncio
+        from agent.transport.context import send_json
+
+        events: list[tuple[str, int]] = []
+
+        class TimedWS:
+            def __init__(self) -> None:
+                self.counter = 0
+
+            async def send(self, data: str) -> None:
+                self.counter += 1
+                my_id = self.counter
+                events.append(("start", my_id))
+                await asyncio.sleep(0.01)  # simulate slow socket write
+                events.append(("end", my_id))
+
+        async def _run():
+            ws = TimedWS()
+            await asyncio.gather(
+                send_json(ws, type="a", thread_id="t"),
+                send_json(ws, type="b", thread_id="t"),
+                send_json(ws, type="c", thread_id="t"),
+            )
+            return ws
+
+        asyncio.run(_run())
+
+        # Each (start, n) must be immediately followed by (end, n) — no interleaving.
+        for i in range(0, len(events), 2):
+            assert events[i][0] == "start", f"events[{i}] = {events[i]}"
+            assert events[i + 1][0] == "end", f"events[{i+1}] = {events[i+1]}"
+            assert events[i][1] == events[i + 1][1], "send not atomic"

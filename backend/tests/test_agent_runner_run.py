@@ -53,7 +53,8 @@ class FakePool:
     def __init__(self, agent: FakeAgent) -> None:
         self._agent = agent
 
-    async def get(self, thread_id: str) -> dict[str, Any]:
+    async def get(self, user_id: str, thread_id: str) -> dict[str, Any]:
+        # W5D3: pool keyed by (user_id, thread_id) — composite key.
         return {"agent": self._agent, "config": {"thread_id": thread_id}}
 
 
@@ -233,9 +234,18 @@ class TestEmptyAndErrorPaths:
         canvases = [m for m in ws.sent if m.get("type") == "canvas_updated"]
         assert len(canvases) == 1
 
-        # save_message 仍写了 agent 错误回复(便于 /admin/events 检索)
+        # W5D3 CR-P0 — save_message persists a SANITIZED hint (recovery taxonomy
+        # message), NOT the raw exception. Reload-session would replay this back
+        # to the user, so it must be safe to display. For S8_UPSTREAM_REFUSED
+        # (the default for non-timeout RuntimeError), the recovery hint mentions
+        # "系统暂时繁忙" — that's what the user sees in chat history.
         agent_save = [c for c in saved_messages if c[2] == "agent"]
-        assert "处理出错" in agent_save[0][3]
+        saved_text = agent_save[0][3]
+        assert "upstream gone" not in saved_text, "raw exception leaked into chat history"
+        # Sanitized message must come from RECOVERY_HINTS (友好中文) or fallback
+        assert "繁忙" in saved_text or "处理出错" in saved_text, (
+            f"expected sanitized hint, got: {saved_text}"
+        )
 
     def test_send_failure_on_final_frame_swallowed(self, saved_messages, stub_canvas_data):
         """末尾发 agent_response 时连接已关 — 不该再抛异常。"""

@@ -253,7 +253,10 @@ export function ChatPanel({
             </button>
             <p className="mt-3 text-[10px] text-stone-400 dark:text-stone-600 tabular">
               {COPY.side_failed_code_prefix}
-              {failure.code} · {failure.request_id}
+              {failure.code}
+              {failure.request_id && failure.request_id !== "__client_synth__"
+                ? ` · ${failure.request_id}`
+                : ""}
             </p>
           </div>
         )}

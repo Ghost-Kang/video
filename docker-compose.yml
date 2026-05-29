@@ -24,10 +24,10 @@ services:
       # Sane prod defaults — override via .env if needed
       CASCADE_UPSTREAM: ${CASCADE_UPSTREAM:-doubao_direct}
       TOPRADOR_RESOLVER_MODE: ${TOPRADOR_RESOLVER_MODE:-douyin_share}
-      # W5D3 — Path-resolution off-by-one in persistence/db.py defaults to
-      # /app/src/data/messages.db (ephemeral container layer), wiping events
-      # + analyses + anchors on every redeploy. Override to volume-mounted path.
-      CASCADE_DB_PATH: /app/data/cascade.db
+      # CASCADE_DB_PATH no longer required — persistence/db.py now detects
+      # container layout via Path("/app/src").exists() and defaults to the
+      # volume-mounted /app/data/cascade.db. The env var is still honored
+      # as an override for tests / non-standard layouts.
     volumes:
       - ./data:/app/data
     # Backend binds 0.0.0.0:8765 + 0.0.0.0:8766 internally; we do NOT

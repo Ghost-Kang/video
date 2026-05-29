@@ -64,8 +64,8 @@ describe("AnalysisProgress 95% pin escape (W5D3)", () => {
     const failure = useCanvasStore.getState().failure;
     expect(failure).not.toBeNull();
     expect(failure?.code).toBe("S7_UPSTREAM_TIMEOUT");
-    // W5D3 — client-synthesized failures now have empty request_id
-    expect(failure?.request_id).toBe("");
+    // W5D3 P2 — client-synth failures carry CLIENT_SYNTH_REQUEST_ID sentinel
+    expect(failure?.request_id).toBe("__client_synth__");
   });
 
   it("clicking 继续等 hides the warning (snoozed)", () => {

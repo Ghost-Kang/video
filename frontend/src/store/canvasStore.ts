@@ -116,8 +116,23 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
       // on reconnect, or a snapshot replay) must not nuke the rewrite the
       // user just spent 60s producing. Only reset script/rewriteShots when
       // the analysis_id actually changed.
+      //
+      // W5D3 CR-P1 follow-up — `analysis_id` is deterministic
+      // hash(user_id + source_url); a re-analysis of the same URL returns the
+      // SAME id even if Doubao produced different scenes. Comparing by id
+      // alone risks leaving rewriteShots indexed against the OLD scenes when
+      // the new analysis has rearranged them. Compare a coarse scenes
+      // signature (count + every timestamp pair) so true re-analysis with
+      // mutated scenes triggers a full reset of dependent state.
+      const sceneSignature = (a: CascadeAnalysisContract) =>
+        `${a.scenes.length}|` +
+        a.scenes
+          .map((s) => `${s.timestamp_start}-${s.timestamp_end}`)
+          .join(",");
       const sameAnalysis =
-        state.analysis !== null && state.analysis.analysis_id === analysis.analysis_id;
+        state.analysis !== null &&
+        state.analysis.analysis_id === analysis.analysis_id &&
+        sceneSignature(state.analysis) === sceneSignature(analysis);
       return sameAnalysis
         ? {
             analysis,

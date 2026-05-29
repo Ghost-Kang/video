@@ -16,7 +16,7 @@ from pydantic import ValidationError
 from websockets.exceptions import ConnectionClosedOK
 
 from agent import config, store  # 通过 module 访问,方便 test monkeypatch
-from agent.pool import AgentPool
+from agent.pool import SHARED_POOL
 from agent.tools import canvas as canvas_tools
 from agent.transport import notify
 from agent.transport.context import WSCtx, send_json
@@ -25,11 +25,14 @@ from agent.transport.ws_messages import AuthMsg
 from agent.workers import generation_worker  # module 访问同理
 
 
-POOL_SIZE = 5
+# W5D3 — pool is now module-level singleton (`SHARED_POOL`). Keyed by
+# (user_id, thread_id) so reconnects from the same user/thread reuse the
+# warm agent + checkpointer. Per-connection pools previously leaked aiosqlite
+# connections every reconnect because `pool.close()` was never invoked in
+# this function's finally block.
 
 
 async def handle(websocket) -> None:
-    pool = AgentPool(max_size=POOL_SIZE)
     user_id: str | None = None
     ctx: WSCtx | None = None
     print("[连接] 新连接,等待 auth...")
@@ -72,8 +75,8 @@ async def handle(websocket) -> None:
                 canvas_tools.set_user_id(user_id)
                 notify.register(user_id, websocket)
                 generation_worker.start_workers()
-                ctx = WSCtx(user_id=user_id, ws=websocket, pool=pool)
-                print(f"[连接] user={user_id} pool 上限 {POOL_SIZE}")
+                ctx = WSCtx(user_id=user_id, ws=websocket, pool=SHARED_POOL)
+                print(f"[连接] user={user_id} (shared pool, capacity {SHARED_POOL._max})")
                 # auth 后自动下发会话列表
                 sessions = store.list_sessions(user_id)
                 await send_json(websocket, type="session_list", sessions=sessions)
@@ -111,4 +114,11 @@ async def handle(websocket) -> None:
     finally:
         if user_id:
             notify.unregister(user_id)
+        # W5D3 P0-3 — drop the send-lock pin so closed ws objects don't keep
+        # a stale Lock alive (weak dict GCs the entry once the ws is collected).
+        try:
+            from agent.transport.context import _release_send_lock
+            _release_send_lock(websocket)
+        except Exception:
+            pass
         print("[断开] WS 连接已关闭")

@@ -18,6 +18,38 @@ import type { FailurePayload } from "../types/cascade";
 const TIMEOUT_PATTERN = /请求超时|处理出错|系统暂时繁忙/;
 const REFUSED_PATTERN = /系统暂时繁忙/;
 
+// W5D3 P2 — runtime guard for the analysis_failed payload.
+// Backend Pydantic typing is wider than the frontend FailurePayload union
+// (the WS contract uses `str`, not an enum). If the backend ever ships a new
+// code the frontend doesn't know about, we map it to a stable fallback.
+const KNOWN_CODES: ReadonlySet<FailurePayload["code"]> = new Set([
+  "S1_NO_SOURCE_URL",
+  "S2_VERSION_MISMATCH",
+  "S3_NO_FORMULA",
+  "S4_SCENES_LEN_OUT_OF_RANGE",
+  "S5_INVALID_PAYLOAD",
+  "S6_NEGATIVE_COST",
+  "S7_UPSTREAM_TIMEOUT",
+  "S8_UPSTREAM_REFUSED",
+] satisfies FailurePayload["code"][]);
+
+const KNOWN_ACTIONS: ReadonlySet<FailurePayload["actions"][number]> = new Set([
+  "RETRY_SAME_URL",
+  "RETRY_SAME_URL_AFTER_30S",
+  "RETRY_SAME_URL_AFTER_60S",
+  "RETRY_WITH_NEW_URL",
+  "PICK_FROM_FEATURED",
+  "RELOAD",
+  "REPORT",
+] satisfies FailurePayload["actions"][number][]);
+
+// W5D3 — sentinel for client-synthesized failures (NOT for UI display).
+// Diagnostics chip checks `request_id === CLIENT_SYNTH_REQUEST_ID` and renders
+// "client-synth" instead of the raw value, so this string never leaks visually
+// while still allowing dev tools / event correlation to distinguish client
+// fallback from a real backend failure (which always has a real hex request_id).
+export const CLIENT_SYNTH_REQUEST_ID = "__client_synth__";
+
 export function synthesizeFailureFromContent(content: string): FailurePayload {
   const isRefused = REFUSED_PATTERN.test(content);
   return {
@@ -26,7 +58,7 @@ export function synthesizeFailureFromContent(content: string): FailurePayload {
       ? COPY.synth_failure_refused_hint
       : COPY.synth_failure_timeout_hint,
     actions: ["RETRY_SAME_URL_AFTER_60S", "PICK_FROM_FEATURED"],
-    request_id: "",
+    request_id: CLIENT_SYNTH_REQUEST_ID,
   };
 }
 
@@ -258,10 +290,25 @@ export const useWSStore = create<WSStore>((set, get) => ({
         // non-null,so this drives the UI directly without keyword matching.
         set({ loading: false, thinking: [] });
         queueMicrotask(() => {
+          // W5D3 P2 — runtime-validate the code/actions before downcasting.
+          // The backend Pydantic AnalysisFailedEvent allows any string for
+          // `code` and `actions[]`. If a backend deploy adds a new code the
+          // frontend type union doesn't know about, casting silently produces
+          // an undefined hint title. Map unknown codes to a stable fallback.
+          const normalizedCode: FailurePayload["code"] = KNOWN_CODES.has(
+            event.code as FailurePayload["code"],
+          )
+            ? (event.code as FailurePayload["code"])
+            : "S5_INVALID_PAYLOAD";
+          const normalizedActions: FailurePayload["actions"] = (event.actions || [])
+            .filter((a): a is FailurePayload["actions"][number] =>
+              KNOWN_ACTIONS.has(a as FailurePayload["actions"][number]),
+            );
           useCanvasStore.getState().setFailure({
-            code: event.code as FailurePayload["code"],
+            code: normalizedCode,
             hint: event.hint,
-            actions: event.actions as FailurePayload["actions"],
+            actions:
+              normalizedActions.length > 0 ? normalizedActions : ["REPORT"],
             request_id: event.request_id || "",
           });
           // Clear any in-flight streaming so it doesn't visually compete

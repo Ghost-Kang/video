@@ -651,3 +651,32 @@ def test_phase0_gate_warning_codes_have_hints() -> None:
     """Every WarningCode in the catalog has a hint string (may be empty for silent codes)."""
     for code in WarningCode:
         assert code.value in RECOVERY_HINTS, f"WarningCode {code.value} missing in RECOVERY_HINTS"
+
+
+# ---------- W5D3 CR-P0 — adapter all-scenes-dropped degenerate ----------
+
+
+def test_adapter_all_scenes_dropped_raises_explicit_hardfailure() -> None:
+    """Doubao occasionally returns every scene with timestamp_start >= duration_s.
+    The drop pass then empties `normalized`, and W18 pad's `and normalized` guard
+    silently no-ops, letting the contract validator hard-fail. W5D3 CR-P0 fix:
+    detect the degenerate case and raise S5_INVALID_PAYLOAD with a real hint
+    instead of letting the user see a generic validation error."""
+    from agent.cascade.failures import FailureCode, HardFailure
+
+    raw = _load(SYNTH / "baomam_fushi" / "001.json")
+    raw["duration_s"] = 30
+    raw["scenes"] = [
+        {"scene_index": 1, "timestamp_start": 60, "timestamp_end": 65,
+         "shot_type": "wide", "camera_movement": "static", "description": "x"},
+        {"scene_index": 2, "timestamp_start": 70, "timestamp_end": 75,
+         "shot_type": "wide", "camera_movement": "static", "description": "y"},
+        {"scene_index": 3, "timestamp_start": 80, "timestamp_end": 85,
+         "shot_type": "wide", "camera_movement": "static", "description": "z"},
+    ]
+    with pytest.raises(HardFailure) as exc:
+        normalize_analysis_result(raw)
+    assert exc.value.code == FailureCode.S5_INVALID_PAYLOAD
+    # The debug_detail should hint at the degenerate timestamps so /admin/events
+    # tells operators what happened.
+    assert "duration" in str(exc.value).lower() or "timestamp" in str(exc.value).lower()

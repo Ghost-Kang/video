@@ -417,6 +417,11 @@ async def _call_doubao_direct(
 
     payload["_upstream_latency_ms"] = int((time.monotonic() - start) * 1000)
     payload["_upstream_attempts"] = 1
+    # W5D3 CR-P1 — emit a `transcribe` stage between ark return and done so
+    # the frontend's third stage label ("整理输出") lights up briefly instead
+    # of being skipped. Adapter normalization + scenes timestamp checks all
+    # happen after this in the calling cascade tool.
+    await _emit_progress("transcribe", 92, 3, "整理时间线 + 字幕对齐")
     await _emit_progress("done", 100, 0, "整理完成")
     return payload
 
