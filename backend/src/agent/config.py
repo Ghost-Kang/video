@@ -85,6 +85,17 @@ if not INVITE_CODES and _LOOKS_PROD and _AUTH_MODE == "open":
         flush=True,
     )
 
+# Public flag so the transport layer can fail-closed in prod without
+# re-deriving the heuristic.
+IS_PROD_LIKE = _LOOKS_PROD
+
+# -------- Admin API token --------
+# Separate, stronger gate for cross-user admin reads (GET /api/events,
+# /api/creators, /api/health/summary). The invite_code is a shared cohort
+# secret; admin data must require a token only the founder holds. Empty in
+# dev = open; empty in prod = admin endpoints fail closed (403) until set.
+ADMIN_TOKEN = os.getenv("CASCADE_ADMIN_TOKEN", "").strip()
+
 S3_AK = os.getenv("S3_AK", "")
 S3_SK = os.getenv("S3_SK", "")
 S3_ENDPOINT = os.getenv("S3_ENDPOINT", "")

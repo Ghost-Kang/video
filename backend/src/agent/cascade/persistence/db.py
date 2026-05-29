@@ -26,6 +26,14 @@ _DEFAULT_LOCAL_PATH = (
 )
 _DEFAULT_CONTAINER_PATH = Path("/app/data/cascade.db")
 
+# Paths whose schema DDL has already run in this process. Previously every
+# `_connect()` re-ran ~12 CREATE TABLE/INDEX IF NOT EXISTS statements — cheap
+# individually but paid on every connection (the health endpoint opens one per
+# request). We run the DDL once per distinct path and only set per-connection
+# PRAGMAs thereafter. Keyed by path string so tests that point CASCADE_DB_PATH
+# at a fresh temp file still bootstrap.
+_BOOTSTRAPPED_PATHS: set[str] = set()
+
 
 def db_path() -> Path:
     override = os.getenv("CASCADE_DB_PATH")
@@ -45,14 +53,16 @@ def utc_now_rfc3339() -> str:
 
 async def bootstrap_schema(db: aiosqlite.Connection | None = None) -> None:
     own_connection = db is None
+    path = db_path()
     if db is None:
-        path = db_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         db = await aiosqlite.connect(str(path))
     try:
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA synchronous=NORMAL")
         await db.execute("PRAGMA busy_timeout=5000")
+        if str(path) in _BOOTSTRAPPED_PATHS:
+            return
         await db.execute(
             """CREATE TABLE IF NOT EXISTS analyses (
               analysis_id TEXT PRIMARY KEY,
@@ -114,6 +124,7 @@ async def bootstrap_schema(db: aiosqlite.Connection | None = None) -> None:
             "CREATE INDEX IF NOT EXISTS idx_toprador_cache_expires ON toprador_cache(expires_at)"
         )
         await db.commit()
+        _BOOTSTRAPPED_PATHS.add(str(path))
     finally:
         if own_connection:
             await db.close()

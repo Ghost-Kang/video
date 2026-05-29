@@ -21,6 +21,10 @@ services:
     env_file:
       - .env  # ARK_API_KEY, INVITE_CODES, CASCADE_UPSTREAM, etc.
     environment:
+      # Marks this as a prod-like deploy so the auth layer fails closed:
+      # config.py aborts boot if INVITE_CODES is empty, and admin endpoints
+      # return 403 if CASCADE_ADMIN_TOKEN is unset (rather than silently open).
+      ENV: ${ENV:-prod}
       # Sane prod defaults — override via .env if needed
       CASCADE_UPSTREAM: ${CASCADE_UPSTREAM:-doubao_direct}
       TOPRADOR_RESOLVER_MODE: ${TOPRADOR_RESOLVER_MODE:-douyin_share}
@@ -38,7 +42,10 @@ services:
     networks:
       - cascade
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8766/api/events?limit=1', timeout=2)"]
+      # Dedicated unauthenticated liveness endpoint (not /api/events, which is
+      # now admin-gated). 127.0.0.1 not localhost — the backend binds IPv4 only;
+      # `localhost` can resolve to ::1 first and fail (see frontend Dockerfile).
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8766/api/health', timeout=2)"]
       interval: 30s
       timeout: 5s
       retries: 3

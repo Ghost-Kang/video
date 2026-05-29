@@ -8,6 +8,7 @@ import {
   getPublishTitles,
 } from "../../lib/buildPublishPack";
 import { CARD_CLASS, BTN_PRIMARY } from "../../lib/cardStyles";
+import { apiFetch } from "../../lib/apiClient";
 
 interface Props {
   script: string;
@@ -23,7 +24,7 @@ export function PublishPackCard({ script, analysis }: Props) {
     const payload = buildPublishPack(script, analysis);
     try {
       await navigator.clipboard.writeText(payload);
-      fetch("/api/events", {
+      apiFetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

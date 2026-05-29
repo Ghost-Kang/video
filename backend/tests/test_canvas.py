@@ -17,6 +17,23 @@ from agent.tools.canvas import (
     schedule_generation_retry,
     update_canvas_node,
 )
+from agent.tools.canvas_persistence import db as canvas_db
+
+
+@pytest.fixture(autouse=True)
+def _isolated_canvas_db(tmp_path, monkeypatch):
+    """Give every canvas test its own fresh canvas.db.
+
+    These tests share module-level state and `claim_pending_tasks` /
+    `recover_generation_tasks` are GLOBAL (not thread-scoped). Without isolation,
+    pending image nodes left by one test (or a prior pytest run against the dev
+    canvas.db) leak into another and break exact-count assertions. Pointing
+    `_DB_PATH` at a per-test temp file makes the suite deterministic.
+    """
+    p = tmp_path / "canvas.db"
+    monkeypatch.setattr(canvas_db, "_DB_PATH", p)
+    canvas_db._MIGRATED_PATHS.discard(str(p))
+    yield
 
 
 def _unique_thread():

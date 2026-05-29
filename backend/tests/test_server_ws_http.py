@@ -4,7 +4,7 @@ import asyncio
 import json
 from typing import Iterable
 
-from agent import server, store
+from agent import config, server, store
 from agent.cascade import cost_guard
 from agent.workers import generation_worker
 
@@ -133,3 +133,87 @@ def test_cost_status_accepts_user_id(monkeypatch):
     assert status == 200
     assert body["user_id"] == "u1"
     assert body["run_id"] == "r1"
+
+
+# ---------- P0: HTTP API auth gate ----------
+
+
+def _drive(raw: bytes) -> tuple[int, dict]:
+    reader = FakeReader(raw)
+    writer = FakeWriter()
+    asyncio.run(server._handle_http(reader, writer))
+    return _http_json_response(writer.data)
+
+
+def _req(method: str, path: str, *, headers: str = "", body: dict | None = None) -> bytes:
+    payload = json.dumps(body or {}).encode("utf-8")
+    head = f"{method} {path} HTTP/1.1\r\nHost: test\r\n{headers}"
+    if body is not None:
+        head += f"Content-Length: {len(payload)}\r\n"
+    return head.encode("utf-8") + b"\r\n" + (payload if body is not None else b"")
+
+
+def test_open_routes_need_no_auth(monkeypatch):
+    # Even with both gates configured, OPEN routes stay reachable.
+    monkeypatch.setattr(config, "INVITE_CODES", frozenset({"GOOD"}))
+    monkeypatch.setattr(config, "ADMIN_TOKEN", "secret")
+    status, body = _drive(_req("GET", "/api/health"))
+    assert status == 200 and body.get("ok") is True
+    status, body = _drive(_req("GET", "/api/stats/public"))
+    assert status == 200 and "runs" in body and "creators" in body
+
+
+def test_admin_route_requires_token_when_configured(monkeypatch):
+    monkeypatch.setattr(config, "ADMIN_TOKEN", "secret")
+    monkeypatch.setattr(config, "INVITE_CODES", frozenset())
+    # No token → 401
+    status, body = _drive(_req("GET", "/api/creators"))
+    assert status == 401 and body["error"] == "admin_token_required"
+    # Correct token → passes the gate (200 from the handler)
+    status, _ = _drive(_req("GET", "/api/creators", headers="X-Admin-Token: secret\r\n"))
+    assert status == 200
+
+
+def test_admin_route_fail_closed_in_prod_without_token(monkeypatch):
+    monkeypatch.setattr(config, "ADMIN_TOKEN", "")
+    monkeypatch.setattr(config, "IS_PROD_LIKE", True)
+    status, body = _drive(_req("GET", "/api/events"))
+    assert status == 403 and body["error"] == "admin_not_configured"
+
+
+def test_cohort_route_requires_invite_code_when_configured(monkeypatch):
+    # Stub emit so the test exercises the auth gate, not event-schema validation.
+    from agent.transport import http_router
+
+    async def _noop_emit(*a, **k):
+        return None
+
+    monkeypatch.setattr(http_router, "emit", _noop_emit)
+    monkeypatch.setattr(config, "INVITE_CODES", frozenset({"GOOD"}))
+    monkeypatch.setattr(config, "ADMIN_TOKEN", "")
+    monkeypatch.setattr(config, "IS_PROD_LIKE", False)
+    ev = {"event_name": "consent_accepted", "user_id": "u1", "payload": {}}
+    # Missing / wrong code → 401, handler not reached
+    status, body = _drive(_req("POST", "/api/events", body=ev))
+    assert status == 401 and body["error"] == "invite_code_required"
+    status, body = _drive(_req("POST", "/api/events", headers="X-Invite-Code: BAD\r\n", body=ev))
+    assert status == 401
+    # Valid code → handler runs
+    status, body = _drive(_req("POST", "/api/events", headers="X-Invite-Code: GOOD\r\n", body=ev))
+    assert status == 200 and body == {"ok": True}
+
+
+def test_cohort_route_open_when_invite_codes_empty(monkeypatch):
+    # Dev/test parity: empty INVITE_CODES disables the cohort gate.
+    from agent.transport import http_router
+
+    async def _noop_emit(*a, **k):
+        return None
+
+    monkeypatch.setattr(http_router, "emit", _noop_emit)
+    monkeypatch.setattr(config, "INVITE_CODES", frozenset())
+    monkeypatch.setattr(config, "ADMIN_TOKEN", "")
+    monkeypatch.setattr(config, "IS_PROD_LIKE", False)
+    ev = {"event_name": "consent_accepted", "user_id": "u1", "payload": {}}
+    status, body = _drive(_req("POST", "/api/events", body=ev))
+    assert status == 200 and body == {"ok": True}

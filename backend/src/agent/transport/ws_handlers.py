@@ -36,6 +36,25 @@ from agent.transport.ws_messages import (
 )
 
 _THREAD_RUN_LOCKS: dict[str, asyncio.Lock] = {}
+_MAX_THREAD_LOCKS = 512
+
+
+def _get_thread_run_lock(thread_id: str) -> asyncio.Lock:
+    """Per-thread run lock with a bound on dict growth.
+
+    Previously `setdefault` grew this dict forever (one entry per thread_id
+    ever seen) — a slow leak over long uptime. When we exceed the cap we drop
+    currently-unlocked entries (an unlocked asyncio.Lock has no holder and no
+    waiters, so removing it is safe).
+    """
+    lock = _THREAD_RUN_LOCKS.get(thread_id)
+    if lock is None:
+        if len(_THREAD_RUN_LOCKS) >= _MAX_THREAD_LOCKS:
+            for k in [k for k, l in _THREAD_RUN_LOCKS.items() if not l.locked()]:
+                del _THREAD_RUN_LOCKS[k]
+        lock = asyncio.Lock()
+        _THREAD_RUN_LOCKS[thread_id] = lock
+    return lock
 
 
 async def _run_agent_serialized(ctx: WSCtx, msg: UserMessageMsg) -> None:
@@ -45,7 +64,7 @@ async def _run_agent_serialized(ctx: WSCtx, msg: UserMessageMsg) -> None:
     two `run_agent` tasks for the same thread race over the same LangGraph
     checkpoint and can duplicate expensive upstream analysis calls.
     """
-    lock = _THREAD_RUN_LOCKS.setdefault(msg.thread_id, asyncio.Lock())
+    lock = _get_thread_run_lock(msg.thread_id)
     async with lock:
         await agent_runner.run_agent(
             ctx.user_id,
@@ -61,21 +80,30 @@ async def _run_agent_serialized(ctx: WSCtx, msg: UserMessageMsg) -> None:
 
 
 async def handle_list_sessions(ctx: WSCtx, msg: ListSessionsMsg) -> None:
-    sessions = store.list_sessions(ctx.user_id)
+    # store.* is synchronous sqlite3 — offload so it doesn't block the loop.
+    sessions = await asyncio.to_thread(store.list_sessions, ctx.user_id)
     await send_json(ctx.ws, type="session_list", sessions=sessions)
 
 
 async def handle_delete_session(ctx: WSCtx, msg: DeleteSessionMsg) -> None:
-    store.delete_session(ctx.user_id, msg.thread_id)
-    sessions = store.list_sessions(ctx.user_id)
+    def _work() -> list:
+        store.delete_session(ctx.user_id, msg.thread_id)
+        return store.list_sessions(ctx.user_id)
+
+    sessions = await asyncio.to_thread(_work)
     await send_json(ctx.ws, type="session_list", sessions=sessions)
 
 
 async def handle_get_session_state(ctx: WSCtx, msg: GetSessionStateMsg) -> None:
-    store.ensure_session_exists(ctx.user_id, msg.thread_id)
     print(f"[请求] get_session_state thread={msg.thread_id}")
-    msgs = store.get_messages(ctx.user_id, msg.thread_id)
-    canvas = canvas_data(msg.thread_id)
+
+    def _work() -> tuple[list, dict | None]:
+        store.ensure_session_exists(ctx.user_id, msg.thread_id)
+        msgs = store.get_messages(ctx.user_id, msg.thread_id)
+        canvas = canvas_data(msg.thread_id)
+        return msgs, canvas
+
+    msgs, canvas = await asyncio.to_thread(_work)
     print(f"[请求] 返回 msgs={len(msgs)} canvas={canvas is not None}")
     await send_json(
         ctx.ws,
@@ -87,28 +115,48 @@ async def handle_get_session_state(ctx: WSCtx, msg: GetSessionStateMsg) -> None:
 
 
 # ---------- canvas edges ----------
+#
+# Each handler bundles set_thread_id + mutation + canvas snapshot into one
+# `asyncio.to_thread` call. set_thread_id is a ContextVar; to_thread copies the
+# current context into the worker thread, so the set and the subsequent reads
+# stay consistent within the same thread. Keeps synchronous sqlite3 off the
+# event loop.
 
 
 async def handle_reorder_edge(ctx: WSCtx, msg: ReorderEdgeMsg) -> None:
-    canvas_tools.set_thread_id(msg.thread_id)
-    canvas_tools.reorder_edge(msg.edge_id, msg.direction)
-    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=canvas_data(msg.thread_id))
+    def _work() -> dict | None:
+        canvas_tools.set_thread_id(msg.thread_id)
+        canvas_tools.reorder_edge(msg.edge_id, msg.direction)
+        return canvas_data(msg.thread_id)
+
+    snapshot = await asyncio.to_thread(_work)
+    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
 
 
 async def handle_create_edge(ctx: WSCtx, msg: CreateEdgeMsg) -> None:
-    canvas_tools.set_thread_id(msg.thread_id)
-    result = canvas_tools.create_canvas_edge(msg.source, msg.target)
+    def _work() -> tuple[dict, dict | None]:
+        canvas_tools.set_thread_id(msg.thread_id)
+        result = canvas_tools.create_canvas_edge(msg.source, msg.target)
+        snapshot = canvas_data(msg.thread_id) if "error" not in result else None
+        return result, snapshot
+
+    result, snapshot = await asyncio.to_thread(_work)
     if "error" not in result:
-        await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=canvas_data(msg.thread_id))
+        await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
     else:
         print(f"[边] 创建失败: {result['error']}")
 
 
 async def handle_delete_edge(ctx: WSCtx, msg: DeleteEdgeMsg) -> None:
-    canvas_tools.set_thread_id(msg.thread_id)
-    result = canvas_tools.delete_canvas_edge(msg.edge_id)
+    def _work() -> tuple[dict, dict | None]:
+        canvas_tools.set_thread_id(msg.thread_id)
+        result = canvas_tools.delete_canvas_edge(msg.edge_id)
+        snapshot = canvas_data(msg.thread_id) if "deleted" in result else None
+        return result, snapshot
+
+    result, snapshot = await asyncio.to_thread(_work)
     if "deleted" in result:
-        await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=canvas_data(msg.thread_id))
+        await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
     else:
         print(f"[边] 删除失败: {result.get('error')}")
 
@@ -117,21 +165,28 @@ async def handle_delete_edge(ctx: WSCtx, msg: DeleteEdgeMsg) -> None:
 
 
 async def handle_update_position(ctx: WSCtx, msg: UpdatePositionMsg) -> None:
-    canvas_tools.set_thread_id(msg.thread_id)
-    node = canvas_tools._load_node(msg.node_id)
-    if node:
-        node["x"] = msg.x
-        node["y"] = msg.y
-        canvas_tools._upsert_node(node)
+    def _work() -> None:
+        canvas_tools.set_thread_id(msg.thread_id)
+        node = canvas_tools._load_node(msg.node_id)
+        if node:
+            node["x"] = msg.x
+            node["y"] = msg.y
+            canvas_tools._upsert_node(node)
+
+    await asyncio.to_thread(_work)
 
 
 async def handle_review_node(ctx: WSCtx, msg: ReviewNodeMsg) -> None:
-    canvas_tools.set_thread_id(msg.thread_id)
-    if msg.action == "approve":
-        canvas_tools.approve_node(msg.node_id)
-    elif msg.action == "reject":
-        canvas_tools.reject_node(msg.node_id, msg.feedback or "")
-    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=canvas_data(msg.thread_id))
+    def _work() -> dict | None:
+        canvas_tools.set_thread_id(msg.thread_id)
+        if msg.action == "approve":
+            canvas_tools.approve_node(msg.node_id)
+        elif msg.action == "reject":
+            canvas_tools.reject_node(msg.node_id, msg.feedback or "")
+        return canvas_data(msg.thread_id)
+
+    snapshot = await asyncio.to_thread(_work)
+    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
 
 
 async def handle_execute_node(ctx: WSCtx, msg: ExecuteNodeMsg) -> None:
@@ -139,30 +194,38 @@ async def handle_execute_node(ctx: WSCtx, msg: ExecuteNodeMsg) -> None:
     print(
         f"[执行] execute_node node={msg.node_id} type={msg.node_type} provider={provider} prompt={msg.description[:50]}..."
     )
-    canvas_tools.set_thread_id(msg.thread_id)
 
-    result = canvas_tools.execute_node(msg.node_id, msg.node_type, msg.description, provider)
-    if "_pending_submit" in result:
-        # 媒体节点:入队让 worker 处理
-        canvas_tools.enqueue_generation(msg.node_id)
-        if msg.node_type == "video":
-            canvas_tools._update_node_result(msg.node_id, {
-                "prompt": msg.description,
-                "duration": msg.duration if msg.duration is not None else 5,
-                "resolution": msg.resolution or "720p",
-                "generate_audio": msg.generate_audio if msg.generate_audio is not None else True,
-            })
+    def _work() -> dict | None:
+        canvas_tools.set_thread_id(msg.thread_id)
+        result = canvas_tools.execute_node(msg.node_id, msg.node_type, msg.description, provider)
+        if "_pending_submit" in result:
+            # 媒体节点:入队让 worker 处理
+            canvas_tools.enqueue_generation(msg.node_id)
+            if msg.node_type == "video":
+                canvas_tools._update_node_result(msg.node_id, {
+                    "prompt": msg.description,
+                    "duration": msg.duration if msg.duration is not None else 5,
+                    "resolution": msg.resolution or "720p",
+                    "generate_audio": msg.generate_audio if msg.generate_audio is not None else True,
+                })
+        return canvas_data(msg.thread_id)
 
-    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=canvas_data(msg.thread_id))
+    snapshot = await asyncio.to_thread(_work)
+    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
 
 
 async def handle_update_node_status(ctx: WSCtx, msg: UpdateNodeStatusMsg) -> None:
     print(f"[状态] update_node_status node={msg.node_id} → {msg.node_status}")
-    canvas_tools.set_thread_id(msg.thread_id)
-    canvas_tools.update_canvas_node(msg.node_id, node_status=msg.node_status)
-    updated = canvas_tools._load_node(msg.node_id)
+
+    def _work() -> tuple[dict | None, dict | None]:
+        canvas_tools.set_thread_id(msg.thread_id)
+        canvas_tools.update_canvas_node(msg.node_id, node_status=msg.node_status)
+        updated = canvas_tools._load_node(msg.node_id)
+        return canvas_data(msg.thread_id), updated
+
+    snapshot, updated = await asyncio.to_thread(_work)
     print(f"[状态] 确认 node={msg.node_id} node_status={updated.get('node_status') if updated else 'NOT FOUND'}")
-    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=canvas_data(msg.thread_id))
+    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
 
 
 async def handle_optimize_prompt(ctx: WSCtx, msg: OptimizePromptMsg) -> None:

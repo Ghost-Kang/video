@@ -31,6 +31,11 @@ class FailureCode(str, Enum):
     S9_CROSS_BORDER_BLOCKED = "S9_CROSS_BORDER_BLOCKED"
     # W4D5: duration guard. <5s ↔ too short; >180s ↔ too long.
     S10_DURATION_OUT_OF_RANGE = "S10_DURATION_OUT_OF_RANGE"
+    # 2026-05-28: unexpected internal error (programming bug / unclassified
+    # exception). Distinct from S8 so we stop mislabeling our own bugs as
+    # "upstream refused". The full traceback is captured in an
+    # uncaught_exception event for the founder; the user sees a generic hint.
+    S11_INTERNAL_ERROR = "S11_INTERNAL_ERROR"
 
 
 class RecoveryAction(str, Enum):
@@ -119,6 +124,9 @@ RECOVERY_HINTS: dict[str, str] = {
     FailureCode.S10_DURATION_OUT_OF_RANGE.value: (
         "这条视频长度不在分析范围内（5 秒以下太短，3 分钟以上太长）。先剪到 5s-3min 范围再来。"
     ),
+    FailureCode.S11_INTERNAL_ERROR.value: (
+        "系统出了点小问题，我们已经记录下来了。直接重试一次,或者换一条链接试试。"
+    ),
 
     # Soft warnings — inline labels on the card, not banners
     WarningCode.W1_AUTO_ID.value: "（系统已自动编号）",
@@ -193,6 +201,11 @@ RECOVERY_ACTIONS: dict[str, list[str]] = {
         RecoveryAction.PICK_FROM_FEATURED.value,
         RecoveryAction.REPORT.value,
     ],
+    FailureCode.S11_INTERNAL_ERROR.value: [
+        RecoveryAction.RETRY_SAME_URL.value,
+        RecoveryAction.RETRY_WITH_NEW_URL.value,
+        RecoveryAction.REPORT.value,
+    ],
 }
 
 
@@ -209,6 +222,7 @@ HTTP_STATUS: dict[str, int] = {
     FailureCode.S8_UPSTREAM_REFUSED.value: 503,     # gateway unavailable
     FailureCode.S9_CROSS_BORDER_BLOCKED.value: 422,  # local compliance refusal
     FailureCode.S10_DURATION_OUT_OF_RANGE.value: 422,  # user-input refusal: source video out of supported range
+    FailureCode.S11_INTERNAL_ERROR.value: 500,         # our bug, not the user's
 }
 
 

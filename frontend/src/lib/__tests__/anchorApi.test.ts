@@ -5,7 +5,8 @@ describe("anchorApi", () => {
   it("lists with kind query", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("[]", { status: 200 }));
     await listAnchors("character");
-    expect(fetchSpy).toHaveBeenCalledWith("/api/anchors?kind=character");
+    // apiFetch always passes an init carrying auth headers (empty in tests).
+    expect(fetchSpy).toHaveBeenCalledWith("/api/anchors?kind=character", expect.anything());
     fetchSpy.mockRestore();
   });
 

@@ -14,6 +14,8 @@ export const RECOVERY_HINTS: Record<string, string> = {
     "分析超时了。可能视频太长，也可能服务繁忙。等 30 秒重试，或者换一条更短的。",
   S8_UPSTREAM_REFUSED:
     "系统暂时繁忙。1 分钟后重试，或者从今日精选里挑一条（这些是已经分析好的）。",
+  S11_INTERNAL_ERROR:
+    "系统出了点小问题，我们已经记录下来了。直接重试一次，或者换一条链接试试。",
   W1_AUTO_ID: "（系统已自动编号）",
   W2_FALLBACK_USED: "这部分系统没完全看懂，用了通用判断，可能不太准。",
   W3_SCENES_TRUNCATED: "这条视频镜头较多，系统只取了前 12 个。",

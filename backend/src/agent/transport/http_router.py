@@ -25,6 +25,7 @@ from urllib.parse import parse_qs, urlparse
 
 from pydantic import ValidationError
 
+from agent import config
 from agent.cascade import cost_guard
 from agent.cascade.analysis_service import request_shallow_analysis
 from agent.cascade.anchors import create_anchor, list_anchors, list_reuses, reuse_anchor
@@ -34,6 +35,13 @@ from agent.cascade.failures import HardFailure
 from agent.cascade.persistence.db import _connect
 from agent.cascade.rewrite_service import error_payload, request_rewrite
 from agent.cascade.storage import list_creators, list_events
+
+
+# Slowloris guard for the hand-rolled HTTP server: cap how long we wait for a
+# client to finish sending headers/body. nginx fronts us in prod (it buffers +
+# times out), but defense-in-depth — a direct/local client must not be able to
+# pin an asyncio task forever on a half-open socket.
+HTTP_READ_TIMEOUT_S = 15.0
 
 
 # ---------- response helper ----------
@@ -162,12 +170,14 @@ async def handle_rewrite(qs: dict, body: dict) -> tuple[int, dict, str]:
     user_id = str(body.get("user_id") or "default")
     run_id = str(body.get("run_id") or "default")
     await cost_guard.cost_guard(user_id, run_id, cost_guard.PREDICT_REWRITE_CNY)
+    _t0 = time.monotonic()
     result = await request_rewrite(
         analysis_id=str(body.get("analysis_id") or ""),
         niche=body.get("niche"),
         user_id=user_id,
         run_id=run_id,
     )
+    _latency_ms = int((time.monotonic() - _t0) * 1000)
     await emit(
         EventName.GENERATION_COST,
         user_id=user_id,
@@ -178,7 +188,7 @@ async def handle_rewrite(qs: dict, body: dict) -> tuple[int, dict, str]:
             "provider": "local",
             "model": result.model,
             "cost_fen": int(round(result.cost_cny * 100)),
-            "latency_ms": 0,
+            "latency_ms": _latency_ms,
             "tokens_in": None,
             "tokens_out": None,
             "outcome": "done",
@@ -194,7 +204,9 @@ async def handle_analysis_shallow(qs: dict, body: dict) -> tuple[int, dict, str]
     user_id = str(body.get("user_id") or "default")
     run_id = str(body.get("run_id") or "default")
     await cost_guard.cost_guard(user_id, run_id, cost_guard.PREDICT_ANALYSIS_CNY)
+    _t0 = time.monotonic()
     contract = await request_shallow_analysis(source_url, user_id=user_id, run_id=run_id)
+    _latency_ms = int((time.monotonic() - _t0) * 1000)
     await emit(
         EventName.GENERATION_COST,
         user_id=user_id,
@@ -205,7 +217,7 @@ async def handle_analysis_shallow(qs: dict, body: dict) -> tuple[int, dict, str]
             "provider": "fixture",
             "model": contract.model,
             "cost_fen": int(round(contract.cost_cny * 100)),
-            "latency_ms": 0,
+            "latency_ms": _latency_ms,
             "tokens_in": None,
             "tokens_out": None,
             "outcome": "done",
@@ -412,6 +424,36 @@ def _meminfo_proc() -> tuple[int, int]:
         return 0, 0
 
 
+async def handle_health_live(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """Lightweight liveness probe (OPEN, no auth). Used by the container
+    healthcheck. Distinct from /api/health/summary, which is admin-gated and
+    does real DB aggregation. Must stay cheap and unauthenticated so the
+    Docker healthcheck doesn't need a token and doesn't write a data-endpoint
+    access-log line every 30s."""
+    return 200, {"ok": True, "uptime_seconds": int(time.monotonic() - _SERVER_START_TIME)}, "OK"
+
+
+async def handle_public_stats(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """Aggregate-only public counters for the landing page (OPEN, no auth).
+
+    Replaces the landing page pulling 500 raw events to the browser (which
+    leaked source URLs / user_ids to every anonymous visitor). Returns only
+    two integers, computed server-side via COUNT(DISTINCT)."""
+    try:
+        db = await _connect()
+        try:
+            rows = await db.execute_fetchall(
+                "SELECT COUNT(DISTINCT run_id), COUNT(DISTINCT user_id) FROM events"
+            )
+        finally:
+            await db.close()
+        runs = int(rows[0][0] or 0) if rows else 0
+        creators = int(rows[0][1] or 0) if rows else 0
+    except Exception:
+        runs, creators = 0, 0
+    return 200, {"runs": runs, "creators": creators}, "OK"
+
+
 async def handle_client_error(qs: dict, body: dict) -> tuple[int, dict, str]:
     """W5D2 — frontend Sentry-lite. Browser JS errors POST here; we strip
     PII (truncate UA/stack/message), emit a `client_error` event into the
@@ -459,7 +501,9 @@ EXACT_ROUTES: dict[tuple[str, str], HandlerFn] = {
     ("POST", "/api/rewrite"): handle_rewrite,
     ("POST", "/api/analysis/shallow"): handle_analysis_shallow,
     ("POST", "/api/client_error"): handle_client_error,
+    ("GET", "/api/health"): handle_health_live,
     ("GET", "/api/health/summary"): handle_health_summary,
+    ("GET", "/api/stats/public"): handle_public_stats,
 }
 
 # (method, prefix, suffix, param_name, handler) — 路径里的可变段会作为 path_param 传入。
@@ -467,6 +511,52 @@ PARAM_ROUTES: list[tuple[str, str, str, str, HandlerFn]] = [
     ("GET", "/api/anchors/", "/reuses", "anchor_id", handle_anchor_reuses),
     ("POST", "/api/anchors/", "/reuse", "anchor_id", handle_anchor_reuse_post),
 ]
+
+
+# ---------- auth ----------
+#
+# Three tiers. Default (anything not listed) = COHORT.
+#   OPEN   — no auth. Liveness, public stats, anonymous client error reports.
+#   ADMIN  — cross-user reads; require X-Admin-Token == config.ADMIN_TOKEN.
+#   COHORT — creator actions (spends money / reads own data); require a valid
+#            X-Invite-Code, but only enforced when INVITE_CODES is configured
+#            (mirrors the WS gate: dev/test with empty INVITE_CODES stays open).
+OPEN_ROUTES: frozenset[tuple[str, str]] = frozenset({
+    ("POST", "/api/client_error"),
+    ("GET", "/api/health"),
+    ("GET", "/api/stats/public"),
+})
+ADMIN_ROUTES: frozenset[tuple[str, str]] = frozenset({
+    ("GET", "/api/events"),
+    ("GET", "/api/creators"),
+    ("GET", "/api/health/summary"),
+})
+
+
+def _check_auth(method: str, path: str, headers: dict[str, str]) -> tuple[int, dict, str] | None:
+    """Return an error response tuple if the request is unauthorized, else None.
+
+    `headers` keys are already lowercased by the dispatcher.
+    """
+    key = (method, path)
+    if key in OPEN_ROUTES:
+        return None
+    if key in ADMIN_ROUTES:
+        if not config.ADMIN_TOKEN:
+            # No token configured: open in dev, fail-closed in prod so admin
+            # data is never silently world-readable on a real deploy.
+            if config.IS_PROD_LIKE:
+                return 403, {"error": "admin_not_configured"}, "Forbidden"
+            return None
+        if headers.get("x-admin-token", "") == config.ADMIN_TOKEN:
+            return None
+        return 401, {"error": "admin_token_required"}, "Unauthorized"
+    # COHORT (default)
+    if not config.INVITE_CODES:
+        return None  # dev/test: gate disabled
+    if headers.get("x-invite-code", "") in config.INVITE_CODES:
+        return None
+    return 401, {"error": "invite_code_required"}, "Unauthorized"
 
 
 def _match(method: str, path: str) -> tuple[HandlerFn | None, dict]:
@@ -485,7 +575,12 @@ def _match(method: str, path: str) -> tuple[HandlerFn | None, dict]:
 
 async def handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
     try:
-        header_bytes = await reader.readuntil(b"\r\n\r\n")
+        # Slowloris guard: cap total time spent reading the request. A client
+        # that opens a socket and dribbles bytes can otherwise pin this task
+        # forever (readuntil/readexactly have no timeout of their own).
+        header_bytes = await asyncio.wait_for(
+            reader.readuntil(b"\r\n\r\n"), timeout=HTTP_READ_TIMEOUT_S
+        )
         header_text = header_bytes.decode("iso-8859-1")
         first_line, *header_lines = header_text.split("\r\n")
         method, path, _ = first_line.split(" ", 2)
@@ -495,7 +590,11 @@ async def handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
                 k, v = line.split(":", 1)
                 headers[k.strip().lower()] = v.strip()
         content_length = int(headers.get("content-length", "0") or "0")
-        body_bytes = await reader.readexactly(content_length) if content_length else b"{}"
+        body_bytes = (
+            await asyncio.wait_for(reader.readexactly(content_length), timeout=HTTP_READ_TIMEOUT_S)
+            if content_length
+            else b"{}"
+        )
 
         # P1 fix: malformed JSON body 返 400 而非 500
         try:
@@ -519,10 +618,20 @@ async def handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
             await writer.drain()
             return
 
+        auth_error = _check_auth(method, route_path, headers)
+        if auth_error is not None:
+            a_status, a_body, a_reason = auth_error
+            writer.write(_http_response(a_status, a_body, a_reason))
+            await writer.drain()
+            return
+
         status, response_body, reason = await handler(qs, body, **path_params)
         writer.write(_http_response(status, response_body, reason))
         await writer.drain()
 
+    except (asyncio.TimeoutError, asyncio.IncompleteReadError, asyncio.LimitOverrunError):
+        # Slow/oversized/broken request — close quietly without a full response.
+        pass
     except HardFailure as exc:
         status = 503 if exc.code.value == "S8_UPSTREAM_REFUSED" else 422
         writer.write(_http_response(status, error_payload(exc), "Unprocessable Entity"))

@@ -1,3 +1,5 @@
+import { apiFetch } from "./apiClient";
+
 export interface EventRow {
   id: number;
   ts: string;
@@ -29,7 +31,7 @@ export async function listEvents(params: ListEventsParams = {}): Promise<EventsP
   if (params.user_id) qs.set("user_id", params.user_id);
   if (params.since_ts) qs.set("since_ts", params.since_ts);
   const url = qs.toString() ? `/api/events?${qs}` : "/api/events";
-  const res = await fetch(url);
+  const res = await apiFetch(url);
   if (!res.ok) {
     return { events: [], has_more: false, next_offset: null };
   }

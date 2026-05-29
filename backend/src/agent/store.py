@@ -7,6 +7,9 @@ from pathlib import Path
 _DB_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 _DB_PATH = _DB_DIR / "messages.db"
 
+# Paths whose ALTER migration has already run this process (see canvas db.py).
+_MIGRATED_PATHS: set[str] = set()
+
 
 def _conn() -> sqlite3.Connection:
     _DB_DIR.mkdir(parents=True, exist_ok=True)
@@ -27,10 +30,12 @@ def _conn() -> sqlite3.Connection:
     c.execute(
         "CREATE INDEX IF NOT EXISTS idx_thread ON messages(user_id, thread_id, id)"
     )
-    try:
-        c.execute("ALTER TABLE messages ADD COLUMN user_id TEXT NOT NULL DEFAULT 'default'")
-    except sqlite3.OperationalError:
-        pass
+    if str(_DB_PATH) not in _MIGRATED_PATHS:
+        try:
+            c.execute("ALTER TABLE messages ADD COLUMN user_id TEXT NOT NULL DEFAULT 'default'")
+        except sqlite3.OperationalError:
+            pass
+        _MIGRATED_PATHS.add(str(_DB_PATH))
 
     # 会话元信息（is_deleted 软删除标志）
     c.execute(

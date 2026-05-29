@@ -1,3 +1,5 @@
+import { apiFetch } from "./apiClient";
+
 export type AnchorKind = "character" | "scene";
 
 export interface Anchor {
@@ -31,7 +33,7 @@ function parseAnchorList(payload: unknown): Anchor[] | null {
 export async function listAnchors(kind?: AnchorKind): Promise<Anchor[]> {
   try {
     const suffix = kind ? `?kind=${kind}` : "";
-    const res = await fetch(`/api/anchors${suffix}`);
+    const res = await apiFetch(`/api/anchors${suffix}`);
     if (res.ok) {
       const anchors = parseAnchorList(await res.json());
       if (anchors) return anchors;
@@ -45,7 +47,7 @@ export async function listAnchors(kind?: AnchorKind): Promise<Anchor[]> {
 }
 
 export async function createAnchor(anchor: Omit<Anchor, "id" | "reuse_count" | "created_at">) {
-  const res = await fetch("/api/anchors", {
+  const res = await apiFetch("/api/anchors", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(anchor),
@@ -54,7 +56,7 @@ export async function createAnchor(anchor: Omit<Anchor, "id" | "reuse_count" | "
 }
 
 export async function reuseAnchor(anchorId: string, payload: { user_id: string; reused_in_run_id: string; reused_in_shot_index: number }) {
-  await fetch(`/api/anchors/${anchorId}/reuse`, {
+  await apiFetch(`/api/anchors/${anchorId}/reuse`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

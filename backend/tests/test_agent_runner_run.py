@@ -236,14 +236,14 @@ class TestEmptyAndErrorPaths:
 
         # W5D3 CR-P0 — save_message persists a SANITIZED hint (recovery taxonomy
         # message), NOT the raw exception. Reload-session would replay this back
-        # to the user, so it must be safe to display. For S8_UPSTREAM_REFUSED
-        # (the default for non-timeout RuntimeError), the recovery hint mentions
-        # "系统暂时繁忙" — that's what the user sees in chat history.
+        # to the user, so it must be safe to display. A bare RuntimeError with an
+        # unrecognized message now classifies as S11_INTERNAL_ERROR (we no longer
+        # pretend an unknown error was "upstream"); its hint mentions "系统出了点小问题".
         agent_save = [c for c in saved_messages if c[2] == "agent"]
         saved_text = agent_save[0][3]
         assert "upstream gone" not in saved_text, "raw exception leaked into chat history"
         # Sanitized message must come from RECOVERY_HINTS (友好中文) or fallback
-        assert "繁忙" in saved_text or "处理出错" in saved_text, (
+        assert "小问题" in saved_text or "繁忙" in saved_text or "处理出错" in saved_text, (
             f"expected sanitized hint, got: {saved_text}"
         )
 

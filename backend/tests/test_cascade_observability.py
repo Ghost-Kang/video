@@ -142,7 +142,10 @@ def test_cache_hit_emits_on_warm_cache(monkeypatch, tmp_path):
     hits = _events_of_type(db_path, "cascade_cache_hit")
     assert len(hits) == 1
     assert hits[0]["source_url_hash"] and len(hits[0]["source_url_hash"]) == 12
-    assert 0 < hits[0]["ttl_remaining_s"] <= 60.0
+    # cache_layer="sqlite" → this is the cross-user analysis-reuse path, which is
+    # permanent (no TTL). ttl_remaining_s is null; the earlier hardcoded 60.0 was
+    # misleading telemetry. (The toprador cache path carries a real numeric TTL.)
+    assert hits[0]["ttl_remaining_s"] is None
     assert hits[0]["cache_layer"] == "sqlite"
 
 

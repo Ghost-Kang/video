@@ -6,6 +6,7 @@ ws_handlers 里 `user_message` handler 调度此函数;`optimize_prompt` 单独�
 
 from __future__ import annotations
 
+import asyncio
 from typing import Optional
 
 from langchain_core.messages import AIMessageChunk, ToolMessage
@@ -65,7 +66,7 @@ async def run_agent(
         # agent 的 tool call 通过 ContextVar 读写正确的用户/会话数据
         canvas_tools.set_user_id(user_id)
         canvas_tools.set_thread_id(thread_id)
-        save_message(user_id, thread_id, "user", user_content)
+        await asyncio.to_thread(save_message, user_id, thread_id, "user", user_content)
         entry = await pool.get(user_id, thread_id)
 
         # 注入 niche 标记 — 不污染存储,只在喂给 LLM 的 turn 加 prefix。
@@ -102,7 +103,7 @@ async def run_agent(
                     await send_json(ws, type="agent_stream", thread_id=thread_id, event="text", content=token)
 
         reply = full_reply or "（未生成回复）"
-        save_message(user_id, thread_id, "agent", reply)
+        await asyncio.to_thread(save_message, user_id, thread_id, "agent", reply)
     except Exception as e:
         # W5D3 — don't leak raw exception string into the WS push, AND don't
         # persist it verbatim into the chat history. The persisted line is
@@ -124,14 +125,21 @@ async def run_agent(
         else:
             if type(e).__name__ == "TimeoutError" or "timeout" in str(e).lower():
                 code_val = _FC.S7_UPSTREAM_TIMEOUT.value
-            else:
+            elif isinstance(e, (ConnectionError, OSError)) or "refus" in str(e).lower() or "rate" in str(e).lower():
                 code_val = _FC.S8_UPSTREAM_REFUSED.value
+            else:
+                # Unexpected internal error (programming bug / unclassified) —
+                # don't mislabel our own bug as "upstream refused". Full
+                # traceback is captured in the uncaught_exception event below.
+                code_val = _FC.S11_INTERNAL_ERROR.value
             hint_val = _HINTS.get(code_val, "处理出错,请重试或换一条链接。")
             actions_val = _ACTIONS.get(code_val, ["REPORT"])
             request_id_val = ""
 
         # Persist sanitized hint (raw traceback still lands in events.db below).
-        save_message(user_id, thread_id, "agent", hint_val or "处理出错,请重试")
+        await asyncio.to_thread(
+            save_message, user_id, thread_id, "agent", hint_val or "处理出错,请重试"
+        )
 
         # W5D2 observability — persist the full traceback to events.db so
         # /admin/events can surface it. Best-effort; observability errors
@@ -180,13 +188,15 @@ async def run_agent(
     # push canvas snapshot to keep canvas/anchor state consistent, then return
     # without sending `agent_response` (which would carry the failure hint
     # again and confuse the chat history).
+    # Canvas snapshot is synchronous sqlite3 — read it off the event loop.
+    snapshot = await asyncio.to_thread(canvas_data, thread_id)
     if failed:
         try:
             await send_json(
                 ws,
                 type="canvas_updated",
                 thread_id=thread_id,
-                canvas=canvas_data(thread_id),
+                canvas=snapshot,
             )
         except (ConnectionClosed, ConnectionClosedOK, RuntimeError, OSError):
             pass
@@ -197,7 +207,7 @@ async def run_agent(
                 type="agent_response",
                 thread_id=thread_id,
                 content=reply,
-                canvas=canvas_data(thread_id),
+                canvas=snapshot,
             )
         except (ConnectionClosed, ConnectionClosedOK, RuntimeError, OSError):
             pass
@@ -208,13 +218,21 @@ async def optimize_prompt(node_id: str, prompt: str, feedback: str) -> str:
     model = get_chat_model()
     system = "你是一位专业的 AI 绘画提示词优化师。根据用户的反馈优化提示词，只返回优化后的提示词，不要加任何解释或前缀。"
     user = f"当前提示词：\n{prompt}\n\n用户反馈：\n{feedback}\n\n请输出优化后的提示词："
-    result = model.invoke([{"role": "system", "content": system}, {"role": "user", "content": user}])
+    # await ainvoke — `.invoke()` is a blocking network call; on the asyncio
+    # event loop it would stall ALL websocket/HTTP handling for the duration.
+    result = await model.ainvoke(
+        [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    )
     optimized = result.content if hasattr(result, "content") else str(result)
 
-    node = canvas_tools._load_node(node_id)
-    if node:
-        node["description"] = optimized
-        canvas_tools._upsert_node(node)
-        print(f"[润色] 已更新节点 description node={node_id}")
+    # Canvas DAO is synchronous sqlite3 — offload so the load/upsert doesn't
+    # block the event loop either.
+    def _persist() -> None:
+        node = canvas_tools._load_node(node_id)
+        if node:
+            node["description"] = optimized
+            canvas_tools._upsert_node(node)
+            print(f"[润色] 已更新节点 description node={node_id}")
 
+    await asyncio.to_thread(_persist)
     return optimized

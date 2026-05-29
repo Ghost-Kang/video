@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 from pydantic import ValidationError
@@ -77,8 +78,8 @@ async def handle(websocket) -> None:
                 generation_worker.start_workers()
                 ctx = WSCtx(user_id=user_id, ws=websocket, pool=SHARED_POOL)
                 print(f"[连接] user={user_id} (shared pool, capacity {SHARED_POOL._max})")
-                # auth 后自动下发会话列表
-                sessions = store.list_sessions(user_id)
+                # auth 后自动下发会话列表 — store.* 是同步 sqlite3,offload。
+                sessions = await asyncio.to_thread(store.list_sessions, user_id)
                 await send_json(websocket, type="session_list", sessions=sessions)
                 continue
 

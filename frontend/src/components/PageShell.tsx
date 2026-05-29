@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { AmbientCursor } from "./landing/AmbientCursor";
 import { ScrollProgress } from "./landing/ScrollProgress";
 import { DarkModeToggle } from "./landing/DarkModeToggle";
+import { AdminTokenBar } from "./admin/AdminTokenBar";
 
 /**
  * 全站统一壳子 — 一切页面用这个 wrap,自动获得:
@@ -35,6 +36,8 @@ export function PageShell({
       {showProgress && <ScrollProgress />}
       {showToggle && <DarkModeToggle />}
       {ambient && <AmbientCursor />}
+      {/* Self-guards: renders only on /admin/* routes. */}
+      <AdminTokenBar />
       <div className="relative z-10 flex-1 flex flex-col">{children}</div>
     </div>
   );

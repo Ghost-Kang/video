@@ -122,7 +122,8 @@ export type FailureCode =
   | 'S5_INVALID_PAYLOAD'
   | 'S6_NEGATIVE_COST'
   | 'S7_UPSTREAM_TIMEOUT'
-  | 'S8_UPSTREAM_REFUSED';
+  | 'S8_UPSTREAM_REFUSED'
+  | 'S11_INTERNAL_ERROR';
 
 /** Production-safe error payload — never includes debug_detail. */
 export interface FailurePayload {

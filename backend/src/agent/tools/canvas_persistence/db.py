@@ -20,6 +20,13 @@ _DB_PATH = _DB_DIR / "canvas.db"
 _current_thread_id: ContextVar[str] = ContextVar("canvas_thread_id", default="default")
 _current_user_id: ContextVar[str] = ContextVar("canvas_user_id", default="default")
 
+# Paths whose ALTER-TABLE migrations have already run this process. Every `_db()`
+# previously attempted 13 `ALTER TABLE ADD COLUMN` statements that almost always
+# raise OperationalError ("column exists") and get caught — wasted work on every
+# connection. CREATE TABLE IF NOT EXISTS still runs every time (cheap, keeps us
+# resilient if the file is recreated); only the migrations are gated.
+_MIGRATED_PATHS: set[str] = set()
+
 
 def set_thread_id(thread_id: str) -> None:
     _current_thread_id.set(thread_id)
@@ -44,6 +51,11 @@ def _db() -> sqlite3.Connection:
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA synchronous=NORMAL")
     db.execute("PRAGMA busy_timeout=5000")
+    # CREATE TABLE is the complete source of truth for the current schema. The
+    # ALTER block below only migrates genuinely-old databases that predate a
+    # column. Keeping CREATE complete means a fresh file gets every column even
+    # when the ALTER migrations are gated (see _MIGRATED_PATHS) — otherwise a
+    # recreated file would be missing the generation_* columns.
     db.execute(
         """CREATE TABLE IF NOT EXISTS canvas_nodes (
             user_id TEXT NOT NULL DEFAULT 'default',
@@ -59,27 +71,17 @@ def _db() -> sqlite3.Connection:
             subtype TEXT,
             feedback TEXT,
             x REAL, y REAL,
+            shot_no TEXT,
+            image_gen_provider TEXT,
+            generation_status TEXT NOT NULL DEFAULT 'idle',
+            generation_task_id TEXT,
+            generation_error TEXT,
+            generation_attempt_count INTEGER NOT NULL DEFAULT 0,
+            generation_lease_until TEXT,
+            generation_next_retry_at TEXT,
             PRIMARY KEY (user_id, thread_id, node_id)
         )"""
     )
-    # 兼容旧数据库:添加新列(若不存在)
-    for col, defn in [
-        ("user_id", "TEXT NOT NULL DEFAULT 'default'"),
-        ("node_status", "TEXT NOT NULL DEFAULT 'reviewing'"),
-        ("asset_status", "TEXT NOT NULL DEFAULT 'idle'"),
-        ("shot_no", "TEXT"),
-        ("image_gen_provider", "TEXT"),
-        ("generation_status", "TEXT NOT NULL DEFAULT 'idle'"),
-        ("generation_task_id", "TEXT"),
-        ("generation_error", "TEXT"),
-        ("generation_attempt_count", "INTEGER NOT NULL DEFAULT 0"),
-        ("generation_lease_until", "TEXT"),
-        ("generation_next_retry_at", "TEXT"),
-    ]:
-        try:
-            db.execute(f"ALTER TABLE canvas_nodes ADD COLUMN {col} {defn}")
-        except sqlite3.OperationalError:
-            pass  # 列已存在
     db.execute(
         """CREATE TABLE IF NOT EXISTS canvas_edges (
             user_id TEXT NOT NULL DEFAULT 'default',
@@ -91,12 +93,33 @@ def _db() -> sqlite3.Connection:
             PRIMARY KEY (user_id, thread_id, edge_id)
         )"""
     )
-    try:
-        db.execute("ALTER TABLE canvas_edges ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        db.execute("ALTER TABLE canvas_edges ADD COLUMN user_id TEXT NOT NULL DEFAULT 'default'")
-    except sqlite3.OperationalError:
-        pass
+
+    # ALTER migrations — run once per path per process (see _MIGRATED_PATHS).
+    if str(_DB_PATH) not in _MIGRATED_PATHS:
+        for col, defn in [
+            ("user_id", "TEXT NOT NULL DEFAULT 'default'"),
+            ("node_status", "TEXT NOT NULL DEFAULT 'reviewing'"),
+            ("asset_status", "TEXT NOT NULL DEFAULT 'idle'"),
+            ("shot_no", "TEXT"),
+            ("image_gen_provider", "TEXT"),
+            ("generation_status", "TEXT NOT NULL DEFAULT 'idle'"),
+            ("generation_task_id", "TEXT"),
+            ("generation_error", "TEXT"),
+            ("generation_attempt_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("generation_lease_until", "TEXT"),
+            ("generation_next_retry_at", "TEXT"),
+        ]:
+            try:
+                db.execute(f"ALTER TABLE canvas_nodes ADD COLUMN {col} {defn}")
+            except sqlite3.OperationalError:
+                pass  # 列已存在
+        try:
+            db.execute("ALTER TABLE canvas_edges ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE canvas_edges ADD COLUMN user_id TEXT NOT NULL DEFAULT 'default'")
+        except sqlite3.OperationalError:
+            pass
+        _MIGRATED_PATHS.add(str(_DB_PATH))
     return db

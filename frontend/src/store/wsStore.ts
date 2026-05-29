@@ -31,6 +31,7 @@ const KNOWN_CODES: ReadonlySet<FailurePayload["code"]> = new Set([
   "S6_NEGATIVE_COST",
   "S7_UPSTREAM_TIMEOUT",
   "S8_UPSTREAM_REFUSED",
+  "S11_INTERNAL_ERROR",
 ] satisfies FailurePayload["code"][]);
 
 const KNOWN_ACTIONS: ReadonlySet<FailurePayload["actions"][number]> = new Set([

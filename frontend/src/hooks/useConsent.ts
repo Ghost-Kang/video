@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiFetch } from "../lib/apiClient";
 
 export const CONSENT_STORAGE_KEY = "openrhtv_consent_v0";
 export const CONSENT_VERSION = "v0";
@@ -69,7 +70,7 @@ export function useConsent(): UseConsentResult {
     window.dispatchEvent(new Event("rhtv-auth-changed"));
 
     try {
-      await fetch("/api/events", {
+      await apiFetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

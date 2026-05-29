@@ -1,3 +1,5 @@
+import { apiFetch } from "./apiClient";
+
 export interface Creator {
   user_id: string;
   first_seen: string | null;
@@ -48,7 +50,7 @@ const MOCK_CREATORS: Creator[] = [
 
 export async function listCreators(): Promise<Creator[]> {
   try {
-    const res = await fetch("/api/creators");
+    const res = await apiFetch("/api/creators");
     if (res.ok) {
       const body = (await res.json()) as { creators?: Creator[] };
       if (body && Array.isArray(body.creators)) return body.creators;

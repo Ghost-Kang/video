@@ -62,10 +62,27 @@ DOUBAO_DIRECT_MODE = "doubao_direct"
 _CIRCUIT_OPEN_EMIT_WINDOW_S = 60.0
 _last_circuit_open_emit: dict[str, float] = {}
 _source_analysis_locks: dict[str, asyncio.Lock] = {}
+_MAX_SOURCE_LOCKS = 1024
 
 
 def _hash_source_url(source_url: str) -> str:
     return hashlib.sha1(source_url.encode("utf-8")).hexdigest()[:12]
+
+
+def _get_source_lock(source_url_hash: str) -> asyncio.Lock:
+    """Per-source-URL lock with a bound on dict growth.
+
+    Previously `setdefault` grew this dict one entry per distinct URL forever.
+    When over cap we drop currently-unlocked entries (an unlocked asyncio.Lock
+    has no holder and no waiters, so removing it is safe)."""
+    lock = _source_analysis_locks.get(source_url_hash)
+    if lock is None:
+        if len(_source_analysis_locks) >= _MAX_SOURCE_LOCKS:
+            for k in [k for k, l in _source_analysis_locks.items() if not l.locked()]:
+                del _source_analysis_locks[k]
+        lock = asyncio.Lock()
+        _source_analysis_locks[source_url_hash] = lock
+    return lock
 
 
 async def request_shallow_analysis(
@@ -76,7 +93,7 @@ async def request_shallow_analysis(
 ) -> CascadeAnalysisContract:
     """Entry point. Calls upstream or fixture, normalizes, persists, emits event."""
     source_url_hash = _hash_source_url(source_url)
-    lock = _source_analysis_locks.setdefault(source_url_hash, asyncio.Lock())
+    lock = _get_source_lock(source_url_hash)
     async with lock:
         existing = await load_analysis_for_source(user_id, source_url)
         if existing is not None:
@@ -90,7 +107,11 @@ async def request_shallow_analysis(
                 run_id=run_id,
                 payload={
                     "source_url_hash": source_url_hash,
-                    "ttl_remaining_s": 60.0,
+                    # Stored analyses are reused permanently (no TTL); the
+                    # earlier hardcoded 60.0 was misleading telemetry. null =
+                    # "no expiry". (The separate toprador_cache table has a real
+                    # TTL; this cross-user analysis reuse does not.)
+                    "ttl_remaining_s": None,
                     "cache_layer": "sqlite",
                 },
             )

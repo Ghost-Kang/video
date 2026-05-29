@@ -5,6 +5,8 @@
  * 进 error state。
  */
 
+import { apiFetch } from "./apiClient";
+
 export interface HealthServer {
   cpu_percent: number;
   mem_used_mb: number;
@@ -37,7 +39,7 @@ export interface HealthSummary {
 
 export async function fetchHealthSummary(): Promise<HealthSummary | null> {
   try {
-    const res = await fetch("/api/health/summary");
+    const res = await apiFetch("/api/health/summary");
     if (!res.ok) return null;
     const body = (await res.json()) as Partial<HealthSummary>;
     if (!body || !body.server) return null;
