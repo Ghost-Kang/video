@@ -1,5 +1,0 @@
-[   16568ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://cascade.herwin.top/admin/events:0
-[   17346ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://cascade.herwin.top/api/events?limit=200:0
-[   46894ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://cascade.herwin.top/api/events?limit=200:0
-[   78831ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://cascade.herwin.top/api/events?limit=200:0
-[  107240ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://cascade.herwin.top/api/events?limit=200:0

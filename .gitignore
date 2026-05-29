@@ -44,3 +44,6 @@ frontend/scripts/ws_schema.json
 docs/nexus/founder_log/algo_filing_attachments/
 docs/nexus/founder_log/*.local.md
 docs/nexus/founder_log/**/*.local.md
+
+# Playwright MCP local artifacts (browser test logs/snapshots)
+.playwright-mcp/
