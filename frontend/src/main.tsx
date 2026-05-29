@@ -77,13 +77,12 @@ function AppRoutes() {
   // auth 自动带。真正准入判定在 backend 的 INVITE_CODES 集合,这里只是 UX。
   const [inviteCode, setInviteCode] = useState<string | null>(() => readInviteCode());
 
-  if (!inviteCode) {
-    return <InviteCode onAccept={setInviteCode} />;
-  }
-
-  // Phase 1 anon-consent bridge: useConsent.accept() writes rhtv_user
-  // then dispatches this event so /chat becomes accessible without an
-  // explicit /login round-trip.
+  // W5D3 hotfix — Rules of Hooks: 必须在任何 early return *之前* 声明所有 hooks。
+  // 之前 useEffect/useCallback 放在 invite-gate early return 之后,导致第一次渲染
+  // (inviteCode=null) hooks count=2,第二次(inviteCode 已 set) hooks count=5,
+  // 触发 React minified error #310 "Rendered more hooks than during the previous
+  // render" → ErrorBoundary。所有首次访问用户 100% crash 在 invite gate → Landing
+  // 的过渡上。Evidence Collector e2e 测试发现并定位。
   useEffect(() => {
     const refresh = () => setUser(localStorage.getItem("rhtv_user"));
     window.addEventListener("rhtv-auth-changed", refresh);
@@ -98,6 +97,10 @@ function AppRoutes() {
     localStorage.removeItem("rhtv_user");
     setUser(null);
   }, []);
+
+  if (!inviteCode) {
+    return <InviteCode onAccept={setInviteCode} />;
+  }
 
   return (
     <Routes>
