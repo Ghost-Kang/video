@@ -6,11 +6,15 @@ import pytest
 from agent.tools import canvas as canvas_tools
 from agent.tools.canvas import (
     approve_node,
+    claim_pending_tasks,
     create_canvas_node,
     delete_canvas_node,
+    enqueue_generation,
     execute_node,
     get_canvas_state,
+    recover_generation_tasks,
     reject_node,
+    schedule_generation_retry,
     update_canvas_node,
 )
 
@@ -117,3 +121,44 @@ def test_edge_created():
     assert len(state["edges"]) == 1
     assert state["edges"][0]["source"] == parent["id"]
     assert state["edges"][0]["target"] == child["id"]
+
+
+def test_generation_claim_sets_attempt_and_lease():
+    tid = _unique_thread()
+    canvas_tools.set_thread_id(tid)
+    node = create_canvas_node("image", "测试图", "prompt")
+    enqueue_generation(node["id"])
+
+    tasks = claim_pending_tasks("image")
+
+    assert [t["id"] for t in tasks] == [node["id"]]
+    state = get_canvas_state(node["id"])["node"]
+    assert state["generation_status"] == "submitted"
+    assert state["generation_attempt_count"] == 1
+    assert state["generation_lease_until"]
+    assert state["generation_next_retry_at"] is None
+
+
+def test_generation_retry_backoff_blocks_immediate_claim():
+    tid = _unique_thread()
+    canvas_tools.set_thread_id(tid)
+    node = create_canvas_node("image", "重试图", "prompt")
+    enqueue_generation(node["id"])
+    claim_pending_tasks("image")
+
+    assert schedule_generation_retry(node["id"], "provider 503") is True
+    state = get_canvas_state(node["id"])["node"]
+    assert state["generation_status"] == "pending"
+    assert state["generation_error"] == "provider 503"
+    assert state["generation_next_retry_at"]
+    assert claim_pending_tasks("image") == []
+
+
+def test_generation_recover_only_expired_lease():
+    tid = _unique_thread()
+    canvas_tools.set_thread_id(tid)
+    node = create_canvas_node("image", "租约图", "prompt")
+    enqueue_generation(node["id"])
+    claim_pending_tasks("image")
+
+    assert recover_generation_tasks("image") == []

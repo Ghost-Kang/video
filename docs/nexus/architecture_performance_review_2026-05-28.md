@@ -42,7 +42,7 @@ experience. This is not a rewrite moment.
    - Expected impact: large cost/latency win when cohort users test the same
      trending videos.
 
-## P1 — Completed By Codex
+## P1 - Completed By Codex
 
 1. Frontend route-level code splitting
    - Problem: landing, chat, admin, analytics, and React Flow loaded in one
@@ -52,7 +52,17 @@ experience. This is not a rewrite moment.
    - Expected impact: lighter first load for landing/invite users; chat/admin
      code is fetched only when needed.
 
-## P1 — Recommended Next Codex Follow-Up
+2. Generation queue lease/backoff
+   - Problem: generation workers recovered every submitted/polling task without
+     a durable lease, so restart recovery and transient provider errors could
+     cause tight retries or duplicate polling under multiple workers.
+   - Change: canvas generation nodes now persist `attempt_count`, `lease_until`,
+     and `next_retry_at`; claim/recover paths take a lease and transient worker
+     exceptions schedule exponential-backoff retries.
+   - Expected impact: more deterministic recovery and lower provider pressure
+     during provider or network instability.
+
+## P1 - Recommended Next Codex Follow-Up
 
 These are not in the current patch because they touch longer-running behavior
 and should ship with product-level soak:
@@ -62,12 +72,7 @@ and should ship with product-level soak:
    - Push transcript/audio/production patches as follow-up WS frames.
    - Goal: reduce perceived analysis latency even when transcript is slow.
 
-2. Generation queue lease/backoff
-   - Extend canvas generation rows with `attempt_count`, `lease_until`, and
-     `next_retry_at`.
-   - Goal: avoid tight retry loops and make multi-worker recovery deterministic.
-
-## P2 — Assigned To Claude
+## P2 - Plan Prepared For Claude
 
 Owner: Claude
 

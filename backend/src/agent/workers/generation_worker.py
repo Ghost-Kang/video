@@ -135,7 +135,9 @@ async def _run_with_sem(
         except Exception as e:
             dt = (time.time() - t0) * 1000
             print(f"[Worker:{label}] 任务异常 node={nid[:16]} 耗时={dt:.0f}ms error={e}")
-            canvas_tools.update_generation_state(task["id"], "failed", error=str(e), user_id=uid, thread_id=tid)
+            retried = canvas_tools.schedule_generation_retry(task["id"], str(e), user_id=uid, thread_id=tid)
+            if not retried:
+                canvas_tools.update_generation_state(task["id"], "failed", error=str(e), user_id=uid, thread_id=tid)
             notify_user(uid, tid)
 
 
@@ -165,6 +167,9 @@ async def _recover_one(task: dict, task_type: str) -> None:
         _apply_poll_result(task, result)
     except Exception as e:
         print(f"[Worker:recover] 异常 node={nid[:16]}: {e}")
+        retried = canvas_tools.schedule_generation_retry(nid, str(e), user_id=uid, thread_id=tid)
+        if retried:
+            notify_user(uid, tid)
 
 
 def _apply_poll_result(task: dict, result: dict) -> None:

@@ -72,6 +72,9 @@ def _db() -> sqlite3.Connection:
         ("generation_status", "TEXT NOT NULL DEFAULT 'idle'"),
         ("generation_task_id", "TEXT"),
         ("generation_error", "TEXT"),
+        ("generation_attempt_count", "INTEGER NOT NULL DEFAULT 0"),
+        ("generation_lease_until", "TEXT"),
+        ("generation_next_retry_at", "TEXT"),
     ]:
         try:
             db.execute(f"ALTER TABLE canvas_nodes ADD COLUMN {col} {defn}")

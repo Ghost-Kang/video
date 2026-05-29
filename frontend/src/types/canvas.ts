@@ -19,6 +19,9 @@ export interface CanvasNode {
   generation_status: GenerationStatus;
   generation_task_id: string | null;
   generation_error: string | null;
+  generation_attempt_count: number;
+  generation_lease_until: string | null;
+  generation_next_retry_at: string | null;
   user_id: string;
   thread_id: string;
   x: number | null;

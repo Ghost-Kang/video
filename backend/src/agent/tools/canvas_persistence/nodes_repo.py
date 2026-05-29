@@ -29,6 +29,9 @@ def _row_to_node(row: sqlite3.Row) -> dict:
         "generation_status": row["generation_status"] or "idle",
         "generation_task_id": row["generation_task_id"],
         "generation_error": row["generation_error"],
+        "generation_attempt_count": row["generation_attempt_count"] or 0,
+        "generation_lease_until": row["generation_lease_until"],
+        "generation_next_retry_at": row["generation_next_retry_at"],
         "user_id": row["user_id"],
         "thread_id": row["thread_id"],
         "x": row["x"],
@@ -76,6 +79,9 @@ def _upsert_node(node: dict, *, user_id: str | None = None, thread_id: str | Non
         node.get("generation_status", "idle"),
         node.get("generation_task_id"),
         node.get("generation_error"),
+        node.get("generation_attempt_count", 0),
+        node.get("generation_lease_until"),
+        node.get("generation_next_retry_at"),
         node.get("x"), node.get("y"),
         uid, tid, node["id"],
     )
@@ -83,14 +89,16 @@ def _upsert_node(node: dict, *, user_id: str | None = None, thread_id: str | Non
         """UPDATE canvas_nodes SET
            type=?, title=?, description=?, status=?, node_status=?, asset_status=?,
            result=?, subtype=?, shot_no=?, image_gen_provider=?,
-           generation_status=?, generation_task_id=?, generation_error=?, x=?, y=?
+           generation_status=?, generation_task_id=?, generation_error=?,
+           generation_attempt_count=?, generation_lease_until=?, generation_next_retry_at=?,
+           x=?, y=?
            WHERE user_id=? AND thread_id=? AND node_id=?""",
         values,
     )
     if cursor.rowcount == 0:
         db.execute(
-            """INSERT INTO canvas_nodes (user_id, thread_id, node_id, type, title, description, status, node_status, asset_status, result, subtype, shot_no, image_gen_provider, generation_status, generation_task_id, generation_error, x, y)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO canvas_nodes (user_id, thread_id, node_id, type, title, description, status, node_status, asset_status, result, subtype, shot_no, image_gen_provider, generation_status, generation_task_id, generation_error, generation_attempt_count, generation_lease_until, generation_next_retry_at, x, y)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 uid, tid, node["id"], node["type"], node["title"],
                 node.get("description", ""), node.get("status", "pending"),
@@ -100,6 +108,9 @@ def _upsert_node(node: dict, *, user_id: str | None = None, thread_id: str | Non
                 node.get("generation_status", "idle"),
                 node.get("generation_task_id"),
                 node.get("generation_error"),
+                node.get("generation_attempt_count", 0),
+                node.get("generation_lease_until"),
+                node.get("generation_next_retry_at"),
                 node.get("x"), node.get("y"),
             ),
         )

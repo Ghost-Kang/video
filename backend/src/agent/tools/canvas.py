@@ -38,6 +38,7 @@ from agent.tools.canvas_persistence.edges_repo import (
 from agent.tools.canvas_persistence.generation_repo import (
     claim_pending_tasks,
     recover_generation_tasks,
+    schedule_generation_retry,
     update_generation_state,
 )
 from agent.tools.canvas_persistence.nodes_repo import (
@@ -407,6 +408,12 @@ def get_canvas_state(node_id: str = "") -> dict:
             "asset_status": n.get("asset_status", "idle"), "subtype": n.get("subtype"),
             "description": n.get("description", ""),
             "result": n.get("result"),
+            "generation_status": n.get("generation_status"),
+            "generation_task_id": n.get("generation_task_id"),
+            "generation_error": n.get("generation_error"),
+            "generation_attempt_count": n.get("generation_attempt_count", 0),
+            "generation_lease_until": n.get("generation_lease_until"),
+            "generation_next_retry_at": n.get("generation_next_retry_at"),
         }
         related_edges = [e for e in edges if e["source"] == node_id or e["target"] == node_id]
         return {"node": detail, "edges": related_edges}
@@ -421,6 +428,12 @@ def get_canvas_state(node_id: str = "") -> dict:
             "result": n.get("result"),
             "shot_no": n.get("shot_no"),
             "image_gen_provider": n.get("image_gen_provider"),
+            "generation_status": n.get("generation_status"),
+            "generation_task_id": n.get("generation_task_id"),
+            "generation_error": n.get("generation_error"),
+            "generation_attempt_count": n.get("generation_attempt_count", 0),
+            "generation_lease_until": n.get("generation_lease_until"),
+            "generation_next_retry_at": n.get("generation_next_retry_at"),
         })
     return {"nodes": summary, "edges": edges}
 
@@ -458,6 +471,9 @@ def enqueue_generation(node_id: str) -> dict | None:
         return None
     node["generation_status"] = "pending"
     node["asset_status"] = "generating"
+    node["generation_error"] = None
+    node["generation_lease_until"] = None
+    node["generation_next_retry_at"] = None
     _upsert_node(node)
     return node
 
@@ -489,6 +505,7 @@ __all__ = [
     "_update_node_result",
     "claim_pending_tasks",
     "recover_generation_tasks",
+    "schedule_generation_retry",
     "update_generation_state",
     # domain services
     "create_canvas_edge",

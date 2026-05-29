@@ -31,6 +31,9 @@ class CanvasNode(BaseModel):
     generation_status: GenerationStatus = "idle"
     generation_task_id: str | None = None
     generation_error: str | None = None
+    generation_attempt_count: int = 0
+    generation_lease_until: str | None = None
+    generation_next_retry_at: str | None = None
     user_id: str
     thread_id: str
     x: float | None = None
