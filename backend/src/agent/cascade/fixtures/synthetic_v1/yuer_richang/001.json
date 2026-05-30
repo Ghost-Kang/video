@@ -32,7 +32,15 @@
         "原片夜灯卧室 → 你的卧室夜灯",
         "原片宝宝睡颜 → 你家宝宝/玩偶"
       ]
-    }
+    },
+    "summary": "母亲视角口播：「你以为终于哄睡了；宝宝在小床里突然睁眼笑的反差表情",
+    "theme": "生活分享",
+    "material_benefit": "为观众提供可照着做的方法 + 情绪价值",
+    "main_elements": "夜灯橙黄低饱和，手持轻晃，居家真实感",
+    "micro_innovation": "可加入封面优化、话题引导、片尾互动提升完播与转发",
+    "pain_points": "母亲视角口播：「你以为终于哄睡了",
+    "emotion_trigger": "疲惫 → 期待 → 哭笑不得",
+    "bgm_style": "轻柔夜灯氛围 lo-fi，无明显主旋律"
   },
   "scenes": [
     {
@@ -46,7 +54,22 @@
       "shot_type": "close_up",
       "camera_movement": "handheld",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "母亲手持镜头自拍",
+      "segment_note": "",
+      "segment_description": "母亲手持镜头自拍，背景是夜灯橙黄色的卧室",
+      "emotion": "",
+      "visual_summary": "前置摄像头自拍",
+      "audio_summary": "",
+      "audio_content": "终于把这小祖宗哄睡了，今天 11 点半，比昨天还晚",
+      "cinematography": "手持",
+      "camera_position": "特写",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 2,
@@ -59,7 +82,22 @@
       "shot_type": "close_up",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "夜灯下的小床",
+      "segment_note": "",
+      "segment_description": "夜灯下的小床，宝宝闭眼安睡画面",
+      "emotion": "",
+      "visual_summary": "俯拍小床",
+      "audio_summary": "",
+      "audio_content": "你看这睡得多香，我都不舍得呼吸",
+      "cinematography": "固定机位",
+      "camera_position": "特写",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 3,
@@ -72,8 +110,24 @@
       "shot_type": "close_up",
       "camera_movement": "handheld",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "宝宝突然睁眼笑出声",
+      "segment_note": "",
+      "segment_description": "宝宝突然睁眼笑出声，母亲镜头外崩溃语气",
+      "emotion": "",
+      "visual_summary": "宝宝面部特写",
+      "audio_summary": "",
+      "audio_content": "啊？？你怎么醒了？？哪个妈妈也这样的扣个 1",
+      "cinematography": "手持",
+      "camera_position": "特写",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     }
   ],
-  "warnings": []
+  "warnings": [],
+  "video_summary": ""
 }

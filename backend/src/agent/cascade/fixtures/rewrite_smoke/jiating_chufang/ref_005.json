@@ -31,7 +31,15 @@
         "原片米其林感摆盘 → 你的家常摆盘",
         "原片预算价位 → 你的当地预算价位"
       ]
-    }
+    },
+    "summary": "开场 1 秒:一根黄瓜变三道菜；倒数第二镜情绪反转",
+    "theme": "生活分享",
+    "material_benefit": "为观众提供可照着做的方法 + 情绪价值",
+    "main_elements": "暖色调,家庭场景,自然光",
+    "micro_innovation": "可加入封面优化、话题引导、片尾互动提升完播与转发",
+    "pain_points": "开场 1 秒:一根黄瓜变三道菜",
+    "emotion_trigger": "好奇 → 节俭 → 创意 → 推荐",
+    "bgm_style": "节奏感 house 鼓点，烹饪段加速时压紧"
   },
   "scenes": [
     {
@@ -45,7 +53,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "一根黄瓜",
+      "segment_note": "",
+      "segment_description": "一根黄瓜",
+      "emotion": "",
+      "visual_summary": "黄瓜砧板俯拍",
+      "audio_summary": "",
+      "audio_content": "一根黄瓜,我能做三道",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 2,
@@ -58,7 +81,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "拍黄瓜凉拌",
+      "segment_note": "",
+      "segment_description": "拍黄瓜凉拌",
+      "emotion": "",
+      "visual_summary": "拍黄瓜手部特写",
+      "audio_summary": "",
+      "audio_content": "拍碎拌蒜醋",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 3,
@@ -71,7 +109,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "切片做小菜",
+      "segment_note": "",
+      "segment_description": "切片做小菜",
+      "emotion": "",
+      "visual_summary": "切片砧板俯拍",
+      "audio_summary": "",
+      "audio_content": "切薄片加糖醋",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 4,
@@ -84,7 +137,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "切丁炒鸡蛋",
+      "segment_note": "",
+      "segment_description": "切丁炒鸡蛋",
+      "emotion": "",
+      "visual_summary": "炒锅侧拍",
+      "audio_summary": "",
+      "audio_content": "切丁炒蛋,一锅菜",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 5,
@@ -97,8 +165,24 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "三道菜上桌",
+      "segment_note": "",
+      "segment_description": "三道菜上桌",
+      "emotion": "",
+      "visual_summary": "餐桌三盘菜俯拍",
+      "audio_summary": "",
+      "audio_content": "你家黄瓜还有什么吃法,评论区分享",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     }
   ],
-  "warnings": []
+  "warnings": [],
+  "video_summary": ""
 }

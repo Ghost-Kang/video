@@ -31,7 +31,15 @@
         "原片夜灯卧室 → 你的卧室夜灯",
         "原片宝宝睡颜 → 你家宝宝"
       ]
-    }
+    },
+    "summary": "开场 1.8 秒:娃在幼儿园门口不撒手；倒数第二镜情绪反转",
+    "theme": "生活分享",
+    "material_benefit": "为观众提供可照着做的方法 + 情绪价值",
+    "main_elements": "暖色调,家庭场景,自然光",
+    "micro_innovation": "可加入封面优化、话题引导、片尾互动提升完播与转发",
+    "pain_points": "开场 1.8 秒:娃在幼儿园门口不撒手",
+    "emotion_trigger": "挣扎 → 心疼 → 转折 → 成长",
+    "bgm_style": "轻柔夜灯氛围 lo-fi，无明显主旋律"
   },
   "scenes": [
     {
@@ -45,7 +53,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "幼儿园门口娃拽妈妈衣角",
+      "segment_note": "",
+      "segment_description": "幼儿园门口娃拽妈妈衣角",
+      "emotion": "",
+      "visual_summary": "幼儿园门口广角",
+      "audio_summary": "",
+      "audio_content": "他第一天不肯进去",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 2,
@@ -58,7 +81,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "妈妈蹲下来",
+      "segment_note": "",
+      "segment_description": "妈妈蹲下来",
+      "emotion": "",
+      "visual_summary": "妈妈蹲下中景",
+      "audio_summary": "",
+      "audio_content": "我说'妈妈下午第一个来接你'",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 3,
@@ -71,7 +109,22 @@
       "shot_type": "close_up",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "娃慢慢松手",
+      "segment_note": "",
+      "segment_description": "娃慢慢松手",
+      "emotion": "",
+      "visual_summary": "娃手部松开特写",
+      "audio_summary": "",
+      "audio_content": "他看了我三秒",
+      "cinematography": "固定机位",
+      "camera_position": "特写",
+      "actors": "孩子",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 4,
@@ -84,7 +137,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "妈妈躲到墙后哭",
+      "segment_note": "",
+      "segment_description": "妈妈躲到墙后哭",
+      "emotion": "",
+      "visual_summary": "妈妈侧影暗光",
+      "audio_summary": "",
+      "audio_content": "我躲到墙后才敢哭",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 5,
@@ -97,8 +165,24 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "下午接娃笑跑",
+      "segment_note": "",
+      "segment_description": "下午接娃笑跑",
+      "emotion": "",
+      "visual_summary": "幼儿园门口中景",
+      "audio_summary": "",
+      "audio_content": "你家娃第一天入园是什么样",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     }
   ],
-  "warnings": []
+  "warnings": [],
+  "video_summary": ""
 }

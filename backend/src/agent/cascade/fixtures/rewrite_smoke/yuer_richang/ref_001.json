@@ -31,7 +31,15 @@
         "原片夜灯卧室 → 你的卧室夜灯",
         "原片宝宝睡颜 → 你家宝宝"
       ]
-    }
+    },
+    "summary": "开场 1 秒:妈妈在凌晨 3 点的卧室；倒数第二镜情绪反转",
+    "theme": "生活分享",
+    "material_benefit": "为观众提供可照着做的方法 + 情绪价值",
+    "main_elements": "暖色调,家庭场景,自然光",
+    "micro_innovation": "可加入封面优化、话题引导、片尾互动提升完播与转发",
+    "pain_points": "开场 1 秒:妈妈在凌晨 3 点的卧室",
+    "emotion_trigger": "疲惫 → 触动 → 治愈 → 自我和解",
+    "bgm_style": "轻柔夜灯氛围 lo-fi，无明显主旋律"
   },
   "scenes": [
     {
@@ -45,7 +53,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "凌晨卧室",
+      "segment_note": "",
+      "segment_description": "凌晨卧室,妈妈坐起",
+      "emotion": "",
+      "visual_summary": "夜灯昏黄",
+      "audio_summary": "",
+      "audio_content": "他又醒了,这是今晚第三次",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 2,
@@ -58,7 +81,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "妈妈轻拍娃",
+      "segment_note": "",
+      "segment_description": "妈妈轻拍娃",
+      "emotion": "",
+      "visual_summary": "妈妈手轻拍娃后背特写",
+      "audio_summary": "",
+      "audio_content": "我快撑不住了",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 3,
@@ -71,7 +109,22 @@
       "shot_type": "close_up",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "娃小声说:妈妈在",
+      "segment_note": "",
+      "segment_description": "娃小声说:妈妈在",
+      "emotion": "",
+      "visual_summary": "娃睡颜侧面",
+      "audio_summary": "",
+      "audio_content": "他说了句'妈妈在',然后就睡了",
+      "cinematography": "固定机位",
+      "camera_position": "特写",
+      "actors": "孩子",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 4,
@@ -84,7 +137,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "妈妈静静看着",
+      "segment_note": "",
+      "segment_description": "妈妈静静看着",
+      "emotion": "",
+      "visual_summary": "妈妈侧脸特写",
+      "audio_summary": "",
+      "audio_content": "原来他也在确认我在",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 5,
@@ -97,8 +165,24 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "妈妈对镜头",
+      "segment_note": "",
+      "segment_description": "妈妈对镜头",
+      "emotion": "",
+      "visual_summary": "自拍角度",
+      "audio_summary": "",
+      "audio_content": "你被娃哪句话戳过,留言告诉我",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     }
   ],
-  "warnings": []
+  "warnings": [],
+  "video_summary": ""
 }

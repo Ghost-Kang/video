@@ -31,7 +31,15 @@
         "原片厨房 → 你的厨房",
         "原片辅食食材 → 你家宝宝爱吃的水果"
       ]
-    }
+    },
+    "summary": "开场 1 秒:妈妈疲惫旁白—又一次没吃完；倒数第二镜情绪反转",
+    "theme": "生活分享",
+    "material_benefit": "为观众提供可照着做的方法 + 情绪价值",
+    "main_elements": "暖色调,家庭场景,自然光",
+    "micro_innovation": "可加入封面优化、话题引导、片尾互动提升完播与转发",
+    "pain_points": "开场 1 秒:妈妈疲惫旁白—又一次没吃完",
+    "emotion_trigger": "挫败 → 尝试 → 转折 → 解脱",
+    "bgm_style": "轻快童谣风钢琴，前 3s 起拍后保持稳定背景"
   },
   "scenes": [
     {
@@ -45,7 +53,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "厨房一片狼藉",
+      "segment_note": "",
+      "segment_description": "厨房一片狼藉",
+      "emotion": "",
+      "visual_summary": "广角厨房",
+      "audio_summary": "",
+      "audio_content": "做了一上午,还是没吃完",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 2,
@@ -58,7 +81,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "妈妈坐下喘气",
+      "segment_note": "",
+      "segment_description": "妈妈坐下喘气",
+      "emotion": "",
+      "visual_summary": "中景妈妈侧脸",
+      "audio_summary": "",
+      "audio_content": "我也不是营养师,就想让他多吃一口",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 3,
@@ -71,7 +109,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "翻冰箱找剩饭",
+      "segment_note": "",
+      "segment_description": "翻冰箱找剩饭",
+      "emotion": "",
+      "visual_summary": "俯拍砧板",
+      "audio_summary": "",
+      "audio_content": "剩米饭加蛋,捏成饭团",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 4,
@@ -84,7 +137,22 @@
       "shot_type": "close_up",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "宝宝啃饭团",
+      "segment_note": "",
+      "segment_description": "宝宝啃饭团",
+      "emotion": "",
+      "visual_summary": "宝宝小手抓饭团特写",
+      "audio_summary": "",
+      "audio_content": "他居然吃完了,我都没敢相信",
+      "cinematography": "固定机位",
+      "camera_position": "特写",
+      "actors": "宝宝",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 5,
@@ -97,8 +165,24 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "妈妈对镜头",
+      "segment_note": "",
+      "segment_description": "妈妈对镜头",
+      "emotion": "",
+      "visual_summary": "妈妈对镜头中景",
+      "audio_summary": "",
+      "audio_content": "有时候简单的反而好,你家也这样吗",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     }
   ],
-  "warnings": []
+  "warnings": [],
+  "video_summary": ""
 }

@@ -46,17 +46,16 @@ HAPPY_FIXTURES = [
     SYNTH / "jiating_chufang" / "001.json",
 ]
 
-EDGE_HARD_FAIL = {
-    "edge_no_formula.json": FailureCode.S3_NO_FORMULA,
-    # W5D2: edge_scenes_too_short (1-2 scenes) moved to RECOVERABLE — adapter
-    # now pads to 3 with a W18_SCENES_PADDED warning. Only 0 scenes is hard fail.
-}
+# 2026-05-30 toprador 对齐:replicable_formula 不再硬必填(改写专用,已暂挂),
+# 故 edge_no_formula 从硬失败降级为可恢复(校验通过 + 走兜底)。
+EDGE_HARD_FAIL: dict[str, FailureCode] = {}
 
 EDGE_RECOVERABLE = [
     "edge_scenes_too_long.json",
     "edge_scenes_too_short.json",  # W5D2: padded via W18_SCENES_PADDED
     "edge_non_monotonic.json",
     "edge_low_confidence.json",
+    "edge_no_formula.json",  # 改写暂挂后不再硬失败
 ]
 
 
@@ -362,10 +361,11 @@ def test_adapter_computes_confidence_when_missing() -> None:
 
 
 def test_adapter_replaces_generic_scene_label() -> None:
+    # toprador 对齐:分镜标题字段从 `scene` 改为 `theme`;空标题走通用兜底。
     raw = _load(SYNTH / "baomam_fushi" / "001.json")
-    raw["scenes"][0]["scene"] = ""
+    raw["scenes"][0]["theme"] = ""
     contract = normalize_analysis_result(raw)
-    assert contract.scenes[0].scene.startswith("镜头")
+    assert contract.scenes[0].theme.startswith("镜头")
     assert any(w.code == WarningCode.W4_GENERIC_SCENE_LABEL.value for w in contract.warnings)
 
 
@@ -453,8 +453,8 @@ def _real_corpus_ready() -> bool:
 def test_phase0_gate_field_completeness_real() -> None:
     """Phase 0 Gate G2: ≥ 90% core-field completeness over real samples (≥20)."""
     required_fields = [
-        "hook", "pacing", "climax", "visual_style",
-        "emotional_arc", "target_audience", "engagement_levers", "replicable_formula",
+        "summary", "theme", "target_audience", "material_benefit", "hook",
+        "main_elements", "micro_innovation", "pain_points", "emotion_trigger", "bgm_style",
     ]
     real_dir = FIXTURES_ROOT / "real_v1"
     samples = sorted(real_dir.rglob("*.json"))
@@ -506,9 +506,9 @@ def test_phase0_gate_no_silent_failures() -> None:
     corruptions = [
         # Originally-tested loud paths
         ("source_url", ""),
-        ("viral_analysis.replicable_formula", ""),
+        ("viral_analysis.summary", ""),  # toprador 维度,空 → 兜底告警
         ("viral_analysis.hook", ""),  # falls back, must warn
-        ("scenes.0.scene", ""),
+        ("scenes.0.theme", ""),  # 分镜标题空 → W4 通用兜底告警
         ("cost_cny", -5.0),
         # New probes covering Evidence Collector findings
         ("schema_version", _SENTINEL_DELETE),       # was: silent fill → now: HARD FAIL S2

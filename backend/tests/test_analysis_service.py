@@ -118,7 +118,11 @@ def test_hard_failure_records_failure_event(
     db_path = _use_tmp_db(monkeypatch, tmp_path)
 
     async def corrupted_fixture(source_url: str, **_kwargs) -> dict:
-        return json.loads((SYNTH / "edge_no_formula.json").read_text(encoding="utf-8"))
+        # toprador 对齐后 replicable_formula 不再硬失败;用「空 scenes」(S4)
+        # 制造一个仍然 deterministic 的硬失败来验证 failure_emitted 事件链路。
+        raw = json.loads((SYNTH / "baomam_fushi" / "001.json").read_text(encoding="utf-8"))
+        raw["scenes"] = []
+        return raw
 
     monkeypatch.setattr("agent.cascade.analysis_service._load_upstream_payload", corrupted_fixture)
 
@@ -131,7 +135,7 @@ def test_hard_failure_records_failure_event(
     assert [name for name, _ in rows] == ["failure_emitted"]
     payload = json.loads(rows[0][1])
     assert payload == {
-        "failure_code": "S3_NO_FORMULA",
+        "failure_code": "S4_SCENES_LEN_OUT_OF_RANGE",
         "stage": "analysis",
         "recovery_path_id": "RETRY_WITH_NEW_URL",
     }

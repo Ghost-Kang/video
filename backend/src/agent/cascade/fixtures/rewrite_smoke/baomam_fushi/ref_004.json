@@ -31,7 +31,15 @@
         "原片厨房 → 你的厨房",
         "原片辅食食材 → 你家宝宝爱吃的水果"
       ]
-    }
+    },
+    "summary": "开场 2 秒:宝宝把碗推翻；倒数第二镜情绪反转",
+    "theme": "生活分享",
+    "material_benefit": "为观众提供可照着做的方法 + 情绪价值",
+    "main_elements": "暖色调,家庭场景,自然光",
+    "micro_innovation": "可加入封面优化、话题引导、片尾互动提升完播与转发",
+    "pain_points": "开场 2 秒:宝宝把碗推翻",
+    "emotion_trigger": "崩溃 → 平静 → 智慧 → 成长",
+    "bgm_style": "轻快童谣风钢琴，前 3s 起拍后保持稳定背景"
   },
   "scenes": [
     {
@@ -45,7 +53,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "碗被推翻",
+      "segment_note": "",
+      "segment_description": "碗被推翻,泥洒桌",
+      "emotion": "",
+      "visual_summary": "餐桌广角",
+      "audio_summary": "",
+      "audio_content": "我深呼吸三次",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 2,
@@ -58,7 +81,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "妈妈不喂了",
+      "segment_note": "",
+      "segment_description": "妈妈不喂了,自己吃别的",
+      "emotion": "",
+      "visual_summary": "妈妈侧面端碗",
+      "audio_summary": "",
+      "audio_content": "今天不喂了,你看妈妈吃",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 3,
@@ -71,7 +109,22 @@
       "shot_type": "close_up",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "宝宝盯着妈妈的碗",
+      "segment_note": "",
+      "segment_description": "宝宝盯着妈妈的碗",
+      "emotion": "",
+      "visual_summary": "宝宝眼神追随特写",
+      "audio_summary": "",
+      "audio_content": "他开始好奇了",
+      "cinematography": "固定机位",
+      "camera_position": "特写",
+      "actors": "宝宝",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 4,
@@ -84,7 +137,22 @@
       "shot_type": "medium",
       "camera_movement": "handheld",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "宝宝伸手要",
+      "segment_note": "",
+      "segment_description": "宝宝伸手要",
+      "emotion": "",
+      "visual_summary": "宝宝小手伸向妈妈",
+      "audio_summary": "",
+      "audio_content": "诶?自己想吃了?",
+      "cinematography": "手持",
+      "camera_position": "中景",
+      "actors": "宝宝",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 5,
@@ -97,8 +165,24 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "母子一起吃",
+      "segment_note": "",
+      "segment_description": "母子一起吃",
+      "emotion": "",
+      "visual_summary": "母子餐桌中景",
+      "audio_summary": "",
+      "audio_content": "你家有没有'不追着喂就吃'的瞬间",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     }
   ],
-  "warnings": []
+  "warnings": [],
+  "video_summary": ""
 }

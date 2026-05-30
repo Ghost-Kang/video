@@ -49,28 +49,55 @@ export interface ProductionDim {
 }
 
 export interface ViralAnalysis {
-  hook: string;
-  pacing: string;
-  climax: string;
-  visual_style: string;
-  emotional_arc: string;
+  // toprador 爆点 10 维(渲染用)
+  summary: string;
+  theme: string;
   target_audience: string;
-  engagement_levers: string;
-  replicable_formula: string;
-  audio: AudioDim;
-  production: ProductionDim;
+  material_benefit: string;
+  hook: string;
+  main_elements: string;
+  micro_innovation: string;
+  pain_points: string;
+  emotion_trigger: string;
+  bgm_style: string;
+  // 遗留(改写暂挂期保留,不渲染)
+  pacing?: string;
+  climax?: string;
+  visual_style?: string;
+  emotional_arc?: string;
+  engagement_levers?: string;
+  replicable_formula?: string;
+  audio?: AudioDim | null;
+  production?: ProductionDim | null;
 }
 
 export interface Scene {
   scene_index: number;
   timestamp_start: number;
   timestamp_end: number;
-  scene: string;
+  // toprador 视频分析维度
+  theme: string;
+  segment_note: string;
+  segment_description: string;
   dialogue_and_narration: string;
+  emotion: string;
+  visual_summary: string;
   visual_content: string;
-  subject: string | null;
-  shot_type: ShotType;
-  camera_movement: CameraMovement;
+  audio_summary: string;
+  audio_content: string;
+  cinematography: string;
+  camera_position: string;
+  actors: string;
+  on_screen_text: string;
+  visual_presentation_style: string;
+  scene: string;
+  props_list: string;
+  costume: string;
+  lighting_and_color: string;
+  // 遗留(可选)
+  subject?: string | null;
+  shot_type?: ShotType;
+  camera_movement?: CameraMovement;
   first_frame_url: string | null;
   warnings: Warning_[];
 }
@@ -84,6 +111,7 @@ export interface CascadeAnalysisContract {
   model: string;
   cost_cny: number;
   duration_s: number;
+  video_summary: string;
   viral_analysis: ViralAnalysis;
   scenes: Scene[];
   warnings: Warning_[];

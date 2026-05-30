@@ -149,7 +149,12 @@ export default function App({ userId, onLogout }: AppProps) {
   // 自动把改写跑起来(别把唯一的价值「你的版本」锁在用户手动点 CTA 后面)。
   // 三重守卫:justSubmitted(冷 replay 不触发)/ 每 analysis_id 只发一次 /
   // 已有 rewrite 或正在 loading 则跳过。niche 未知时不发,交给卡片里的醒目 CTA。
+  // 2026-05-30 toprador 对齐:改写「你的版本」本轮暂挂,自动改写关闭。
+  // 代码保留(rewrite_service / wsStore rewrite_returned 仍在),改 REWRITE_ENABLED
+  // 为 true 即可恢复「分析→自动改写」。
+  const REWRITE_ENABLED = false;
   useEffect(() => {
+    if (!REWRITE_ENABLED) return;
     if (!analysis || loading) return;
     if (!justSubmittedRef.current) return;
     if (rewriteShots.length > 0) return;

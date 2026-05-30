@@ -31,7 +31,15 @@
         "原片米其林感摆盘 → 你的家常摆盘",
         "原片预算价位 → 你的当地预算价位"
       ]
-    }
+    },
+    "summary": "开场 2 秒:用电饭煲做整锅卤味；倒数第二镜情绪反转",
+    "theme": "生活分享",
+    "material_benefit": "为观众提供可照着做的方法 + 情绪价值",
+    "main_elements": "暖色调,家庭场景,自然光",
+    "micro_innovation": "可加入封面优化、话题引导、片尾互动提升完播与转发",
+    "pain_points": "开场 2 秒:用电饭煲做整锅卤味",
+    "emotion_trigger": "疑问 → 验证 → 惊喜 → 推荐",
+    "bgm_style": "节奏感 house 鼓点，烹饪段加速时压紧"
   },
   "scenes": [
     {
@@ -45,7 +53,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "电饭煲掀盖",
+      "segment_note": "",
+      "segment_description": "电饭煲掀盖",
+      "emotion": "",
+      "visual_summary": "电饭煲俯拍特写",
+      "audio_summary": "",
+      "audio_content": "电饭煲能做卤味吗?",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 2,
@@ -58,7 +81,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "码料汁",
+      "segment_note": "",
+      "segment_description": "码料汁",
+      "emotion": "",
+      "visual_summary": "调料碗俯拍",
+      "audio_summary": "",
+      "audio_content": "酱油老抽糖八角桂皮",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 3,
@@ -71,7 +109,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "鸡腿放进去",
+      "segment_note": "",
+      "segment_description": "鸡腿放进去",
+      "emotion": "",
+      "visual_summary": "鸡腿手部特写",
+      "audio_summary": "",
+      "audio_content": "鸡腿戳几下入味",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 4,
@@ -84,7 +137,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "煮饭键按下",
+      "segment_note": "",
+      "segment_description": "煮饭键按下",
+      "emotion": "",
+      "visual_summary": "电饭煲按键特写",
+      "audio_summary": "",
+      "audio_content": "煮饭键 + 保温 30 分钟",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 5,
@@ -97,8 +165,24 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "开盖撕鸡腿",
+      "segment_note": "",
+      "segment_description": "开盖撕鸡腿",
+      "emotion": "",
+      "visual_summary": "撕开成品特写",
+      "audio_summary": "",
+      "audio_content": "撕开你看,这汁",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     }
   ],
-  "warnings": []
+  "warnings": [],
+  "video_summary": ""
 }

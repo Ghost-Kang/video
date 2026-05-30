@@ -32,7 +32,15 @@
         "原片米其林感摆盘 → 你的家常摆盘",
         "原片 30 块预算 → 你的当地预算价位"
       ]
-    }
+    },
+    "summary": "「30 块钱晚餐做出米其林感」标题钩子 + 翻锅特写；摆盘完成后筷子夹起拉丝特写",
+    "theme": "生活分享",
+    "material_benefit": "为观众提供可照着做的方法 + 情绪价值",
+    "main_elements": "冷暖对比，黑色台面 + 暖色食材，俯拍 + 侧拍交替",
+    "micro_innovation": "可加入封面优化、话题引导、片尾互动提升完播与转发",
+    "pain_points": "「30 块钱晚餐做出米其林感」标题钩子 + 翻锅特写",
+    "emotion_trigger": "好奇 → 跟着做 → 满足",
+    "bgm_style": "节奏感 house 鼓点，烹饪段加速时配合压紧"
   },
   "scenes": [
     {
@@ -46,7 +54,22 @@
       "shot_type": "close_up",
       "camera_movement": "push",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "标题字幕：30 块钱晚餐做出米其",
+      "segment_note": "",
+      "segment_description": "标题字幕：30 块钱晚餐做出米其林感",
+      "emotion": "",
+      "visual_summary": "黑色背景",
+      "audio_summary": "",
+      "audio_content": "30 块钱，米其林感晚餐，跟我做",
+      "cinematography": "推镜",
+      "camera_position": "特写",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 2,
@@ -59,7 +82,22 @@
       "shot_type": "aerial",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "食材摆盘：番茄、芝士、罗勒、面条",
+      "segment_note": "",
+      "segment_description": "食材摆盘：番茄、芝士、罗勒、面条",
+      "emotion": "",
+      "visual_summary": "俯拍黑色石板台面",
+      "audio_summary": "",
+      "audio_content": "番茄两个，马苏里拉一小块，罗勒几片，意面 100 克",
+      "cinematography": "固定机位",
+      "camera_position": "俯拍",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 3,
@@ -72,7 +110,22 @@
       "shot_type": "close_up",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "切番茄特写",
+      "segment_note": "",
+      "segment_description": "切番茄特写，刀工干净",
+      "emotion": "",
+      "visual_summary": "特写刀切番茄",
+      "audio_summary": "",
+      "audio_content": "番茄切大块，不用切太碎",
+      "cinematography": "固定机位",
+      "camera_position": "特写",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 4,
@@ -85,7 +138,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "热锅倒油",
+      "segment_note": "",
+      "segment_description": "热锅倒油，番茄入锅",
+      "emotion": "",
+      "visual_summary": "侧拍黑色平底锅",
+      "audio_summary": "",
+      "audio_content": "热锅冷油，番茄炒出汁",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 5,
@@ -98,7 +166,22 @@
       "shot_type": "aerial",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "意面加入锅中翻炒",
+      "segment_note": "",
+      "segment_description": "意面加入锅中翻炒，与番茄酱融合",
+      "emotion": "",
+      "visual_summary": "俯拍翻炒动作",
+      "audio_summary": "",
+      "audio_content": "无",
+      "cinematography": "固定机位",
+      "camera_position": "俯拍",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 6,
@@ -111,7 +194,22 @@
       "shot_type": "close_up",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "撒上芝士和罗勒",
+      "segment_note": "",
+      "segment_description": "撒上芝士和罗勒，盖锅盖焖",
+      "emotion": "",
+      "visual_summary": "俯拍芝士融化过程",
+      "audio_summary": "",
+      "audio_content": "芝士拉丝的灵魂在这里",
+      "cinematography": "固定机位",
+      "camera_position": "特写",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 7,
@@ -124,7 +222,22 @@
       "shot_type": "aerial",
       "camera_movement": "pull",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "摆盘：意面盛入黑色深盘",
+      "segment_note": "",
+      "segment_description": "摆盘：意面盛入黑色深盘，罗勒点缀",
+      "emotion": "",
+      "visual_summary": "俯拍黑色深盘",
+      "audio_summary": "",
+      "audio_content": "摆盘讲究一点，米其林感就出来了",
+      "cinematography": "拉镜",
+      "camera_position": "俯拍",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 8,
@@ -137,8 +250,24 @@
       "shot_type": "close_up",
       "camera_movement": "push",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "筷子夹起意面",
+      "segment_note": "",
+      "segment_description": "筷子夹起意面，拉丝特写，结尾价格悬念",
+      "emotion": "",
+      "visual_summary": "筷子夹起意面拉丝",
+      "audio_summary": "",
+      "audio_content": "你猜这一盘多少钱？评论区告诉我，差距太大我直接关注一波",
+      "cinematography": "推镜",
+      "camera_position": "特写",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     }
   ],
-  "warnings": []
+  "warnings": [],
+  "video_summary": ""
 }

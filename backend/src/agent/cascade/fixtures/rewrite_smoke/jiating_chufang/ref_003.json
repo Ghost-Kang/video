@@ -31,7 +31,15 @@
         "原片米其林感摆盘 → 你的家常摆盘",
         "原片预算价位 → 你的当地预算价位"
       ]
-    }
+    },
+    "summary": "开场 1.5 秒:厨房小白也能做的法式吐司；倒数第二镜情绪反转",
+    "theme": "生活分享",
+    "material_benefit": "为观众提供可照着做的方法 + 情绪价值",
+    "main_elements": "暖色调,家庭场景,自然光",
+    "micro_innovation": "可加入封面优化、话题引导、片尾互动提升完播与转发",
+    "pain_points": "开场 1.5 秒:厨房小白也能做的法式吐司",
+    "emotion_trigger": "紧张 → 上手 → 满足 → 自信",
+    "bgm_style": "节奏感 house 鼓点，烹饪段加速时压紧"
   },
   "scenes": [
     {
@@ -45,7 +53,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "鸡蛋牛奶打散",
+      "segment_note": "",
+      "segment_description": "鸡蛋牛奶打散",
+      "emotion": "",
+      "visual_summary": "搅拌碗俯拍",
+      "audio_summary": "",
+      "audio_content": "厨房小白也能做",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 2,
@@ -58,7 +81,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "面包浸蛋液",
+      "segment_note": "",
+      "segment_description": "面包浸蛋液",
+      "emotion": "",
+      "visual_summary": "面包浸入特写",
+      "audio_summary": "",
+      "audio_content": "面包两面浸 10 秒",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 3,
@@ -71,7 +109,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "小火煎",
+      "segment_note": "",
+      "segment_description": "小火煎",
+      "emotion": "",
+      "visual_summary": "平底锅侧拍",
+      "audio_summary": "",
+      "audio_content": "小火慢煎,别开大火",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 4,
@@ -84,7 +137,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "撒糖粉",
+      "segment_note": "",
+      "segment_description": "撒糖粉",
+      "emotion": "",
+      "visual_summary": "撒糖动作特写",
+      "audio_summary": "",
+      "audio_content": "出锅撒糖粉,挤蜂蜜",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 5,
@@ -97,8 +165,24 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "餐桌切开",
+      "segment_note": "",
+      "segment_description": "餐桌切开",
+      "emotion": "",
+      "visual_summary": "餐桌切开特写",
+      "audio_summary": "",
+      "audio_content": "周末早餐你做不做,评论区聊聊",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     }
   ],
-  "warnings": []
+  "warnings": [],
+  "video_summary": ""
 }

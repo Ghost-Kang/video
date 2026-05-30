@@ -35,15 +35,42 @@ from agent.cascade.failures import FailureCode, HardFailure, WarningCode
 from agent.cascade.minor_audit import detect_minor_subjects
 
 
+# toprador 爆点 10 维 fallback。2026-05-30 对齐 toprador:分析不再因缺
+# replicable_formula 硬失败(那是改写专用字段,改写已暂挂)。
 _VIRAL_FALLBACKS: dict[str, str] = {
-    "hook": "未识别开场钩子",
-    "pacing": "未识别节奏特征",
-    "climax": "未识别爆点",
-    "visual_style": "自然风格",
-    "emotional_arc": "未识别情绪轨迹",
+    "summary": "未识别爆点总结",
+    "theme": "未识别主题",
     "target_audience": "未识别目标人群",
-    "engagement_levers": "未识别互动钩子",
-    # NOTE: replicable_formula has no fallback — it is HARD-required (S3).
+    "material_benefit": "未识别素材利益点",
+    "hook": "未识别开场钩子",
+    "main_elements": "未识别主要元素",
+    "micro_innovation": "未识别微创新方向",
+    "pain_points": "未识别痛点需求",
+    "emotion_trigger": "未识别情绪触发",
+    "bgm_style": "未识别 BGM 风格",
+}
+
+# 每维允许的最大长度(与 contract.ViralAnalysis 对齐,留 1:1 防 ValidationError)。
+_VIRAL_MAXLEN: dict[str, int] = {
+    "summary": 400, "theme": 120, "target_audience": 200, "material_benefit": 300,
+    "hook": 300, "main_elements": 300, "micro_innovation": 400, "pain_points": 300,
+    "emotion_trigger": 200, "bgm_style": 200,
+}
+
+# 逐幕描述字段(toprador 视频分析维度)缺失时的兜底 + 最大长度。
+_SCENE_TEXT_FALLBACKS: dict[str, str] = {
+    "theme": "", "segment_note": "", "segment_description": "", "emotion": "",
+    "visual_summary": "", "audio_summary": "", "audio_content": "无",
+    "cinematography": "", "camera_position": "", "actors": "无",
+    "on_screen_text": "无", "visual_presentation_style": "", "scene": "",
+    "props_list": "无", "costume": "无", "lighting_and_color": "",
+}
+_SCENE_TEXT_MAXLEN: dict[str, int] = {
+    "theme": 120, "segment_note": 300, "segment_description": 600, "emotion": 80,
+    "visual_summary": 120, "audio_summary": 120, "audio_content": 600,
+    "cinematography": 200, "camera_position": 120, "actors": 200,
+    "on_screen_text": 400, "visual_presentation_style": 120, "scene": 300,
+    "props_list": 300, "costume": 300, "lighting_and_color": 300,
 }
 
 # W4D5 audio 3-axis fallbacks. Phrase mirrors the prompt's `<n/a — storyline 未呈现>`
@@ -99,6 +126,10 @@ def normalize_analysis_result(raw: Any) -> CascadeAnalysisContract:
     _ensure_cost(data, warnings)
     _ensure_duration(data)
 
+    # toprador 对齐:顶层一句话总览。缺失/非串则置空(contract 默认 "")。
+    vs = data.get("video_summary")
+    data["video_summary"] = vs.strip()[:600] if isinstance(vs, str) else ""
+
     _normalize_viral_analysis(data, warnings)
     _normalize_scenes(data, warnings)
     _audit_minor_subjects(data, warnings)
@@ -112,6 +143,18 @@ def normalize_analysis_result(raw: Any) -> CascadeAnalysisContract:
                 w.setdefault("severity", Severity.WARN.value)
                 warnings.append(Warning_(**w))
     data["warnings"] = [w.model_dump(mode="json") for w in warnings]
+
+    # 防御:模型偶尔多吐 toprador 习惯键(total_duration/scene_count 顶层,
+    # scene_id/time_range 逐幕)。contract 是 extra="forbid",白名单过滤掉,
+    # 否则一个杂键就让整条分析 S5 失败。
+    _scene_fields = set(Scene.model_fields.keys())
+    if isinstance(data.get("scenes"), list):
+        data["scenes"] = [
+            {k: v for k, v in s.items() if k in _scene_fields} if isinstance(s, dict) else s
+            for s in data["scenes"]
+        ]
+    _top_fields = set(CascadeAnalysisContract.model_fields.keys())
+    data = {k: v for k, v in data.items() if k in _top_fields}
 
     try:
         return CascadeAnalysisContract(**data)
@@ -302,18 +345,16 @@ def _ensure_duration(data: dict[str, Any]) -> None:
 def _normalize_viral_analysis(data: dict[str, Any], warnings: list[Warning_]) -> None:
     va = data.get("viral_analysis")
     if not isinstance(va, dict):
-        # If the whole block is missing, we can salvage only if replicable_formula
-        # surfaces elsewhere — which it doesn't. HARD fail.
-        raise HardFailure(
-            FailureCode.S3_NO_FORMULA,
-            "viral_analysis missing entirely; cannot extract replicable_formula",
+        # toprador 对齐:整块缺失不再硬失败,给一份全兜底块 + 一条 warning。
+        va = {}
+        warnings.append(
+            Warning_(
+                code=WarningCode.W2_FALLBACK_USED.value,
+                field="viral_analysis",
+                message="viral_analysis block missing; used full fallback",
+                severity=Severity.WARN,
+            )
         )
-
-    formula = va.get("replicable_formula")
-    if not isinstance(formula, str) or not formula.strip():
-        raise HardFailure(FailureCode.S3_NO_FORMULA, "viral_analysis.replicable_formula blank")
-    # Trim to contract max
-    va["replicable_formula"] = formula.strip()[:120]
 
     for key, fallback in _VIRAL_FALLBACKS.items():
         val = va.get(key)
@@ -328,8 +369,14 @@ def _normalize_viral_analysis(data: dict[str, Any], warnings: list[Warning_]) ->
                 )
             )
         else:
-            va[key] = val.strip()[:80]
+            va[key] = val.strip()[: _VIRAL_MAXLEN[key]]
 
+    # 遗留字段:存在则规整裁剪,缺失保持默认(改写暂挂期不强制)。
+    for legacy in ("pacing", "climax", "visual_style", "emotional_arc",
+                   "engagement_levers", "replicable_formula"):
+        lv = va.get(legacy)
+        va[legacy] = lv.strip()[:200] if isinstance(lv, str) else ""
+    # audio/production 仍照旧兜底(无害,供暂挂的改写 + 既有 W15/W16 用例)。
     _normalize_audio_dim(va, warnings)
     _normalize_production_dim(va, warnings)
 
@@ -497,20 +544,20 @@ def _normalize_scenes(data: dict[str, Any], warnings: list[Warning_]) -> None:
         ns = dict(s)
         ns["scene_index"] = i
 
-        # scene label
-        label = ns.get("scene")
-        if not isinstance(label, str) or not label.strip():
-            ns["scene"] = f"镜头 {i}"
+        # 分镜标题 theme（toprador 对齐：取代旧的 scene label 作为标题）
+        title = ns.get("theme")
+        if not isinstance(title, str) or not title.strip():
+            ns["theme"] = f"镜头 {i}"
             warnings.append(
                 Warning_(
                     code=WarningCode.W4_GENERIC_SCENE_LABEL.value,
-                    field=f"scenes[{i - 1}].scene",
-                    message="scene label absent; used generic",
+                    field=f"scenes[{i - 1}].theme",
+                    message="scene theme absent; used generic",
                     severity=Severity.WARN,
                 )
             )
         else:
-            ns["scene"] = label.strip()[:120]
+            ns["theme"] = title.strip()[:120]
 
         # dialogue may be empty — that's OK (silent scene)
         d = ns.get("dialogue_and_narration")
@@ -519,18 +566,31 @@ def _normalize_scenes(data: dict[str, Any], warnings: list[Warning_]) -> None:
         # visual_content is required non-empty
         vc = ns.get("visual_content")
         if not isinstance(vc, str) or not vc.strip():
-            # Salvage: derive from scene label
-            ns["visual_content"] = ns["scene"][:200]
+            # Salvage: derive from theme / visual_summary / segment_description
+            salvage = (
+                (ns.get("visual_summary") if isinstance(ns.get("visual_summary"), str) else "")
+                or (ns.get("segment_description") if isinstance(ns.get("segment_description"), str) else "")
+                or ns["theme"]
+            )
+            ns["visual_content"] = (salvage or ns["theme"]).strip()[:800] or ns["theme"]
             warnings.append(
                 Warning_(
                     code=WarningCode.W2_FALLBACK_USED.value,
                     field=f"scenes[{i - 1}].visual_content",
-                    message="visual_content absent; derived from scene label",
+                    message="visual_content absent; derived from theme/summary",
                     severity=Severity.WARN,
                 )
             )
         else:
-            ns["visual_content"] = vc.strip()[:200]
+            ns["visual_content"] = vc.strip()[:800]
+
+        # toprador 逐幕描述维度：缺失填兜底,存在则裁剪到 contract 上限。
+        for fkey, fdefault in _SCENE_TEXT_FALLBACKS.items():
+            fv = ns.get(fkey)
+            if isinstance(fv, str) and fv.strip():
+                ns[fkey] = fv.strip()[: _SCENE_TEXT_MAXLEN[fkey]]
+            else:
+                ns[fkey] = fdefault
 
         # subject — optional. Distinguish three cases:
         #   - absent: leave None silently (true optional)

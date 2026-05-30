@@ -31,7 +31,15 @@
         "原片夜灯卧室 → 你的卧室夜灯",
         "原片宝宝睡颜 → 你家宝宝"
       ]
-    }
+    },
+    "summary": "开场 2 秒:妈妈崩溃到躲进厕所哭；倒数第二镜情绪反转",
+    "theme": "生活分享",
+    "material_benefit": "为观众提供可照着做的方法 + 情绪价值",
+    "main_elements": "暖色调,家庭场景,自然光",
+    "micro_innovation": "可加入封面优化、话题引导、片尾互动提升完播与转发",
+    "pain_points": "开场 2 秒:妈妈崩溃到躲进厕所哭",
+    "emotion_trigger": "崩溃 → 自我对话 → 走出来 → 拥抱",
+    "bgm_style": "轻柔夜灯氛围 lo-fi，无明显主旋律"
   },
   "scenes": [
     {
@@ -45,7 +53,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "妈妈关厕所门",
+      "segment_note": "",
+      "segment_description": "妈妈关厕所门",
+      "emotion": "",
+      "visual_summary": "厕所门外视角",
+      "audio_summary": "",
+      "audio_content": "我今天真的撑不住了",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "无",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 2,
@@ -58,7 +81,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "妈妈坐地上",
+      "segment_note": "",
+      "segment_description": "妈妈坐地上",
+      "emotion": "",
+      "visual_summary": "妈妈侧脸暗光",
+      "audio_summary": "",
+      "audio_content": "当妈是不是都这样",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 3,
@@ -71,7 +109,22 @@
       "shot_type": "close_up",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "门外小手敲门",
+      "segment_note": "",
+      "segment_description": "门外小手敲门",
+      "emotion": "",
+      "visual_summary": "门缝小手特写",
+      "audio_summary": "",
+      "audio_content": "他不知道发生了什么",
+      "cinematography": "固定机位",
+      "camera_position": "特写",
+      "actors": "孩子",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 4,
@@ -84,7 +137,22 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "妈妈开门抱住娃",
+      "segment_note": "",
+      "segment_description": "妈妈开门抱住娃",
+      "emotion": "",
+      "visual_summary": "母子拥抱中景",
+      "audio_summary": "",
+      "audio_content": "原来你担心我",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     },
     {
       "scene_index": 5,
@@ -97,8 +165,24 @@
       "shot_type": "medium",
       "camera_movement": "static",
       "first_frame_url": null,
-      "warnings": []
+      "warnings": [],
+      "theme": "母子坐沙发",
+      "segment_note": "",
+      "segment_description": "母子坐沙发",
+      "emotion": "",
+      "visual_summary": "沙发中景",
+      "audio_summary": "",
+      "audio_content": "你家有没有'被孩子治愈'的瞬间",
+      "cinematography": "固定机位",
+      "camera_position": "中景",
+      "actors": "妈妈",
+      "on_screen_text": "无",
+      "visual_presentation_style": "真人实拍",
+      "props_list": "无",
+      "costume": "无",
+      "lighting_and_color": "自然光为主"
     }
   ],
-  "warnings": []
+  "warnings": [],
+  "video_summary": ""
 }
