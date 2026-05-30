@@ -91,6 +91,9 @@ describe("wsStore shots routing (T1)", () => {
       expect(s.shots).toHaveLength(2);
       expect(s.shots[0].scene).toBe("源视频第 1 幕");
       expect(s.rewriteShots).toEqual([]);
+      // 缺陷 ① 回归:分析阶段 script 必须留空,不预填源逐字稿 —— 否则改写在途的
+      // ~30s 窗口里源稿会被误显示成「改完的版本」+ 过早冒出发布包。
+      expect(s.script).toBe("");
     });
   });
 

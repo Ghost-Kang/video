@@ -6,6 +6,7 @@ import { AudioCard } from "./cards/AudioCard";
 import { ProductionCard } from "./cards/ProductionCard";
 import { TranscriptCard } from "./cards/TranscriptCard";
 import { useCanvasStore } from "../store/canvasStore";
+import { useWSStore } from "../store/wsStore";
 import { COPY } from "../lib/cardCopy";
 import { ConfidenceBanner } from "./feedback/ConfidenceBanner";
 import { FailureBanner } from "./feedback/FailureBanner";
@@ -32,6 +33,7 @@ export function CardStack({ onGenerateFirstFrame, onTriggerRewrite }: CardStackP
   const rewriteShots = useCanvasStore((s) => s.rewriteShots);
   const setScript = useCanvasStore((s) => s.setScript);
   const failure = useCanvasStore((s) => s.failure);
+  const loading = useWSStore((s) => s.loading);
 
   if (!analysis) {
     return (
@@ -54,6 +56,10 @@ export function CardStack({ onGenerateFirstFrame, onTriggerRewrite }: CardStackP
   }
 
   const hasRewrite = rewriteShots.length > 0;
+  // 改写在途:分析已回、还没改写结果、但有运行中的 run(自动改写 effect 已发,或
+  // 用户刚点了方向)。此窗口别显示「选方向」CTA(防双发),也别显示空的幕2/3
+  // (script 此时为空,见 canvasStore 缺陷 ① 修复),而是给一句「正在帮你改…」。
+  const rewritePending = !hasRewrite && loading;
 
   return (
     <main className="flex-1 overflow-y-auto bg-transparent p-4 md:p-6">
@@ -65,9 +71,24 @@ export function CardStack({ onGenerateFirstFrame, onTriggerRewrite }: CardStackP
           analysis={analysis}
           script={script}
           onScriptChange={setScript}
-          // CTA 只在还没改写过时显示;改写出来后别再勾引重复触发,换方向直接 chat。
-          onTriggerRewrite={hasRewrite ? undefined : onTriggerRewrite}
+          // CTA 只在「还没改写、且没有改写在途」时显示;改写出来后或正在改时都别再
+          // 勾引重复触发,换方向直接 chat。
+          onTriggerRewrite={hasRewrite || rewritePending ? undefined : onTriggerRewrite}
         />
+
+        {/* 改写在途:一句轻提示占住幕2的位置,等 rewrite_returned 替换成真脚本 */}
+        {rewritePending && (
+          <div
+            className="rounded-2xl border border-stone-200 dark:border-stone-700 bg-white/50 dark:bg-stone-900/40 px-4 py-5 text-center text-[15px] text-stone-600 dark:text-stone-300"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="inline-flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#7c2d12] dark:bg-[#ea580c] animate-pulse" aria-hidden />
+              {COPY.your_version_waiting}
+            </span>
+          </div>
+        )}
 
         {/* 幕2续:改写后的镜头 — 价值主角,留在主流显眼处 */}
         {hasRewrite && (

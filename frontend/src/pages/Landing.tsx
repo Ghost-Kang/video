@@ -10,6 +10,8 @@ import { HighlightPhrase } from "../components/landing/HighlightPhrase";
 import { useParallax } from "../hooks/useParallax";
 import { useLiveStats } from "../hooks/useLiveStats";
 import type { FeaturedCard } from "../components/landing/HotCard";
+import { SAMPLE_URL_BY_NICHE } from "../lib/sampleUrls";
+import { useNicheStore, type NicheId } from "../store/nicheStore";
 
 function sessionId() {
   return `session-${Date.now().toString(36)}`;
@@ -29,8 +31,14 @@ export function Landing() {
     [navigate],
   );
 
+  // 「挑一条」卡片走和聊天内「试一条 X 爆款」chip 同一条真链接管线:真分析 + 自动改写。
+  // (旧实现 navigate `?analysis_id=ana_syn_*` 走前端合成 fixture,但 App 从不消费
+  //  analysis_id query、且只有 baomam 一个 fixture → 三张卡点开全空白,缺陷 ②。)
+  // 先落 niche,确保分析回来后自动改写触发、发布包标签按方向走。
   const pick = (card: FeaturedCard) => {
-    fadeNavigate(`/chat/${sessionId()}?analysis_id=${card.fixture_analysis_id}`);
+    const niche = (card.niche in SAMPLE_URL_BY_NICHE ? card.niche : "baomam_fushi") as NicheId;
+    useNicheStore.getState().setNiche(niche);
+    fadeNavigate(`/chat/${sessionId()}?source_url=${encodeURIComponent(SAMPLE_URL_BY_NICHE[niche])}`);
   };
   const submitUrl = (url: string) => {
     fadeNavigate(`/chat/${sessionId()}?source_url=${encodeURIComponent(url)}`);

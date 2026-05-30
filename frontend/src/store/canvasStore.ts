@@ -2,7 +2,6 @@ import { create } from "zustand";
 import type { CanvasNode } from "../types";
 import type { CascadeAnalysisContract, FailurePayload, Scene } from "../types/cascade";
 import type { RewriteShot } from "../lib/cascadeMapper";
-import { buildDefaultScript } from "../fixtures/baomamFushi001";
 
 interface Edge {
   id: string;
@@ -133,6 +132,10 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
         state.analysis !== null &&
         state.analysis.analysis_id === analysis.analysis_id &&
         sceneSignature(state.analysis) === sceneSignature(analysis);
+      // W4 redesign + 缺陷 ① 修复:分析阶段 script 留空,不再预填源逐字稿
+      // (buildDefaultScript)。「改完的版本」/「拿去发」是改写产物(幕2/3),
+      // 由 rewrite_returned 的 setScript 填入;分析回来只显示幕1(为什么火+选方向)。
+      // 否则改写在途的 ~30s 窗口里,源逐字稿会被误显示成「改完的版本」+ 过早冒出发布包。
       return sameAnalysis
         ? {
             analysis,
@@ -141,7 +144,7 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
           }
         : {
             analysis,
-            script: buildDefaultScript(analysis),
+            script: "",
             shots: analysis.scenes,
             rewriteShots: [],
             failure: null,
