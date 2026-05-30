@@ -58,12 +58,12 @@ export const COPY = {
   suggested_titles: "标题备选",
   tags_label: "话题标签",
 
-  onboarding_title: "粘条爆款链接,把它改成你自己的",
-  onboarding_subtitle: "粘一条链接,几十秒后看到分析 + 改好的版本",
+  onboarding_title: "粘条爆款链接,看懂它为什么火",
+  onboarding_subtitle: "粘一条链接,几十秒后看到完整拆解",
   onboarding_step1_title: "粘条爆款链接",
   onboarding_step1_desc: "抖音 / 小红书都行,直接复制视频链接",
-  onboarding_step2_title: "看分析 + 改完的版本",
-  onboarding_step2_desc: "拆解这条为什么火,顺手给你一份能直接发的版本",
+  onboarding_step2_title: "看完整拆解",
+  onboarding_step2_desc: "爆点分析 + 逐幕视频分析,看懂这条为什么火",
 
   niche_baomam: "宝妈辅食",
   niche_yuer: "育儿日常",
@@ -147,9 +147,9 @@ export const COPY = {
   side_failed_report: "告诉客服这条",
   side_failed_code_prefix: "错误代码 ",
 
-  // 状态 4:分析好了,等用户决定改写方向
-  side_ready_headline: "分析好了,要改成你自己的吗?",
-  side_ready_hint: "去左侧卡片底部挑一个方向(宝妈辅食 / 育儿日常 / 家庭厨房),我帮你改",
+  // 状态 4:分析好了(改写暂挂 — 不再引导挑方向改写)
+  side_ready_headline: "分析好了 →",
+  side_ready_hint: "左侧是完整拆解:爆点分析 + 逐幕视频分析,往下滑看每一幕。有问题直接问我。",
 
   // 状态 5(refine)输入框 placeholder — 替换原「想改哪里,直接说」
   side_refine_placeholder: "想改哪儿就告诉我,比如「开头再短一点」",
