@@ -20,7 +20,7 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "doubao").strip().lower()
 # the duplicate was leftover from a refactor. Removed.
 ARK_API_KEY = os.getenv("ARK_API_KEY", "")
 ARK_BASE_URL = os.getenv("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")
-DOUBAO_MODEL = os.getenv("DOUBAO_MODEL", "doubao-seed-2-0-pro")
+DOUBAO_MODEL = os.getenv("DOUBAO_MODEL", "doubao-seed-2-0-pro-260215")
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3-flash-preview")
 
 # -------- 图片生成 --------
