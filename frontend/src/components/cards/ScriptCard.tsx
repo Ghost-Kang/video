@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { CascadeAnalysisContract } from "../../types/cascade";
-import { COPY } from "../../lib/cardCopy";
+import { COPY, scrubUiForbidden } from "../../lib/cardCopy";
 import { CARD_CLASS, BTN_PRIMARY, BTN_SECONDARY } from "../../lib/cardStyles";
 import { WarningChips } from "../feedback/WarningChip";
 import { NicheCTA } from "./NicheCTA";
@@ -22,9 +22,9 @@ export function ScriptCard({ analysis, script, onScriptChange, onTriggerRewrite 
   const warnings = analysis.warnings.filter((w) => w.field.startsWith("viral_analysis."));
 
   const bullets = [
-    { label: COPY.hook_label, text: va.hook },
-    { label: COPY.pacing_label, text: va.pacing },
-    { label: COPY.climax_label, text: va.climax },
+    { label: COPY.hook_label, text: scrubUiForbidden(va.hook) },
+    { label: COPY.pacing_label, text: scrubUiForbidden(va.pacing) },
+    { label: COPY.climax_label, text: scrubUiForbidden(va.climax) },
   ];
 
   const save = () => {
@@ -56,6 +56,16 @@ export function ScriptCard({ analysis, script, onScriptChange, onTriggerRewrite 
           </li>
         ))}
       </ul>
+      {va.replicable_formula && (
+        <div className="mb-6 rounded-xl bg-[#fef7f0] dark:bg-stone-800/60 border border-[#7c2d12]/15 dark:border-[#ea580c]/25 px-4 py-3">
+          <div className="text-[11px] uppercase tracking-[0.14em] font-medium text-[#7c2d12] dark:text-[#ea580c] mb-1">
+            {COPY.formula_label}
+          </div>
+          <p className="text-[15px] leading-[1.6] text-stone-900 dark:text-stone-100 font-medium">
+            {scrubUiForbidden(va.replicable_formula)}
+          </p>
+        </div>
+      )}
       <WarningChips warnings={warnings} />
 
       {showCta && <NicheCTA onPick={onTriggerRewrite!} />}

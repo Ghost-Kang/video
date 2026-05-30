@@ -7,6 +7,8 @@ export const COPY = {
   hook_label: "开头怎么抓人",
   pacing_label: "中间为什么不快进",
   climax_label: "结尾为什么忍不住点赞",
+  formula_label: "可复制套路 · 照这个骨架改",
+  spread_label: "谁会忍不住转发评论",
   shot_label_prefix: "第",
   shot_label_suffix: "段",
   shot_dialogue_placeholder: "（这段没有台词，是画面）",
@@ -65,6 +67,12 @@ export const COPY = {
   audio_bgm_label: "BGM",
   audio_pace_label: "口播 / 语速",
   audio_sfx_label: "音效",
+
+  detail_drawer_label: "想还原拍摄细节?",
+  detail_drawer_hint: "原片逐镜、台词、音频、成本 — 想照着拍才需要,默认收起",
+
+  your_version_header: "你的版本",
+  your_version_waiting: "正在帮你改成你自己的版本…",
 
   transcript_header: "完整原片台词",
   transcript_expand: "展开",
@@ -153,3 +161,33 @@ export const FORBIDDEN_TERMS = [
   "pipeline",
   "workflow",
 ] as const;
+
+// Safe display synonyms. Analysis content (hook / pacing / replicable_formula
+// 等) is upstream LLM text and may legitimately contain a banned substring —
+// e.g. 辅食配方「换工具」里的「工具」。We scrub at the UI boundary so the brand
+// guardrail (FORBIDDEN_TERMS never in DOM) holds regardless of what the model
+// emitted, without mangling the creator-facing meaning.
+const UI_TERM_REPLACEMENTS: Record<string, string> = {
+  节点: "环节",
+  锚点: "素材",
+  DAG: "流程",
+  agent: "助手",
+  Agent: "助手",
+  画布: "画面",
+  AI: "",
+  平台: "渠道",
+  工具: "用具",
+  智能: "顺手",
+  pipeline: "流程",
+  workflow: "流程",
+};
+
+/** Replace any UI-forbidden term in upstream/analysis text with a safe synonym. */
+export function scrubUiForbidden(text: string): string {
+  let out = text ?? "";
+  for (const term of FORBIDDEN_TERMS) {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(new RegExp(escaped, "gi"), UI_TERM_REPLACEMENTS[term] ?? "");
+  }
+  return out;
+}

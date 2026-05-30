@@ -26,6 +26,11 @@ export default function App({ userId, onLogout }: AppProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // W4 redesign: 自动改写守卫。只有用户在本会话真提交过一条 URL(justSubmitted)
+  // 后分析回来,才自动触发改写 —— 冷加载历史会话的 replay 不会误触发(那时
+  // justSubmitted 始终 false)。autoRewriteFiredFor 再加一层:每个 analysis_id 只发一次。
+  const justSubmittedRef = useRef(false);
+  const autoRewriteFiredFor = useRef<string | null>(null);
   const isProView = searchParams.get("view") === "pro";
   const { sidebarOpen, chatOpen, setSidebarOpen, setChatOpen } = useLayoutState();
   const sessions = useSessionStore((s) => s.sessions);
@@ -37,6 +42,8 @@ export default function App({ userId, onLogout }: AppProps) {
   const messages = useCanvasStore((s) => s.messages);
   const streaming = useCanvasStore((s) => s.streamingContent);
   const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
+  const analysis = useCanvasStore((s) => s.analysis);
+  const rewriteShots = useCanvasStore((s) => s.rewriteShots);
   const addMessage = useCanvasStore((s) => s.addMessage);
   const clearCanvas = useCanvasStore((s) => s.clear);
   const setCanvas = useCanvasStore((s) => s.setCanvas);
@@ -61,6 +68,8 @@ export default function App({ userId, onLogout }: AppProps) {
     // when the user hasn't picked one yet — backend treats it as "ask the user".
     const niche = useNicheStore.getState().niche;
     sendCommand({ type: "user_message", thread_id: tid, content: text, selected_niche: niche ?? undefined });
+    // 标记「本会话刚提交了一条链接」——分析回来后据此判断是否自动改写。
+    if (/https?:\/\//i.test(text)) justSubmittedRef.current = true;
     setLoading(true);
     timerRef.current = setTimeout(() => {
       // W5D3 Bug #6 — 超时时必须同时清掉 loading 和 progress 残留,否则
@@ -89,8 +98,10 @@ export default function App({ userId, onLogout }: AppProps) {
   // subsequent natural-language follow-ups inherit the same niche.
   const onTriggerRewrite = useCallback((niche: NicheId) => {
     useNicheStore.getState().setNiche(niche);
+    justSubmittedRef.current = false; // 手动选了方向 = 消费掉自动改写信号
+    if (analysis) autoRewriteFiredFor.current = analysis.analysis_id;
     sendChatMessage(`[selected_niche: ${niche}] 改成这个方向`);
-  }, [sendChatMessage]);
+  }, [sendChatMessage, analysis]);
   useEffect(() => {
     setSessionUserId(userId);
   }, [setSessionUserId, userId]);
@@ -134,6 +145,21 @@ export default function App({ userId, onLogout }: AppProps) {
       return next;
     }, { replace: true });
   }, [connected, searchParams, sendChatMessage, setSearchParams]);
+  // W4 redesign — 自动改写:分析回来后,若 niche 已知且本会话刚提交过链接,
+  // 自动把改写跑起来(别把唯一的价值「你的版本」锁在用户手动点 CTA 后面)。
+  // 三重守卫:justSubmitted(冷 replay 不触发)/ 每 analysis_id 只发一次 /
+  // 已有 rewrite 或正在 loading 则跳过。niche 未知时不发,交给卡片里的醒目 CTA。
+  useEffect(() => {
+    if (!analysis || loading) return;
+    if (!justSubmittedRef.current) return;
+    if (rewriteShots.length > 0) return;
+    if (autoRewriteFiredFor.current === analysis.analysis_id) return;
+    const niche = useNicheStore.getState().niche;
+    if (!niche) return;
+    autoRewriteFiredFor.current = analysis.analysis_id;
+    justSubmittedRef.current = false;
+    onTriggerRewrite(niche);
+  }, [analysis, loading, rewriteShots, onTriggerRewrite]);
   const switchSession = useCallback((id: string) => {
     if (id === tid) return;
     clearTimeout(timerRef.current ?? undefined);

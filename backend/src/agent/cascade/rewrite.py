@@ -428,7 +428,36 @@ def _normalize_llm_output(
     data["cost_cny"] = max(0.0001, round(estimated_cost, 4))
 
     data["parser_warnings"] = warnings
+
+    # Whitelist-filter to RewriteResult's allowed keys. The model (esp. under
+    # the ghostwriter prompts) may emit extra QA fields like `self_check`; the
+    # downstream RewriteResult / RewriteShot models are extra="forbid", so any
+    # stray key would crash validation the moment we run on the live LLM path.
+    # Strip silently — these are model scratch fields, not creator-facing data.
+    data = {k: v for k, v in data.items() if k in _RESULT_KEYS}
+    data["shots"] = [
+        {k: v for k, v in (shot or {}).items() if k in _SHOT_KEYS}
+        for shot in (data.get("shots") or [])
+    ]
     return data
+
+
+_RESULT_KEYS: frozenset[str] = frozenset(
+    {
+        "rewrite_id",
+        "analysis_id",
+        "niche",
+        "script_markdown",
+        "shots",
+        "parser_warnings",
+        "confidence",
+        "cost_cny",
+        "model",
+        "hook_pattern_id",
+        "source_classification",
+    }
+)
+_SHOT_KEYS: frozenset[str] = frozenset({"shot_index", "dialogue", "visual"})
 
 
 def _join_content_parts(parts: Any) -> str:
