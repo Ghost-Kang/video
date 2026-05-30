@@ -9,6 +9,8 @@ import {
 } from "../../lib/buildPublishPack";
 import { CARD_CLASS, BTN_PRIMARY } from "../../lib/cardStyles";
 import { apiFetch } from "../../lib/apiClient";
+import { useCanvasStore } from "../../store/canvasStore";
+import { useNicheStore } from "../../store/nicheStore";
 
 interface Props {
   script: string;
@@ -17,11 +19,15 @@ interface Props {
 
 export function PublishPackCard({ script, analysis }: Props) {
   const [toast, setToast] = useState<string | null>(null);
-  const titles = getPublishTitles(analysis);
-  const tags = getPublishTags(analysis);
+  // 标题/标签描述的是「创作者改完的版本」:标题优先取改写稿口吻,标签按所选方向 ——
+  // 都不再从源片分析里拿(否则把别的赛道视频改成辅食后,会泄漏源片标签/受众,缺陷 E)。
+  const rewriteShots = useCanvasStore((s) => s.rewriteShots);
+  const niche = useNicheStore((s) => s.niche);
+  const titles = getPublishTitles(analysis, rewriteShots, niche);
+  const tags = getPublishTags(niche);
 
   const handleCopy = async () => {
-    const payload = buildPublishPack(script, analysis);
+    const payload = buildPublishPack(script, analysis, [], rewriteShots, niche);
     try {
       await navigator.clipboard.writeText(payload);
       apiFetch("/api/events", {

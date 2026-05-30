@@ -104,6 +104,7 @@ describe("ChatPanel dock layout (W5D3)", () => {
     );
 
     fireEvent.click(screen.getByLabelText("试一条 宝妈辅食 爆款"));
-    expect(onSend).toHaveBeenCalledWith("https://www.douyin.com/video/7385782607067335962");
+    // 时长验证过的 in-range 样本(62.6s),见 SampleUrlChips。
+    expect(onSend).toHaveBeenCalledWith("https://www.douyin.com/video/7616954826602428411");
   });
 });

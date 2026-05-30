@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { CascadeAnalysisContract } from "../../types/cascade";
-import { COPY, scrubUiForbidden } from "../../lib/cardCopy";
+import { COPY, scrubUiForbidden, stripHookCode } from "../../lib/cardCopy";
 import { CARD_CLASS, BTN_PRIMARY, BTN_SECONDARY } from "../../lib/cardStyles";
 import { WarningChips } from "../feedback/WarningChip";
 import { NicheCTA } from "./NicheCTA";
@@ -21,10 +21,12 @@ export function ScriptCard({ analysis, script, onScriptChange, onTriggerRewrite 
   const va = analysis.viral_analysis;
   const warnings = analysis.warnings.filter((w) => w.field.startsWith("viral_analysis."));
 
+  // stripHookCode 剥掉 hook/climax 开头的内部钩子分类码(如「H4 …」),只对句首生效,
+  // 没有码时是 no-op —— 别让「开头怎么抓人:H4 发现孩子落水」这种内部标签露给创作者。
   const bullets = [
-    { label: COPY.hook_label, text: scrubUiForbidden(va.hook) },
+    { label: COPY.hook_label, text: scrubUiForbidden(stripHookCode(va.hook)) },
     { label: COPY.pacing_label, text: scrubUiForbidden(va.pacing) },
-    { label: COPY.climax_label, text: scrubUiForbidden(va.climax) },
+    { label: COPY.climax_label, text: scrubUiForbidden(stripHookCode(va.climax)) },
   ];
 
   const save = () => {

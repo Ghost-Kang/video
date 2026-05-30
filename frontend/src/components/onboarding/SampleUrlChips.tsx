@@ -14,10 +14,18 @@ interface Sample {
   hintKey: "sample_url_hint_baomam" | "sample_url_hint_yuer" | "sample_url_hint_kitchen";
 }
 
+// 首屏「试一条」样本必须落在分析时长闸门内(5s–180s,后端 analysis_service
+// _enforce_duration_guard)。2026-05-30 founder 实测发现旧的三条样本全部 >180s
+// (baomam 203.9s / yuer 255.2s / kitchen 393.7s)—— 新用户点任意一条都吃
+// 「视频太长」错误,首屏直接劝退(缺陷 C)。下面三条均经 prod resolver 实测时长,
+// 优选 15-90s 甜区。换样本前务必重测时长(抖音视频会被删/替换)。
 const SAMPLES: Sample[] = [
-  { niche: "baomam_fushi", url: "https://www.douyin.com/video/7385782607067335962", emoji: "🍼", hintKey: "sample_url_hint_baomam" },
-  { niche: "jiating_chufang", url: "https://www.douyin.com/video/7429237817613520140", emoji: "🍳", hintKey: "sample_url_hint_kitchen" },
-  { niche: "yuer_richang", url: "https://www.douyin.com/video/7466377349529881856", emoji: "👶", hintKey: "sample_url_hint_yuer" },
+  // 62.6s · 「添加辅食 #宝宝辅食 #厨房小白 #只有宝妈才懂吧」自嘲钩子
+  { niche: "baomam_fushi", url: "https://www.douyin.com/video/7616954826602428411", emoji: "🍼", hintKey: "sample_url_hint_baomam" },
+  // 58.6s · 家庭厨房调味场景
+  { niche: "jiating_chufang", url: "https://www.douyin.com/video/7296430710208941322", emoji: "🍳", hintKey: "sample_url_hint_kitchen" },
+  // 126s · 「当妈以后才发现,最累的不是熬夜,是没人懂」情绪共鸣
+  { niche: "yuer_richang", url: "https://www.douyin.com/video/7610100974662207717", emoji: "👶", hintKey: "sample_url_hint_yuer" },
 ];
 
 export function SampleUrlChips({ onPick, disabled = false, variant = "block" }: Props) {
