@@ -41,19 +41,21 @@ describe("buildPublishPack", () => {
     expect(tags.join(" ")).not.toMatch(/厨房环境|普通家庭/);
   });
 
-  it("strips internal hook taxonomy codes (Hxx) from titles", () => {
+  it("strips internal hook taxonomy codes (Hxx, incl. +H8) from titles", () => {
     const leaky = {
       ...MOCK_BAOMAM_ANALYSIS,
       viral_analysis: {
         ...MOCK_BAOMAM_ANALYSIS.viral_analysis,
-        hook: "H4 发现孩子落水的危机场景",
+        hook: "+H8 家庭温情+情绪共鸣", // 模型实测带前导「+」的变体
         climax: "H6 夏天+童年欢笑",
       },
     };
     const titles = getPublishTitles(leaky);
     for (const t of titles) {
-      expect(t).not.toMatch(/^H\d/);
+      expect(t).not.toMatch(/^[+＋]?H\d/);
     }
+    // 「+H8 」前缀剥掉,正文保留。
+    expect(titles[0]).toMatch(/^家庭温情/);
   });
 
   it("prefers the rewritten script's voice over the source hook", () => {

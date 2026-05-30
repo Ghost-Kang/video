@@ -192,10 +192,10 @@ export function scrubUiForbidden(text: string): string {
   return out;
 }
 
-// 分析侧 hook/climax 常以钩子分类码开头(如「H4 发现孩子落水…」「H6 夏天+童年…」)。
-// 那是内部 hook taxonomy(hook_taxonomy.py),不该出现在创作者看见的「为什么火」
-// 或发布包标题里。开头 `H` + 1-2 位数字 + 分隔符的前缀剥掉即可;正文里偶然的
-// 「H4」(不在句首)不动,避免误伤。
+// 分析侧 hook/climax 常以钩子分类码开头(如「H4 发现孩子落水…」「H6 夏天+童年…」),
+// 有时还带前导「+」(模型实测「+H8 家庭温情+情绪共鸣」)。那是内部 hook taxonomy
+// (hook_taxonomy.py),不该出现在创作者看见的「为什么火」或发布包标题里。剥掉句首
+// 「[+/空白]* H<1-2 位数字> <分隔符>」前缀即可;正文里偶然的「H4」(不在句首)不动。
 export function stripHookCode(text: string): string {
-  return (text ?? "").replace(/^\s*H\d{1,2}\s*[:：·、.\-—\s]*/, "").trim();
+  return (text ?? "").replace(/^[\s+＋]*H\d{1,2}\s*[:：·、.\-—\s]*/, "").trim();
 }
