@@ -25,8 +25,8 @@ export function ScriptCard({ analysis, script, onScriptChange, onTriggerRewrite 
   // 没有码时是 no-op —— 别让「开头怎么抓人:H4 发现孩子落水」这种内部标签露给创作者。
   const bullets = [
     { label: COPY.hook_label, text: scrubUiForbidden(stripHookCode(va.hook)) },
-    { label: COPY.pacing_label, text: scrubUiForbidden(va.pacing) },
-    { label: COPY.climax_label, text: scrubUiForbidden(stripHookCode(va.climax)) },
+    { label: COPY.pacing_label, text: scrubUiForbidden(va.pacing ?? "") },
+    { label: COPY.climax_label, text: scrubUiForbidden(stripHookCode(va.climax ?? "")) },
   ];
 
   const save = () => {
