@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cleanTranscript, transcriptLines } from "../scriptText";
+import { cleanTranscript, transcriptLines, transcriptItems } from "../scriptText";
 
 describe("cleanTranscript", () => {
   it("strips douyin watermark / promo lines, keeps real content", () => {
@@ -31,5 +31,25 @@ describe("cleanTranscript", () => {
   it("handles empty input", () => {
     expect(cleanTranscript("")).toBe("");
     expect(transcriptLines(null)).toEqual([]);
+  });
+});
+
+describe("transcriptItems", () => {
+  it("classifies title / reaction / meaningful lines", () => {
+    const items = transcriptItems(
+      ["《那条河，装满了夏天》", "那时候夏天，总是很长", "哈哈哈哈", "嗯啊", "呀我的衣服", "真甜！"].join("\n"),
+    );
+    expect(items[0]).toEqual({ text: "《那条河，装满了夏天》", kind: "title" });
+    expect(items[1].kind).toBe("line"); // 旁白
+    expect(items[2].kind).toBe("reaction"); // 纯笑声
+    expect(items[3].kind).toBe("reaction"); // 语气词
+    expect(items[4].kind).toBe("line"); // 呀我的衣服 → 有实义
+    expect(items[5].kind).toBe("line"); // 真甜！
+  });
+
+  it("only treats a wrapped FIRST line as title", () => {
+    const items = transcriptItems("先说一句\n《不是标题》");
+    expect(items[0].kind).toBe("line");
+    expect(items[1].kind).toBe("line");
   });
 });

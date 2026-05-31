@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { X, Copy, Check } from "lucide-react";
 import type { CascadeAnalysisContract, Scene } from "../../types/cascade";
 import { COPY, scrubUiForbidden } from "../../lib/cardCopy";
-import { transcriptLines } from "../../lib/scriptText";
+import { transcriptItems, transcriptLines } from "../../lib/scriptText";
 
 interface Props {
   analysis: CascadeAnalysisContract;
@@ -79,6 +79,7 @@ export function ScriptDrawer({ analysis, onClose }: Props) {
 
   const scenes = [...analysis.scenes].sort((a, b) => a.scene_index - b.scene_index);
   const lines = transcriptLines(analysis.full_transcript);
+  const items = transcriptItems(analysis.full_transcript);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -260,20 +261,60 @@ export function ScriptDrawer({ analysis, onClose }: Props) {
                 );
               })}
             </ol>
-          ) : lines.length > 0 ? (
-            <div className="space-y-1.5">
-              {lines.map((line, i) => (
-                <p
-                  key={i}
-                  className="anim-fade-up flex gap-2.5 text-[13.5px] leading-[1.7] text-stone-700 dark:text-stone-300"
-                  style={{ animationDelay: `${Math.min(i, 12) * 35}ms` }}
-                >
-                  <span className="num-tech mt-0.5 shrink-0 text-[11px] text-stone-300 dark:text-stone-600">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span>{line}</span>
-                </p>
-              ))}
+          ) : items.length > 0 ? (
+            <div className="relative">
+              {/* 时间线竖轴 — 与分镜统一 */}
+              <span
+                className="pointer-events-none absolute bottom-2 left-[11px] top-3 w-px bg-gradient-to-b from-[#7c2d12]/30 via-stone-200 to-transparent dark:via-stone-700"
+                aria-hidden
+              />
+              {items.map((it, i) => {
+                if (it.kind === "title") {
+                  // 片头标题卡 —— 单独突出
+                  return (
+                    <div
+                      key={i}
+                      className="anim-fade-up relative mb-3 pl-9"
+                      style={{ animationDelay: `${i * 35}ms` }}
+                    >
+                      <span className="absolute left-0 top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#7c2d12] text-[11px] text-white shadow-[0_0_12px_-2px_rgba(234,88,12,0.65)] dark:bg-[#ea580c]">
+                        ✦
+                      </span>
+                      <span className="mb-1 inline-block rounded-md bg-[#7c2d12]/[0.08] px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-[#7c2d12]/80 dark:bg-[#ea580c]/15 dark:text-[#ea580c]/80">
+                        片头标题
+                      </span>
+                      <p className="font-serif-cn text-[16px] leading-[1.5] text-shimmer-clay">{it.text}</p>
+                    </div>
+                  );
+                }
+                const muted = it.kind === "reaction";
+                return (
+                  <div
+                    key={i}
+                    className="anim-fade-up relative flex gap-2.5 pb-2.5 pl-9"
+                    style={{ animationDelay: `${Math.min(i, 14) * 35}ms` }}
+                  >
+                    <span
+                      className={`num-tech absolute left-[3px] top-1 inline-flex h-[17px] w-[17px] items-center justify-center rounded-full text-[10px] ${
+                        muted
+                          ? "bg-stone-100 text-stone-400 dark:bg-stone-800 dark:text-stone-600"
+                          : "bg-[#7c2d12]/10 text-[#7c2d12]/80 dark:bg-[#ea580c]/15 dark:text-[#ea580c]/80"
+                      }`}
+                    >
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span
+                      className={
+                        muted
+                          ? "text-[12.5px] leading-[1.7] text-stone-400 dark:text-stone-500"
+                          : "text-[14px] leading-[1.75] text-stone-800 dark:text-stone-200"
+                      }
+                    >
+                      {it.text}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <p className="py-8 text-center text-[13px] text-stone-400 dark:text-stone-500">

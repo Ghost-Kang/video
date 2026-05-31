@@ -26,3 +26,23 @@ export function transcriptLines(raw: string | null | undefined): string[] {
   const cleaned = cleanTranscript(raw);
   return cleaned ? cleaned.split("\n") : [];
 }
+
+export type TranscriptKind = "title" | "reaction" | "line";
+export interface TranscriptItem {
+  text: string;
+  kind: TranscriptKind;
+}
+
+// 片头标题卡:《…》/「…」/【…】整行包裹(屏幕标题,非口播)
+const TITLE_RE = /^[《「【(].+[》」】)]$/;
+// 纯笑声 / 语气词(哈哈哈、嗯啊、哦…)—— 逐字稿里真实存在但非「重点内容」,弱化
+const REACTION_RE = /^[哈呵嘿嘻啊嗯哦噢哎唉呀哇咦\s]+[！!。.,，、…~～\s]*$/;
+
+// 分类逐字稿每句,供 UI 凸显重点(片头标题/有意义台词)、弱化语气词。
+export function transcriptItems(raw: string | null | undefined): TranscriptItem[] {
+  return transcriptLines(raw).map((text, i) => {
+    if (i === 0 && TITLE_RE.test(text)) return { text, kind: "title" as const };
+    if (REACTION_RE.test(text)) return { text, kind: "reaction" as const };
+    return { text, kind: "line" as const };
+  });
+}
