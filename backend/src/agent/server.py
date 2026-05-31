@@ -97,6 +97,16 @@ async def main(host: str = "0.0.0.0", port: int = 8765, http_port: int = 8766) -
             print(f"[boot] reconciled {n} stale 'running' run(s) → failed")
     except Exception as exc:
         print(f"[boot] run reconcile skipped: {exc}")
+    # Best-effort retention: drop per-scene clip/poster media older than 48h so
+    # the data volume doesn't grow unbounded. Clips are a convenience layer —
+    # the frontend degrades to poster/no-player when a referenced file is gone.
+    try:
+        from agent.cascade.mediakit.clip_extractor import sweep_old_media
+        swept = sweep_old_media()
+        if swept:
+            print(f"[boot] swept {swept} stale clip media dir(s)")
+    except Exception as exc:
+        print(f"[boot] media sweep skipped: {exc}")
     generation_worker.start_workers()
 
     stop_event = asyncio.Event()

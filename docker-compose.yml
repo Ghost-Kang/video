@@ -70,6 +70,11 @@ services:
       # nginx listens on 80; cf tunnel / caddy points here.
       # If running standalone with TLS, swap for 443 + mount cert volume.
       - "80:80"
+    volumes:
+      # Per-scene clips/posters the backend writes to ./data/media are served
+      # by nginx at /media/ (see nginx.conf `location ^~ /media/`). Read-only —
+      # nginx never writes. Same host ./data the backend mounts at /app/data.
+      - ./data/media:/usr/share/nginx/media:ro
     networks:
       - cascade
 

@@ -172,6 +172,26 @@ export const COPY = {
   // 超时/系统繁忙的同义 hint — 用在前端启发式合成的 FailurePayload 上。
   synth_failure_timeout_hint: "拆解超时了,刚才那条视频上游没响应。换一条样本试试,或者 1 分钟后再来一次。",
   synth_failure_refused_hint: "上游暂时繁忙拒绝了这条,换一条样本试试。",
+
+  // ── 原视频脚本抽屉(2026-05-31)──────────────────────────────────
+  script_entry: "原视频脚本",
+  script_drawer_title: "原视频脚本",
+  script_drawer_subtitle: "照着这个骨架,能复刻这条视频",
+  script_tab_shots: "分镜脚本",
+  script_tab_transcript: "逐字稿",
+  script_shot_field_shot: "景别 / 运镜",
+  script_shot_field_visual: "画面",
+  script_shot_field_dialogue: "台词",
+  script_shot_field_props: "道具 / 服装",
+  script_transcript_empty: "这条没有逐字稿",
+  script_copy: "复制脚本",
+  script_copied: "已复制 ✓",
+  script_close: "关闭",
+
+  // ── 逐幕视频片段(2026-05-31)────────────────────────────────────
+  clip_play_label: "播放这一幕",
+  clip_loading: "加载中…",
+  clip_poster_only: "仅首帧",
 } as const;
 
 /** Terms that must never appear in card-stack UI copy or DOM. */

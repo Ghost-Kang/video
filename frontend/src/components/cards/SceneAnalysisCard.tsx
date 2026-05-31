@@ -1,6 +1,8 @@
 import type { Scene } from "../../types/cascade";
 import { COPY, scrubUiForbidden } from "../../lib/cardCopy";
 import { CARD_CLASS } from "../../lib/cardStyles";
+import { useInView } from "../../hooks/useInView";
+import { SceneClip } from "./SceneClip";
 
 interface Props {
   scene: Scene;
@@ -32,9 +34,17 @@ export function SceneAnalysisCard({ scene }: Props) {
 
   const visual = c(scene.visual_content);
   const audio = c(scene.audio_content);
+  const { ref, inView } = useInView<HTMLElement>();
 
   return (
-    <section className={CARD_CLASS} data-testid="scene-analysis-card">
+    <section
+      ref={ref}
+      className={`${CARD_CLASS} transition-shadow hover:shadow-soft-lg ${inView ? "anim-fade-up" : "opacity-0"}`}
+      data-testid="scene-analysis-card"
+    >
+      {/* 逐幕视频片段 */}
+      <SceneClip clipUrl={scene.clip_url} poster={scene.clip_poster_url ?? scene.first_frame_url} />
+
       {/* 头部 */}
       <div className="flex items-baseline gap-2 mb-1.5">
         <span className="text-[12px] tabular-nums text-stone-400 dark:text-stone-500">

@@ -161,6 +161,22 @@
   to { transform: scaleX(1); }
 }
 
+/* 纵向描边绘入 — 爆点英雄维度左条 */
+@keyframes drawLineY {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+/* 抽屉滑入 — 桌面从右 / 手机从下 */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes slideInUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
 /* 关键短语 hover 时背景 swipe */
 @keyframes phraseSwipe {
   from { transform: translateX(-100%); }
@@ -314,6 +330,17 @@
     transform-origin: left center;
     animation: drawLine 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
+  .anim-draw-line-y {
+    transform: scaleY(0);
+    transform-origin: top center;
+    animation: drawLineY 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .anim-slide-in-right {
+    animation: slideInRight 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .anim-slide-in-up {
+    animation: slideInUp 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  }
   .anim-sparkle-twinkle {
     animation: sparkleTwinkle 1.4s ease-in-out infinite;
   }
@@ -413,11 +440,13 @@
     .anim-aurora-1, .anim-aurora-2, .anim-spin-slow, .text-shimmer-clay,
     .ripple-dot, .anim-page-out,
     .anim-cta-breathe, .anim-cta-glow, .anim-arrow-nudge, .anim-input-glow,
-    .anim-draw-line, .anim-sparkle-twinkle,
+    .anim-draw-line, .anim-draw-line-y, .anim-sparkle-twinkle,
+    .anim-slide-in-right, .anim-slide-in-up,
     .anim-float-a, .anim-float-b, .anim-float-c, .anim-icon-breathe,
     .anim-steam, .anim-flame, .anim-heart-beat, .anim-wobble, .anim-blink {
       animation: none !important;
       opacity: 1 !important;
+      transform: none !important;
     }
   }
 

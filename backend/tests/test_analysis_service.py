@@ -37,6 +37,18 @@ def _event_payloads(db_path: Path, event_name: str) -> list[dict]:
     return [json.loads(payload) for name, payload in _events(db_path) if name == event_name]
 
 
+@pytest.fixture(autouse=True)
+def _no_network_clips(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clip extraction is best-effort decoration on the doubao_direct path; stub
+    it network-free by default so tests never reach out to a CDN. Clip-specific
+    tests re-monkeypatch it with their own stub."""
+
+    async def _noop(*_args, **_kwargs) -> dict:
+        return {}
+
+    monkeypatch.setattr("agent.cascade.analysis_service.extract_scene_clips", _noop)
+
+
 def test_fixture_mode_returns_valid_contract(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _use_tmp_db(monkeypatch, tmp_path)
 
@@ -878,6 +890,71 @@ def test_doubao_direct_mode_routes_to_client(
     assert contract.cost_cny == pytest.approx(0.50)
     payload = _event_payloads(db_path, "analysis_returned")[0]
     assert payload["model"] == contract.model
+
+
+def test_doubao_direct_attaches_scene_clips(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """When extraction yields clip urls, the matching scenes carry clip_url +
+    clip_poster_url (and persist for cache reuse); un-clipped scenes stay None."""
+    _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_UPSTREAM", "doubao_direct")
+
+    async def resolve(_url: str) -> tuple[str, dict]:
+        return "https://cdn.test/direct.mp4", {"duration_s": 30.0}
+
+    async def client_call(direct_mp4_url: str, **_kw) -> dict:
+        return _doubao_direct_payload()
+
+    async def fake_clips(direct_url, scenes, analysis_id, **_kw) -> dict:
+        assert direct_url == "https://cdn.test/direct.mp4"
+        return {1: ("/media/abc/scene_1.mp4", "/media/abc/scene_1.jpg")}
+
+    monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
+    monkeypatch.setattr("agent.cascade.analysis_service.analyze_video_direct", client_call)
+    monkeypatch.setattr("agent.cascade.analysis_service.extract_scene_clips", fake_clips)
+
+    contract = asyncio.run(
+        request_shallow_analysis("https://www.douyin.com/video/771", user_id="user_1")
+    )
+    by_idx = {s.scene_index: s for s in contract.scenes}
+    assert by_idx[1].clip_url == "/media/abc/scene_1.mp4"
+    assert by_idx[1].clip_poster_url == "/media/abc/scene_1.jpg"
+    assert by_idx[2].clip_url is None and by_idx[2].clip_poster_url is None
+
+    stored = asyncio.run(load_analysis(contract.analysis_id))
+    stored_by_idx = {s.scene_index: s for s in stored.scenes}
+    assert stored_by_idx[1].clip_url == "/media/abc/scene_1.mp4"
+
+
+def test_clip_extraction_failure_never_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """extract_scene_clips raising must NOT fail the analysis — scenes simply
+    carry no clips. Clips are off the critical path."""
+    _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_UPSTREAM", "doubao_direct")
+
+    async def resolve(_url: str) -> tuple[str, dict]:
+        return "https://cdn.test/direct.mp4", {"duration_s": 30.0}
+
+    async def client_call(direct_mp4_url: str, **_kw) -> dict:
+        return _doubao_direct_payload()
+
+    async def boom(*_a, **_k) -> dict:
+        raise RuntimeError("ffmpeg blew up")
+
+    monkeypatch.setattr("agent.cascade.analysis_service.resolve_to_direct_media", resolve)
+    monkeypatch.setattr("agent.cascade.analysis_service.analyze_video_direct", client_call)
+    monkeypatch.setattr("agent.cascade.analysis_service.extract_scene_clips", boom)
+
+    contract = asyncio.run(
+        request_shallow_analysis("https://www.douyin.com/video/882", user_id="user_1")
+    )
+    assert isinstance(contract, CascadeAnalysisContract)
+    assert all(s.clip_url is None for s in contract.scenes)
 
 
 def test_doubao_direct_duration_guard_rejects_too_long(

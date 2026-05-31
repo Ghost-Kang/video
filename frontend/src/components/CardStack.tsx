@@ -2,6 +2,7 @@ import { ViralAnalysisCard } from "./cards/ViralAnalysisCard";
 import { SceneAnalysisCard } from "./cards/SceneAnalysisCard";
 import { useCanvasStore } from "../store/canvasStore";
 import { useWSStore } from "../store/wsStore";
+import { useInView } from "../hooks/useInView";
 import { COPY } from "../lib/cardCopy";
 import { ConfidenceBanner } from "./feedback/ConfidenceBanner";
 import { FailureBanner } from "./feedback/FailureBanner";
@@ -43,6 +44,7 @@ export function CardStack(_props: CardStackProps = {}) {
   }
 
   const scenes = [...analysis.scenes].sort((a, b) => a.scene_index - b.scene_index);
+  const { ref: headerRef, inView: headerInView } = useInView<HTMLHeadingElement>();
 
   return (
     <main className="flex-1 overflow-y-auto bg-transparent p-4 md:p-6">
@@ -54,7 +56,10 @@ export function CardStack(_props: CardStackProps = {}) {
 
         {/* 视频分析:逐幕拆解网格 */}
         <section className="space-y-3">
-          <h2 className="font-serif-cn text-lg text-stone-900 dark:text-stone-50 px-1 pt-2">
+          <h2
+            ref={headerRef}
+            className={`font-serif-cn text-lg text-stone-900 dark:text-stone-50 px-1 pt-2 ${headerInView ? "anim-fade-up" : "opacity-0"}`}
+          >
             {COPY.video_analysis_header}
           </h2>
           {scenes.map((scene) => (

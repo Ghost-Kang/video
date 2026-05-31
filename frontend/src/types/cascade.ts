@@ -99,11 +99,17 @@ export interface Scene {
   shot_type?: ShotType;
   camera_movement?: CameraMovement;
   first_frame_url: string | null;
+  // 逐幕视频片段(doubao_direct 分析时切出,自托管 /media/...);为空则降级到
+  // first_frame_url 海报或不显媒体槽。optional —— 旧 fixture/契约可能没有。
+  clip_url?: string | null;
+  clip_poster_url?: string | null;
   warnings: Warning_[];
 }
 
 export interface CascadeAnalysisContract {
   schema_version: '1.0';
+  // 后端缓存版本标记(纯后端用,前端不读);optional。
+  pipeline_revision?: number | null;
   analysis_id: string;
   source_url: string;
   platform: Platform;

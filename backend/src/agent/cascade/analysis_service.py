@@ -22,6 +22,7 @@ from agent.cascade.event_names import EventName
 from agent.cascade.events import emit
 from agent.cascade.failures import FailureCode, HardFailure, WarningCode
 from agent.cascade.mediakit import analyze_storyline, overlay_viral_dims, storyline_to_payload
+from agent.cascade.mediakit.clip_extractor import extract_scene_clips
 from agent.cascade.mediakit.doubao_direct_client import (
     PREDICT_DOUBAO_DIRECT_CNY,
     analyze_video_direct,
@@ -76,6 +77,48 @@ def _is_current_revision(contract: CascadeAnalysisContract) -> bool:
     empty fields). Treat those as a cache miss → regenerate via upstream. See
     ANALYSIS_PIPELINE_REVISION."""
     return contract.pipeline_revision == ANALYSIS_PIPELINE_REVISION
+
+
+async def _attach_scene_clips(
+    contract: CascadeAnalysisContract,
+    direct_url: str | None,
+) -> CascadeAnalysisContract:
+    """Cut a clip + poster per scene from the source video and attach the URLs.
+
+    Best-effort and doubao_direct-only (direct_url is None for mediakit/fixture,
+    which carry first_frame_url snapshots instead). Never raises — clip
+    extraction is a convenience layer, not the critical path. Runs after the
+    contract is finalized so scene timestamps are post-sort/clamp and the
+    clip↔scene mapping is stable.
+    """
+    if not direct_url:
+        return contract
+    await _emit_progress("clip", 95, 8, "剪辑每幕片段")
+    try:
+        clips = await extract_scene_clips(
+            direct_url,
+            contract.scenes,
+            contract.analysis_id,
+            duration_s=contract.duration_s,
+        )
+    except Exception:
+        clips = {}
+    await _emit_progress("done", 100, 0, "完成")
+    if not clips:
+        return contract
+    new_scenes = []
+    for scene in contract.scenes:
+        pair = clips.get(scene.scene_index)
+        if pair:
+            clip_url, poster_url = pair
+            new_scenes.append(
+                scene.model_copy(
+                    update={"clip_url": clip_url, "clip_poster_url": poster_url or None}
+                )
+            )
+        else:
+            new_scenes.append(scene)
+    return contract.model_copy(update={"scenes": new_scenes})
 
 
 def _get_source_lock(source_url_hash: str) -> asyncio.Lock:
@@ -148,6 +191,9 @@ async def request_shallow_analysis(
             raw = copy.deepcopy(raw)
             upstream_latency_ms = int(raw.pop("_upstream_latency_ms", 0) or 0)
             upstream_attempts = int(raw.pop("_upstream_attempts", 0) or 0)
+            # Threaded out of _call_doubao_direct (extra="forbid" would reject it
+            # at normalize, so pop it like the other private _-prefixed fields).
+            direct_url = raw.pop("_direct_url", None)
             raw["source_url"] = source_url
             raw["analysis_id"] = _analysis_id(user_id, source_url)
             contract = normalize_analysis_result(raw)
@@ -157,6 +203,8 @@ async def request_shallow_analysis(
             contract = contract.model_copy(
                 update={"pipeline_revision": ANALYSIS_PIPELINE_REVISION}
             )
+            # Best-effort per-scene clips (doubao_direct only; never blocks).
+            contract = await _attach_scene_clips(contract, direct_url)
         except HardFailure as exc:
             await emit(
                 EventName.FAILURE_EMITTED,
@@ -461,12 +509,17 @@ async def _call_doubao_direct(
 
     payload["_upstream_latency_ms"] = int((time.monotonic() - start) * 1000)
     payload["_upstream_attempts"] = 1
+    # Thread the resolved CDN url out so the caller can cut per-scene clips
+    # against the *finalized* contract scenes (post sort/clamp). Popped before
+    # normalize in request_shallow_analysis (extra="forbid").
+    payload["_direct_url"] = direct_url
     # W5D3 CR-P1 — emit a `transcribe` stage between ark return and done so
     # the frontend's third stage label ("整理输出") lights up briefly instead
-    # of being skipped. Adapter normalization + scenes timestamp checks all
-    # happen after this in the calling cascade tool.
+    # of being skipped. The terminal "done" emit now fires after clip
+    # extraction (_attach_scene_clips) so the bar isn't stuck at 100% while
+    # clips cut. Adapter normalization + scenes timestamp checks all happen
+    # after this in the calling cascade tool.
     await _emit_progress("transcribe", 92, 3, "整理时间线 + 字幕对齐")
-    await _emit_progress("done", 100, 0, "整理完成")
     return payload
 
 

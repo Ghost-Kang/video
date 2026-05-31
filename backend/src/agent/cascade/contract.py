@@ -24,7 +24,8 @@ SCHEMA_VERSION = "1.0"
 # value is treated as a cache miss and regenerated (analysis_service).
 #   1 → pre-toprador (legacy dims: pacing/climax/visual_style/emotional_arc/…)
 #   2 → toprador-aligned (10 viral dims + 14 scene dims)
-ANALYSIS_PIPELINE_REVISION = 2
+#   3 → + per-scene video clips (scenes[].clip_url / clip_poster_url)
+ANALYSIS_PIPELINE_REVISION = 3
 
 
 class Platform(str, Enum):
@@ -176,6 +177,14 @@ class Scene(BaseModel):
     shot_type: ShotType = ShotType.MEDIUM
     camera_movement: CameraMovement = CameraMovement.STATIC
     first_frame_url: Optional[HttpUrl] = None
+    # Per-scene video clip cut from the source video during analysis
+    # (doubao_direct pipeline → clip_extractor). Self-hosted relative paths
+    # (`/media/<analysis_id>/scene_<i>.mp4|.jpg`) served by nginx, so `str`
+    # not `HttpUrl` (which rejects relative paths). None when extraction was
+    # skipped/failed (best-effort) or upstream is mediakit/fixture — the
+    # frontend degrades to first_frame_url / no player.
+    clip_url: Optional[str] = Field(None, max_length=512)
+    clip_poster_url: Optional[str] = Field(None, max_length=512)
     warnings: list[Warning_] = Field(default_factory=list)
 
     @field_validator("timestamp_end")
