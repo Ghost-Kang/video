@@ -182,29 +182,62 @@ def _safe_unlink(p: Path) -> None:
         pass
 
 
-def sweep_old_media(max_age_h: float = 48.0) -> int:
-    """Best-effort retention: delete media dirs older than ``max_age_h``.
-
-    Returns the count removed. Called opportunistically at server boot. Clips
-    are a convenience layer; the contract degrades gracefully when files vanish
-    (frontend falls back to poster / no player on 404). Mirrors toprador's
-    '24h 中间产物清理'."""
-    root = media_root()
-    if not root.exists():
-        return 0
-    cutoff = time.time() - max_age_h * 3600
-    removed = 0
+def _dir_size_bytes(p: Path) -> int:
+    total = 0
     try:
-        for child in root.iterdir():
-            # `showcase/` holds curated landing samples — never sweep it.
-            if child.name == "showcase":
-                continue
+        for f in p.rglob("*"):
             try:
-                if child.is_dir() and child.stat().st_mtime < cutoff:
-                    shutil.rmtree(child, ignore_errors=True)
-                    removed += 1
+                total += f.stat().st_size
             except OSError:
                 continue
     except OSError:
-        return removed
+        pass
+    return total
+
+
+def sweep_old_media(max_age_h: float = 720.0, max_total_mb: float = 4096.0) -> int:
+    """Retention for per-analysis clip media. Returns count of dirs removed.
+
+    Two passes (called opportunistically at server boot):
+      1) **age** — delete dirs older than ``max_age_h`` (default 30 days). The
+         old 48h was too aggressive: analyses are permanent (no TTL), so their
+         clips vanishing after 2 days left old result pages with broken clips.
+      2) **size cap** — if total remaining media exceeds ``max_total_mb``, evict
+         oldest dirs (by mtime) until under cap, so disk stays bounded even with
+         the longer retention.
+
+    `showcase/` (curated landing samples) is never touched. Clips remain a
+    convenience layer — the frontend degrades cleanly when a file is gone."""
+    root = media_root()
+    if not root.exists():
+        return 0
+    try:
+        children = [c for c in root.iterdir() if c.is_dir() and c.name != "showcase"]
+    except OSError:
+        return 0
+
+    removed = 0
+    cutoff = time.time() - max_age_h * 3600
+    survivors: list[tuple[float, int, Path]] = []
+    for c in children:
+        try:
+            mtime = c.stat().st_mtime
+        except OSError:
+            continue
+        if mtime < cutoff:
+            shutil.rmtree(c, ignore_errors=True)
+            removed += 1
+        else:
+            survivors.append((mtime, _dir_size_bytes(c), c))
+
+    cap_bytes = max_total_mb * 1024 * 1024
+    total = sum(sz for _, sz, _ in survivors)
+    survivors.sort()  # oldest first
+    i = 0
+    while total > cap_bytes and i < len(survivors):
+        _, sz, c = survivors[i]
+        shutil.rmtree(c, ignore_errors=True)
+        removed += 1
+        total -= sz
+        i += 1
     return removed

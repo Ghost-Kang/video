@@ -16,6 +16,9 @@ export function SceneClip({ clipUrl, poster }: Props) {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hoverPreview, setHoverPreview] = useState(false);
+  // 媒体加载失败(如旧分析的 clip/poster 已被清理 → 404)。优雅降级:不显破图/破框。
+  const [posterFailed, setPosterFailed] = useState(false);
+  const [clipFailed, setClipFailed] = useState(false);
   const hoverTimer = useRef<number | null>(null);
 
   // 卸载时清掉 hover 防抖计时器。必须在任何条件 return 之前声明所有 hook
@@ -32,6 +35,9 @@ export function SceneClip({ clipUrl, poster }: Props) {
 
   // 无任何媒体 → 不占位
   if (!canPlay && !hasPoster) return null;
+  // 媒体已失效(404):海报挂了且没在播 → 整槽隐藏;clip 挂了且无海报 → 隐藏。
+  if (posterFailed && !playing) return null;
+  if (clipFailed && !hasPoster) return null;
 
   const reduceMotion =
     typeof window !== "undefined" &&
@@ -86,6 +92,11 @@ export function SceneClip({ clipUrl, poster }: Props) {
           onWaiting={() => setLoading(true)}
           onPlaying={() => setLoading(false)}
           onCanPlay={() => setLoading(false)}
+          onError={() => {
+            setClipFailed(true);
+            setPlaying(false);
+            setLoading(false);
+          }}
           className="h-full w-full object-contain"
         />
       )}
@@ -111,6 +122,7 @@ export function SceneClip({ clipUrl, poster }: Props) {
               src={poster ?? undefined}
               alt=""
               loading="lazy"
+              onError={() => setPosterFailed(true)}
               className="h-full w-full object-cover"
             />
           ) : (

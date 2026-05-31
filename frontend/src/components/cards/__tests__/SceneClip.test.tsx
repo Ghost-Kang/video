@@ -28,6 +28,16 @@ describe("SceneClip", () => {
     expect(document.querySelector("video")).not.toBeNull();
   });
 
+  it("hides the slot when the poster media is gone (404) — graceful degrade", () => {
+    const { container } = render(<SceneClip clipUrl={null} poster="/media/gone/scene_1.jpg" />);
+    // poster shown initially…
+    const img = container.querySelector("img");
+    expect(img).not.toBeNull();
+    // …then its load fails (deleted media) → whole slot hides, no broken img
+    fireEvent.error(img!);
+    expect(container.firstChild).toBeNull();
+  });
+
   // Regression: every hook must run before the no-media early return, else
   // flipping props between media→no-media changes the hook count and React
   // throws #310 (crashed the whole result page in prod 2026-05-31).

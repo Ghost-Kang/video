@@ -5,7 +5,6 @@ import { CaseShowcase } from "../components/landing/CaseShowcase";
 import { SampleCaseCarousel } from "../components/landing/SampleCaseCarousel";
 import { SAMPLE_CASES } from "../lib/sampleCases";
 import { UrlFallback } from "../components/landing/UrlFallback";
-import { CreatorTicker } from "../components/landing/CreatorTicker";
 import { StatCounter } from "../components/landing/StatCounter";
 import { PageShell } from "../components/PageShell";
 import { HighlightPhrase } from "../components/landing/HighlightPhrase";
@@ -107,6 +106,18 @@ export function Landing() {
             )}
           </div>
 
+          {/* 唯一真实的「live」一行 —— 真实产品事实,不编造活动流 */}
+          <p
+            className="anim-fade-up mb-12 -mt-8 flex items-center justify-center gap-2 text-[12px] text-stone-500 dark:text-stone-400"
+            style={{ animationDelay: "560ms" }}
+          >
+            <span className="relative inline-flex h-1.5 w-1.5">
+              <span className="absolute inset-0 rounded-full bg-emerald-500 anim-pulse-ring" />
+              <span className="relative h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            </span>
+            平均拆解约 30 秒
+          </p>
+
           <ConsentGate>
             <div
               className="anim-fade-up mx-auto max-w-xl"
@@ -133,10 +144,6 @@ export function Landing() {
             </div>
           </ConsentGate>
         </div>
-      </div>
-
-      <div className={`relative z-10 ${exiting ? "anim-page-out" : ""}`}>
-        <CreatorTicker />
       </div>
     </PageShell>
   );

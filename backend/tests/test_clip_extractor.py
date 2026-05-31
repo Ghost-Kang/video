@@ -116,3 +116,22 @@ def test_sweep_old_media(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
     assert not old.exists()
     assert fresh.exists()
     assert showcase.exists()  # never swept
+
+
+def test_sweep_size_cap_evicts_oldest(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("CASCADE_DB_PATH", str(tmp_path / "cascade.db"))
+    root = clip_extractor.media_root()
+    now = time.time()
+    # three ~800B dirs, ages oldest→newest; cap ~1KB → evict oldest until under.
+    for i, name in enumerate(("a", "b", "c")):
+        d = root / name
+        d.mkdir(parents=True)
+        (d / "f").write_bytes(b"x" * 800)
+        t = now - (3 - i) * 1000  # a oldest, c newest
+        os.utime(d, (t, t))
+
+    removed = clip_extractor.sweep_old_media(max_age_h=99999, max_total_mb=0.001)
+    remaining = {p.name for p in root.iterdir()}
+    assert "c" in remaining  # newest always survives
+    assert "a" not in remaining  # oldest evicted first
+    assert removed >= 1
