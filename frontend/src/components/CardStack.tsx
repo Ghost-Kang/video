@@ -22,6 +22,10 @@ export function CardStack(_props: CardStackProps = {}) {
   const analysis = useCanvasStore((s) => s.analysis);
   const failure = useCanvasStore((s) => s.failure);
   const loading = useWSStore((s) => s.loading);
+  // Must run before the early returns below — React rules of hooks. (Placing it
+  // after the `!analysis` return changed the hook count when analysis arrived
+  // → #310 crash that the error boundary swallowed into a blank page.)
+  const { ref: headerRef, inView: headerInView } = useInView<HTMLHeadingElement>();
 
   if (!analysis) {
     return (
@@ -44,7 +48,6 @@ export function CardStack(_props: CardStackProps = {}) {
   }
 
   const scenes = [...analysis.scenes].sort((a, b) => a.scene_index - b.scene_index);
-  const { ref: headerRef, inView: headerInView } = useInView<HTMLHeadingElement>();
 
   return (
     <main className="flex-1 overflow-y-auto bg-transparent p-4 md:p-6">
