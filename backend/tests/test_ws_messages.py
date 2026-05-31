@@ -354,6 +354,16 @@ class TestSessionMsgs:
         with pytest.raises(ValidationError):
             DeleteSessionMsg.model_validate({"type": "delete_session"})
 
+    def test_delete_sessions_requires_nonempty_thread_ids(self):
+        from agent.transport.ws_messages import DeleteSessionsMsg
+
+        with pytest.raises(ValidationError):
+            DeleteSessionsMsg.model_validate({"type": "delete_sessions", "thread_ids": []})
+        msg = DeleteSessionsMsg.model_validate(
+            {"type": "delete_sessions", "thread_ids": ["a", "b"]}
+        )
+        assert msg.thread_ids == ["a", "b"]
+
     def test_get_session_state(self):
         msg = GetSessionStateMsg.model_validate({
             "type": "get_session_state",
@@ -602,7 +612,8 @@ class TestInboundModelsRegistry:
 
     def test_registry_has_no_unexpected_keys(self):
         expected = {
-            "auth", "list_sessions", "delete_session", "get_session_state",
+            "auth", "list_sessions", "delete_session", "delete_sessions",
+            "get_session_state",
             "reorder_edge", "create_edge", "delete_edge", "update_position",
             "review_node", "execute_node", "update_node_status",
             "optimize_prompt", "user_message",

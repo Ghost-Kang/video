@@ -180,14 +180,17 @@ export default function App({ userId, onLogout }: AppProps) {
     deleteSessionLocal(id);
     sendCommand({ type: "delete_session", thread_id: id });
   }, [deleteSessionLocal, sendCommand]);
-  // 清理「空会话」:未拆解(无 meta)且未被用户重命名、且非当前会话的。复用
-  // deleteSession(本地 + 后端软删 delete_session),所以重连也不会回来。
+  // 清理「空会话」:未拆解(无 meta)且未被用户重命名、且非当前会话的。本地全删 +
+  // 一条 delete_sessions 批量软删命令。用「一条命令」而非 N 条 delete_session,
+  // 是因为 N 条会触发 N 个 session_list 回推,中间态的 union 会把还没删完的会话
+  // 重新加回 localStorage(刷新后又冒出来)。批量 = 一次事务 + 一次最终 session_list。
   const clearEmptySessions = useCallback(() => {
     const { sessions: all, names: nm, meta: mt } = useSessionStore.getState();
-    all
-      .filter((id) => id !== tid && !mt[id] && !nm[id]?.trim())
-      .forEach((id) => deleteSession(id));
-  }, [tid, deleteSession]);
+    const empties = all.filter((id) => id !== tid && !mt[id] && !nm[id]?.trim());
+    if (empties.length === 0) return;
+    empties.forEach((id) => deleteSessionLocal(id));
+    sendCommand({ type: "delete_sessions", thread_ids: empties });
+  }, [tid, deleteSessionLocal, sendCommand]);
   const toggleProView = useCallback(() => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);

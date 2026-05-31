@@ -305,6 +305,29 @@ def test_delete_session_sends_session_list_ack(isolated_ws):
     assert "t-keep" in ack_thread_ids
 
 
+def test_delete_sessions_bulk_acks_once(isolated_ws):
+    """delete_sessions 批量软删:一条命令 → 一条 session_list ACK(非 N 条),
+    所有被删的都不在列表里,保留项还在。"""
+    from agent.store import ensure_session_exists
+
+    for t in ("t-keep", "t-del1", "t-del2", "t-del3"):
+        ensure_session_exists("u1", t)
+
+    ws = FakeWebSocket([
+        json.dumps({"type": "auth", "user_id": "u1"}),
+        json.dumps({"type": "delete_sessions", "thread_ids": ["t-del1", "t-del2", "t-del3"]}),
+    ])
+    _run(server.handle(ws))
+
+    assert ws.closed is None
+    # auth 后的 session_list + 批量删后的「一条」ACK —— 不是 3 条。
+    assert len(ws.sent) == 2
+    assert ws.sent[1]["type"] == "session_list"
+    ack_ids = {s["thread_id"] for s in ws.sent[1]["sessions"]}
+    assert ack_ids.isdisjoint({"t-del1", "t-del2", "t-del3"})
+    assert "t-keep" in ack_ids
+
+
 def test_unknown_msg_type_silently_dropped(isolated_ws):
     """未知 msg_type → 静默 drop,连接存活,后续消息仍能正常处理。"""
     ws = FakeWebSocket([

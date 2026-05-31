@@ -131,11 +131,19 @@ export interface RewriteReturnedEventTyped extends Omit<RewriteReturnedEvent, "r
   };
 }
 
+/** 批量软删除会话(历史「清理空会话」)。后端一个事务删完 + 一次 session_list 推送。
+ *  手写在此(非 ws_generated)以免为单个命令重跑 schema 生成器。 */
+export interface DeleteSessionsMsg {
+  type: "delete_sessions";
+  thread_ids: string[];
+}
+
 /** 客户端 → 服务端 命令。Codex-D 把 useWebSocket 的 12 个 sendXxx 收敛到 sendCommand<T extends WSCommand>。*/
 export type WSCommand =
   | AuthMsg
   | ListSessionsMsg
   | DeleteSessionMsg
+  | DeleteSessionsMsg
   | GetSessionStateMsg
   | ReorderEdgeMsg
   | CreateEdgeMsg

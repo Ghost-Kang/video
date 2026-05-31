@@ -27,6 +27,7 @@ from agent.transport.ws_messages import (
     CreateEdgeMsg,
     DeleteEdgeMsg,
     DeleteSessionMsg,
+    DeleteSessionsMsg,
     ExecuteNodeMsg,
     GetSessionStateMsg,
     ListSessionsMsg,
@@ -91,6 +92,18 @@ async def handle_list_sessions(ctx: WSCtx, msg: ListSessionsMsg) -> None:
 async def handle_delete_session(ctx: WSCtx, msg: DeleteSessionMsg) -> None:
     def _work() -> list:
         store.delete_session(ctx.user_id, msg.thread_id)
+        return store.list_sessions(ctx.user_id)
+
+    sessions = await asyncio.to_thread(_work)
+    await send_json(ctx.ws, type="session_list", sessions=sessions)
+
+
+async def handle_delete_sessions(ctx: WSCtx, msg: DeleteSessionsMsg) -> None:
+    # Bulk soft-delete in one transaction, then a SINGLE session_list push with
+    # the final state. Avoids the per-session round-trip race where a mid-state
+    # session_list re-added not-yet-deleted sessions on the client.
+    def _work() -> list:
+        store.delete_sessions(ctx.user_id, msg.thread_ids)
         return store.list_sessions(ctx.user_id)
 
     sessions = await asyncio.to_thread(_work)
@@ -348,6 +361,7 @@ HandlerFn = Callable[[WSCtx, Any], Awaitable[None]]
 HANDLERS: dict[str, tuple[type, HandlerFn]] = {
     "list_sessions": (ListSessionsMsg, handle_list_sessions),
     "delete_session": (DeleteSessionMsg, handle_delete_session),
+    "delete_sessions": (DeleteSessionsMsg, handle_delete_sessions),
     "get_session_state": (GetSessionStateMsg, handle_get_session_state),
     "reorder_edge": (ReorderEdgeMsg, handle_reorder_edge),
     "create_edge": (CreateEdgeMsg, handle_create_edge),

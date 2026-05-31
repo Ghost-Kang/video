@@ -181,3 +181,19 @@ def delete_session(user_id: str, thread_id: str):
     db.commit()
     db.close()
     print(f"[存储] 软删除 user={user_id} thread={thread_id}")
+
+
+def delete_sessions(user_id: str, thread_ids: list[str]):
+    """批量软删除（历史「清理空会话」）。一个事务设全部 is_deleted=1。"""
+    if not thread_ids:
+        return
+    db = _conn()
+    db.executemany(
+        """INSERT INTO session_meta (user_id, thread_id, is_deleted)
+           VALUES (?, ?, 1)
+           ON CONFLICT(user_id, thread_id) DO UPDATE SET is_deleted=1""",
+        [(user_id, t) for t in thread_ids],
+    )
+    db.commit()
+    db.close()
+    print(f"[存储] 批量软删除 user={user_id} count={len(thread_ids)}")

@@ -52,6 +52,14 @@ class DeleteSessionMsg(_Base):
     thread_id: str = Field(min_length=1)
 
 
+class DeleteSessionsMsg(_Base):
+    # Bulk soft-delete (e.g. 历史「清理空会话」). One command → one transaction →
+    # one session_list push, avoiding the N-round-trip race that let mid-state
+    # session_list events re-add deleted sessions on the client.
+    type: Literal["delete_sessions"]
+    thread_ids: list[str] = Field(min_length=1)
+
+
 class GetSessionStateMsg(_Base):
     type: Literal["get_session_state"]
     thread_id: str = Field(min_length=1)
@@ -332,6 +340,7 @@ INBOUND_MODELS: dict[str, type[_Base]] = {
     "auth": AuthMsg,
     "list_sessions": ListSessionsMsg,
     "delete_session": DeleteSessionMsg,
+    "delete_sessions": DeleteSessionsMsg,
     "get_session_state": GetSessionStateMsg,
     "reorder_edge": ReorderEdgeMsg,
     "create_edge": CreateEdgeMsg,
