@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowRight, Link as LinkIcon } from "lucide-react";
+import { ArrowRight, Link as LinkIcon, Check, HelpCircle } from "lucide-react";
 import { useMagnetic } from "../../hooks/useMagnetic";
 import { COPY } from "../../lib/cardCopy";
+import { checkLink } from "../../lib/linkValidator";
+import { DurationSweetSpot } from "./DurationSweetSpot";
 
-const PLACEHOLDERS = [
-  "粘一条小红书链接",
-  "粘一条抖音链接",
-  "粘一条视频号链接",
-];
+// 只承诺我们真能解析的(抖音);不再写「小红书」。
+const PLACEHOLDERS = [COPY.url_placeholder_a, COPY.url_placeholder_b];
 
 function useTypewriterPlaceholder(phrases: string[], paused: boolean): string {
   const [text, setText] = useState("");
@@ -61,8 +60,17 @@ function useTypewriterPlaceholder(phrases: string[], paused: boolean): string {
 export function UrlFallback({ onSubmit }: { onSubmit: (url: string) => void }) {
   const [url, setUrl] = useState("");
   const [focused, setFocused] = useState(false);
+  const [submitErr, setSubmitErr] = useState<string | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
   const placeholder = useTypewriterPlaceholder(PLACEHOLDERS, focused || url.length > 0);
   const canSubmit = url.trim().length > 0;
+  const check = checkLink(url);
+  // 即时反馈:认出的(✓)/ 别的平台(立刻提示);「没认出」不打字时不唠叨,提交时才报。
+  const livePlatformErr =
+    !check.ok && check.reason === "platform"
+      ? `${COPY.link_err_platform_prefix}${check.platform}${COPY.link_err_platform_suffix}`
+      : null;
+  const errorMsg = submitErr || livePlatformErr;
   const btnRef = useMagnetic<HTMLButtonElement>(0.4, 110);
   const formRef = useRef<HTMLFormElement>(null);
   const submittedRef = useRef(false);
@@ -70,6 +78,16 @@ export function UrlFallback({ onSubmit }: { onSubmit: (url: string) => void }) {
   const submit = (e: React.FormEvent | React.MouseEvent) => {
     e.preventDefault();
     if (!canSubmit || submittedRef.current) return;
+    const verdict = checkLink(url);
+    if (!verdict.ok) {
+      setSubmitErr(
+        verdict.reason === "platform"
+          ? `${COPY.link_err_platform_prefix}${verdict.platform}${COPY.link_err_platform_suffix}`
+          : COPY.link_err_unknown,
+      );
+      setShowHelp(true);
+      return;
+    }
     submittedRef.current = true;
     const el = formRef.current;
     if (el && "clientX" in e) {
@@ -113,11 +131,14 @@ export function UrlFallback({ onSubmit }: { onSubmit: (url: string) => void }) {
 
         <input
           value={url}
-          onChange={(event) => setUrl(event.target.value)}
+          onChange={(event) => {
+            setUrl(event.target.value);
+            if (submitErr) setSubmitErr(null);
+          }}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           className="min-w-0 flex-1 bg-transparent text-base md:text-lg text-stone-900 dark:text-stone-100 outline-none placeholder:text-stone-500 dark:placeholder:text-stone-500 py-3 text-left font-medium"
-          placeholder={placeholder + (placeholder ? " │" : "粘一条小红书 / 抖音链接")}
+          placeholder={placeholder + (placeholder ? " │" : COPY.url_placeholder_a)}
           aria-label="爆款视频链接"
           autoFocus
         />
@@ -141,9 +162,54 @@ export function UrlFallback({ onSubmit }: { onSubmit: (url: string) => void }) {
           />
         </button>
       </form>
-      <p className="mt-2 text-center text-[11px] text-stone-500 dark:text-stone-400">
-        {COPY.duration_hint}
-      </p>
+
+      {/* 即时反馈 / 引导 */}
+      <div className="mt-2 min-h-[20px] text-[12px]">
+        {errorMsg ? (
+          <p className="anim-fade-in flex items-start gap-1.5 text-rose-500 dark:text-rose-400">
+            <span>{errorMsg}</span>
+          </p>
+        ) : check.ok && url.trim() ? (
+          <p className="anim-fade-in flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+            <Check className="h-3.5 w-3.5" />
+            {check.kind === "short" ? COPY.link_ok_short : COPY.link_ok_full}
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowHelp((v) => !v)}
+            className="inline-flex items-center gap-1 text-stone-400 transition-colors hover:text-[#7c2d12] dark:text-stone-500 dark:hover:text-[#ea580c]"
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+            {COPY.link_help_toggle}
+          </button>
+        )}
+      </div>
+
+      {/* 怎么复制链接 —— 引导 */}
+      {showHelp && (
+        <div className="anim-fade-in mt-2 space-y-2.5 rounded-xl border border-stone-200/60 bg-white/60 p-3.5 text-left backdrop-blur-sm dark:border-stone-700/50 dark:bg-stone-900/40">
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 shrink-0 rounded-md bg-[#7c2d12]/[0.08] px-1.5 py-0.5 text-[11px] font-medium text-[#7c2d12] dark:bg-[#ea580c]/15 dark:text-[#ea580c]">
+              {COPY.link_help_desktop_t}
+            </span>
+            <p className="text-[12.5px] leading-[1.6] text-stone-600 dark:text-stone-300">
+              {COPY.link_help_desktop_d}
+            </p>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 shrink-0 rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-500 dark:bg-stone-800 dark:text-stone-400">
+              {COPY.link_help_app_t}
+            </span>
+            <p className="text-[12.5px] leading-[1.6] text-stone-600 dark:text-stone-300">
+              {COPY.link_help_app_d}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 时长甜蜜点 */}
+      <DurationSweetSpot />
     </div>
   );
 }

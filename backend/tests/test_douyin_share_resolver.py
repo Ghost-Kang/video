@@ -124,6 +124,42 @@ def test_happy_path_accepts_share_url_form():
     assert metadata["video_id"] == "7643415855329561897"
 
 
+def test_accepts_app_share_text_with_full_url():
+    """用户直接粘 App「分享 → 复制链接」的整段文案(里面是完整 www.douyin.com/video URL)。"""
+    _FakeAsyncClient.response = _make_response(200, _load_fixture("douyin_share_sample.html"))
+    share_text = (
+        "7.65 复制打开抖音，看看【人民日报的作品】 "
+        "https://www.douyin.com/video/7643415855329561897 啊巴拉巴拉 # 美好"
+    )
+    _direct, metadata = asyncio.run(dsr.resolve_douyin_url(share_text))
+    assert metadata["video_id"] == "7643415855329561897"
+
+
+def test_follows_v_douyin_shortlink_in_share_text():
+    """App 分享出来的 v.douyin.com 短链 + 文案:跟随 302 拿到含 id 的规范 URL。
+
+    单个 fake response 同时服务两跳:第一跳(短链 get)读 .url(= 规范 URL,含 id),
+    第二跳(SSR get)读 .text(= SSR HTML)。"""
+    _FakeAsyncClient.response = _make_response(
+        200,
+        _load_fixture("douyin_share_sample.html"),
+        url="https://www.douyin.com/video/7643415855329561897",
+    )
+    share_text = (
+        "7.65 复制打开抖音，看看【人民日报的作品】 https://v.douyin.com/iRabc123/ 复制此链接"
+    )
+    _direct, metadata = asyncio.run(dsr.resolve_douyin_url(share_text))
+    assert metadata["video_id"] == "7643415855329561897"
+
+
+def test_shortlink_that_does_not_resolve_falls_back_to_s5():
+    """短链跟随后仍拿不到 id(风控/失效)→ 走原有 S5,前端给引导。"""
+    _FakeAsyncClient.response = _make_response(200, "", url="https://www.douyin.com/")
+    with pytest.raises(HardFailure) as excinfo:
+        asyncio.run(dsr.resolve_douyin_url("https://v.douyin.com/iRdead404/"))
+    assert excinfo.value.code == FailureCode.S5_INVALID_PAYLOAD
+
+
 def test_hits_iesdouyin_with_mobile_ua():
     _FakeAsyncClient.response = _make_response(200, _load_fixture("douyin_share_sample.html"))
 

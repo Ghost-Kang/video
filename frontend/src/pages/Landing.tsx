@@ -90,10 +90,10 @@ export function Landing() {
             className="anim-fade-up text-lg md:text-xl text-stone-700 dark:text-stone-200 leading-relaxed mb-10 max-w-xl mx-auto font-medium"
             style={{ animationDelay: "400ms" }}
           >
-            看懂别人{" "}
-            <HighlightPhrase delay={950}>为什么火</HighlightPhrase>
-            ,改成{" "}
-            <HighlightPhrase delay={1180}>你自己的版本</HighlightPhrase>
+            看懂它{" "}
+            <HighlightPhrase delay={950}>凭什么火</HighlightPhrase>
+            ——钩子、节奏、情绪、人群,{" "}
+            <HighlightPhrase delay={1180}>逐帧讲给你听</HighlightPhrase>
             。
           </p>
 

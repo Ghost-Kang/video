@@ -99,6 +99,13 @@ def _unescape_url(raw: str) -> str:
         return cleaned
 
 
+# 抖音 App「分享 → 复制链接」给出的是 v.douyin.com 短链(通常还裹着一段文案,
+# 如「7.65 复制打开抖音,看看【…】 https://v.douyin.com/iRxxx/ …」)。短链本身不含
+# 数字 id,要跟随它的 302 才能拿到含 id 的规范 URL。从用户视角:粘 App 复制的
+# 整段内容就行,我们负责认出里面的链接。
+_SHORTLINK_RE = re.compile(r"https?://v\.douyin\.com/[A-Za-z0-9_-]+/?")
+
+
 def _extract_video_id(page_url: str) -> str:
     m = _VIDEO_ID_RE.search(page_url)
     if not m:
@@ -107,6 +114,39 @@ def _extract_video_id(page_url: str) -> str:
             f"not a recognised douyin video URL: {page_url!r}",
         )
     return m.group(1)
+
+
+async def _follow_shortlink(short_url: str) -> str | None:
+    """Follow a v.douyin.com short link to the canonical URL that carries the
+    numeric video id. Best-effort: returns None on network failure or if the
+    redirect target still has no id (caller then raises the normal S5)."""
+    try:
+        async with httpx.AsyncClient(
+            timeout=_TIMEOUT_S,
+            follow_redirects=True,
+            headers={"User-Agent": _MOBILE_UA},
+        ) as client:
+            response = await client.get(short_url)
+    except (httpx.HTTPError, OSError):
+        return None
+    final = str(response.url)
+    return final if _VIDEO_ID_RE.search(final) else None
+
+
+async def _normalize_input(raw: str) -> str:
+    """Accept whatever the user pastes — a bare URL, or the App's share text
+    with surrounding caption. If a full video URL is already present anywhere
+    in the string (`www.douyin.com/video/<id>` / `iesdouyin.com/share/video/`),
+    use it as-is (search handles embedded-in-text). Otherwise, if there's a
+    `v.douyin.com` short link, follow it to a canonical URL."""
+    if _VIDEO_ID_RE.search(raw):
+        return raw
+    m = _SHORTLINK_RE.search(raw)
+    if m:
+        resolved = await _follow_shortlink(m.group(0))
+        if resolved:
+            return resolved
+    return raw
 
 
 def _parse_ssr_html(html: str) -> tuple[str, dict[str, Any]]:
@@ -213,6 +253,7 @@ async def resolve_douyin_url(page_url: str) -> tuple[str, dict[str, Any]]:
     HardFailure(S7_UPSTREAM_TIMEOUT) on timeout,
     HardFailure(S8_UPSTREAM_REFUSED) on other network failures.
     """
+    page_url = await _normalize_input(page_url)
     video_id = _extract_video_id(page_url)
     html = await _fetch_share_html(video_id)
     direct_url, metadata = _parse_ssr_html(html)

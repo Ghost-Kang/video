@@ -203,6 +203,25 @@ export const COPY = {
   stat_duration: "时长",
   stat_confidence: "把握",
   stat_duration_unit: "秒",
+
+  // ── 链接校验 + 引导(2026-05-31 入口改版)──────────────────────
+  url_placeholder_a: "粘抖音链接,或整段分享文案都行",
+  url_placeholder_b: "抖音 App:分享 → 复制链接,直接粘这里",
+  link_ok_full: "认出抖音链接",
+  link_ok_short: "认出抖音短链 · 会自动展开",
+  link_err_platform_prefix: "目前只支持抖音,",
+  link_err_platform_suffix: " 还在排期。先粘一条抖音视频试试 →",
+  link_err_unknown: "没认出抖音视频链接。把抖音「分享 → 复制链接」整段贴进来,或粘 www.douyin.com/video/… 的网址",
+  link_help_toggle: "不确定怎么复制?看这里",
+  link_help_desktop_t: "电脑最稳",
+  link_help_desktop_d: "抖音网页版进入视频,复制地址栏 www.douyin.com/video/… 粘进来。",
+  link_help_app_t: "手机也行",
+  link_help_app_d: "抖音 App 点「分享 → 复制链接」,整段文案直接粘,我们会自动认出里面的链接(含短链)。",
+
+  // ── 时长甜蜜点 chip(2026-05-31)────────────────────────────────
+  duration_chip_title: "时长甜蜜点",
+  duration_chip_best: "拆得最透",
+  duration_chip_sub: "15–90 秒信息最足,拆出来最过瘾;5 秒以下太短、3 分钟以上拆不了",
 } as const;
 
 /** Terms that must never appear in card-stack UI copy or DOM. */
