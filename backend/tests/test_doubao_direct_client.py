@@ -99,6 +99,7 @@ def _ark_response(status_code: int, model_json: dict | None = None, body: dict |
 
 class _FakeAsyncClient:
     response: httpx.Response | None = None
+    responses: list[httpx.Response] | None = None  # per-call sequence (retry tests)
     exc: Exception | None = None
     calls: int = 0
     last_headers: dict | None = None
@@ -122,6 +123,11 @@ class _FakeAsyncClient:
         type(self).last_json = json
         if self.exc:
             raise self.exc
+        if type(self).responses is not None:
+            # Return the response for this call index; clamp to last so an
+            # all-invalid run keeps returning the final element.
+            seq = type(self).responses
+            return seq[min(type(self).calls - 1, len(seq) - 1)]
         assert self.response is not None
         return self.response
 
@@ -142,7 +148,12 @@ def _setup(monkeypatch) -> None:
         "agent.cascade.mediakit.doubao_direct_client.cost_guard",
         _no_op_cost_guard,
     )
+    # Neutralize retry backoff so retry tests run instantly.
+    monkeypatch.setattr(
+        "agent.cascade.mediakit.doubao_direct_client._RETRY_SLEEP_S", 0
+    )
     _FakeAsyncClient.response = None
+    _FakeAsyncClient.responses = None
     _FakeAsyncClient.exc = None
     _FakeAsyncClient.calls = 0
     _FakeAsyncClient.last_headers = None
@@ -258,14 +269,19 @@ def test_timeout_maps_s7(monkeypatch) -> None:
     assert exc.value.code == FailureCode.S7_UPSTREAM_TIMEOUT
 
 
-def test_malformed_json_maps_s5(monkeypatch) -> None:
-    _setup(monkeypatch)
+def _bad_json_response() -> httpx.Response:
     request = httpx.Request("POST", doubao_direct_client.ARK_CHAT_COMPLETIONS_URL)
-    _FakeAsyncClient.response = httpx.Response(
+    return httpx.Response(
         200,
         json={"choices": [{"message": {"content": "not really json {{{"}}]},
         request=request,
     )
+
+
+def test_malformed_json_retries_then_maps_s5(monkeypatch) -> None:
+    """Persistently invalid JSON → retried _MAX_JSON_ATTEMPTS times, then S5."""
+    _setup(monkeypatch)
+    _FakeAsyncClient.response = _bad_json_response()
 
     with pytest.raises(HardFailure) as exc:
         asyncio.run(
@@ -276,6 +292,44 @@ def test_malformed_json_maps_s5(monkeypatch) -> None:
             )
         )
     assert exc.value.code == FailureCode.S5_INVALID_PAYLOAD
+    assert _FakeAsyncClient.calls == doubao_direct_client._MAX_JSON_ATTEMPTS
+
+
+def test_invalid_json_retried_then_succeeds(monkeypatch) -> None:
+    """A transient malformed-JSON response is retried; the next valid response
+    yields the parsed contract (the founder-reported flakiness fallback)."""
+    _setup(monkeypatch)
+    _FakeAsyncClient.responses = [
+        _bad_json_response(),
+        _ark_response(200, _model_payload()),
+    ]
+
+    result = asyncio.run(
+        analyze_video_direct(
+            "https://cdn.test/v.mp4",
+            user_id="user_1",
+            run_id="run_1",
+        )
+    )
+    assert len(result["scenes"]) == 3
+    assert _FakeAsyncClient.calls == 2  # one retry
+
+
+def test_auth_failure_is_not_retried(monkeypatch) -> None:
+    """Non-JSON failures (auth) must fail fast — no retry spend."""
+    _setup(monkeypatch)
+    _FakeAsyncClient.response = _ark_response(401, body={"error": "unauthorized"})
+
+    with pytest.raises(HardFailure) as exc:
+        asyncio.run(
+            analyze_video_direct(
+                "https://cdn.test/v.mp4",
+                user_id="user_1",
+                run_id="run_1",
+            )
+        )
+    assert exc.value.code == FailureCode.S8_UPSTREAM_REFUSED
+    assert _FakeAsyncClient.calls == 1
 
 
 def test_missing_api_key_short_circuits_before_http(monkeypatch) -> None:

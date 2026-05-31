@@ -11,6 +11,7 @@ W15 audio fallback, W16 production fallback, S-code hard failures, etc.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from pathlib import Path
@@ -35,6 +36,12 @@ PROMPT_PATH = (
     Path(__file__).resolve().parents[2] / "prompts" / "doubao_direct_analyze.md"
 )
 _TIMEOUT_S = 120.0
+# ARK vision is non-deterministic and occasionally emits a malformed JSON body
+# (e.g. a missing delimiter mid-output) that hard-fails the whole analysis. Such
+# glitches almost always clear on a re-request, so retry the call a few times
+# before giving up. Only invalid-JSON (S5) is retried — auth/timeout/5xx are not.
+_MAX_JSON_ATTEMPTS = 3
+_RETRY_SLEEP_S = 0.4  # patched to 0 in tests
 _VIDEO_FPS = 1
 _VIDEO_MAX_FRAMES = 60
 _VIDEO_MAX_PIXELS = 518_400  # mirrors viral_overlay.py — keeps token spend honest
@@ -81,24 +88,57 @@ async def analyze_video_direct(
         "Authorization": f"Bearer {config.ARK_API_KEY}",
         "Content-Type": "application/json",
     }
-    try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT_S) as client:
-            response = await client.post(
-                ARK_CHAT_COMPLETIONS_URL,
-                json=request_body,
-                headers=headers,
-            )
-    except httpx.TimeoutException as exc:
-        raise HardFailure(
-            FailureCode.S7_UPSTREAM_TIMEOUT,
-            f"doubao_direct timeout: {exc}",
-        ) from exc
-    except httpx.TransportError as exc:
-        raise HardFailure(
-            FailureCode.S8_UPSTREAM_REFUSED,
-            f"doubao_direct transport_error: {exc}",
-        ) from exc
 
+    last_invalid: HardFailure | None = None
+    async with httpx.AsyncClient(timeout=_TIMEOUT_S) as client:
+        for attempt in range(1, _MAX_JSON_ATTEMPTS + 1):
+            try:
+                response = await client.post(
+                    ARK_CHAT_COMPLETIONS_URL,
+                    json=request_body,
+                    headers=headers,
+                )
+            except httpx.TimeoutException as exc:
+                raise HardFailure(
+                    FailureCode.S7_UPSTREAM_TIMEOUT,
+                    f"doubao_direct timeout: {exc}",
+                ) from exc
+            except httpx.TransportError as exc:
+                raise HardFailure(
+                    FailureCode.S8_UPSTREAM_REFUSED,
+                    f"doubao_direct transport_error: {exc}",
+                ) from exc
+
+            _raise_for_status(response)  # auth/429/5xx/other → S8, not retried
+
+            try:
+                parsed = _parse_response_json(response)
+            except HardFailure as exc:
+                # Only transient invalid-JSON (S5) is retried; re-request the
+                # model — non-determinism usually yields valid JSON next time.
+                if exc.code == FailureCode.S5_INVALID_PAYLOAD and attempt < _MAX_JSON_ATTEMPTS:
+                    last_invalid = exc
+                    print(
+                        f"[doubao_direct] invalid JSON (attempt {attempt}/"
+                        f"{_MAX_JSON_ATTEMPTS}), retrying: {exc.debug_detail}"
+                    )
+                    await asyncio.sleep(_RETRY_SLEEP_S * attempt)
+                    continue
+                raise
+
+            _clamp_confidence(parsed)
+            return parsed
+
+    # Exhausted retries on invalid JSON.
+    assert last_invalid is not None  # loop always sets it before falling through
+    raise last_invalid
+
+
+# ---------- internals ----------
+
+
+def _raise_for_status(response: httpx.Response) -> None:
+    """Map non-2xx ARK responses to HardFailures. None of these are retried."""
     if response.status_code in (401, 403):
         raise HardFailure(
             FailureCode.S8_UPSTREAM_REFUSED,
@@ -119,6 +159,11 @@ async def analyze_video_direct(
             f"upstream_http_{response.status_code}",
         ) from exc
 
+
+def _parse_response_json(response: httpx.Response) -> dict[str, Any]:
+    """ARK envelope JSON → the model's parsed contract dict. Raises S5 (which
+    the caller retries) when either the envelope or the model's content is not
+    valid JSON."""
     try:
         body = response.json()
     except ValueError as exc:
@@ -126,13 +171,7 @@ async def analyze_video_direct(
             FailureCode.S5_INVALID_PAYLOAD,
             "doubao_direct response not JSON",
         ) from exc
-
-    parsed = _parse_model_payload(body)
-    _clamp_confidence(parsed)
-    return parsed
-
-
-# ---------- internals ----------
+    return _parse_model_payload(body)
 
 
 def _auth_ready() -> bool:
