@@ -27,4 +27,16 @@ describe("SceneClip", () => {
     fireEvent.click(screen.getByRole("button", { name: COPY.clip_play_label }));
     expect(document.querySelector("video")).not.toBeNull();
   });
+
+  // Regression: every hook must run before the no-media early return, else
+  // flipping props between media→no-media changes the hook count and React
+  // throws #310 (crashed the whole result page in prod 2026-05-31).
+  it("survives re-renders flipping between media and no-media", () => {
+    const { rerender, container } = render(<SceneClip clipUrl="/media/a/s.mp4" poster={null} />);
+    expect(container.firstChild).not.toBeNull();
+    rerender(<SceneClip clipUrl={null} poster={null} />);
+    expect(container.firstChild).toBeNull();
+    rerender(<SceneClip clipUrl="/media/a/s.mp4" poster={null} />);
+    expect(screen.getByRole("button", { name: COPY.clip_play_label })).toBeInTheDocument();
+  });
 });

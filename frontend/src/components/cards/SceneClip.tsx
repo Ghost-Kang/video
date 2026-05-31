@@ -18,6 +18,15 @@ export function SceneClip({ clipUrl, poster }: Props) {
   const [hoverPreview, setHoverPreview] = useState(false);
   const hoverTimer = useRef<number | null>(null);
 
+  // 卸载时清掉 hover 防抖计时器。必须在任何条件 return 之前声明所有 hook
+  // (React rules of hooks)——否则「无媒体 → return null」会少调一个 hook 致崩溃。
+  useEffect(
+    () => () => {
+      if (hoverTimer.current !== null) window.clearTimeout(hoverTimer.current);
+    },
+    [],
+  );
+
   const canPlay = !!clipUrl;
   const hasPoster = !!poster;
 
@@ -40,8 +49,6 @@ export function SceneClip({ clipUrl, poster }: Props) {
       hoverTimer.current = null;
     }
   };
-
-  useEffect(() => () => clearHoverTimer(), []);
 
   const onEnter = () => {
     if (!allowHoverPreview || playing) return;
