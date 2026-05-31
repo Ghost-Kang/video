@@ -1,5 +1,6 @@
 import { ViralAnalysisCard } from "./cards/ViralAnalysisCard";
 import { SceneAnalysisCard } from "./cards/SceneAnalysisCard";
+import { AnalysisStatStrip } from "./cards/AnalysisStatStrip";
 import { useCanvasStore } from "../store/canvasStore";
 import { useWSStore } from "../store/wsStore";
 import { useInView } from "../hooks/useInView";
@@ -50,9 +51,22 @@ export function CardStack(_props: CardStackProps = {}) {
   const scenes = [...analysis.scenes].sort((a, b) => a.scene_index - b.scene_index);
 
   return (
-    <main className="flex-1 overflow-y-auto bg-transparent p-4 md:p-6">
-      <div className="mx-auto w-full max-w-[680px] space-y-4">
+    <main className="relative flex-1 overflow-y-auto bg-transparent p-4 md:p-6">
+      {/* 暖色科技背景层:细网格 + 顶部柔光,营造深度与科技感(克制、不抢内容) */}
+      <div className="pointer-events-none absolute inset-0 tech-grid opacity-[0.5] dark:opacity-[0.6]" aria-hidden />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-64 opacity-70 dark:opacity-60"
+        aria-hidden
+        style={{
+          background:
+            "radial-gradient(60% 100% at 50% 0%, rgba(234,88,12,0.10), transparent 70%)",
+        }}
+      />
+      <div className="relative mx-auto w-full max-w-[680px] space-y-4">
         <ConfidenceBanner confidence={analysis.confidence} />
+
+        {/* 数据条:镜头 / 时长 / 把握 滚动计数 */}
+        <AnalysisStatStrip analysis={analysis} />
 
         {/* 爆点分析:总结 + 主题 + 创作者向维度网格 */}
         <ViralAnalysisCard analysis={analysis} />

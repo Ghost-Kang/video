@@ -2,21 +2,20 @@ import { useState } from "react";
 import { ScrollText } from "lucide-react";
 import type { CascadeAnalysisContract } from "../../types/cascade";
 import { COPY, scrubUiForbidden, stripHookCode } from "../../lib/cardCopy";
-import { CARD_CLASS } from "../../lib/cardStyles";
+import { CARD_GLASS } from "../../lib/cardStyles";
+import { useInView } from "../../hooks/useInView";
 import { ScriptDrawer } from "./ScriptDrawer";
 
 interface Props {
   analysis: CascadeAnalysisContract;
 }
 
-// 爆点分析 — 三级层级 + 原视频脚本入口。
-//   英雄四维(钩子/痛点/情绪/人群):为什么火的命脉,大字 + accent 左条 + 绘入。
-//   次级(素材利益点/主要元素/微创新):常规网格。
-//   辅助(BGM 风格):弱化,最末。
-//   右上角「原视频脚本」pill → 抽屉(分镜脚本 + 逐字稿)。
+// 爆点分析 — 暖色科技重设计:玻璃拟态卡 + 顶部流光描边 + 入场光扫;三级层级,
+// 英雄四维(钩子/痛点/情绪/人群)入场发光脉冲吸睛 + 悬浮暖光;主题用流光渐变。
 export function ViralAnalysisCard({ analysis }: Props) {
   const va = analysis.viral_analysis;
   const [scriptOpen, setScriptOpen] = useState(false);
+  const { ref, inView } = useInView<HTMLElement>();
   const clean = (s: string | undefined) => scrubUiForbidden(stripHookCode(s ?? "")).trim();
 
   const heroDims = [
@@ -36,7 +35,14 @@ export function ViralAnalysisCard({ analysis }: Props) {
   const summary = clean(va.summary) || scrubUiForbidden(analysis.video_summary);
 
   return (
-    <section className={`${CARD_CLASS} anim-fade-up`} data-testid="viral-analysis-card">
+    <section
+      ref={ref}
+      className={`${CARD_GLASS} ${inView ? "anim-tech-in anim-sheen" : "opacity-0"}`}
+      data-testid="viral-analysis-card"
+    >
+      {/* 顶部流光描边 */}
+      <span className="tech-topline pointer-events-none absolute inset-x-0 top-0 h-[3px]" aria-hidden />
+
       {/* 标题行 + 原视频脚本入口 */}
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="font-serif-cn text-lg font-medium tracking-[-0.01em] text-stone-900 dark:text-stone-50">
@@ -48,7 +54,7 @@ export function ViralAnalysisCard({ analysis }: Props) {
           aria-haspopup="dialog"
           aria-expanded={scriptOpen}
           data-testid="script-entry"
-          className="group inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 px-3 py-1.5 text-[12px] font-medium text-stone-600 transition-colors hover:border-[#7c2d12]/40 hover:text-[#7c2d12] dark:border-stone-700 dark:text-stone-300 dark:hover:text-[#ea580c]"
+          className="group inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200/80 bg-white/50 px-3 py-1.5 text-[12px] font-medium text-stone-600 backdrop-blur transition-all hover:border-[#7c2d12]/40 hover:text-[#7c2d12] hover:shadow-[0_0_14px_-2px_rgba(234,88,12,0.4)] dark:border-stone-700 dark:bg-stone-900/40 dark:text-stone-300 dark:hover:text-[#ea580c]"
         >
           <ScrollText className="h-3.5 w-3.5 group-hover:anim-icon-breathe" />
           {COPY.script_entry}
@@ -58,7 +64,7 @@ export function ViralAnalysisCard({ analysis }: Props) {
       {clean(va.theme) && (
         <p className="mb-2 text-[15px] text-stone-800 dark:text-stone-200">
           <span className="font-medium text-[#7c2d12] dark:text-[#ea580c]">{COPY.va_theme}：</span>
-          {clean(va.theme)}
+          <span className="font-serif-cn text-[17px] text-shimmer-clay">{clean(va.theme)}</span>
         </p>
       )}
       {summary && (
@@ -70,16 +76,24 @@ export function ViralAnalysisCard({ analysis }: Props) {
 
       {/* 英雄四维 */}
       {heroDims.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 border-t border-stone-100 pt-4 dark:border-stone-800 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 border-t border-stone-200/60 pt-4 dark:border-stone-700/50 sm:grid-cols-2">
           {heroDims.map((d, i) => (
             <div
               key={d.label}
-              className="va-hero anim-fade-up relative rounded-xl bg-[#fef7f0]/70 py-3 pl-4 pr-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft-lg dark:bg-stone-800/40"
+              className="va-hero anim-fade-up glow-warm hover-glow relative rounded-xl bg-[#fef7f0]/70 py-3 pl-4 pr-3 dark:bg-stone-800/40"
               style={{ animationDelay: `${120 + i * 80}ms` }}
             >
+              {/* 入场一次性发光脉冲 — 吸睛 */}
+              <span
+                className="anim-glow-pulse pointer-events-none absolute inset-0 rounded-xl"
+                style={{ animationDelay: `${360 + i * 110}ms` }}
+                aria-hidden
+              />
+              {/* accent 左条绘入 */}
               <span
                 className="anim-draw-line-y absolute inset-y-2 left-0 w-[3px] rounded bg-[#7c2d12] dark:bg-[#ea580c]"
                 style={{ animationDelay: `${260 + i * 80}ms` }}
+                aria-hidden
               />
               <div className="mb-1 text-[12px] font-semibold text-[#7c2d12] dark:text-[#ea580c]">
                 <span aria-hidden className="mr-1">

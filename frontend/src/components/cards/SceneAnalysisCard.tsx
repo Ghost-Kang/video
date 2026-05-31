@@ -39,7 +39,7 @@ export function SceneAnalysisCard({ scene }: Props) {
   return (
     <section
       ref={ref}
-      className={`${CARD_CLASS} transition-shadow hover:shadow-soft-lg ${inView ? "anim-fade-up" : "opacity-0"}`}
+      className={`${CARD_CLASS} hover-glow ${inView ? "anim-tech-in" : "opacity-0"}`}
       data-testid="scene-analysis-card"
     >
       {/* 逐幕视频片段 */}
@@ -47,7 +47,7 @@ export function SceneAnalysisCard({ scene }: Props) {
 
       {/* 头部 */}
       <div className="flex items-baseline gap-2 mb-1.5">
-        <span className="text-[12px] tabular-nums text-stone-400 dark:text-stone-500">
+        <span className="num-tech rounded-md bg-[#7c2d12]/[0.06] px-1.5 py-0.5 text-[12px] text-[#7c2d12]/80 dark:bg-[#ea580c]/10 dark:text-[#ea580c]/80">
           {fmtTime(scene.timestamp_start)}–{fmtTime(scene.timestamp_end)}
         </span>
         <h3 className="font-serif-cn text-[16px] text-stone-900 dark:text-stone-50">

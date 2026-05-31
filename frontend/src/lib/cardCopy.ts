@@ -192,6 +192,12 @@ export const COPY = {
   clip_play_label: "播放这一幕",
   clip_loading: "加载中…",
   clip_poster_only: "仅首帧",
+
+  // ── 数据条(暖色科技重设计 2026-05-31)──────────────────────────
+  stat_scenes: "镜头",
+  stat_duration: "时长",
+  stat_confidence: "把握",
+  stat_duration_unit: "秒",
 } as const;
 
 /** Terms that must never appear in card-stack UI copy or DOM. */
