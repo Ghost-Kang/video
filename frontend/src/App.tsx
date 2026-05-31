@@ -11,6 +11,7 @@ import { useLayoutState } from "./hooks/useLayoutState";
 import { useNodeActions } from "./hooks/useNodeActions";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { shouldHideProToggle, isAdminUser } from "./lib/proViewAccess";
+import { sessionDisplayName } from "./lib/sessionTitle";
 import { useCanvasStore } from "./store/canvasStore";
 import { useNicheStore, type NicheId } from "./store/nicheStore";
 import { useSessionStore } from "./store/sessionStore";
@@ -35,6 +36,7 @@ export default function App({ userId, onLogout }: AppProps) {
   const { sidebarOpen, chatOpen, setSidebarOpen, setChatOpen } = useLayoutState();
   const sessions = useSessionStore((s) => s.sessions);
   const names = useSessionStore((s) => s.names);
+  const sessionMeta = useSessionStore((s) => s.meta);
   const setSessionUserId = useSessionStore((s) => s.setUserId);
   const addSession = useSessionStore((s) => s.addSession);
   const renameSession = useSessionStore((s) => s.rename);
@@ -194,10 +196,10 @@ export default function App({ userId, onLogout }: AppProps) {
   return (
     <div className="relative flex flex-col h-screen bg-[var(--color-paper)] dark:bg-stone-950 text-stone-900 dark:text-stone-100 transition-colors duration-500">
       <DarkModeToggle />
-      <Header userId={userId} sessionName={names[tid] || "新会话"} connected={connected} connecting={connecting} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((v) => !v)} onNewSession={() => navigate(`/chat/${newSessionId()}`)} onLogout={onLogout} isProView={isProView} onToggleProView={proToggle} hideProToggle={shouldHideProToggle(userId)} />
+      <Header userId={userId} sessionName={sessionDisplayName(names, sessionMeta, tid)} connected={connected} connecting={connecting} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((v) => !v)} onNewSession={() => navigate(`/chat/${newSessionId()}`)} onLogout={onLogout} isProView={isProView} onToggleProView={proToggle} hideProToggle={shouldHideProToggle(userId)} />
       <div className="flex flex-1 overflow-hidden flex-col" data-testid="app-shell">
         <div className="flex flex-1 overflow-hidden" data-testid="app-main-row">
-          {sidebarOpen && <Sidebar sessions={sessions} current={tid} names={names} onSwitch={switchSession} onRename={renameSession} onDelete={deleteSession} />}
+          {sidebarOpen && <Sidebar sessions={sessions} current={tid} names={names} meta={sessionMeta} onSwitch={switchSession} onRename={renameSession} onDelete={deleteSession} />}
           {isProView ? (
             <>
               <Canvas onPositionChange={(pos) => sendCommand({ ...pos, thread_id: tid })} onCreateEdge={actions.handleCreateEdge} onDeleteEdge={actions.handleDeleteEdge} />

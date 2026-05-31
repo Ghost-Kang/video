@@ -1,15 +1,24 @@
 import { useState, useRef, useEffect } from "react";
+import { Clapperboard, Pencil, Trash2 } from "lucide-react";
+import {
+  sessionDisplayName,
+  sessionSubtitle,
+  type SessionMeta,
+} from "../lib/sessionTitle";
 
 interface Props {
   sessions: string[];
   current: string;
   names: Record<string, string>;
+  meta: Record<string, SessionMeta>;
   onSwitch: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
 }
 
-export function Sidebar({ sessions, current, names, onSwitch, onRename, onDelete }: Props) {
+// 历史会话列表 — 每条显示从分析自动生成的标题(主题)+ 副标题(平台·相对时间),
+// 未拆解的新会话显示「新会话 · 待拆解」。用户重命名优先于自动标题。
+export function Sidebar({ sessions, current, names, meta, onSwitch, onRename, onDelete }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -23,8 +32,6 @@ export function Sidebar({ sessions, current, names, onSwitch, onRename, onDelete
     setEditing(null);
   };
 
-  const displayName = (id: string) => names[id] || "新会话";
-
   return (
     <div className="flex w-[220px] flex-col gap-1.5 overflow-auto border-r border-stone-200/70 dark:border-stone-800/70 bg-[var(--color-paper)]/40 dark:bg-stone-950/40 backdrop-blur-md p-4">
       <div className="px-2 pb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-stone-400 dark:text-stone-600">
@@ -37,7 +44,7 @@ export function Sidebar({ sessions, current, names, onSwitch, onRename, onDelete
             <input
               key={id}
               ref={inputRef}
-              defaultValue={displayName(id)}
+              defaultValue={sessionDisplayName(names, meta, id)}
               onBlur={() => submitRename(id)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") submitRename(id);
@@ -46,44 +53,70 @@ export function Sidebar({ sessions, current, names, onSwitch, onRename, onDelete
               className="w-full rounded-lg border border-[#7c2d12] dark:border-[#ea580c] bg-white dark:bg-stone-900 px-2.5 py-1.5 text-xs text-stone-900 dark:text-stone-100 outline-none focus:ring-2 focus:ring-[#7c2d12]/30 dark:focus:ring-[#ea580c]/30"
             />
           ) : (
-            <div
-              key={id}
-              className={`session-row group flex items-center overflow-hidden rounded-lg transition-colors ${
-                id === current
-                  ? "bg-white dark:bg-stone-800/60 ring-1 ring-stone-200 dark:ring-stone-700 shadow-soft"
-                  : "hover:bg-[var(--color-paper-deeper)]/70 dark:hover:bg-stone-800/40"
-              }`}
-            >
-              <button
-                onClick={() => onSwitch(id)}
-                className="flex-1 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap bg-transparent px-3 py-2 text-left text-xs text-stone-900 dark:text-stone-100 font-inherit"
-                type="button"
-              >
-                {displayName(id)}
-              </button>
-              <button
-                onClick={() => setEditing(id)}
-                className="action-btn flex h-[22px] w-[22px] items-center justify-center rounded text-stone-400 dark:text-stone-500 hover:text-[#7c2d12] dark:hover:text-[#ea580c] transition-colors"
-                title="重命名"
-                type="button"
-              >
-                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M11.5 1.5l3 3-10 10H1.5v-3z" />
-                </svg>
-              </button>
-              {sessions.length > 1 && (
-                <button
-                  onClick={() => onDelete(id)}
-                  className="action-btn mr-1 flex h-[22px] w-[22px] items-center justify-center rounded text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
-                  title="删除"
-                  type="button"
+            (() => {
+              const analyzed = !!meta[id];
+              const title = sessionDisplayName(names, meta, id);
+              const subtitle = sessionSubtitle(names, meta, id);
+              const active = id === current;
+              return (
+                <div
+                  key={id}
+                  className={`session-row group flex items-center gap-2 overflow-hidden rounded-lg pl-2.5 transition-colors ${
+                    active
+                      ? "bg-white dark:bg-stone-800/60 ring-1 ring-stone-200 dark:ring-stone-700 shadow-soft"
+                      : "hover:bg-[var(--color-paper-deeper)]/70 dark:hover:bg-stone-800/40"
+                  }`}
                 >
-                  <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M2.5 4.5h11M5.5 4.5V3a1 1 0 011-1h3a1 1 0 011 1v1.5M6.5 7.5v5M9.5 7.5v5M3.5 4.5l1 9h7l1-9" />
-                  </svg>
-                </button>
-              )}
-            </div>
+                  <Clapperboard
+                    className={`h-3.5 w-3.5 shrink-0 ${
+                      analyzed
+                        ? "text-[#7c2d12] dark:text-[#ea580c]"
+                        : "text-stone-300 dark:text-stone-600"
+                    }`}
+                    strokeWidth={1.75}
+                  />
+                  <button
+                    onClick={() => onSwitch(id)}
+                    className="flex-1 cursor-pointer overflow-hidden bg-transparent py-2 pr-1 text-left font-inherit"
+                    type="button"
+                    title={title}
+                  >
+                    <div
+                      className={`overflow-hidden text-ellipsis whitespace-nowrap text-xs ${
+                        analyzed || names[id]
+                          ? "text-stone-900 dark:text-stone-100"
+                          : "text-stone-400 dark:text-stone-500"
+                      }`}
+                    >
+                      {title}
+                    </div>
+                    {subtitle && (
+                      <div className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap text-[10px] text-stone-400 dark:text-stone-500">
+                        {subtitle}
+                      </div>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setEditing(id)}
+                    className="action-btn flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-stone-400 dark:text-stone-500 hover:text-[#7c2d12] dark:hover:text-[#ea580c] transition-colors"
+                    title="重命名"
+                    type="button"
+                  >
+                    <Pencil className="h-[11px] w-[11px]" />
+                  </button>
+                  {sessions.length > 1 && (
+                    <button
+                      onClick={() => onDelete(id)}
+                      className="action-btn mr-1 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-stone-400 dark:text-stone-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
+                      title="删除"
+                      type="button"
+                    >
+                      <Trash2 className="h-[11px] w-[11px]" />
+                    </button>
+                  )}
+                </div>
+              );
+            })()
           )
         )}
         {sessions.length === 0 && (

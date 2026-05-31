@@ -4,6 +4,7 @@ import { useSessionStore } from "./sessionStore";
 import { useToastStore, type ToastAction } from "./toastStore";
 import type { WSEvent } from "../types/ws";
 import { mapRewriteShotsToScenes } from "../lib/cascadeMapper";
+import { deriveSessionMeta } from "../lib/sessionTitle";
 import { COPY } from "../lib/cardCopy";
 import type { FailurePayload } from "../types/cascade";
 
@@ -320,6 +321,14 @@ export const useWSStore = create<WSStore>((set, get) => ({
         });
         queueMicrotask(() => {
           useCanvasStore.getState().loadFromAnalysis(event.analysis);
+          // Auto-name the history entry from the analysis so the sidebar shows
+          // a meaningful title (主题 + 平台·时间) instead of "新会话". User
+          // renames still win — sessionDisplayName prefers `names` over `meta`.
+          const tid =
+            ("thread_id" in event && event.thread_id) || get().currentThreadId;
+          if (tid) {
+            useSessionStore.getState().setMeta(tid, deriveSessionMeta(event.analysis));
+          }
         });
         break;
       case "rewrite_returned":

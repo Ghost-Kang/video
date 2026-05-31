@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { SessionMeta } from "../lib/sessionTitle";
 
 function lsKey(key: string, userId: string) {
   return `openrhtv_${userId}_${key}`;
@@ -21,10 +22,12 @@ interface SessionStore {
   userId: string;
   sessions: string[];
   names: Record<string, string>;
+  meta: Record<string, SessionMeta>;
   setUserId: (userId: string) => void;
   hydrate: (userId?: string) => void;
   setSessions: (sessions: string[]) => void;
   setNames: (names: Record<string, string>) => void;
+  setMeta: (threadId: string, meta: SessionMeta) => void;
   addSession: (threadId: string) => void;
   deleteSession: (threadId: string) => void;
   rename: (threadId: string, name: string) => void;
@@ -35,6 +38,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   userId: "default",
   sessions: [],
   names: {},
+  meta: {},
 
   setUserId: (userId) => {
     set({ userId });
@@ -46,6 +50,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       userId,
       sessions: loadJSON<string[]>(lsKey("sessions", userId), []),
       names: loadJSON<Record<string, string>>(lsKey("names", userId), {}),
+      meta: loadJSON<Record<string, SessionMeta>>(lsKey("meta", userId), {}),
     }),
 
   setSessions: (sessions) => {
@@ -58,6 +63,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     set({ names });
   },
 
+  setMeta: (threadId, m) =>
+    set((state) => {
+      const meta = { ...state.meta, [threadId]: m };
+      saveJSON(lsKey("meta", state.userId), meta);
+      return { meta };
+    }),
+
   addSession: (threadId) =>
     set((state) => {
       if (state.sessions.includes(threadId)) return state;
@@ -69,10 +81,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   deleteSession: (threadId) =>
     set((state) => {
       const sessions = state.sessions.filter((id) => id !== threadId);
-      const { [threadId]: _deleted, ...names } = state.names;
+      const { [threadId]: _deletedName, ...names } = state.names;
+      const { [threadId]: _deletedMeta, ...meta } = state.meta;
       saveJSON(lsKey("sessions", state.userId), sessions);
       saveJSON(lsKey("names", state.userId), names);
-      return { sessions, names };
+      saveJSON(lsKey("meta", state.userId), meta);
+      return { sessions, names, meta };
     }),
 
   rename: (threadId, name) =>
@@ -82,5 +96,5 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       return { names };
     }),
 
-  reset: () => set({ sessions: [], names: {} }),
+  reset: () => set({ sessions: [], names: {}, meta: {} }),
 }));
