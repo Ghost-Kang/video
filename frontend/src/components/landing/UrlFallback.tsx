@@ -90,12 +90,12 @@ export function UrlFallback({ onSubmit }: { onSubmit: (url: string) => void }) {
     <div>
       <form
         ref={formRef}
-        className={`group relative overflow-hidden flex items-center gap-3 rounded-2xl border-2 px-5 py-2 transition-all duration-300 ${
+        className={`group relative overflow-hidden flex items-center gap-3 rounded-2xl border-2 px-5 py-2 backdrop-blur-md transition-all duration-300 ${
           canSubmit
-            ? "border-[#7c2d12]/40 bg-white dark:bg-stone-900 shadow-[0_8px_32px_-8px_rgba(124,45,18,0.25)] anim-input-glow"
+            ? "border-[#7c2d12]/40 bg-white/90 dark:bg-stone-900/85 shadow-[0_8px_32px_-8px_rgba(124,45,18,0.25)] anim-input-glow"
             : focused
-              ? "border-stone-900 dark:border-stone-100 bg-white dark:bg-stone-900 shadow-soft-lg"
-              : "border-stone-300/80 dark:border-stone-700/80 bg-white/50 dark:bg-stone-900/40 hover:border-stone-400 dark:hover:border-stone-600"
+              ? "border-stone-900 dark:border-stone-100 bg-white/90 dark:bg-stone-900/85 shadow-soft-lg"
+              : "border-stone-300/70 dark:border-stone-700/70 bg-white/55 dark:bg-stone-900/40 hover:border-[#7c2d12]/30 dark:hover:border-[#ea580c]/30 hover:shadow-[0_0_22px_-6px_rgba(234,88,12,0.35)]"
         }`}
         onSubmit={submit}
       >

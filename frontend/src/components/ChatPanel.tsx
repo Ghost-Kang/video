@@ -386,13 +386,13 @@ export function ChatPanel({
             disabled={loading}
             aria-label={COPY.side_refine_placeholder}
             data-testid="refine-textarea"
-            className="w-full rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-[13px] leading-[1.55] text-stone-900 dark:text-stone-100 outline-none placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:border-stone-900 dark:focus:border-stone-100 transition-colors resize-y font-inherit"
+            className="w-full rounded-xl border border-stone-300 dark:border-stone-700 bg-white/90 dark:bg-stone-900/80 backdrop-blur-sm px-3.5 py-2.5 text-[13px] leading-[1.55] text-stone-900 dark:text-stone-100 outline-none placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:border-[#7c2d12] dark:focus:border-[#ea580c] focus:shadow-[0_0_18px_-6px_rgba(234,88,12,0.4)] transition-all resize-y font-inherit"
           />
           <div className="mt-2.5 flex items-center gap-2">
             <button
               onClick={handleSend}
               disabled={loading}
-              className={`flex-1 rounded-xl bg-stone-900 dark:bg-[#7c2d12] py-2.5 text-[13px] font-medium tracking-[0.01em] text-[#faf8f3] transition-colors hover:bg-stone-800 dark:hover:bg-[#9a3412] font-inherit ${
+              className={`flex-1 rounded-xl bg-stone-900 dark:bg-[#7c2d12] py-2.5 text-[13px] font-medium tracking-[0.01em] text-[#faf8f3] transition-all hover:bg-stone-800 dark:hover:bg-[#9a3412] hover:shadow-[0_6px_22px_-8px_rgba(234,88,12,0.55)] font-inherit ${
                 loading ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
               }`}
               type="button"

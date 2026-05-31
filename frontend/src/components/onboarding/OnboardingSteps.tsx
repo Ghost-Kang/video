@@ -30,11 +30,12 @@ export function OnboardingSteps({ currentStep }: Props) {
           const isDone = s.n < currentStep;
           const isFuture = s.n > currentStep;
 
-          const base = "relative rounded-2xl border p-5 transition-all duration-300";
+          const base =
+            "relative overflow-hidden rounded-2xl border p-5 backdrop-blur-md transition-all duration-300";
           const tone = isActive
-            ? "border-[#7c2d12]/40 dark:border-[#ea580c]/50 bg-white dark:bg-stone-900 shadow-soft anim-cta-breathe"
+            ? "border-[#7c2d12]/40 dark:border-[#ea580c]/50 bg-white/80 dark:bg-stone-900/70 glow-warm hover-glow"
             : isDone
-              ? "border-emerald-500/30 bg-white/60 dark:bg-stone-900/60"
+              ? "border-emerald-500/30 bg-white/55 dark:bg-stone-900/55"
               : "border-stone-200/60 dark:border-stone-800/60 bg-white/40 dark:bg-stone-900/40 opacity-60";
 
           return (
@@ -43,6 +44,9 @@ export function OnboardingSteps({ currentStep }: Props) {
               className={`${base} ${tone}`}
               aria-current={isActive ? "step" : undefined}
             >
+              {isActive && (
+                <span className="tech-topline pointer-events-none absolute inset-x-0 top-0 h-[3px]" aria-hidden />
+              )}
               <div className="flex items-center gap-2 mb-2">
                 <span
                   className={

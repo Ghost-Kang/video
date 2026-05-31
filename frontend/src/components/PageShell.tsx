@@ -36,6 +36,13 @@ export function PageShell({
       {showProgress && <ScrollProgress />}
       {showToggle && <DarkModeToggle />}
       {ambient && <AmbientCursor />}
+      {/* 暖色科技:全站极淡科技网格,叠在 aurora 之上做深度(克制、不抢内容) */}
+      {ambient && (
+        <div
+          className="tech-grid pointer-events-none fixed inset-0 opacity-[0.35] dark:opacity-50"
+          aria-hidden
+        />
+      )}
       {/* Self-guards: renders only on /admin/* routes. */}
       <AdminTokenBar />
       <div className="relative z-10 flex-1 flex flex-col">{children}</div>
