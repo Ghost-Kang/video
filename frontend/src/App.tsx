@@ -180,6 +180,14 @@ export default function App({ userId, onLogout }: AppProps) {
     deleteSessionLocal(id);
     sendCommand({ type: "delete_session", thread_id: id });
   }, [deleteSessionLocal, sendCommand]);
+  // 清理「空会话」:未拆解(无 meta)且未被用户重命名、且非当前会话的。复用
+  // deleteSession(本地 + 后端软删 delete_session),所以重连也不会回来。
+  const clearEmptySessions = useCallback(() => {
+    const { sessions: all, names: nm, meta: mt } = useSessionStore.getState();
+    all
+      .filter((id) => id !== tid && !mt[id] && !nm[id]?.trim())
+      .forEach((id) => deleteSession(id));
+  }, [tid, deleteSession]);
   const toggleProView = useCallback(() => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -199,7 +207,7 @@ export default function App({ userId, onLogout }: AppProps) {
       <Header userId={userId} sessionName={sessionDisplayName(names, sessionMeta, tid)} connected={connected} connecting={connecting} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((v) => !v)} onNewSession={() => navigate(`/chat/${newSessionId()}`)} onLogout={onLogout} isProView={isProView} onToggleProView={proToggle} hideProToggle={shouldHideProToggle(userId)} />
       <div className="flex flex-1 overflow-hidden flex-col" data-testid="app-shell">
         <div className="flex flex-1 overflow-hidden" data-testid="app-main-row">
-          {sidebarOpen && <Sidebar sessions={sessions} current={tid} names={names} meta={sessionMeta} onSwitch={switchSession} onRename={renameSession} onDelete={deleteSession} />}
+          {sidebarOpen && <Sidebar sessions={sessions} current={tid} names={names} meta={sessionMeta} onSwitch={switchSession} onRename={renameSession} onDelete={deleteSession} onClearEmpty={clearEmptySessions} />}
           {isProView ? (
             <>
               <Canvas onPositionChange={(pos) => sendCommand({ ...pos, thread_id: tid })} onCreateEdge={actions.handleCreateEdge} onDeleteEdge={actions.handleDeleteEdge} />

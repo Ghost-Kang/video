@@ -14,13 +14,20 @@ interface Props {
   onSwitch: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
+  onClearEmpty?: () => void;
 }
 
 // 历史会话列表 — 每条显示从分析自动生成的标题(主题)+ 副标题(平台·相对时间),
 // 未拆解的新会话显示「新会话 · 待拆解」。用户重命名优先于自动标题。
-export function Sidebar({ sessions, current, names, meta, onSwitch, onRename, onDelete }: Props) {
+export function Sidebar({ sessions, current, names, meta, onSwitch, onRename, onDelete, onClearEmpty }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // 「空会话」= 未拆解(无 meta)且未被用户重命名、且非当前会话。
+  const clearableCount = sessions.filter(
+    (id) => id !== current && !meta[id] && !names[id]?.trim(),
+  ).length;
 
   useEffect(() => {
     if (editing) inputRef.current?.focus();
@@ -34,8 +41,41 @@ export function Sidebar({ sessions, current, names, meta, onSwitch, onRename, on
 
   return (
     <div className="flex w-[220px] flex-col gap-1.5 overflow-auto border-r border-stone-200/70 dark:border-stone-800/70 bg-[var(--color-paper)]/40 dark:bg-stone-950/40 backdrop-blur-md p-4">
-      <div className="px-2 pb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-stone-400 dark:text-stone-600">
-        历史
+      <div className="flex items-center justify-between px-2 pb-2">
+        <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-stone-400 dark:text-stone-600">
+          历史
+        </span>
+        {onClearEmpty && clearableCount > 0 &&
+          (confirmClear ? (
+            <span className="flex items-center gap-2 text-[10px]">
+              <button
+                type="button"
+                onClick={() => {
+                  onClearEmpty();
+                  setConfirmClear(false);
+                }}
+                className="font-medium text-rose-500 hover:text-rose-600 dark:text-rose-400"
+              >
+                清除 {clearableCount} 条
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmClear(false)}
+                className="text-stone-400 hover:text-stone-600 dark:text-stone-500"
+              >
+                取消
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmClear(true)}
+              title="清理未拆解的空会话"
+              className="text-[10px] text-stone-400 transition-colors hover:text-[#7c2d12] dark:text-stone-500 dark:hover:text-[#ea580c]"
+            >
+              清理空会话
+            </button>
+          ))}
       </div>
 
       <div className="flex flex-col gap-0.5">

@@ -73,4 +73,43 @@ describe("Sidebar", () => {
     fireEvent.click(screen.getByText("童年怀旧动画"));
     expect(onSwitch).toHaveBeenCalledWith("t1");
   });
+
+  it("offers 清理空会话 only when empty sessions exist, and confirms before clearing", () => {
+    const onClearEmpty = vi.fn();
+    // t1 analyzed (kept), t2 current (kept), t3+t4 empty → clearable = 2
+    render(
+      <Sidebar
+        sessions={["t1", "t2", "t3", "t4"]}
+        current="t2"
+        names={{}}
+        meta={analyzed}
+        onSwitch={noop}
+        onRename={noop}
+        onDelete={noop}
+        onClearEmpty={onClearEmpty}
+      />,
+    );
+    fireEvent.click(screen.getByText("清理空会话"));
+    // two-tap confirm shows the count and only fires on confirm
+    const confirm = screen.getByText("清除 2 条");
+    expect(onClearEmpty).not.toHaveBeenCalled();
+    fireEvent.click(confirm);
+    expect(onClearEmpty).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides 清理空会话 when there are no empty sessions", () => {
+    render(
+      <Sidebar
+        sessions={["t1"]}
+        current="t1"
+        names={{}}
+        meta={analyzed}
+        onSwitch={noop}
+        onRename={noop}
+        onDelete={noop}
+        onClearEmpty={() => {}}
+      />,
+    );
+    expect(screen.queryByText("清理空会话")).toBeNull();
+  });
 });
