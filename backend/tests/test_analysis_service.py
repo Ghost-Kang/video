@@ -10,7 +10,7 @@ import pytest
 
 from agent.cascade import circuit_breaker
 from agent.cascade.analysis_service import request_shallow_analysis
-from agent.cascade.contract import CascadeAnalysisContract
+from agent.cascade.contract import ANALYSIS_PIPELINE_REVISION, CascadeAnalysisContract
 from agent.cascade.failures import FailureCode, HardFailure, WarningCode
 from agent.cascade.storage import load_analysis
 
@@ -221,6 +221,80 @@ def test_different_users_same_url_reuses_upstream_once(
     asyncio.run(request_shallow_analysis("https://example.com/shared2", user_id="user_2"))
 
     assert calls == 1
+
+
+def test_fresh_analysis_is_stamped_with_pipeline_revision(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _use_tmp_db(monkeypatch, tmp_path)
+    contract = asyncio.run(
+        request_shallow_analysis("https://example.com/rev", user_id="user_1")
+    )
+    assert contract.pipeline_revision == ANALYSIS_PIPELINE_REVISION
+
+
+def test_stale_revision_cache_is_regenerated_not_served(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A cached analysis from an older pipeline revision must be a cache miss
+    and regenerated — otherwise the permanent (no-TTL) analysis cache keeps
+    serving pre-toprador results that render with dimensions stripped out."""
+    db_path = _use_tmp_db(monkeypatch, tmp_path)
+    raw = json.loads((SYNTH / "baomam_fushi" / "001.json").read_text(encoding="utf-8"))
+    calls = 0
+
+    async def loader(source_url: str, **_kwargs) -> dict:
+        nonlocal calls
+        calls += 1
+        return dict(raw)
+
+    monkeypatch.setattr("agent.cascade.analysis_service._load_upstream_payload", loader)
+
+    first = asyncio.run(
+        request_shallow_analysis("https://example.com/stale", user_id="user_1")
+    )
+    assert calls == 1
+    assert first.pipeline_revision == ANALYSIS_PIPELINE_REVISION
+
+    # Simulate a legacy cached row: drop the revision marker the way a row
+    # persisted before the field existed would deserialize (→ None).
+    db = sqlite3.connect(str(db_path))
+    stored = json.loads(
+        db.execute(
+            "SELECT contract_json FROM analyses WHERE analysis_id = ?",
+            (first.analysis_id,),
+        ).fetchone()[0]
+    )
+    stored.pop("pipeline_revision", None)
+    db.execute(
+        "UPDATE analyses SET contract_json = ? WHERE analysis_id = ?",
+        (json.dumps(stored), first.analysis_id),
+    )
+    db.commit()
+    db.close()
+
+    # Same user + URL → guard rejects the stale row → upstream re-runs.
+    second = asyncio.run(
+        request_shallow_analysis("https://example.com/stale", user_id="user_1")
+    )
+    assert calls == 2
+    assert second.pipeline_revision == ANALYSIS_PIPELINE_REVISION
+
+    # Upsert replaced the stale row in place (no duplicate, now current).
+    db = sqlite3.connect(str(db_path))
+    count = db.execute(
+        "SELECT COUNT(*) FROM analyses WHERE source_url = ?",
+        ("https://example.com/stale",),
+    ).fetchone()[0]
+    revision = json.loads(
+        db.execute(
+            "SELECT contract_json FROM analyses WHERE analysis_id = ?",
+            (first.analysis_id,),
+        ).fetchone()[0]
+    )["pipeline_revision"]
+    db.close()
+    assert count == 1
+    assert revision == ANALYSIS_PIPELINE_REVISION
 
 
 def _mediakit_storyline() -> dict:

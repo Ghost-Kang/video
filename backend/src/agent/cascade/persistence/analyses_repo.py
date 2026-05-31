@@ -16,13 +16,20 @@ def set_analysis_context(user_id: str, run_id: str | None) -> None:
 
 
 async def save_analysis(contract: CascadeAnalysisContract) -> bool:
-    """Persist an analysis. Returns True only when a new row was inserted."""
+    """Persist an analysis (upsert). Returns True when a row was written.
+
+    Uses INSERT OR REPLACE so a regenerated analysis overwrites a stale one
+    sharing the same deterministic analysis_id. This is required by the
+    pipeline-revision cache guard (analysis_service._is_current_revision):
+    when a cached analysis predates a prompt/dimension change it's treated as
+    a miss and regenerated, and the fresh result must replace — not be ignored
+    behind — the stale row (which carries the same id)."""
     user_id = _analysis_user_id.get()
     run_id = _analysis_run_id.get()
     db = await _connect()
     try:
         cursor = await db.execute(
-            """INSERT OR IGNORE INTO analyses (
+            """INSERT OR REPLACE INTO analyses (
               analysis_id, user_id, run_id, source_url, platform, cost_cny,
               confidence, contract_json, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",

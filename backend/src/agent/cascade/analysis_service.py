@@ -17,7 +17,7 @@ import httpx
 from agent import config
 from agent.cascade import circuit_breaker
 from agent.cascade.adapter import normalize_analysis_result
-from agent.cascade.contract import CascadeAnalysisContract
+from agent.cascade.contract import ANALYSIS_PIPELINE_REVISION, CascadeAnalysisContract
 from agent.cascade.event_names import EventName
 from agent.cascade.events import emit
 from agent.cascade.failures import FailureCode, HardFailure, WarningCode
@@ -69,6 +69,15 @@ def _hash_source_url(source_url: str) -> str:
     return hashlib.sha1(source_url.encode("utf-8")).hexdigest()[:12]
 
 
+def _is_current_revision(contract: CascadeAnalysisContract) -> bool:
+    """A cached analysis is reusable only if it was produced by the current
+    pipeline revision. Older/None revisions predate a prompt/dimension change,
+    so they would render with the dimensions stripped out (the frontend filters
+    empty fields). Treat those as a cache miss → regenerate via upstream. See
+    ANALYSIS_PIPELINE_REVISION."""
+    return contract.pipeline_revision == ANALYSIS_PIPELINE_REVISION
+
+
 def _get_source_lock(source_url_hash: str) -> asyncio.Lock:
     """Per-source-URL lock with a bound on dict growth.
 
@@ -96,11 +105,11 @@ async def request_shallow_analysis(
     lock = _get_source_lock(source_url_hash)
     async with lock:
         existing = await load_analysis_for_source(user_id, source_url)
-        if existing is not None:
+        if existing is not None and _is_current_revision(existing):
             return existing
 
         global_existing = await load_latest_analysis_for_source(source_url)
-        if global_existing is not None:
+        if global_existing is not None and _is_current_revision(global_existing):
             await emit(
                 EventName.CASCADE_CACHE_HIT,
                 user_id=user_id,
@@ -142,6 +151,12 @@ async def request_shallow_analysis(
             raw["source_url"] = source_url
             raw["analysis_id"] = _analysis_id(user_id, source_url)
             contract = normalize_analysis_result(raw)
+            # Stamp the current pipeline revision so this analysis is treated as
+            # a valid cache hit later (and stale rows from older revisions get
+            # overwritten via the upsert in save_analysis).
+            contract = contract.model_copy(
+                update={"pipeline_revision": ANALYSIS_PIPELINE_REVISION}
+            )
         except HardFailure as exc:
             await emit(
                 EventName.FAILURE_EMITTED,

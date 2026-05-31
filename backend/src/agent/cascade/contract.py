@@ -15,6 +15,17 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 SCHEMA_VERSION = "1.0"
 
+# Cache-invalidation revision for the *analysis pipeline* (prompt + dimension
+# set), distinct from the wire-format SCHEMA_VERSION above. Bump this whenever a
+# prompt/dimension change makes previously-cached analyses stale, so the
+# permanent analysis cache (analyses table, no TTL) stops serving pre-change
+# results that would render with missing dimensions. Stored analyses carry
+# their revision in CascadeAnalysisContract.pipeline_revision; a missing/older
+# value is treated as a cache miss and regenerated (analysis_service).
+#   1 → pre-toprador (legacy dims: pacing/climax/visual_style/emotional_arc/…)
+#   2 → toprador-aligned (10 viral dims + 14 scene dims)
+ANALYSIS_PIPELINE_REVISION = 2
+
 
 class Platform(str, Enum):
     DOUYIN = "douyin"
@@ -186,6 +197,11 @@ class CascadeAnalysisContract(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = Field(..., pattern=r"^1\.[0-9]+$", description="Only 1.x accepted.")
+    # Cache-invalidation marker — see ANALYSIS_PIPELINE_REVISION. Optional so
+    # analyses persisted before this field existed parse as None (→ stale →
+    # regenerated). Stamped by analysis_service before persistence; upstreams
+    # and fixtures don't set it.
+    pipeline_revision: Optional[int] = Field(default=None)
     analysis_id: str = Field(..., min_length=1, max_length=64)
     source_url: HttpUrl
     platform: Platform
