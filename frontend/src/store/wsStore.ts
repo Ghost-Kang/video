@@ -85,7 +85,7 @@ export function normalizeFailurePayload(
 }
 
 
-// 把后端 invalid_command code 映射成宝妈看得懂的中文标题。
+// 把后端 invalid_command code 映射成用户看得懂的中文标题。
 // 未列的 code 一律 fallback 到通用 "请求出错"。
 const ERROR_CODE_TITLES: Record<string, string> = {
   invalid_command: "请求格式不对",
@@ -418,7 +418,7 @@ export const useWSStore = create<WSStore>((set, get) => ({
         console.warn("[WS] error", event.code, event.message, event.bad_type);
         // 推到 toast 让用户实际看到 — 不然 Pydantic 校验失败完全静默。
         const title = ERROR_CODE_TITLES[event.code] ?? "请求出错";
-        // body 用 bad_type 给开发者线索;不暴露 Pydantic 详细 message(那对宝妈无意义)。
+        // body 用 bad_type 给开发者线索;不暴露 Pydantic 详细 message(那对用户无意义)。
         const body = event.bad_type ? `操作:${event.bad_type}` : undefined;
 
         // W4D5-T2 — 已知可一键恢复的 case 注入 action,其他不给(避免误导)。

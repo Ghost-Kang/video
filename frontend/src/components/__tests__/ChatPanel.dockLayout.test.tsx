@@ -6,6 +6,8 @@
 
 import { describe, it, expect, vi, beforeAll } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { COPY } from "../../lib/cardCopy";
+import { SAMPLE_CASES } from "../../lib/sampleCases";
 import { ChatPanel } from "../ChatPanel";
 
 beforeAll(() => {
@@ -103,8 +105,8 @@ describe("ChatPanel dock layout (W5D3)", () => {
       />
     );
 
-    fireEvent.click(screen.getByLabelText("试一条 宝妈辅食 爆款"));
-    // 时长验证过的 in-range 样本(62.6s),见 SampleUrlChips。
-    expect(onSend).toHaveBeenCalledWith("https://www.douyin.com/video/7616954826602428411");
+    fireEvent.click(screen.getByLabelText(`${COPY.sample_try_prefix} ${SAMPLE_CASES[0].category}`));
+    // 真实已拆案例(SampleUrlChips 改用 SAMPLE_CASES,不再按垂类)。
+    expect(onSend).toHaveBeenCalledWith(SAMPLE_CASES[0].source_url);
   });
 });

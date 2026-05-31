@@ -73,7 +73,7 @@ export function useWebSocket(userId: string, onMessage: Handler) {
         }),
       );
       // W4D5-T1: 检测从 disconnected→connected 切回(retryRef>0 说明经历过断
-      // 连),给宝妈一个正向反馈。第一次冷启 onopen 时 retryRef=0,不弹。
+      // 连),给用户一个正向反馈。第一次冷启 onopen 时 retryRef=0,不弹。
       const wasReconnect = retryRef.current > 0;
       setConnecting(false);
       setConnected(true);

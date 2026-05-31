@@ -62,6 +62,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # 只复制 src/,然后 uv sync 在 deps 都装好的前提下只装 file:///app 本地包。
 # 实测 ~3-5s。
 COPY src ./src
+# 运维脚本(如 scripts/gen_showcase_case.py —— 一条命令加落地页样例案例)。
+COPY scripts ./scripts
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev \
         --default-index ${UV_INDEX_URL}

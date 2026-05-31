@@ -61,20 +61,19 @@ export const COPY = {
   onboarding_title: "粘条爆款链接,看懂它为什么火",
   onboarding_subtitle: "粘一条链接,几十秒后看到完整拆解",
   onboarding_step1_title: "粘条爆款链接",
-  onboarding_step1_desc: "抖音 / 小红书都行,直接复制视频链接",
+  onboarding_step1_desc: "抖音链接,直接复制粘贴(整段分享文案也行)",
   onboarding_step2_title: "看完整拆解",
   onboarding_step2_desc: "爆点分析 + 逐幕视频分析,看懂这条为什么火",
 
+  // niche_* 仅供暂挂的改写基建(nicheStore.NICHE_LABELS)引用,不在任何页面渲染。
   niche_baomam: "宝妈辅食",
   niche_yuer: "育儿日常",
   niche_kitchen: "家庭厨房",
 
-  sample_url_label: "想先试试?用这几条爆款做样本",
-  sample_url_hint_baomam: "试一条 宝妈辅食 爆款",
-  sample_url_hint_yuer: "试一条 育儿日常 爆款",
-  sample_url_hint_kitchen: "试一条 家庭厨房 爆款",
+  sample_url_label: "想先试试?挑一条真实样例",
+  sample_try_prefix: "试一条",
 
-  chat_placeholder_empty: "粘一条抖音 / 小红书爆款链接到这里 ↓",
+  chat_placeholder_empty: "粘一条抖音爆款链接到这里 ↓",
   chat_placeholder_followup: "想改哪里,直接说",
   chat_quick_continue: "继续下一步",
   chat_quick_hook: "开头再抓",
