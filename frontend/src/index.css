@@ -279,12 +279,27 @@
 /* 时长甜蜜点:一束光持续流过甜区(活感) */
 @keyframes meterFlow {
   0%   { transform: translateX(-120%); }
-  100% { transform: translateX(420%); }
+  100% { transform: translateX(520%); }
 }
 /* ⭐ 轻微上下浮动 */
 @keyframes bob {
   0%, 100% { transform: translateX(-50%) translateY(0); }
-  50%      { transform: translateX(-50%) translateY(-2.5px); }
+  50%      { transform: translateX(-50%) translateY(-3px); }
+}
+/* 甜区渐变持续流动(一直动) */
+@keyframes bandFlow {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+/* 甜区持续脉冲发光(呼吸) */
+@keyframes sweetGlow {
+  0%, 100% { box-shadow: 0 0 8px 0 rgba(234, 88, 12, 0.45); }
+  50%      { box-shadow: 0 0 20px 4px rgba(234, 88, 12, 0.85); }
+}
+/* 甜区中心一圈持续扩散涟漪 */
+@keyframes sweetRipple {
+  0%   { transform: translate(-50%, -50%) scale(0.6); opacity: 0.7; }
+  100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
 }
 
 @layer components {
@@ -444,12 +459,20 @@
     font-feature-settings: "tnum" 1;
     letter-spacing: 0.02em;
   }
-  /* 时长甜蜜点:流光 + ⭐ 浮动 */
+  /* 时长甜蜜点:流光 + ⭐ 浮动 + 渐变流动 + 脉冲发光 + 涟漪 */
   .anim-meter-flow {
-    animation: meterFlow 2.6s ease-in-out infinite;
+    animation: meterFlow 2.2s ease-in-out infinite;
   }
   .anim-bob {
-    animation: bob 2.2s ease-in-out infinite;
+    animation: bob 2s ease-in-out infinite;
+  }
+  /* 甜区:渐变流动 + 脉冲发光 一个元素上同时跑(逗号串联,避免 animation 互相覆盖) */
+  .anim-sweet-band {
+    background-size: 200% 100%;
+    animation: bandFlow 2.8s linear infinite, sweetGlow 1.7s ease-in-out infinite;
+  }
+  .anim-sweet-ripple {
+    animation: sweetRipple 1.8s ease-out infinite;
   }
   .anim-sparkle-twinkle {
     animation: sparkleTwinkle 1.4s ease-in-out infinite;
@@ -553,6 +576,7 @@
     .anim-draw-line, .anim-draw-line-y, .anim-sparkle-twinkle,
     .anim-slide-in-right, .anim-slide-in-up,
     .anim-tech-in, .anim-glow-pulse, .tech-topline, .anim-meter-flow, .anim-bob,
+    .anim-sweet-band, .anim-sweet-ripple,
     .anim-float-a, .anim-float-b, .anim-float-c, .anim-icon-breathe,
     .anim-steam, .anim-flame, .anim-heart-beat, .anim-wobble, .anim-blink {
       animation: none !important;

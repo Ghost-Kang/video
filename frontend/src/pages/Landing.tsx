@@ -1,7 +1,9 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ConsentGate } from "../components/landing/ConsentGate";
+import { CaseShowcase } from "../components/landing/CaseShowcase";
 import { SampleCaseCarousel } from "../components/landing/SampleCaseCarousel";
+import { SAMPLE_CASES } from "../lib/sampleCases";
 import { UrlFallback } from "../components/landing/UrlFallback";
 import { CreatorTicker } from "../components/landing/CreatorTicker";
 import { StatCounter } from "../components/landing/StatCounter";
@@ -120,8 +122,13 @@ export function Landing() {
               >
                 {COPY.sample_cases_header} 👇
               </p>
-              <div className="anim-fade-up" style={{ animationDelay: "900ms" }}>
-                <SampleCaseCarousel onPick={pickCase} />
+              <div className="anim-fade-up space-y-4" style={{ animationDelay: "900ms" }}>
+                {/* 头牌案例:逐幕视频轮播(一个案例就能轮播) */}
+                {SAMPLE_CASES[0] && <CaseShowcase sample={SAMPLE_CASES[0]} onPick={pickCase} />}
+                {/* 其余案例(后续新增):简卡 */}
+                {SAMPLE_CASES.length > 1 && (
+                  <SampleCaseCarousel onPick={pickCase} cases={SAMPLE_CASES.slice(1)} />
+                )}
               </div>
             </div>
           </ConsentGate>

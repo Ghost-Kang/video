@@ -105,8 +105,14 @@ def test_sweep_old_media(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
     os.utime(old, (stale, stale))
     fresh = root / "ana_fresh"
     fresh.mkdir(parents=True)
+    # `showcase/` is curated landing media — must survive even when stale.
+    showcase = root / "showcase"
+    showcase.mkdir(parents=True)
+    (showcase / "x.mp4").write_bytes(b"x")
+    os.utime(showcase, (stale, stale))
 
     removed = clip_extractor.sweep_old_media(max_age_h=48)
     assert removed == 1
     assert not old.exists()
     assert fresh.exists()
+    assert showcase.exists()  # never swept

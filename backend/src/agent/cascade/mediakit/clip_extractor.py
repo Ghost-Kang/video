@@ -196,6 +196,9 @@ def sweep_old_media(max_age_h: float = 48.0) -> int:
     removed = 0
     try:
         for child in root.iterdir():
+            # `showcase/` holds curated landing samples — never sweep it.
+            if child.name == "showcase":
+                continue
             try:
                 if child.is_dir() and child.stat().st_mtime < cutoff:
                     shutil.rmtree(child, ignore_errors=True)

@@ -4,12 +4,12 @@ import { COPY } from "../../lib/cardCopy";
 
 interface Props {
   onPick: (c: SampleCase) => void;
+  cases?: SampleCase[];
 }
 
 // 「看看能拆出什么」预览轮播 —— 用真实已拆案例,卡面秀「拆出的洞察」(钩子/情绪)
 // 而非垂类名。点开进入真实完整分析。可扩展:案例来自 SAMPLE_CASES 配置数组。
-export function SampleCaseCarousel({ onPick }: Props) {
-  const cases = SAMPLE_CASES;
+export function SampleCaseCarousel({ onPick, cases = SAMPLE_CASES }: Props) {
   if (cases.length === 0) return null;
 
   // 1 条时居中;多条时横向滑动(swipe)。
