@@ -222,6 +222,12 @@ export const COPY = {
   duration_chip_title: "时长甜蜜点",
   duration_chip_best: "拆得最透",
   duration_chip_sub: "15–90 秒信息最足,拆出来最过瘾;5 秒以下太短、3 分钟以上拆不了",
+
+  // ── 样例案例预览轮播(2026-05-31)──────────────────────────────
+  sample_cases_header: "没有链接?先看看我们能拆出什么",
+  sample_case_tag: "真实拆解",
+  sample_case_hook: "钩子",
+  sample_case_cta: "点开看完整拆解",
 } as const;
 
 /** Terms that must never appear in card-stack UI copy or DOM. */

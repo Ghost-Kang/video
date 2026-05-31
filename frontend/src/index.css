@@ -276,6 +276,16 @@
   from { opacity: 0; transform: translateY(14px) scale(0.985); filter: blur(6px); }
   to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
+/* 时长甜蜜点:一束光持续流过甜区(活感) */
+@keyframes meterFlow {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(420%); }
+}
+/* ⭐ 轻微上下浮动 */
+@keyframes bob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(-2.5px); }
+}
 
 @layer components {
   /* entrance animations — 配合 inline style { animationDelay } 实现 stagger */
@@ -434,6 +444,13 @@
     font-feature-settings: "tnum" 1;
     letter-spacing: 0.02em;
   }
+  /* 时长甜蜜点:流光 + ⭐ 浮动 */
+  .anim-meter-flow {
+    animation: meterFlow 2.6s ease-in-out infinite;
+  }
+  .anim-bob {
+    animation: bob 2.2s ease-in-out infinite;
+  }
   .anim-sparkle-twinkle {
     animation: sparkleTwinkle 1.4s ease-in-out infinite;
   }
@@ -535,7 +552,7 @@
     .anim-cta-breathe, .anim-cta-glow, .anim-arrow-nudge, .anim-input-glow,
     .anim-draw-line, .anim-draw-line-y, .anim-sparkle-twinkle,
     .anim-slide-in-right, .anim-slide-in-up,
-    .anim-tech-in, .anim-glow-pulse, .tech-topline,
+    .anim-tech-in, .anim-glow-pulse, .tech-topline, .anim-meter-flow, .anim-bob,
     .anim-float-a, .anim-float-b, .anim-float-c, .anim-icon-breathe,
     .anim-steam, .anim-flame, .anim-heart-beat, .anim-wobble, .anim-blink {
       animation: none !important;

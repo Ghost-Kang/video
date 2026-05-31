@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ConsentGate } from "../components/landing/ConsentGate";
-import { HotCardGrid } from "../components/landing/HotCardGrid";
+import { SampleCaseCarousel } from "../components/landing/SampleCaseCarousel";
 import { UrlFallback } from "../components/landing/UrlFallback";
 import { CreatorTicker } from "../components/landing/CreatorTicker";
 import { StatCounter } from "../components/landing/StatCounter";
@@ -9,9 +9,8 @@ import { PageShell } from "../components/PageShell";
 import { HighlightPhrase } from "../components/landing/HighlightPhrase";
 import { useParallax } from "../hooks/useParallax";
 import { useLiveStats } from "../hooks/useLiveStats";
-import type { FeaturedCard } from "../components/landing/HotCard";
-import { SAMPLE_URL_BY_NICHE } from "../lib/sampleUrls";
-import { useNicheStore, type NicheId } from "../store/nicheStore";
+import { COPY } from "../lib/cardCopy";
+import type { SampleCase } from "../lib/sampleCases";
 
 function sessionId() {
   return `session-${Date.now().toString(36)}`;
@@ -31,14 +30,9 @@ export function Landing() {
     [navigate],
   );
 
-  // 「挑一条」卡片走和聊天内「试一条 X 爆款」chip 同一条真链接管线:真分析 + 自动改写。
-  // (旧实现 navigate `?analysis_id=ana_syn_*` 走前端合成 fixture,但 App 从不消费
-  //  analysis_id query、且只有 baomam 一个 fixture → 三张卡点开全空白,缺陷 ②。)
-  // 先落 niche,确保分析回来后自动改写触发、发布包标签按方向走。
-  const pick = (card: FeaturedCard) => {
-    const niche = (card.niche in SAMPLE_URL_BY_NICHE ? card.niche : "baomam_fushi") as NicheId;
-    useNicheStore.getState().setNiche(niche);
-    fadeNavigate(`/chat/${sessionId()}?source_url=${encodeURIComponent(SAMPLE_URL_BY_NICHE[niche])}`);
+  // 样例卡 = 一条真实已拆解的视频。点开走真链接管线(命中缓存秒出完整分析)。
+  const pickCase = (c: SampleCase) => {
+    fadeNavigate(`/chat/${sessionId()}?source_url=${encodeURIComponent(c.source_url)}`);
   };
   const submitUrl = (url: string) => {
     fadeNavigate(`/chat/${sessionId()}?source_url=${encodeURIComponent(url)}`);
@@ -121,16 +115,13 @@ export function Landing() {
 
             <div className="mt-20">
               <p
-                className="anim-fade-up text-[11px] uppercase tracking-[0.22em] text-stone-400 dark:text-stone-600 mb-8"
+                className="anim-fade-up mb-8 text-[13px] text-stone-500 dark:text-stone-400"
                 style={{ animationDelay: "780ms" }}
               >
-                没有链接?挑一条
+                {COPY.sample_cases_header} 👇
               </p>
-              <div
-                className="anim-fade-up"
-                style={{ animationDelay: "900ms" }}
-              >
-                <HotCardGrid onPick={pick} />
+              <div className="anim-fade-up" style={{ animationDelay: "900ms" }}>
+                <SampleCaseCarousel onPick={pickCase} />
               </div>
             </div>
           </ConsentGate>
