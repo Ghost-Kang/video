@@ -1,16 +1,17 @@
 # D6 改写解封质量门 · 评测集 URL(generic 通用代笔)
 #
-# 怎么填:把真实抖音链接一行一个贴到本文件末尾。# 开头的行是注释,脚本自动忽略,
-#         空行也忽略 —— 所以这些说明可以保留,直接在下面追加链接即可。
+# 怎么填:把真实抖音链接一行一个粘到下面(删掉这些 # 注释行或保留都行,
+#         脚本会忽略空行;但 # 开头的行也会被当 URL 读 —— 所以填之前请把下面
+#         的占位示例和注释整段删掉,只留你的链接)。
 #
 # 要求(rewrite_quality_standard §4.1):
 #   - 数量 ≥15(批次解封门的统计基础)
-#   - 跨题材:美食 / 剧情 / 知识 / 萌宠 / 穿搭 / 生活技巧 / 健身 … 混着来,别集中一类
+#   - 跨题材:美食/剧情/知识/萌宠/穿搭/生活技巧/健身… 混着来,别集中一类
 #             (验证 generic 通用代笔对各题材都成立)
 #   - 格式:完整 URL / v.douyin.com 短链 / 整段「x.xx 复制打开抖音…」分享文案 都行
 #
-# 配套主题(可选):eval_topics_generic.txt 逐行写对应主题(一句话),按出现顺序对齐
-#   本文件的链接;某行留空 = 该条不指定主题(沿用原片主题)。
+# 配套主题(可选):eval_topics_generic.txt 里逐行写对应主题(一句话),
+#   行号对齐本文件的链接行;某行留空 = 该条不指定主题(沿用原片主题)。
 #
 # 跑(prod 容器或本地,需 ARK_API_KEY,真 doubao 约 ¥0.5/条):
 #   CASCADE_REWRITE_UPSTREAM=llm CASCADE_UPSTREAM=doubao_direct TOPRADOR_RESOLVER_MODE=douyin_share \
@@ -18,7 +19,20 @@
 #       docs/nexus/founder_log/eval_urls_generic.txt \
 #       docs/nexus/founder_log/eval_topics_generic.txt
 #
-# ===== 在下面贴链接(一行一个)=====
-# 示例(删掉示例,换成你的):
-# https://www.douyin.com/video/7645650053617609381
-# https://v.douyin.com/xxxxxx/
+# ↓↓↓ 在下面贴你的链接(把这行连同上面注释一起删掉,只留链接)↓↓↓
+
+1.   https://v.douyin.com/eHbZAHeRLJ4/ 
+2.   https://v.douyin.com/ojHthCnJu9c/ 
+3.   https://v.douyin.com/29qw1WUJUaE/ 
+4.  https://v.douyin.com/t5xlUt_tKz4/ 
+5.  https://v.douyin.com/pykgmulFYDg/ 
+6.   https://v.douyin.com/ZkZLnfazPfU/ 
+7.  https://v.douyin.com/An6nKh2i_hY/ 
+8.  https://v.douyin.com/c60TvNaoMIA/ 
+9.   https://v.douyin.com/M1ibviX8FAU/ 
+10.  https://v.douyin.com/UBVd-dvLBS4/ 
+11.  https://v.douyin.com/y_inwABNIME/ 
+12.  https://v.douyin.com/g0mvq9HLOnk/ 
+13.  https://v.douyin.com/Dkg8wR79C-k/ 
+14.  https://v.douyin.com/QW3DkMA20jI/ 
+15.  https://v.douyin.com/woW7UDiPXJE/ 
