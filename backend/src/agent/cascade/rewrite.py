@@ -226,11 +226,12 @@ def _fixture_rewrite(
         body_lines.append(f"{shot['shot_index']}. {shot['dialogue']}")
         body_lines.append(f"   画面:{shot['visual']}")
     script_markdown = "### 改写脚本\n" + "\n".join(body_lines)
-    # D5: 长度上限统一 80–220 字(手机一拇指可读、一口气念完的口播节奏)。
+    # D5: 长度 80–400 字。script_markdown 含「台词+画面」合并,逐镜 4-5 镜会到
+    # 200-350,放宽到 400 容纳画面描述(台词本身仍是短口播)。
     if len(script_markdown) < 80:
         script_markdown += "\n" + (f"({label}版,贴近自家场景。" * 3)
-    if len(script_markdown) > 220:
-        script_markdown = script_markdown[:217] + "..."
+    if len(script_markdown) > 400:
+        script_markdown = script_markdown[:397] + "..."
 
     # confidence ceiling for negative_ref per prompt spec
     base_confidence = max(0.5, min(1.0, contract.confidence - 0.05))
@@ -428,7 +429,7 @@ def _normalize_llm_output(
         len(shots) < 3
         or len(shots) > 5
         or any(w.startswith("forbidden terms scrubbed") for w in warnings)
-        or not (80 <= len(data["script_markdown"]) <= 220)  # D5: 统一 80–220
+        or not (80 <= len(data["script_markdown"]) <= 400)  # D5: 80–400(台词+画面合并)
     )
     if hard_violation:
         confidence = min(confidence, 0.4)

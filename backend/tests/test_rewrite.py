@@ -82,7 +82,7 @@ def test_generic_fixture_rewrite_runs_and_respects_topic():
     )
     assert result["niche"] == "generic"
     assert 3 <= len(result["shots"]) <= 5
-    assert 80 <= len(result["script_markdown"]) <= 220  # D5 bound holds for generic too
+    assert 80 <= len(result["script_markdown"]) <= 400  # D5 bound (台词+画面合并)
     # topic surfaced in the rationale marker
     assert "三分钟搞定的减脂早餐" in result["script_markdown"]
     # no forbidden brand/jargon terms leaked

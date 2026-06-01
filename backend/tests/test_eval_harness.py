@@ -58,7 +58,7 @@ def test_run_checks_baomam_passes_well():
     result = _stub_result()
     chks = run_checks(result, "baomam_fushi", source_title="一岁宝宝一周辅食蔬菜不重样")
     by_name = {c.name: c for c in chks}
-    assert by_name["script_length_80_220"].passed
+    assert by_name["script_length_80_400"].passed
     assert by_name["shot_count_3_5"].passed
     assert by_name["hook_p0_compliance"].passed
     assert by_name["hook_p0_compliance"].mandatory
@@ -67,14 +67,16 @@ def test_run_checks_baomam_passes_well():
 
 @pytest.mark.parametrize(
     "length,expect_pass",
-    [(79, False), (80, True), (220, True), (221, False)],
+    [(79, False), (80, True), (400, True), (401, False)],
 )
-def test_d5_script_length_bounds_80_220(length, expect_pass):
-    """D5 — length check is 80–220 inclusive (was 80–600). Boundary cases."""
+def test_d5_script_length_bounds_80_400(length, expect_pass):
+    """D5 — length check is 80–400 inclusive. script_markdown 含台词+画面合并,
+    逐镜 4-5 镜会到 200-350,放宽到 400 容纳画面描述(台词本身仍是短口播)。
+    Boundary cases."""
     result = _stub_result(script_markdown="x" * length)
     by_name = {c.name: c for c in run_checks(result, "baomam_fushi", source_title="一岁宝宝辅食")}
-    assert "script_length_80_220" in by_name, "check must be renamed to 80_220"
-    assert by_name["script_length_80_220"].passed is expect_pass
+    assert "script_length_80_400" in by_name, "check must be renamed to 80_400"
+    assert by_name["script_length_80_400"].passed is expect_pass
 
 
 def test_run_checks_fails_when_p0_missing():
