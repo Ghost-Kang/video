@@ -79,14 +79,19 @@ async def _eval_one(url: str, topic: str) -> dict:
     except Exception as exc:
         judged = {"skipped": True, "reason": f"{type(exc).__name__}: {str(exc)[:60]}"}
 
+    jd = judged if isinstance(judged, dict) else {}
     out.update({
         "ok": True,
         "confidence": result.get("confidence"),
         "mech_pass": mech_pass,
         "forbidden_ok": forbidden_ok,
         "mandatory_fails": [c.name for c in mandatory if not c.passed],
-        "judge_realism": judged.get("realism") if isinstance(judged, dict) else None,
-        "judge_kept_formula": judged.get("kept_formula") if isinstance(judged, dict) else None,
+        # judge 返回 key 是 realism_1to5 / ad_risk(不是 realism);之前读错 key → 全 None。
+        "judge_realism": jd.get("realism_1to5"),
+        "judge_kept_formula": jd.get("kept_formula"),
+        "judge_ad_risk": jd.get("ad_risk"),  # "yes"/"no" — 质量门要 =no
+        "judge_skipped": jd.get("skipped", False),
+        "judge_skip_reason": jd.get("reason") if jd.get("skipped") else None,
         "script_len": len(result.get("script_markdown", "") or ""),
     })
     return out
@@ -100,9 +105,11 @@ async def main(urls: list[str], topics: list[str]) -> None:
         r = await _eval_one(url, topic)
         results.append(r)
         if r["ok"]:
+            jskip = f" judge-skip({r.get('judge_skip_reason')})" if r.get("judge_skipped") else ""
             print(f"   conf={r['confidence']} mech={'✓' if r['mech_pass'] else '✗'} "
                   f"forbidden_ok={r['forbidden_ok']} realism={r['judge_realism']} "
-                  f"kept={r['judge_kept_formula']} len={r['script_len']}")
+                  f"kept={r['judge_kept_formula']} ad_risk={r.get('judge_ad_risk')} "
+                  f"len={r['script_len']}{jskip}")
         else:
             print(f"   ✗ {r.get('error')}")
 
@@ -113,13 +120,16 @@ async def main(urls: list[str], topics: list[str]) -> None:
     realisms = [r["judge_realism"] for r in ok if isinstance(r.get("judge_realism"), (int, float))]
     avg_realism = sum(realisms) / len(realisms) if realisms else None
     kept_yes = sum(1 for r in ok if r.get("judge_kept_formula") == "yes") / n
+    ad_risk_n = sum(1 for r in ok if r.get("judge_ad_risk") == "yes")
+    judged_n = sum(1 for r in ok if not r.get("judge_skipped"))
 
     print("\n========== 质量门汇总(对照 rewrite_quality_standard §4.1)==========")
-    print(f"成功跑通:           {len(ok)}/{len(results)}")
+    print(f"成功跑通:           {len(ok)}/{len(results)}  (judge 实评 {judged_n} 条)")
     print(f"机械门通过率:        {mech_rate*100:.0f}%   (门槛 ≥85%)  {'✓' if mech_rate>=0.85 else '✗'}")
     print(f"广告法/禁词 0 泄漏:   {forbidden_rate*100:.0f}%   (门槛 =100%) {'✓' if forbidden_rate>=1.0 else '✗'}")
-    print(f"judge realism 均值:  {avg_realism if avg_realism is not None else 'n/a (judge skipped?)'}   (门槛 ≥3.8)")
+    print(f"judge realism 均值:  {f'{avg_realism:.2f}' if avg_realism is not None else 'n/a'}   (门槛 ≥3.8)  {'✓' if (avg_realism or 0)>=3.8 else '✗'}")
     print(f"kept_formula=yes:    {kept_yes*100:.0f}%   (门槛 ≥70%)  {'✓' if kept_yes>=0.70 else '✗'}")
+    print(f"ad_risk=yes 条数:    {ad_risk_n}    (门槛 =0)    {'✓' if ad_risk_n==0 else '✗'}")
     print("注:人工 signoff(≥70%)+ llm vs fixture 对照 需 founder 看输出 / 另跑 fixture 对照。")
 
 
