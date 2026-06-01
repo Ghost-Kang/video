@@ -83,7 +83,9 @@ export const COPY = {
   shot_generating_first_frame: "正在生成…",
 
   rewrite_cta_header: "改成你自己的版本",
-  rewrite_cta_hint: "选一个方向, 我帮你改成你自己的",
+  rewrite_cta_hint: "套用这条的爆款骨架, 帮你改成你自己的脚本 — 想拍什么主题填一句(选填)",
+  rewrite_topic_placeholder: "想拍什么?一句话,如「免烤提拉米苏」(留空也行)",
+  rewrite_cta_button: "改成我的版本",
 
   duration_hint: "建议 ≤ 3 分钟·最佳 15-90 秒",
   duration_too_long_fallback: "这条视频过长,建议先剪到 3 分钟内再来分析",

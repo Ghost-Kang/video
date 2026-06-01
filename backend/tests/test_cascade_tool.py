@@ -271,8 +271,10 @@ class TestCascadeRewrite:
 
         captured: dict[str, Any] = {}
 
-        async def fake_service(*, analysis_id, niche, user_id, run_id=None):
-            captured.update(analysis_id=analysis_id, niche=niche, user_id=user_id, run_id=run_id)
+        async def fake_service(*, analysis_id, niche, user_id, run_id=None, topic=None):
+            captured.update(
+                analysis_id=analysis_id, niche=niche, user_id=user_id, run_id=run_id, topic=topic
+            )
             return _fake_rewrite_result()
 
         monkeypatch.setattr(cascade_tools, "request_rewrite", fake_service)
@@ -287,6 +289,8 @@ class TestCascadeRewrite:
             "niche": "baomam_fushi",
             "user_id": "u1",
             "run_id": None,
+            # 不传 topic → 工具把空串归一为 None 再下传 service。
+            "topic": None,
         }
 
         # Compact dict — no shots list (LLM doesn't need to see them)
@@ -303,6 +307,50 @@ class TestCascadeRewrite:
         assert frame["analysis_id"] == "ana_fake"
         assert len(frame["rewrite"]["shots"]) == 3
         assert frame["rewrite"]["script_markdown"].startswith("### 改写脚本")
+
+    def test_generic_niche_with_topic_passes_topic_through(self, monkeypatch):
+        # 去 niche 后默认路径:niche="generic" + 一句话主题 topic 透传给 service。
+        ws = FakeWS()
+        set_run_ctx({"user_id": "u1", "thread_id": "t1", "ws": ws, "run_id": None})
+
+        captured: dict[str, Any] = {}
+
+        async def fake_service(*, analysis_id, niche, user_id, run_id=None, topic=None):
+            captured.update(niche=niche, topic=topic)
+            return _fake_rewrite_result()
+
+        monkeypatch.setattr(cascade_tools, "request_rewrite", fake_service)
+
+        result = asyncio.run(cascade_rewrite.ainvoke({
+            "analysis_id": "ana_fake",
+            "niche": "generic",
+            "topic": "  免烤提拉米苏  ",  # 前后空白应被 strip
+        }))
+
+        assert "error" not in result
+        assert captured["niche"] == "generic"
+        assert captured["topic"] == "免烤提拉米苏"
+
+    def test_generic_blank_topic_normalized_to_none(self, monkeypatch):
+        ws = FakeWS()
+        set_run_ctx({"user_id": "u1", "thread_id": "t1", "ws": ws, "run_id": None})
+
+        captured: dict[str, Any] = {}
+
+        async def fake_service(*, analysis_id, niche, user_id, run_id=None, topic=None):
+            captured.update(topic=topic)
+            return _fake_rewrite_result()
+
+        monkeypatch.setattr(cascade_tools, "request_rewrite", fake_service)
+
+        result = asyncio.run(cascade_rewrite.ainvoke({
+            "analysis_id": "ana_fake",
+            "niche": "generic",
+            "topic": "   ",  # 纯空白 → None(纯按源片骨架改写)
+        }))
+
+        assert "error" not in result
+        assert captured["topic"] is None
 
     def test_unknown_niche_rejected_without_calling_service(self, monkeypatch):
         ws = FakeWS()

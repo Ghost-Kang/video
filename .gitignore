@@ -47,3 +47,6 @@ docs/nexus/founder_log/**/*.local.md
 
 # Playwright MCP local artifacts (browser test logs/snapshots)
 .playwright-mcp/
+
+# transient scheduler lock (Claude Code)
+.claude/scheduled_tasks.lock

@@ -265,18 +265,20 @@ async def cascade_analyze(source_url: str) -> dict:
 
 
 @tool
-async def cascade_rewrite(analysis_id: str, niche: str) -> dict:
-    """按指定赛道(niche)把已分析的视频改写成新脚本，返回脚本和分镜。
+async def cascade_rewrite(analysis_id: str, niche: str, topic: str = "") -> dict:
+    """把已分析的视频改写成创作者自己的版本(脚本 + 分镜)。
 
-    **何时调用**：刚调完 cascade_analyze 拿到 analysis_id，并且已经知道用户的
-    赛道(niche)时，立刻调用。不要等用户再确认一次。
+    **何时调用**：刚调完 cascade_analyze 拿到 analysis_id，用户主动要「改成我的
+    版本」时，立刻调用。不要等用户再确认一次。
 
     **参数**：
     - analysis_id (str)：必须是 cascade_analyze 返回的 "ana_xxx" 格式。
-    - niche (str)：必须严格是以下三个值之一，其他值会被拒绝：
-        - "baomam_fushi" (宝妈辅食)
-        - "yuer_richang" (育儿日常)
-        - "jiating_chufang" (家庭厨房)
+    - niche (str)：改写路径，合法值：
+        - "generic" (通用代笔，**去 niche 后的默认**——任何题材都走这个)
+        - "baomam_fushi" / "yuer_richang" / "jiating_chufang" (旧 3 赛道，向后兼容)
+      其他值会被拒绝。**默认用 "generic"**，除非用户明确点了旧赛道。
+    - topic (str, 可选)：用户给的一句话主题(如「免烤提拉米苏」)。**仅 generic 路径
+      使用**，把改写导向这个题材;留空则纯按源片骨架通用改写。旧 3 赛道忽略此参数。
 
     **返回**：
     - 成功：{"rewrite_id": "rw_...", "analysis_id": "ana_...", "niche": "...",
@@ -309,6 +311,8 @@ async def cascade_rewrite(analysis_id: str, niche: str) -> dict:
             niche=niche,  # type: ignore[arg-type]  # Literal validated above
             user_id=user_id,
             run_id=run_id,
+            # generic 路径用一句话主题导向;空串归一为 None(service 把 None 当无主题)。
+            topic=(topic.strip() or None),
         )
     except LookupError:
         return {

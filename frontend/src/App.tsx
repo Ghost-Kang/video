@@ -14,7 +14,7 @@ import { shouldHideProToggle, isAdminUser } from "./lib/proViewAccess";
 import { resolveRewriteEnabled } from "./lib/rewriteAccess";
 import { sessionDisplayName } from "./lib/sessionTitle";
 import { useCanvasStore } from "./store/canvasStore";
-import { useNicheStore, type NicheId } from "./store/nicheStore";
+import { useNicheStore } from "./store/nicheStore";
 import { useSessionStore } from "./store/sessionStore";
 import { useWSStore, synthesizeClientTimeout } from "./store/wsStore";
 import type { WSEvent } from "./types/ws";
@@ -95,15 +95,16 @@ export default function App({ userId, onLogout }: AppProps) {
   const onGenerateFirstFrame = useCallback((idx: number) => {
     sendChatMessage(`[generate_first_frame: shot_index=${idx}]`);
   }, [sendChatMessage]);
-  // Niche CTA on the ScriptCard. The bracket-prefix is picked up by
-  // Director §0.6 — it sees the `[selected_niche: ...]` and immediately
-  // calls `cascade_rewrite`. We also persist the choice in nicheStore so
-  // subsequent natural-language follow-ups inherit the same niche.
-  const onTriggerRewrite = useCallback((niche: NicheId) => {
-    useNicheStore.getState().setNiche(niche);
-    justSubmittedRef.current = false; // 手动选了方向 = 消费掉自动改写信号
+  // 「改成你自己的版本」CTA(去 niche 后通用代笔)。bracket 标记由 Director §0.6
+  // 解析:`[selected_niche: generic]` → 立即 cascade_rewrite;可选的
+  // `[rewrite_topic: ...]` 把一句话主题作为 topic 导向题材。topic 留空 = 纯按源片
+  // 骨架改写。不再写 nicheStore(去 niche 后 niche 恒 null,发布包按分析 theme 派生)。
+  const onTriggerRewrite = useCallback((topic?: string) => {
+    justSubmittedRef.current = false; // 手动触发 = 消费掉自动改写信号
     if (analysis) autoRewriteFiredFor.current = analysis.analysis_id;
-    sendChatMessage(`[selected_niche: ${niche}] 改成这个方向`);
+    const t = topic?.trim();
+    const topicMarker = t ? `[rewrite_topic: ${t}]` : "";
+    sendChatMessage(`[selected_niche: generic]${topicMarker} 改成我的版本`);
   }, [sendChatMessage, analysis]);
   useEffect(() => {
     setSessionUserId(userId);
@@ -166,11 +167,11 @@ export default function App({ userId, onLogout }: AppProps) {
     if (!justSubmittedRef.current) return;
     if (rewriteShots.length > 0) return;
     if (autoRewriteFiredFor.current === analysis.analysis_id) return;
-    const niche = useNicheStore.getState().niche;
-    if (!niche) return;
-    autoRewriteFiredFor.current = analysis.analysis_id;
-    justSubmittedRef.current = false;
-    onTriggerRewrite(niche);
+    // 去 niche 后无 niche onboarding,改写改由 CardStack 的「改成你的版本」CTA
+    // 显式触发(可填一句话主题)。不在此自动改写——避免无主题的低质 auto 改写 +
+    // 不擅自替用户花钱。保留 effect 骨架(REWRITE_ENABLED + 守卫)以便将来按 cohort
+    // 接回自动改写。
+    return;
   }, [REWRITE_ENABLED, analysis, loading, rewriteShots, onTriggerRewrite]);
   const switchSession = useCallback((id: string) => {
     if (id === tid) return;
