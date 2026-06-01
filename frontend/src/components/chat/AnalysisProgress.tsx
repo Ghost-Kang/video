@@ -79,12 +79,26 @@ export function AnalysisProgress({ thinking, startedAtMs }: Props) {
   const [snoozeEndElapsed, setSnoozeEndElapsed] = useState<number>(0);
   const reduced = prefersReducedMotion();
 
+  // Live mirror of `elapsed` for use inside other effects without making them
+  // depend on (and re-fire each tick of) elapsed. Synced in the timer effect.
+  const elapsedRef = useRef(elapsed);
+
   useEffect(() => {
-    if (reduced) return; // reduced-motion: 不跑计时器,直接显示静态文字
+    // The ticker must run even under reduced-motion. Bugfix (萌宠 case): when the
+    // backend is slow to emit its first real progress frame (e.g. a v.douyin.com
+    // short-link resolve doing a 302-follow + SSR scrape, ~10-20s before the 15%
+    // stage), the time-based ramp is the ONLY thing moving the bar. Previously
+    // `if (reduced) return` killed the ticker, so a reduced-motion user saw a
+    // frozen 2% bar = "没有显示拆解的进度". reduced-motion means "don't ANIMATE",
+    // not "don't update" — we slow the tick (1.5s vs 0.5s) and the bar's CSS
+    // transition is what reduced-motion suppresses, not the value itself.
     const start = startedAtMs ?? Date.now();
+    const tickMs = reduced ? 1500 : 500;
     const id = setInterval(() => {
-      setElapsed((Date.now() - start) / 1000);
-    }, 500);
+      const e = (Date.now() - start) / 1000;
+      elapsedRef.current = e;
+      setElapsed(e);
+    }, tickMs);
     return () => clearInterval(id);
   }, [reduced, startedAtMs]);
 
@@ -105,9 +119,56 @@ export function AnalysisProgress({ thinking, startedAtMs }: Props) {
   const realStageStr = useWSStore((s) => s.progressStage);
   const realDetail = useWSStore((s) => s.progressDetail);
 
+  // Bugfix (萌宠 case): the backend emits at stage *boundaries* (5% resolve_url →
+  // 15% ark_overlay → 85% → …). Between boundaries there can be a long silence —
+  // a v.douyin.com short-link resolve (302-follow + SSR scrape) sits at 5% for
+  // ~10-20s, and the slow ARK vision call sits at 15% for most of the run.
+  // Previously percent was pinned to the last real value the whole time, so the
+  // bar FROZE between stages = "进入拆解后没显示进度". Fix: snapshot the elapsed
+  // at which each real percent arrived, then creep from it toward the next
+  // stage's value so the bar always inches forward during the gap.
+  // Snapshot (percent, elapsed-at-arrival) each time a NEW real percent lands,
+  // so the inter-stage creep below knows how long this stage has been running.
+  // Stored in state (not a render-time ref mutation) to stay render-pure.
+  const [lastReal, setLastReal] = useState<{ percent: number; atElapsed: number } | null>(null);
+  useEffect(() => {
+    if (realPercent !== null && realPercent > 0) {
+      // elapsed-at-arrival read from the timer-synced ref (updated in an effect,
+      // never in render — rules-of-hooks clean).
+      const at = elapsedRef.current;
+      setLastReal((prev) =>
+        prev && prev.percent === realPercent ? prev : { percent: realPercent, atElapsed: at },
+      );
+    } else if (realPercent === null) {
+      // New run started (setLoading reset progress to null) → drop stale snapshot
+      // so we don't creep from a prior run's stage. Falls back to the time-ramp.
+      setLastReal(null);
+    }
+  }, [realPercent, startedAtMs]);
+
+  // Soft ceiling for the inter-stage creep: just under the next known boundary,
+  // so the creep never overshoots a real stage. Boundaries: 5→15→85→92→95→100.
+  const nextBoundary = (p: number): number => {
+    if (p < 15) return 14;
+    if (p < 85) return 84;
+    if (p < 92) return 91;
+    if (p < 95) return 94;
+    if (p < 100) return 99;
+    return 100;
+  };
+
   let percent: number;
-  if (realPercent !== null && realPercent > 0) {
-    percent = Math.max(2, Math.min(100, realPercent));
+  if (lastReal) {
+    const { percent: base, atElapsed } = lastReal;
+    const ceiling = nextBoundary(base);
+    // Creep ~ (ceiling-base) over ~45s since this stage started, easing out so
+    // it slows as it approaches the ceiling (never reaches it — only a real
+    // frame advances past). Stays put under reduced-motion handling via the
+    // shared ticker (which still updates `elapsed`, just less often).
+    const sinceStage = Math.max(0, elapsed - atElapsed);
+    const span = ceiling - base;
+    const creep = span * (1 - Math.exp(-sinceStage / 18));
+    percent = base + creep;
   } else if (elapsed <= TOTAL_ETA_SEC) {
     percent = (elapsed / TOTAL_ETA_SEC) * 80;
   } else {
