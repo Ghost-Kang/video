@@ -168,17 +168,13 @@ async def handle_anchor_reuse_post(qs: dict, body: dict, anchor_id: str) -> tupl
 
 
 async def handle_rewrite(qs: dict, body: dict) -> tuple[int, dict, str]:
-    # B8 cost_guard identity gap (KNOWN, do NOT silently "fix" by faking server
-    # identity here): user_id/run_id are taken straight from the client body and
-    # used as the cost-cap keys. The HTTP gate (_check_auth) only verifies a
-    # *shared* cohort invite-code — there is no per-user authenticated session at
-    # this layer to derive a trusted user_id from. An attacker who passes the
-    # cohort gate can therefore rotate user_id/run_id per request to evade the
-    # per-user-day and per-run caps in cost_guard (i.e. spend real money). The
-    # correct fix is an auth-flow change (bind requests to a server-issued,
-    # per-user identity), which is out of scope for B8's "small holes" and must
-    # not be hacked in here. Tracked as a follow-up in
-    # docs/nexus/phase2_kickoff_synthesis_2026-05-31.md §6.
+    # 鉴权 A (B8-3) — cost_guard identity: when the request authenticated with a
+    # per-user MAPPED invite code, the dispatcher already overwrote
+    # body["user_id"] with the server-derived identity (config.INVITE_CODE_MAP),
+    # so the cost-cap key below is trusted and cannot be rotated to dodge caps.
+    # Caveat: requests on a *shared* invite code (or no map) still carry the
+    # client-claimed user_id — those callers can still evade caps. Full closure
+    # = issue one mapped code per user (retire shared codes). See synthesis §6.1.
     user_id = str(body.get("user_id") or "default")
     run_id = str(body.get("run_id") or "default")
     await cost_guard.cost_guard(user_id, run_id, cost_guard.PREDICT_REWRITE_CNY)
@@ -213,12 +209,10 @@ async def handle_analysis_shallow(qs: dict, body: dict) -> tuple[int, dict, str]
     source_url = str(body.get("source_url") or "").strip()
     if not source_url:
         return 400, {"error": "source_url_required"}, "Bad Request"
-    # B8 cost_guard identity gap (KNOWN — see handle_rewrite for the full note):
-    # user_id/run_id come from the client body and are used as the cost-cap keys.
-    # The cohort invite-code gate is not a per-user identity, so a caller past the
-    # gate can rotate these fields to evade the per-user/per-run spend caps. Fixing
-    # this requires a server-derived identity (auth-flow change), intentionally out
-    # of scope for B8. Follow-up tracked in the phase2 synthesis doc §6.
+    # 鉴权 A (B8-3) — see handle_rewrite: per-user MAPPED invite codes get a
+    # server-derived body["user_id"] (dispatcher), so this cost-cap key is
+    # trusted. Shared-code requests still carry the client claim (residual gap;
+    # closed by issuing per-user codes). See synthesis §6.1.
     user_id = str(body.get("user_id") or "default")
     run_id = str(body.get("run_id") or "default")
     await cost_guard.cost_guard(user_id, run_id, cost_guard.PREDICT_ANALYSIS_CNY)
@@ -462,9 +456,10 @@ async def handle_invite_verify(qs: dict, body: dict) -> tuple[int, dict, str]:
     is disabled, so any code is valid — matching the WS auth behavior.
     """
     code = (qs.get("code", [""])[0] or "").strip()
-    if not config.INVITE_CODES:
+    if not config.has_invite_gate():
         return 200, {"valid": True, "gate": "open"}, "OK"
-    valid = code in config.INVITE_CODES
+    # 鉴权 A — accept shared codes OR per-user mapped codes.
+    valid = config.is_valid_invite(code)
     return 200, {"valid": valid, "gate": "cohort"}, "OK"
 
 
@@ -593,10 +588,10 @@ def _check_auth(method: str, path: str, headers: dict[str, str]) -> tuple[int, d
         if hmac.compare_digest(headers.get("x-admin-token", ""), config.ADMIN_TOKEN):
             return None
         return 401, {"error": "admin_token_required"}, "Unauthorized"
-    # COHORT (default)
-    if not config.INVITE_CODES:
+    # COHORT (default) — 鉴权 A: accept shared codes OR per-user mapped codes.
+    if not config.has_invite_gate():
         return None  # dev/test: gate disabled
-    if headers.get("x-invite-code", "") in config.INVITE_CODES:
+    if config.is_valid_invite(headers.get("x-invite-code", "")):
         return None
     return 401, {"error": "invite_code_required"}, "Unauthorized"
 
@@ -666,6 +661,17 @@ async def handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
             writer.write(_http_response(a_status, a_body, a_reason))
             await writer.drain()
             return
+
+        # 鉴权 A — pin the trusted identity onto the body so cost-keyed handlers
+        # (handle_rewrite / handle_analysis_shallow read body["user_id"] for the
+        # cost_guard cap) use the SERVER-derived user_id when a per-user mapped
+        # invite code was presented, instead of the client's self-asserted value.
+        # Closes the刷钱 gap: a caller can't rotate user_id to dodge the caps.
+        # Shared-code / no-map requests keep the client value (legacy behavior).
+        if isinstance(body, dict):
+            _ic = headers.get("x-invite-code", "")
+            if _ic in config.INVITE_CODE_MAP:
+                body["user_id"] = config.INVITE_CODE_MAP[_ic]
 
         status, response_body, reason = await handler(qs, body, **path_params)
         writer.write(_http_response(status, response_body, reason))

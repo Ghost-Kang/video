@@ -64,27 +64,88 @@ STRICT_CROSS_BORDER_REJECT = os.getenv("STRICT_CROSS_BORDER_REJECT", "1") == "1"
 INVITE_CODES = frozenset(
     c.strip() for c in os.getenv("INVITE_CODES", "").split(",") if c.strip()
 )
+
+# B8-3 / 鉴权 A(每用户独立邀请码)— per-user invite codes that carry a
+# SERVER-DERIVED identity. Format: `INVITE_CODE_MAP="code1:userA,code2:userB"`.
+# When a request presents a code in this map, the server uses the MAPPED user_id
+# as the trusted identity — ignoring whatever user_id the client claims. This
+# closes the cost-cap evasion: a caller can no longer rotate user_id/run_id to
+# dodge CASCADE_RUN/USER_DAY caps, because their identity is pinned to the code
+# they authenticated with (which they can't mint).
+#
+# Shared INVITE_CODES still work (legacy / dev): a shared code has no mapped
+# identity, so user_id falls back to the client's claim (the pre-existing,
+# weaker behavior). Migration path: issue one mapped code per beta user, retire
+# the shared codes. A code may appear in both; the map wins for identity.
+def _parse_invite_code_map(raw: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for pair in raw.split(","):
+        pair = pair.strip()
+        if not pair or ":" not in pair:
+            continue
+        code, _, uid = pair.partition(":")
+        code, uid = code.strip(), uid.strip()
+        if code and uid:
+            out[code] = uid
+    return out
+
+
+INVITE_CODE_MAP = _parse_invite_code_map(os.getenv("INVITE_CODE_MAP", ""))
+
+
+def has_invite_gate() -> bool:
+    """True if any invite gate is configured (shared codes OR per-user mapped
+    codes). Read live (not a cached constant) so tests that monkeypatch
+    INVITE_CODES / INVITE_CODE_MAP take effect. dev/test with both empty → no
+    gate (open)."""
+    return bool(INVITE_CODES or INVITE_CODE_MAP)
+
+
+def is_valid_invite(code: str | None) -> bool:
+    """True if `code` is an accepted invite — either a shared INVITE_CODES member
+    or a per-user mapped code. Single source of truth for both WS + HTTP gates."""
+    if not code:
+        return False
+    return code in INVITE_CODES or code in INVITE_CODE_MAP
+
+
+def resolve_user_id(code: str | None, claimed_user_id: str) -> str:
+    """The trusted user_id for a request authenticated with `code`.
+
+    If `code` is a per-user mapped code → the MAPPED user_id (server-derived,
+    the client's claim is ignored — this is the刷钱 fix). Otherwise (shared code
+    or no map) → the client's claimed user_id (legacy behavior, unchanged)."""
+    if code and code in INVITE_CODE_MAP:
+        return INVITE_CODE_MAP[code]
+    return claimed_user_id
+
+
+# Boot-time snapshot of "is any gate configured" — for the fail-closed prod
+# guard below ONLY (runs once at import). Runtime gate checks must call
+# has_invite_gate() instead (reads live state so tests can monkeypatch).
+_HAS_INVITE_GATE_AT_BOOT = bool(INVITE_CODES or INVITE_CODE_MAP)
+
 # W5D3 P1 — fail CLOSED in prod. Previously a misconfigured deploy with
 # `INVITE_CODES=""` shipped wide-open and only a stderr WARN appeared in docker
-# logs (easy to miss). Now: if ENV=prod and INVITE_CODES is empty, raise on
-# import. The only way to deliberately run prod with no gate is to set
+# logs (easy to miss). Now: if ENV=prod and NO invite gate is configured, raise
+# on import. The only way to deliberately run prod with no gate is to set
 # `CASCADE_AUTH_MODE=open` explicitly (opt-in, documented).
 _AUTH_MODE = os.getenv("CASCADE_AUTH_MODE", "").strip().lower()
 _LOOKS_PROD = (
     os.getenv("ENV", "").lower() == "prod"
     or "prod" in os.getenv("HOSTNAME", "").lower()
 )
-if not INVITE_CODES and _LOOKS_PROD and _AUTH_MODE != "open":
+if not _HAS_INVITE_GATE_AT_BOOT and _LOOKS_PROD and _AUTH_MODE != "open":
     raise RuntimeError(
-        "INVITE_CODES is empty in a prod env. Either set INVITE_CODES "
-        "(comma-separated) or explicitly opt-in to open access with "
-        "CASCADE_AUTH_MODE=open. Boot aborted to prevent silently shipping "
-        "an open server."
+        "No invite gate in a prod env. Set INVITE_CODES (comma-separated) "
+        "and/or INVITE_CODE_MAP (code:user_id,...) or explicitly opt-in to "
+        "open access with CASCADE_AUTH_MODE=open. Boot aborted to prevent "
+        "silently shipping an open server."
     )
-if not INVITE_CODES and _LOOKS_PROD and _AUTH_MODE == "open":
+if not _HAS_INVITE_GATE_AT_BOOT and _LOOKS_PROD and _AUTH_MODE == "open":
     import sys as _sys
     print(
-        "[WARN] INVITE_CODES empty + CASCADE_AUTH_MODE=open — WS auth gate is OFF.",
+        "[WARN] No invite gate + CASCADE_AUTH_MODE=open — WS auth gate is OFF.",
         file=_sys.stderr,
         flush=True,
     )

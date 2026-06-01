@@ -67,9 +67,11 @@ async def handle(websocket) -> None:
                     # 空 user_id / missing user_id / 多余字段 — 关闭(test 期望 4001)
                     await websocket.close(4001, "user_id required")
                     return
-                # 内测准入码 gate — 仅在 INVITE_CODES 非空时强制 (production)。
-                # Dev/test 默认空集 = 任何 user 可接入,保留原行为。
-                if config.INVITE_CODES and auth.invite_code not in config.INVITE_CODES:
+                # 内测准入码 gate — 仅在配置了 invite gate 时强制 (production)。
+                # Dev/test 默认无 gate = 任何 user 可接入,保留原行为。
+                # 鉴权 A:gate 同时接受共享码(INVITE_CODES)与 per-user 映射码
+                # (INVITE_CODE_MAP)。
+                if config.has_invite_gate() and not config.is_valid_invite(auth.invite_code):
                     # B8: never log the raw invite code (it is a shared secret —
                     # plaintext in logs lets anyone with log access reuse it).
                     # Log a non-reversible fingerprint instead: sha256 prefix +
@@ -79,7 +81,10 @@ async def handle(websocket) -> None:
                     print(f"[连接] 拒 user={auth.user_id} 无效 invite_code sha256[:8]={_fp} len={len(_ic)}")
                     await websocket.close(4003, "invite code required")
                     return
-                user_id = auth.user_id
+                # 鉴权 A — per-user 映射码时,服务端用映射的 user_id,无视客户端
+                # 自报的 auth.user_id(堵 cost-cap 刷钱:身份钉死在认证码上)。
+                # 共享码 / 无 gate 时回落客户端 user_id(旧行为不变)。
+                user_id = config.resolve_user_id(auth.invite_code, auth.user_id)
                 canvas_tools.set_user_id(user_id)
                 notify.register(user_id, websocket)
                 generation_worker.start_workers()

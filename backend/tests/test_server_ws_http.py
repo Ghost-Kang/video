@@ -6,6 +6,7 @@ from typing import Iterable
 
 from agent import config, server, store
 from agent.cascade import cost_guard
+from agent.transport import http_router as http_router_mod
 from agent.workers import generation_worker
 
 
@@ -232,6 +233,84 @@ def test_admin_token_constant_time_compare(monkeypatch):
     src = inspect.getsource(http_router._check_auth)
     assert "compare_digest" in src
     assert "== config.ADMIN_TOKEN" not in src
+
+
+# ---------- 鉴权 A (B8-3): per-user mapped code pins cost-cap identity ----------
+
+
+def test_mapped_invite_overrides_spoofed_user_id_for_cost_cap(monkeypatch):
+    """The刷钱 fix end-to-end: a request with a per-user MAPPED invite code but a
+    spoofed body user_id must charge the cost_guard against the SERVER-derived
+    (mapped) identity, not the client's claim."""
+    monkeypatch.setattr(config, "INVITE_CODES", frozenset())
+    monkeypatch.setattr(config, "INVITE_CODE_MAP", {"alice-code": "alice"})
+
+    seen: dict[str, str] = {}
+
+    async def _capture_guard(user_id: str, run_id: str, predicted: float) -> None:
+        seen["user_id"] = user_id
+
+    async def _fake_analysis(source_url: str, *, user_id: str, run_id: str):
+        # minimal stand-in so the handler returns without real upstream
+        class _C:
+            model = "test"
+            cost_cny = 0.0
+
+            def model_dump(self, mode="json"):
+                return {"analysis_id": "ana_x", "model": "test"}
+
+        return _C()
+
+    monkeypatch.setattr(cost_guard, "cost_guard", _capture_guard)
+    monkeypatch.setattr(http_router_mod, "request_shallow_analysis", _fake_analysis)
+
+    status, _ = _drive(
+        _req(
+            "POST",
+            "/api/analysis/shallow",
+            headers="X-Invite-Code: alice-code\r\n",
+            body={"source_url": "https://example.com/v", "user_id": "attacker-claims-bob"},
+        )
+    )
+    assert status == 200
+    # cost_guard must have been keyed on the mapped identity, NOT the spoof
+    assert seen["user_id"] == "alice"
+
+
+def test_shared_invite_keeps_client_user_id(monkeypatch):
+    """Shared (non-mapped) code → legacy behavior: client-claimed user_id is used
+    (residual gap, documented; closed by issuing per-user codes)."""
+    monkeypatch.setattr(config, "INVITE_CODES", frozenset({"SHARED"}))
+    monkeypatch.setattr(config, "INVITE_CODE_MAP", {})
+
+    seen: dict[str, str] = {}
+
+    async def _capture_guard(user_id: str, run_id: str, predicted: float) -> None:
+        seen["user_id"] = user_id
+
+    async def _fake_analysis(source_url: str, *, user_id: str, run_id: str):
+        class _C:
+            model = "test"
+            cost_cny = 0.0
+
+            def model_dump(self, mode="json"):
+                return {"analysis_id": "ana_x", "model": "test"}
+
+        return _C()
+
+    monkeypatch.setattr(cost_guard, "cost_guard", _capture_guard)
+    monkeypatch.setattr(http_router_mod, "request_shallow_analysis", _fake_analysis)
+
+    status, _ = _drive(
+        _req(
+            "POST",
+            "/api/analysis/shallow",
+            headers="X-Invite-Code: SHARED\r\n",
+            body={"source_url": "https://example.com/v", "user_id": "claimed-self"},
+        )
+    )
+    assert status == 200
+    assert seen["user_id"] == "claimed-self"
 
 
 def test_admin_route_fail_closed_in_prod_without_token(monkeypatch):
