@@ -38,6 +38,7 @@ export interface SampleCase {
 }
 
 const TONGNIAN = "/media/showcase/tongnian";
+const MENCHONG = "/media/showcase/menchong";
 
 export const SAMPLE_CASES: SampleCase[] = [
   {
@@ -59,20 +60,25 @@ export const SAMPLE_CASES: SampleCase[] = [
     ],
   },
   {
-    // 趣味萌宠 —— 「派大星跳钢管舞」(海星缠水草的猎奇治愈向)。真实分析数据:
-    // 本地真 doubao 跑通(theme/hook/emotion/9 幕均为模型实际输出);resolver 实测
-    // 可解析(duration 49.6s,desc「如何让派大星跳钢管舞」by 神奇小查)。
-    // slides 暂缺:逐幕 clip 媒体需在 prod 容器跑 gen_showcase_case.py 生成到
-    //   /media/showcase/menchong/(见文件头注释)。无 slides → 在 SampleCaseCarousel
-    //   里以静态洞察卡呈现(hook+情绪),点开走真链接进完整分析。prod 生成后把打印的
-    //   slides 数组粘到下方 `slides:` 即可升级成逐幕视频轮播(亦可提到数组首位做 hero)。
+    // 趣味萌宠 —— 「派大星跳钢管舞」(海星缠水草的猎奇治愈向)。
+    // slides 由 prod gen_showcase_case.py 生成(7 幕 clip 落 /media/showcase/menchong/,
+    // 永不清理),theme/note/emotion 为模型实际输出。
     id: "menchong-paidaxing",
     source_url: "https://www.douyin.com/video/7645650053617609381",
     category: "趣味萌宠",
     emoji: "🐾",
-    hook: "开场特写粉色海星缠绕水草,字幕「世界上最喜欢跳钢管舞的动物」,用新奇比喻一秒抓住好奇心。",
-    emotion: "趣味性 · 治愈感 · 好奇心",
+    hook: "开场直接放出粉色海星爬杆的特写画面,配台词「世界上最喜欢跳钢管舞的动物」,用猎奇的表述瞬间抓住观众注意力。",
+    emotion: "猎奇感 · 治愈感 · 搞笑趣味感",
     gradient: "bg-[radial-gradient(120%_120%_at_30%_20%,#fdf2f8_0%,#fbcfe8_45%,#f0a4c8_100%)]",
+    slides: [
+      { clip: `${MENCHONG}/scene_1.mp4`, poster: `${MENCHONG}/scene_1.jpg`, theme: "海星爬杆特写开场", note: "特写粉色海星爬杆的画面", emotion: "猎奇有趣" },
+      { clip: `${MENCHONG}/scene_2.mp4`, poster: `${MENCHONG}/scene_2.jpg`, theme: "多海星爬杆展示", note: "中景展示鱼缸内多只海星爬杆", emotion: "轻松有趣" },
+      { clip: `${MENCHONG}/scene_3.mp4`, poster: `${MENCHONG}/scene_3.jpg`, theme: "展示准备材料", note: "中景展示手持植物茎秆的画面", emotion: "轻松" },
+      { clip: `${MENCHONG}/scene_4.mp4`, poster: `${MENCHONG}/scene_4.jpg`, theme: "展示饲养海星的鱼缸", note: "全景展示鱼缸,手放入海星", emotion: "轻松" },
+      { clip: `${MENCHONG}/scene_5.mp4`, poster: `${MENCHONG}/scene_5.jpg`, theme: "实操插杆放海星", note: "近景展示手在缸内插杆放海星的操作", emotion: "轻松" },
+      { clip: `${MENCHONG}/scene_6.mp4`, poster: `${MENCHONG}/scene_6.jpg`, theme: "意外状况展示", note: "中景展示被海星拔起的茎秆", emotion: "搞笑" },
+      { clip: `${MENCHONG}/scene_7.mp4`, poster: `${MENCHONG}/scene_7.jpg`, theme: "展示成功效果", note: "中景展示多只海星爬杆的效果", emotion: "治愈有趣" },
+    ],
   },
   // ⬇️ 新案例往这里加(给我 source_url + 品类 + 钩子/情绪,我把它的逐幕 clip 预生成到
   //    /media/showcase/<id>/ 后填进 slides 即可)。
