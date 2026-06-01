@@ -34,6 +34,21 @@ IMAGE_GEN_BASE_URL = os.getenv("IMAGE_GEN_BASE_URL", "https://api.apimart.ai")
 IMAGE_GEN_MODEL = os.getenv("IMAGE_GEN_MODEL", "gpt-image-2")
 IMAGE_GEN_GOOGLE_MODEL = os.getenv("IMAGE_GEN_GOOGLE_MODEL", "gemini-3.1-flash-image-preview")
 
+# -------- 落地页案例自动发布(auto-showcase)--------
+# 用户跑完一条分析,达标即自动做成落地页轮播案例(clip 复制到永久 showcase/ 目录
+# + 写 showcase_cases 表),落地页动态 fetch 显示。founder 定:高置信度自动上 + 可下架。
+# kill-switch:AUTO_SHOWCASE_ENABLED=0 关闭自动发布(手动 gen_showcase_case 不受影响)。
+AUTO_SHOWCASE_ENABLED = os.getenv("AUTO_SHOWCASE_ENABLED", "1").strip() not in ("0", "false", "no", "")
+# 质量门槛:置信度下限 —— 低于此不自动上(真实用户视频未经把关公开的风险闸)。
+AUTO_SHOWCASE_MIN_CONFIDENCE = float(os.getenv("AUTO_SHOWCASE_MIN_CONFIDENCE", "0.85") or "0.85")
+# 自动发布案例数上限 —— 落地页固定按置信度排名展示 ≤10 条(见 showcase_repo
+# .list_published + GET /api/showcase 的 limit 钳制),所以自动池也封顶 10:满 10 条后
+# 不再自动上(手动 gen_showcase_case 仍可加,但落地页只取置信度 top-10)。
+# 已下架(hidden)的不占名额。防 showcase/ 媒体无限增长 + 轮播过长。
+AUTO_SHOWCASE_MAX = int(os.getenv("AUTO_SHOWCASE_MAX", "10") or "10")
+# 自动发布案例至少需要几幕成功抽到 clip(无 clip 的卡退化成静态,落地页轮播体验差)。
+AUTO_SHOWCASE_MIN_CLIPS = int(os.getenv("AUTO_SHOWCASE_MIN_CLIPS", "3") or "3")
+
 # -------- 视频生成 --------
 VIDEO_GEN_API_KEY = os.getenv("VIDEO_GEN_API_KEY")
 VIDEO_GEN_BASE_URL = os.getenv("VIDEO_GEN_BASE_URL")

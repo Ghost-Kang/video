@@ -190,6 +190,32 @@ async def bootstrap_schema(db: aiosqlite.Connection | None = None) -> None:
               updated_at  TEXT NOT NULL
             )"""
         )
+        # Auto-showcase — landing-page sample cases, data-driven (replaces the
+        # static SAMPLE_CASES bundled in the frontend). A completed analysis that
+        # passes the quality gate auto-publishes here; `GET /api/showcase` serves
+        # published rows to the landing carousel. `status` = published|hidden
+        # (founder can hide via admin endpoint). `origin` = auto|manual.
+        # `slides_json` is the pre-rendered ShowcaseSlide[] (clip/poster/theme/…)
+        # pointing at the permanent /media/showcase/<case_id>/ dir.
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS showcase_cases (
+              case_id     TEXT PRIMARY KEY,
+              source_url  TEXT NOT NULL UNIQUE,
+              category    TEXT NOT NULL,
+              emoji       TEXT,
+              hook        TEXT NOT NULL,
+              emotion     TEXT,
+              gradient    TEXT,
+              slides_json TEXT NOT NULL,
+              confidence  REAL NOT NULL DEFAULT 0,
+              status      TEXT NOT NULL DEFAULT 'published',
+              origin      TEXT NOT NULL DEFAULT 'auto',
+              created_at  TEXT NOT NULL
+            )"""
+        )
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_showcase_status_time ON showcase_cases(status, created_at DESC)"
+        )
         await db.commit()
         _BOOTSTRAPPED_PATHS.add(str(path))
     finally:

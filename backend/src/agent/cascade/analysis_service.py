@@ -230,6 +230,14 @@ async def request_shallow_analysis(
                     upstream_attempts=upstream_attempts,
                 ),
             )
+            # Auto-showcase: a fresh analysis just had its clips extracted to the
+            # (sweep-eligible) media dir — copy high-confidence ones into the
+            # permanent showcase dir + publish to the landing carousel. Only on
+            # the fresh path (a cache-hit's clips may already be swept). Strictly
+            # best-effort: maybe_publish_showcase swallows all errors and never
+            # touches the WS/lifecycle path, so it can't block or fail analysis.
+            from agent.cascade.showcase_service import maybe_publish_showcase
+            await maybe_publish_showcase(contract)
         else:
             stored = await load_analysis(contract.analysis_id)
             if stored is not None:

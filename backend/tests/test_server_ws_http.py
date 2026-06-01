@@ -164,6 +164,61 @@ def test_open_routes_need_no_auth(monkeypatch):
     assert status == 200 and "runs" in body and "creators" in body
 
 
+# ---------- auto-showcase endpoints ----------
+
+
+def test_showcase_get_is_open_and_lists_published(monkeypatch, tmp_path):
+    """GET /api/showcase is OPEN (landing is public) and returns published cases."""
+    from agent.cascade.persistence import showcase_repo
+
+    monkeypatch.setenv("CASCADE_DB_PATH", str(tmp_path / "cascade.db"))
+    monkeypatch.setattr(config, "INVITE_CODES", frozenset({"GOOD"}))
+    # seed one published + one hidden
+    asyncio.run(showcase_repo.insert_case(
+        case_id="c1", source_url="https://x/1", category="美食", emoji="🍜",
+        hook="h1", emotion="香", gradient=None, slides=[{"clip": "/m/c1/scene_1.mp4", "poster": "", "theme": "t", "note": "n"}],
+        confidence=0.9,
+    ))
+    asyncio.run(showcase_repo.insert_case(
+        case_id="c2", source_url="https://x/2", category="剧情", emoji=None,
+        hook="h2", emotion=None, gradient=None, slides=[], confidence=0.9, status="hidden",
+    ))
+    # reachable with NO auth header
+    status, body = _drive(_req("GET", "/api/showcase"))
+    assert status == 200
+    ids = [c["id"] for c in body["cases"]]
+    assert "c1" in ids and "c2" not in ids  # only published
+
+
+def test_showcase_status_requires_admin(monkeypatch, tmp_path):
+    from agent.cascade.persistence import showcase_repo
+
+    monkeypatch.setenv("CASCADE_DB_PATH", str(tmp_path / "cascade.db"))
+    monkeypatch.setattr(config, "ADMIN_TOKEN", "secret")
+    asyncio.run(showcase_repo.insert_case(
+        case_id="c1", source_url="https://x/1", category="美食", emoji=None,
+        hook="h", emotion=None, gradient=None, slides=[], confidence=0.9,
+    ))
+    # no admin token → 401
+    status, _ = _drive(_req("POST", "/api/showcase/status", body={"case_id": "c1", "status": "hidden"}))
+    assert status == 401
+    # with admin token → hides it
+    status, body = _drive(_req(
+        "POST", "/api/showcase/status",
+        headers="X-Admin-Token: secret\r\n",
+        body={"case_id": "c1", "status": "hidden"},
+    ))
+    assert status == 200 and body["status"] == "hidden"
+    assert asyncio.run(showcase_repo.count_published()) == 0
+    # bad status → 400
+    status, _ = _drive(_req(
+        "POST", "/api/showcase/status",
+        headers="X-Admin-Token: secret\r\n",
+        body={"case_id": "c1", "status": "garbage"},
+    ))
+    assert status == 400
+
+
 def test_invite_verify_open_and_validates_code(monkeypatch):
     # W5D4 — pre-flight gate check. OPEN (no auth header), returns valid:bool.
     monkeypatch.setattr(config, "INVITE_CODES", frozenset({"cascade"}))

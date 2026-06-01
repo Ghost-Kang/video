@@ -238,6 +238,37 @@ async def handle_analysis_shallow(qs: dict, body: dict) -> tuple[int, dict, str]
     return 200, contract.model_dump(mode="json"), "OK"
 
 
+async def handle_showcase_get(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """OPEN — published landing-page showcase cases (auto-showcase). The landing
+    page fetches this to render the case carousel; data-driven, no redeploy to
+    add a case."""
+    from agent.cascade.persistence import showcase_repo
+
+    # 落地页固定展示「≤10 条真实案例,按置信度排名」(founder 规则)。limit 仅允许在
+    # 1..10 内调小,不允许超过 10 —— 10 是产品上限,不是可越过的默认。
+    try:
+        limit = int(qs.get("limit", ["10"])[0])
+    except ValueError:
+        limit = 10
+    cases = await showcase_repo.list_published(limit=max(1, min(10, limit)))
+    return 200, {"cases": cases}, "OK"
+
+
+async def handle_showcase_status_post(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """ADMIN — hide/restore a showcase case (founder takedown control).
+    Body: {case_id, status: "published"|"hidden"}."""
+    from agent.cascade.persistence import showcase_repo
+
+    case_id = str(body.get("case_id") or "").strip()
+    status = str(body.get("status") or "").strip()
+    if not case_id or status not in ("published", "hidden"):
+        return 400, {"error": "case_id + status(published|hidden) required"}, "Bad Request"
+    ok = await showcase_repo.set_status(case_id, status)
+    if not ok:
+        return 404, {"error": "case_id not found"}, "Not Found"
+    return 200, {"ok": True, "case_id": case_id, "status": status}, "OK"
+
+
 _SERVER_START_TIME = time.monotonic()
 
 
@@ -535,6 +566,8 @@ EXACT_ROUTES: dict[tuple[str, str], HandlerFn] = {
     ("GET", "/api/health/summary"): handle_health_summary,
     ("GET", "/api/stats/public"): handle_public_stats,
     ("GET", "/api/invite/verify"): handle_invite_verify,
+    ("GET", "/api/showcase"): handle_showcase_get,
+    ("POST", "/api/showcase/status"): handle_showcase_status_post,
 }
 
 # (method, prefix, suffix, param_name, handler) — 路径里的可变段会作为 path_param 传入。
@@ -557,11 +590,13 @@ OPEN_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("GET", "/api/health"),
     ("GET", "/api/stats/public"),
     ("GET", "/api/invite/verify"),  # pre-flight gate check; must be reachable pre-auth
+    ("GET", "/api/showcase"),  # landing-page sample cases; pre-auth (landing is public)
 })
 ADMIN_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("GET", "/api/events"),
     ("GET", "/api/creators"),
     ("GET", "/api/health/summary"),
+    ("POST", "/api/showcase/status"),  # founder hide/restore a showcase case
 })
 
 

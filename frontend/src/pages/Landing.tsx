@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ConsentGate } from "../components/landing/ConsentGate";
 import { CaseShowcaseRow } from "../components/landing/CaseShowcaseRow";
-import { SAMPLE_CASES } from "../lib/sampleCases";
+import { useShowcaseCases } from "../hooks/useShowcaseCases";
 import { UrlFallback } from "../components/landing/UrlFallback";
 import { StatCounter } from "../components/landing/StatCounter";
 import { PageShell } from "../components/PageShell";
@@ -20,6 +20,7 @@ export function Landing() {
   const navigate = useNavigate();
   const [exiting, setExiting] = useState(false);
   const stats = useLiveStats();
+  const showcaseCases = useShowcaseCases();
 
   // 触发页面退出动画后再 navigate(280ms 让 anim-page-out 跑完)
   const fadeNavigate = useCallback(
@@ -133,8 +134,9 @@ export function Landing() {
                 {COPY.sample_cases_header} 👇
               </p>
               <div className="anim-fade-up" style={{ animationDelay: "900ms" }}>
-                {/* 全部真实作品 → 逐幕视频卡,左右并排;多到一屏装不下按页自动轮转。 */}
-                <CaseShowcaseRow cases={SAMPLE_CASES} onPick={pickCase} />
+                {/* 全部真实作品 → 逐幕视频卡,左右并排;多到一屏装不下按页自动轮转。
+                    数据来自 /api/showcase(用户跑完自动上)∪ 种子案例。 */}
+                <CaseShowcaseRow cases={showcaseCases} onPick={pickCase} />
               </div>
             </div>
           </ConsentGate>
