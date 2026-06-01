@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from agent.cascade.contract import REWRITE_PIPELINE_REVISION
 from agent.cascade.persistence.db import _connect
 
 
@@ -16,9 +17,19 @@ async def save_rewrite(
     db = await _connect()
     try:
         await db.execute(
-            """INSERT INTO rewrites (rewrite_id, analysis_id, niche, user_id, run_id, result_json, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (rewrite_id, analysis_id, niche, user_id, run_id, result_json, created_at),
+            """INSERT INTO rewrites
+               (rewrite_id, analysis_id, niche, user_id, run_id, result_json, created_at, pipeline_revision)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                rewrite_id,
+                analysis_id,
+                niche,
+                user_id,
+                run_id,
+                result_json,
+                created_at,
+                REWRITE_PIPELINE_REVISION,
+            ),
         )
         await db.commit()
     finally:
@@ -53,11 +64,16 @@ async def load_recent_rewrite(
 ) -> str | None:
     db = await _connect()
     try:
+        # pipeline_revision guard (B2): only serve cache from the CURRENT rewrite
+        # pipeline. After 改写解封 bumps REWRITE_PIPELINE_REVISION, older rows
+        # (incl. legacy fixture rows backfilled to 0) fail this predicate and the
+        # caller regenerates — no stale fixture 套娃 within the 24h window.
         row = await db.execute_fetchall(
             """SELECT result_json FROM rewrites
-               WHERE analysis_id = ? AND niche = ? AND user_id = ? AND created_at >= ?
+               WHERE analysis_id = ? AND niche = ? AND user_id = ?
+                 AND created_at >= ? AND pipeline_revision = ?
                ORDER BY created_at DESC LIMIT 1""",
-            (analysis_id, niche, user_id, since),
+            (analysis_id, niche, user_id, since, REWRITE_PIPELINE_REVISION),
         )
     finally:
         await db.close()

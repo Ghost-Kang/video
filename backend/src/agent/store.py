@@ -116,8 +116,8 @@ def list_sessions(user_id: str) -> list[dict]:
 
     # 合并仅有画布数据但无消息的会话
     try:
-        from agent.tools.canvas import _DB_PATH as _CANVAS_DB
-        cdb = sqlite3.connect(str(_CANVAS_DB))
+        from agent.tools.canvas_persistence.db import canvas_db_path
+        cdb = sqlite3.connect(str(canvas_db_path()))
         cdb.row_factory = sqlite3.Row
         crows = cdb.execute(
             """SELECT DISTINCT cn.thread_id

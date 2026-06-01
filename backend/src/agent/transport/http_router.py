@@ -27,7 +27,7 @@ from pydantic import ValidationError
 
 from agent import config
 from agent.cascade import cost_guard
-from agent.cascade.analysis_service import request_shallow_analysis
+from agent.cascade.analysis_service import active_upstream, request_shallow_analysis
 from agent.cascade.anchors import create_anchor, list_anchors, list_reuses, reuse_anchor
 from agent.cascade.event_names import EventName
 from agent.cascade.events import emit
@@ -214,7 +214,7 @@ async def handle_analysis_shallow(qs: dict, body: dict) -> tuple[int, dict, str]
         payload={
             "run_id": run_id,
             "call_kind": "analysis",
-            "provider": "fixture",
+            "provider": active_upstream(),
             "model": contract.model,
             "cost_fen": int(round(contract.cost_cny * 100)),
             "latency_ms": _latency_ms,

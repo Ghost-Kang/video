@@ -264,3 +264,73 @@ class TestEmptyAndErrorPaths:
         # 只 capture 到 agent_stream(第一帧),agent_response 被抛但被吞
         assert len(ws.sent) == 1
         assert ws.sent[0]["type"] == "agent_stream"
+
+
+# ---------- W5D4 B5: 工具级 HardFailure → run lifecycle 标 failed ----------
+
+
+@pytest.fixture
+def captured_lifecycle(monkeypatch):
+    """Capture run_state.mark_* calls without touching the DB.
+
+    Lets us assert the terminal transition: a tool that caught a HardFailure
+    (and recorded it on RUN_CTX) must yield mark_failed, NOT mark_done — even
+    though the agent stream itself completes normally.
+    """
+    calls: list[tuple[str, Any]] = []
+
+    async def _mark_running(user_id: str, thread_id: str) -> int:
+        calls.append(("running", thread_id))
+        return 1
+
+    async def _mark_done(thread_id: str) -> None:
+        calls.append(("done", thread_id))
+
+    async def _mark_failed(thread_id: str, failure: dict | None) -> None:
+        calls.append(("failed", failure))
+
+    monkeypatch.setattr(agent_runner.run_state, "mark_running", _mark_running)
+    monkeypatch.setattr(agent_runner.run_state, "mark_done", _mark_done)
+    monkeypatch.setattr(agent_runner.run_state, "mark_failed", _mark_failed)
+    return calls
+
+
+class TestToolFailureLifecycle:
+    def test_tool_failure_marks_failed_not_done(self, saved_messages, stub_canvas_data, captured_lifecycle):
+        """A tool catches a HardFailure → sets RUN_CTX['tool_failure'] mid-stream.
+        Stream then ends normally, but run_agent must record `failed` (with the
+        recovery payload) so a reconnect replay shows the next step."""
+        from agent.transport.runtime_ctx import get_run_ctx
+
+        failure = {
+            "code": "S8_UPSTREAM_REFUSED",
+            "hint": "上游忙,换条链接重试",
+            "actions": ["RETRY_WITH_NEW_URL"],
+            "request_id": "",
+        }
+
+        class ToolFailingAgent:
+            async def astream(self, _input, *, config, stream_mode, version):
+                # Simulate cascade._push_failure_frame writing to the live ctx.
+                get_run_ctx()["tool_failure"] = failure
+                yield {"data": (AIMessageChunk(content="分析失败了"), {})}
+
+        ws = FakeWS()
+        asyncio.run(run_agent("u1", FakePool(ToolFailingAgent()), "t1", "hi", ws))  # type: ignore[arg-type]
+
+        statuses = [c[0] for c in captured_lifecycle]
+        assert "done" not in statuses, "tool-level failure must NOT be recorded done"
+        assert statuses[0] == "running"
+        assert statuses[-1] == "failed"
+        # the recovery payload is carried through verbatim
+        failed_payload = [c[1] for c in captured_lifecycle if c[0] == "failed"][0]
+        assert failed_payload == failure
+
+    def test_clean_stream_marks_done(self, saved_messages, stub_canvas_data, captured_lifecycle):
+        """No tool_failure on the ctx → normal terminal `done` (regression guard)."""
+        chunks = [(AIMessageChunk(content="ok"), {})]
+        ws = FakeWS()
+        asyncio.run(run_agent("u1", FakePool(FakeAgent(chunks)), "t1", "hi", ws))
+
+        statuses = [c[0] for c in captured_lifecycle]
+        assert statuses == ["running", "done"]

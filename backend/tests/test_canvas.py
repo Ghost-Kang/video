@@ -27,11 +27,16 @@ def _isolated_canvas_db(tmp_path, monkeypatch):
     These tests share module-level state and `claim_pending_tasks` /
     `recover_generation_tasks` are GLOBAL (not thread-scoped). Without isolation,
     pending image nodes left by one test (or a prior pytest run against the dev
-    canvas.db) leak into another and break exact-count assertions. Pointing
-    `_DB_PATH` at a per-test temp file makes the suite deterministic.
+    canvas.db) leak into another and break exact-count assertions.
+
+    canvas.db now resolves through the shared `resolve_data_dir` policy
+    (CASCADE_DB_PATH override → that file's dir), same as cascade.db. We set the
+    env var to a temp file so `canvas_db_path()` lands the per-test canvas.db
+    beside it — this is the standard isolation pattern the rest of the DB suite
+    uses, and it exercises the real override path (not a monkeypatched constant).
     """
     p = tmp_path / "canvas.db"
-    monkeypatch.setattr(canvas_db, "_DB_PATH", p)
+    monkeypatch.setenv("CASCADE_DB_PATH", str(tmp_path / "cascade.db"))
     canvas_db._MIGRATED_PATHS.discard(str(p))
     yield
 

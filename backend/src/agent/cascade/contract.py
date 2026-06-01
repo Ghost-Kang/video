@@ -27,6 +27,19 @@ SCHEMA_VERSION = "1.0"
 #   3 → + per-scene video clips (scenes[].clip_url / clip_poster_url)
 ANALYSIS_PIPELINE_REVISION = 3
 
+# Rewrite cache-invalidation marker — the rewrites table (rewrites_repo) is the
+#改写 counterpart of the permanent analysis cache, but with a 24h window. It had
+# NO version guard: when CASCADE_REWRITE_UPSTREAM flips fixture→llm (改写解封,
+# Phase 2 P0), a within-24h cache hit would keep serving the old fixture 套娃
+# instead of the new LLM rewrite — exactly the "still the old shape" trap the
+# analysis-revision guard was built to prevent. load_recent_rewrite now filters
+# on pipeline_revision; a stored row with an older/missing value (legacy rows
+# backfill to 0) is treated as a miss and regenerated.
+#   1 → fixture/legacy baseline (current, pre-unseal)
+#   bump to 2 at 改写解封 (prompt 审计员→代笔 + flip to llm) — see
+#   docs/nexus/rewrite_quality_standard_2026-05-31.md unseal checklist.
+REWRITE_PIPELINE_REVISION = 1
+
 
 class Platform(str, Enum):
     DOUYIN = "douyin"

@@ -237,13 +237,25 @@ async def request_shallow_analysis(
         return contract
 
 
+def active_upstream() -> str:
+    """The CASCADE_UPSTREAM mode this process resolves to right now.
+
+    Single source of truth for "which upstream are we actually calling" — env
+    override wins, else the config default. Exposed so telemetry (e.g. the
+    GENERATION_COST event in http_router) reports the *real* provider instead of
+    a hardcoded guess; mislabeling it makes the Beta cost/upstream dashboard lie
+    (the same "数字好看≠真相" trap the deploy-validation rule warns about).
+    """
+    return os.getenv("CASCADE_UPSTREAM", config.CASCADE_UPSTREAM).strip().lower() or config.CASCADE_UPSTREAM
+
+
 async def _load_upstream_payload(
     source_url: str,
     *,
     user_id: str,
     run_id: str | None,
 ) -> dict[str, Any]:
-    upstream = os.getenv("CASCADE_UPSTREAM", config.CASCADE_UPSTREAM).strip().lower() or config.CASCADE_UPSTREAM
+    upstream = active_upstream()
     if upstream == FIXTURE_MODE:
         return _load_fixture(source_url)
     if upstream == TOPRADOR_MODE:

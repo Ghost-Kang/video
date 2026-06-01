@@ -37,6 +37,12 @@ class RunCtx(TypedDict, total=False):
     thread_id: str
     ws: Any  # duck-typed websocket; FakeWebSocket works in tests
     run_id: str | None
+    # Set by a tool that caught a HardFailure and pushed an analysis_failed frame
+    # (see cascade._push_failure_frame). `run_agent` reads it after the stream to
+    # mark the run lifecycle `failed` instead of `done` — otherwise the agent loop
+    # completes normally and the run is recorded `done`, so a reconnect replay
+    # loses the failure (violates "失败有下一步 100%"). FailurePayload-shaped.
+    tool_failure: dict[str, Any] | None
 
 
 RUN_CTX: ContextVar[RunCtx] = ContextVar("openrhtv_run_ctx", default={})

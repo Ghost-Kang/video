@@ -61,12 +61,14 @@ async def run_agent(
     # see isolated RUN_CTX values without this reset. The reset is hygiene
     # (avoids holding the ws reference for one extra GC cycle), not concurrency
     # safety. We capture the token before try so it's in scope for finally.
-    _ctx_token = set_run_ctx({
+    _run_ctx = {
         "user_id": user_id,
         "thread_id": thread_id,
         "ws": ws,
         "run_id": None,
-    })
+        "tool_failure": None,  # W5D4 B5 — a tool that catches HardFailure sets this
+    }
+    _ctx_token = set_run_ctx(_run_ctx)
     reply = ""
     failed = False  # W5D3 CR-P1: explicit flag replaces magic-string sentinel.
     await run_state.mark_running(user_id, thread_id)  # W5D4 P0-B — persisted lifecycle
@@ -124,7 +126,15 @@ async def run_agent(
 
         reply = full_reply or "（未生成回复）"
         await asyncio.to_thread(save_message, user_id, thread_id, "agent", reply)
-        await run_state.mark_done(thread_id)  # W5D4 — terminal success, reconnect-visible
+        # W5D4 B5 — a tool may have caught a HardFailure, pushed analysis_failed,
+        # and returned an error dict to the LLM; the stream then ends normally.
+        # Honor that as a terminal `failed` (with the recovery payload) so a
+        # reconnect replay shows the failure + next step, not a misleading `done`.
+        tool_failure = _run_ctx.get("tool_failure")
+        if tool_failure is not None:
+            await run_state.mark_failed(thread_id, tool_failure)
+        else:
+            await run_state.mark_done(thread_id)  # terminal success, reconnect-visible
     except Exception as e:
         # W5D3 — don't leak raw exception string into the WS push, AND don't
         # persist it verbatim into the chat history. The persisted line is

@@ -13,8 +13,32 @@ import sqlite3
 from contextvars import ContextVar
 from pathlib import Path
 
+from agent.cascade.persistence.db import resolve_data_dir
 
-_DB_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent / "data"
+
+# Local-dev default data dir. The *effective* path is resolved lazily by
+# `canvas_db_path()` via the shared `resolve_data_dir` policy (override /
+# container / local) — see W5D4 review B4: previously this DB (which holds the
+# whole generation queue) computed a parent×5 relative path with NO container
+# detection and NO CASCADE_DB_PATH support, so it only landed on the mounted
+# volume by coincidence of directory depth. Any Dockerfile/layout change would
+# silently drop it onto an ephemeral layer → restart loses the queue (and
+# Google in-memory tasks re-enqueue = double billing).
+_LOCAL_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent / "data"
+
+
+def canvas_db_path() -> Path:
+    """Resolve canvas.db through the shared data-dir policy so it always sits on
+    the same volume as cascade.db + clip media (no split-brain, honors
+    CASCADE_DB_PATH override). Returns an identical path to the old constant in
+    every current real layout — this only adds correctness, no migration."""
+    return resolve_data_dir(_LOCAL_DATA_DIR) / "canvas.db"
+
+
+# Backward-compat exports (canvas.py re-exports these; older import paths rely
+# on them). Equal to `canvas_db_path()` in the non-override case. New code and
+# every connection path go through `canvas_db_path()` so the override is honored.
+_DB_DIR = _LOCAL_DATA_DIR
 _DB_PATH = _DB_DIR / "canvas.db"
 
 _current_thread_id: ContextVar[str] = ContextVar("canvas_thread_id", default="default")
@@ -45,8 +69,10 @@ def _resolve_ids(user_id: str | None, thread_id: str | None) -> tuple[str, str]:
 
 
 def _db() -> sqlite3.Connection:
-    _DB_DIR.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
+    path = canvas_db_path()
+    path_key = str(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    db = sqlite3.connect(str(path), check_same_thread=False)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA synchronous=NORMAL")
@@ -95,7 +121,7 @@ def _db() -> sqlite3.Connection:
     )
 
     # ALTER migrations — run once per path per process (see _MIGRATED_PATHS).
-    if str(_DB_PATH) not in _MIGRATED_PATHS:
+    if path_key not in _MIGRATED_PATHS:
         for col, defn in [
             ("user_id", "TEXT NOT NULL DEFAULT 'default'"),
             ("node_status", "TEXT NOT NULL DEFAULT 'reviewing'"),
@@ -121,5 +147,5 @@ def _db() -> sqlite3.Connection:
             db.execute("ALTER TABLE canvas_edges ADD COLUMN user_id TEXT NOT NULL DEFAULT 'default'")
         except sqlite3.OperationalError:
             pass
-        _MIGRATED_PATHS.add(str(_DB_PATH))
+        _MIGRATED_PATHS.add(path_key)
     return db

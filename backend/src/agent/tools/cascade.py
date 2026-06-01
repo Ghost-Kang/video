@@ -100,6 +100,22 @@ async def _push_failure_frame(
             flush=True,
         )
         return
+    # W5D4 review B5 — record the failure on the live run context so run_agent
+    # marks the run lifecycle `failed` (not `done`) after the stream completes.
+    # The tool caught this HardFailure and returns an error dict to the LLM, so
+    # the agent loop ends normally and would otherwise be recorded `done` — a
+    # reconnecting client then replays a "done" with no failure and loses the
+    # recovery hint. We mutate the ctx dict in place on purpose: a child frame's
+    # `set_run_ctx(...)` wouldn't propagate *up* to run_agent's frame, but the
+    # dict object is shared across the task, so an in-place write is visible
+    # there. First failure in a turn wins (don't clobber an earlier stage's).
+    if ctx.get("tool_failure") is None:
+        ctx["tool_failure"] = {
+            "code": code,
+            "hint": hint,
+            "actions": list(actions),
+            "request_id": request_id,
+        }
     await _push_ws(
         {
             "type": "analysis_failed",

@@ -80,6 +80,36 @@ def test_idempotency_within_24h(monkeypatch: pytest.MonkeyPatch, tmp_path: Path)
     assert len(_events(db_path, "script_rewritten")) == 1
 
 
+def test_revision_bump_invalidates_cache(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """B2 — 改写解封 guard: bumping REWRITE_PIPELINE_REVISION must invalidate the
+    24h cache so a stale (e.g. fixture-era) row is NOT served after the flip.
+
+    Within the same revision the rewrite is cached (idempotent). Simulate the
+    unseal by bumping the revision the repo writes/reads; the prior row now has
+    an older pipeline_revision and must miss → a fresh rewrite is generated.
+    """
+    from agent.cascade.persistence import rewrites_repo
+
+    db_path = _use_tmp_db(monkeypatch, tmp_path)
+    analysis_id = asyncio.run(_analysis())
+
+    first = asyncio.run(request_rewrite(analysis_id=analysis_id, niche="baomam_fushi", user_id="u1"))
+    # same revision → cache hit (idempotent)
+    cached = asyncio.run(request_rewrite(analysis_id=analysis_id, niche="baomam_fushi", user_id="u1"))
+    assert cached.rewrite_id == first.rewrite_id
+    assert len(_events(db_path, "script_rewritten")) == 1
+
+    # 改写解封: bump the revision the repo stamps + filters on.
+    monkeypatch.setattr(rewrites_repo, "REWRITE_PIPELINE_REVISION", rewrites_repo.REWRITE_PIPELINE_REVISION + 1)
+    after_bump = asyncio.run(request_rewrite(analysis_id=analysis_id, niche="baomam_fushi", user_id="u1"))
+    # old row (lower revision) must NOT be served → regenerated → new event
+    assert len(_events(db_path, "script_rewritten")) == 2
+    # and the newly stored row is now readable at the bumped revision
+    again = asyncio.run(request_rewrite(analysis_id=analysis_id, niche="baomam_fushi", user_id="u1"))
+    assert again.rewrite_id == after_bump.rewrite_id
+    assert len(_events(db_path, "script_rewritten")) == 2  # second call cached again
+
+
 def test_multi_user_isolation(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _use_tmp_db(monkeypatch, tmp_path)
     analysis_id = asyncio.run(_analysis())

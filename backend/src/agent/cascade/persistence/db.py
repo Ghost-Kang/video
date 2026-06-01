@@ -26,6 +26,30 @@ _DEFAULT_LOCAL_PATH = (
 )
 _DEFAULT_CONTAINER_PATH = Path("/app/data/cascade.db")
 
+
+def resolve_data_dir(local_default: Path) -> Path:
+    """The directory that should hold a persistent SQLite DB / media for this
+    process. Single shared policy so cascade.db, canvas.db and clip media never
+    disagree on where the volume lives:
+
+      - ``CASCADE_DB_PATH`` set → that file's parent dir. Co-locating every store
+        under the override kills the split-brain the W5D4 review flagged: before
+        this, cascade.db honored the override but canvas.db (the generation queue)
+        computed its own relative path and could land on an ephemeral layer.
+      - else inside the container (``/app/src`` exists) → ``/app/data`` (the
+        volume mount).
+      - else local dev → the caller's repo-relative default.
+
+    Note ``db_path()`` keeps returning the override *file* verbatim; this helper
+    is for the *directory* so a second store (canvas.db) can sit beside it.
+    """
+    override = os.getenv("CASCADE_DB_PATH")
+    if override:
+        return Path(override).parent
+    if Path("/app/src").exists():
+        return Path("/app/data")
+    return local_default
+
 # Paths whose schema DDL has already run in this process. Previously every
 # `_connect()` re-ran ~12 CREATE TABLE/INDEX IF NOT EXISTS statements — cheap
 # individually but paid on every connection (the health endpoint opens one per
@@ -107,9 +131,20 @@ async def bootstrap_schema(db: aiosqlite.Connection | None = None) -> None:
               user_id TEXT NOT NULL,
               run_id TEXT,
               result_json TEXT NOT NULL,
-              created_at TEXT NOT NULL
+              created_at TEXT NOT NULL,
+              pipeline_revision INTEGER NOT NULL DEFAULT 0
             )"""
         )
+        # Idempotent migration for prod DBs created before pipeline_revision
+        # existed (B2 / 改写解封 guard). Legacy rows default to 0 (< current
+        # REWRITE_PIPELINE_REVISION) so load_recent_rewrite treats them as a
+        # cache miss and regenerates — no fixture 套娃 survives the llm flip.
+        try:
+            await db.execute(
+                "ALTER TABLE rewrites ADD COLUMN pipeline_revision INTEGER NOT NULL DEFAULT 0"
+            )
+        except Exception:
+            pass  # column already exists (fresh CREATE above, or prior migration)
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_rewrites_lookup ON rewrites(analysis_id, niche, user_id, created_at DESC)"
         )
