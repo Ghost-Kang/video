@@ -58,6 +58,22 @@ export const SAMPLE_CASES: SampleCase[] = [
       { clip: `${TONGNIAN}/scene_7.mp4`, poster: `${TONGNIAN}/scene_7.jpg`, theme: "黄昏回家", note: "手牵手的背影朝夕阳走在田埂上", emotion: "温情怀旧" },
     ],
   },
+  {
+    // 趣味萌宠 —— 「派大星跳钢管舞」(海星缠水草的猎奇治愈向)。真实分析数据:
+    // 本地真 doubao 跑通(theme/hook/emotion/9 幕均为模型实际输出);resolver 实测
+    // 可解析(duration 49.6s,desc「如何让派大星跳钢管舞」by 神奇小查)。
+    // slides 暂缺:逐幕 clip 媒体需在 prod 容器跑 gen_showcase_case.py 生成到
+    //   /media/showcase/menchong/(见文件头注释)。无 slides → 在 SampleCaseCarousel
+    //   里以静态洞察卡呈现(hook+情绪),点开走真链接进完整分析。prod 生成后把打印的
+    //   slides 数组粘到下方 `slides:` 即可升级成逐幕视频轮播(亦可提到数组首位做 hero)。
+    id: "menchong-paidaxing",
+    source_url: "https://www.douyin.com/video/7645650053617609381",
+    category: "趣味萌宠",
+    emoji: "🐾",
+    hook: "开场特写粉色海星缠绕水草,字幕「世界上最喜欢跳钢管舞的动物」,用新奇比喻一秒抓住好奇心。",
+    emotion: "趣味性 · 治愈感 · 好奇心",
+    gradient: "bg-[radial-gradient(120%_120%_at_30%_20%,#fdf2f8_0%,#fbcfe8_45%,#f0a4c8_100%)]",
+  },
   // ⬇️ 新案例往这里加(给我 source_url + 品类 + 钩子/情绪,我把它的逐幕 clip 预生成到
   //    /media/showcase/<id>/ 后填进 slides 即可)。
 ];
