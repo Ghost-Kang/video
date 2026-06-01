@@ -196,6 +196,44 @@ def test_admin_route_requires_token_when_configured(monkeypatch):
     assert status == 200
 
 
+def test_admin_token_constant_time_compare(monkeypatch):
+    """B8 regression: admin token check uses hmac.compare_digest, not `==`.
+
+    We can't time the comparison in a unit test, but we assert the security
+    contract that compare_digest guarantees holds: only the exact token passes,
+    while prefix-matching and length-matching near-misses are rejected. (A buggy
+    refactor back to `==` would still pass these — so we also assert
+    http_router actually references compare_digest.)
+    """
+    from agent.transport import http_router
+
+    monkeypatch.setattr(config, "ADMIN_TOKEN", "secret-token-123")
+    monkeypatch.setattr(config, "INVITE_CODES", frozenset())
+
+    # Exact token → passes the gate (handler returns 200).
+    status, _ = _drive(_req("GET", "/api/creators", headers="X-Admin-Token: secret-token-123\r\n"))
+    assert status == 200
+
+    # Prefix match (right start, wrong rest) → rejected.
+    status, body = _drive(_req("GET", "/api/creators", headers="X-Admin-Token: secret-token-XXX\r\n"))
+    assert status == 401 and body["error"] == "admin_token_required"
+
+    # Same length, one byte off → rejected.
+    status, body = _drive(_req("GET", "/api/creators", headers="X-Admin-Token: secret-token-124\r\n"))
+    assert status == 401 and body["error"] == "admin_token_required"
+
+    # Empty header → rejected.
+    status, body = _drive(_req("GET", "/api/creators"))
+    assert status == 401 and body["error"] == "admin_token_required"
+
+    # The source must actually use the constant-time primitive.
+    import inspect
+
+    src = inspect.getsource(http_router._check_auth)
+    assert "compare_digest" in src
+    assert "== config.ADMIN_TOKEN" not in src
+
+
 def test_admin_route_fail_closed_in_prod_without_token(monkeypatch):
     monkeypatch.setattr(config, "ADMIN_TOKEN", "")
     monkeypatch.setattr(config, "IS_PROD_LIKE", True)

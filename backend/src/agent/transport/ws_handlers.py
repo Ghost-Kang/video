@@ -15,9 +15,11 @@ import time
 from typing import Any, Awaitable, Callable
 
 from agent import store  # 通过 module 访问,方便 test monkeypatch
+from agent.cascade import cost_guard  # B3 — enqueue-time generation cost guard
 from agent.cascade import events as cascade_events  # module 访问,test 可 patch emit
 from agent.cascade import storage as cascade_storage  # module 访问,test 可 patch
 from agent.cascade.event_names import EventName
+from agent.cascade.failures import HardFailure
 from agent.config import IMAGE_GEN_PROVIDER
 from agent.tools import canvas as canvas_tools
 from agent.transport import agent_runner, run_state  # module 访问同理
@@ -283,6 +285,33 @@ async def handle_execute_node(ctx: WSCtx, msg: ExecuteNodeMsg) -> None:
     print(
         f"[执行] execute_node node={msg.node_id} type={msg.node_type} provider={provider} prompt={msg.description[:50]}..."
     )
+
+    # B3 — enqueue-time cost guard for the generation leg. Charged ONCE here
+    # (retries go through schedule_generation_retry, not this path, so they don't
+    # re-charge). user_id is server-derived from the authenticated ctx, NOT the
+    # client payload — a caller can't rotate identity to evade the spend cap.
+    # run_id keyed by thread_id (the run unit at this layer). Over-cap → refuse
+    # before enqueue so the worker never spends. Only media nodes cost money.
+    if msg.node_type in ("image", "video"):
+        predicted = cost_guard.predict_generation_cost(
+            msg.node_type,
+            n_images=1 if msg.node_type == "image" else 0,
+            video_seconds=float(msg.duration) if (msg.node_type == "video" and msg.duration) else 0.0,
+        )
+        try:
+            await cost_guard.cost_guard(ctx.user_id, msg.thread_id, predicted)
+        except HardFailure as exc:
+            await send_json(
+                ctx.ws,
+                type="analysis_failed",
+                thread_id=msg.thread_id,
+                code=exc.code.value,
+                hint=exc.hint or "生成预算超限,请稍后再试或联系我们。",
+                actions=list(exc.actions) or ["REPORT"],
+                request_id=exc.request_id,
+                stage="generation",
+            )
+            return
 
     def _work() -> dict | None:
         canvas_tools.set_thread_id(msg.thread_id)

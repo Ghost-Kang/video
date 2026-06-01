@@ -58,11 +58,23 @@ def test_run_checks_baomam_passes_well():
     result = _stub_result()
     chks = run_checks(result, "baomam_fushi", source_title="一岁宝宝一周辅食蔬菜不重样")
     by_name = {c.name: c for c in chks}
-    assert by_name["script_length_80_600"].passed
+    assert by_name["script_length_80_220"].passed
     assert by_name["shot_count_3_5"].passed
     assert by_name["hook_p0_compliance"].passed
     assert by_name["hook_p0_compliance"].mandatory
     assert is_passing(chks)
+
+
+@pytest.mark.parametrize(
+    "length,expect_pass",
+    [(79, False), (80, True), (220, True), (221, False)],
+)
+def test_d5_script_length_bounds_80_220(length, expect_pass):
+    """D5 — length check is 80–220 inclusive (was 80–600). Boundary cases."""
+    result = _stub_result(script_markdown="x" * length)
+    by_name = {c.name: c for c in run_checks(result, "baomam_fushi", source_title="一岁宝宝辅食")}
+    assert "script_length_80_220" in by_name, "check must be renamed to 80_220"
+    assert by_name["script_length_80_220"].passed is expect_pass
 
 
 def test_run_checks_fails_when_p0_missing():

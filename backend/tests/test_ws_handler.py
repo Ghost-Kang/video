@@ -358,3 +358,51 @@ def test_rename_session_regression_silently_dropped(isolated_ws):
     assert ws.closed is None
     assert len(ws.sent) == 2
     assert all(m["type"] == "session_list" for m in ws.sent)
+
+
+def test_invite_reject_does_not_log_plaintext_code(isolated_ws, monkeypatch, capsys):
+    """B8 regression: a rejected invite code must never appear in plaintext logs.
+
+    The reject path logs only a sha256[:8] fingerprint + length, so the raw
+    secret can't be harvested from log access. We assert the secret string is
+    absent from stdout and that the fingerprint is present instead.
+    """
+    import hashlib
+
+    from agent import config
+
+    secret = "S3CRET-INVITE-XYZ"
+    monkeypatch.setattr(config, "INVITE_CODES", frozenset({"GOOD-CODE"}))
+
+    ws = FakeWebSocket([
+        json.dumps({"type": "auth", "user_id": "u1", "invite_code": secret}),
+    ])
+    _run(server.handle(ws))
+
+    # Rejected with the invite-code close code, nothing sent back.
+    assert ws.closed == (4003, "invite code required")
+    assert ws.sent == []
+
+    out = capsys.readouterr().out
+    # The raw secret must NOT leak to logs.
+    assert secret not in out
+    # A non-reversible fingerprint must be present so attempts stay correlatable.
+    expected_fp = hashlib.sha256(secret.encode("utf-8")).hexdigest()[:8]
+    assert expected_fp in out
+
+
+def test_invite_accept_still_works_after_redaction(isolated_ws, monkeypatch):
+    """B8 regression: redacting the log must not change the gate decision —
+    a valid code still authenticates and gets a session_list."""
+    from agent import config
+
+    monkeypatch.setattr(config, "INVITE_CODES", frozenset({"GOOD-CODE"}))
+
+    ws = FakeWebSocket([
+        json.dumps({"type": "auth", "user_id": "u1", "invite_code": "GOOD-CODE"}),
+    ])
+    _run(server.handle(ws))
+
+    assert ws.closed is None
+    assert len(ws.sent) == 1
+    assert ws.sent[0]["type"] == "session_list"

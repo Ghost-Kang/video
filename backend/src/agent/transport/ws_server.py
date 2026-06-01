@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 
 from pydantic import ValidationError
@@ -69,7 +70,13 @@ async def handle(websocket) -> None:
                 # 内测准入码 gate — 仅在 INVITE_CODES 非空时强制 (production)。
                 # Dev/test 默认空集 = 任何 user 可接入,保留原行为。
                 if config.INVITE_CODES and auth.invite_code not in config.INVITE_CODES:
-                    print(f"[连接] 拒 user={auth.user_id} 无效 invite_code={auth.invite_code!r}")
+                    # B8: never log the raw invite code (it is a shared secret —
+                    # plaintext in logs lets anyone with log access reuse it).
+                    # Log a non-reversible fingerprint instead: sha256 prefix +
+                    # length, enough to correlate repeated attempts without leaking.
+                    _ic = auth.invite_code or ""
+                    _fp = hashlib.sha256(_ic.encode("utf-8")).hexdigest()[:8] if _ic else "(empty)"
+                    print(f"[连接] 拒 user={auth.user_id} 无效 invite_code sha256[:8]={_fp} len={len(_ic)}")
                     await websocket.close(4003, "invite code required")
                     return
                 user_id = auth.user_id

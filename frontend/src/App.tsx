@@ -11,6 +11,7 @@ import { useLayoutState } from "./hooks/useLayoutState";
 import { useNodeActions } from "./hooks/useNodeActions";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { shouldHideProToggle, isAdminUser } from "./lib/proViewAccess";
+import { resolveRewriteEnabled } from "./lib/rewriteAccess";
 import { sessionDisplayName } from "./lib/sessionTitle";
 import { useCanvasStore } from "./store/canvasStore";
 import { useNicheStore, type NicheId } from "./store/nicheStore";
@@ -152,9 +153,13 @@ export default function App({ userId, onLogout }: AppProps) {
   // 三重守卫:justSubmitted(冷 replay 不触发)/ 每 analysis_id 只发一次 /
   // 已有 rewrite 或正在 loading 则跳过。niche 未知时不发,交给卡片里的醒目 CTA。
   // 2026-05-30 toprador 对齐:改写「你的版本」本轮暂挂,自动改写关闭。
-  // 代码保留(rewrite_service / wsStore rewrite_returned 仍在),改 REWRITE_ENABLED
-  // 为 true 即可恢复「分析→自动改写」。
-  const REWRITE_ENABLED = false;
+  // 代码保留(rewrite_service / wsStore rewrite_returned 仍在)。
+  // D2 灰度铺路(phase2_kickoff_synthesis_2026-05-31 §3):REWRITE_ENABLED 不再是
+  // 源码硬常量,改成运行时可控(后端 cohort flag > VITE_REWRITE_ENABLED > false)。
+  // 本轮**保持关闭**:无 cohort flag 下发、不设 env → 恒为 false,行为不变。
+  // TODO: 后端在握手/session_state 下发 per-cohort rewrite_enabled 后,把它取出
+  // 传入 resolveRewriteEnabled(cohortFlag) 即可切到按 cohort 灰度。
+  const REWRITE_ENABLED = useMemo(() => resolveRewriteEnabled(), []);
   useEffect(() => {
     if (!REWRITE_ENABLED) return;
     if (!analysis || loading) return;
@@ -166,7 +171,7 @@ export default function App({ userId, onLogout }: AppProps) {
     autoRewriteFiredFor.current = analysis.analysis_id;
     justSubmittedRef.current = false;
     onTriggerRewrite(niche);
-  }, [analysis, loading, rewriteShots, onTriggerRewrite]);
+  }, [REWRITE_ENABLED, analysis, loading, rewriteShots, onTriggerRewrite]);
   const switchSession = useCallback((id: string) => {
     if (id === tid) return;
     clearTimeout(timerRef.current ?? undefined);

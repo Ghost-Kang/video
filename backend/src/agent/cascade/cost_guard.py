@@ -44,6 +44,29 @@ PREDICT_ASK_CNY = 0.05
 # completion with fps=1/max_frames=60 video_url ≈ ¥0.50 (input video tokens
 # dominate; assistant JSON is ~1.5k tokens negligible).
 PREDICT_DOUBAO_DIRECT_CNY = 0.50
+# B3 (Phase 2) — generation leg per-second video upper bound. Seedance/Kling
+# image-grounded video bill by output duration; a conservative ¥0.30/s keeps a
+# buffer over current provider rates. Used by predict_generation_cost so the
+# enqueue-time guard caps long clips before the worker spends real money.
+PREDICT_VIDEO_SECOND_CNY = 0.30
+
+
+def predict_generation_cost(kind: str, *, n_images: int = 0, video_seconds: float = 0.0) -> float:
+    """Upper-bound ¥ prediction for a generation enqueue (B3).
+
+    - image: ``n_images × PREDICT_SHOT_IMAGE_CNY``
+    - video: ``video_seconds × PREDICT_VIDEO_SECOND_CNY``
+    - composite/script: 0 (no external paid provider call at enqueue)
+
+    Used by the enqueue-time cost_guard so retry×N + restart-reenqueue can't burn
+    real money unbounded (the leg previously had zero spend guard). Charged once
+    at enqueue, NOT per retry (retries reuse the already-committed budget).
+    """
+    if kind == "image":
+        return max(0, n_images) * PREDICT_SHOT_IMAGE_CNY
+    if kind == "video":
+        return max(0.0, video_seconds) * PREDICT_VIDEO_SECOND_CNY
+    return 0.0
 
 
 def _run_cap() -> float:

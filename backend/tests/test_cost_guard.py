@@ -8,7 +8,13 @@ from pathlib import Path
 
 import pytest
 
-from agent.cascade.cost_guard import cost_guard, cost_status
+from agent.cascade.cost_guard import (
+    PREDICT_SHOT_IMAGE_CNY,
+    PREDICT_VIDEO_SECOND_CNY,
+    cost_guard,
+    cost_status,
+    predict_generation_cost,
+)
 from agent.cascade.failures import FailureCode, HardFailure
 from agent.cascade.storage import save_event, utc_now_rfc3339
 
@@ -82,6 +88,39 @@ def test_utc_day_boundary_excludes_yesterday(monkeypatch: pytest.MonkeyPatch, tm
     asyncio.run(_cost("u1", "old", 2_980, yesterday))
     asyncio.run(cost_guard("u1", "new", 0.5))
     assert asyncio.run(cost_status("u1", "new"))["user_today_cost_cny"] == 0
+
+
+# --- B3: generation-leg cost prediction + enqueue guard ---------------------
+
+
+def test_predict_generation_cost_image_and_video():
+    assert predict_generation_cost("image", n_images=1) == PREDICT_SHOT_IMAGE_CNY
+    assert predict_generation_cost("image", n_images=3) == 3 * PREDICT_SHOT_IMAGE_CNY
+    assert predict_generation_cost("video", video_seconds=10) == 10 * PREDICT_VIDEO_SECOND_CNY
+    # composite/script cost nothing at enqueue (no external paid provider call)
+    assert predict_generation_cost("composite") == 0.0
+    assert predict_generation_cost("script") == 0.0
+    # defensive: negatives clamp to 0
+    assert predict_generation_cost("image", n_images=-5) == 0
+    assert predict_generation_cost("video", video_seconds=-3) == 0.0
+
+
+def test_generation_enqueue_blocked_over_run_cap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """An image gen (¥1.5) on top of a run already near the ¥3.0 cap is refused
+    BEFORE enqueue → worker never spends. This is the裸奔 hole B3 closes."""
+    _use_tmp_db(monkeypatch, tmp_path)
+    asyncio.run(_cost("u1", "r1", 200))  # ¥2.00 already this run
+    predicted = predict_generation_cost("image", n_images=1)  # ¥1.50 → 3.50 > 3.0
+    with pytest.raises(HardFailure) as exc:
+        asyncio.run(cost_guard("u1", "r1", predicted))
+    assert exc.value.code == FailureCode.S8_UPSTREAM_REFUSED
+
+
+def test_generation_enqueue_allowed_within_cap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _use_tmp_db(monkeypatch, tmp_path)
+    asyncio.run(_cost("u1", "r1", 100))  # ¥1.00 this run
+    predicted = predict_generation_cost("image", n_images=1)  # ¥1.50 → 2.50 ≤ 3.0
+    asyncio.run(cost_guard("u1", "r1", predicted))  # must not raise
 
 
 def test_env_overrides(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

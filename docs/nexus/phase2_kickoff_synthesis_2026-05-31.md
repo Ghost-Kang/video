@@ -37,18 +37,19 @@
 
 ## 2. P0 硬阻断(落地前必修,全部 code-verified)
 
-> 这 8 条是对抗验证从真码挖出的「不修则解封翻车 / 慢生成裸奔 / 数据失真」级别阻断。**它们是 Phase 2 能否安全启动的真实门槛。**
+> 这 8 条是对抗验证从真码挖出的「不修则解封翻车 / 慢生成裸奔 / 数据失真」级别阻断。
+> **进度(2026-06-01)**:B2/B4/B5/B7 已修(commit ad67fdd P0-a)。本轮再修 B6/B8(安全小洞部分)+ 落地 D1/D3/D5/D2 全部代码,生成 cost_guard(B3)已接线。剩余:B1 解封 flip(需质量门)+ B8 凭证轮换(P0-c,需 founder)+ cost_guard 身份派生缺口(B8-3,需鉴权改造)。
 
-| # | 硬阻断 | 证据(file:line) | 修在哪一步 |
+| # | 硬阻断 | 证据(file:line) | 状态 |
 |---|--------|----------------|-----------|
-| **B1** | **解封三联动,缺一即假解封** | `App.tsx:157` REWRITE_ENABLED=false(源码硬常量,需重建) + `rewrite.py:70` CASCADE_REWRITE_UPSTREAM 默认 fixture(部署文件全没设) + `contract.py:28` revision=3 需 bump | P0-b |
-| **B2** | **改写缓存零版本守卫** —— 切 llm 后 24h 内必命中旧 fixture 套娃(精确重蹈分析缓存坑) | `rewrites_repo.py:47-64` 缓存键无 pipeline 列;全仓 `REWRITE_PIPELINE_REVISION` grep=0;铁律① 的 ANALYSIS_PIPELINE_REVISION 对 rewrites 表**完全无效** | P0-a(解封前置) |
-| **B3** | **生成 leg 零成本护栏裸奔** —— 任意用户 ×retry3 ×重启重入队 = 真金白银失控 | `workers/` + `tools/generation.py`/`video_generation.py` grep cost_guard=0;`cost_guard.py:36` PREDICT_SHOT_IMAGE_CNY=1.5 **从不被调用**,无 video 按秒预测 | P1(生成上线前) |
-| **B4** | **canvas.db 第二库无容器检测** —— 慢生成队列全在此库,挪文件/改 Dockerfile 即回 off-by-one,重启丢队列(Google 内存 task 重入队=重复扣费) | `canvas_persistence/db.py:17` parent×5 纯相对路径,与 cascade.db `db_path()` 的 `/app/src` 检测策略不一致(巧合正确) | P0-a |
-| **B5** | **工具级失败漏标 lifecycle** —— 工具失败记成 done,重连 replay 拿不到 failure,违反「失败有下一步100%」 | `cascade.py:224/304/409/577` 四处 except HardFailure 只 `_push_failure_frame` 不 `mark_failed`;`agent_runner.py:127` 随后 mark_done | P0-a |
-| **B6** | **生成图默认跨境 Gemini** —— 改写已隔离境内,生成图默认 google 处理 30 人真实用户数据,PIPL §38 张力 | `config.py:27` IMAGE_GEN_PROVIDER 默认 `google` | **待 founder 拍板**(P1 前) |
-| **B7** | **成本遥测 provider 失真** —— Beta 期成本/上游 dashboard 误判(数字好看≠真相,铁律⑤同类) | `http_router.py:217` analysis cost 事件硬编码 `provider="fixture"`,实际 doubao_direct | P0-a |
-| **B8** | **凭证未轮换 + 安全小洞** —— 4 项凭证待轮换;另:invite_code 拒绝时打印原始码(`ws_server.py:72`)、admin token 非常量时间比较(`http_router.py:570` 用 `==`)、cost_guard user_id/run_id 须服务端派生(否则换字段绕 cap 刷钱) | memory `reference_prod_server` + 上述行 | P0-c(上线 Gate) |
+| **B1** | **解封三联动,缺一即假解封** | `App.tsx` REWRITE_ENABLED + `rewrite.py:70` CASCADE_REWRITE_UPSTREAM=fixture + `contract.py` revision | ⏳ 解封就绪(D2 flag 已可运行时控,仍默认关);flip 待质量门 |
+| **B2** | **改写缓存零版本守卫** | `rewrites_repo.py` 缓存键无 pipeline 列 | ✅ 修复(REWRITE_PIPELINE_REVISION=1,commit ad67fdd) |
+| **B3** | **生成 leg 零成本护栏裸奔** | `workers/`+`generation.py` 无 cost_guard | ✅ 接线(enqueue 前置 cost_guard + 视频按秒预测,handle_execute_node) |
+| **B4** | **canvas.db 第二库无容器检测** | `canvas_persistence/db.py` parent×5 无检测 | ✅ 修复(resolve_data_dir,commit ad67fdd) |
+| **B5** | **工具级失败漏标 lifecycle** | `cascade.py` HardFailure 不 mark_failed | ✅ 修复(RUN_CTX.tool_failure,commit ad67fdd) |
+| **B6** | **生成图默认跨境 Gemini** | `config.py` IMAGE_GEN_PROVIDER 默认 google | ✅ 修复(默认切 apimart + execute_node 第二处漂移修;D1 双轨) |
+| **B7** | **成本遥测 provider 失真** | `http_router.py` 硬编码 fixture | ✅ 修复(active_upstream,commit ad67fdd) |
+| **B8** | **凭证未轮换 + 安全小洞** | invite码明文/admin token `==`/cost_guard 身份 | 🔶 安全小洞已修(invite码脱敏 sha256[:8] + admin token compare_digest);凭证轮换=P0-c 待 founder;身份派生缺口已注释+§6 follow-up |
 
 **还有几条 cosmetic / 非阻断**(不卡启动,顺手修):事件数 23→21(`event_names.py` 实 21 个);run_started 生产从不 emit(只在 tests,访谈轨 Gate 计数会漏计);boto3 同步上传是否已 to_thread(`s3_upload.py:29` + `video_pipeline.py:55` 需 grep 确认);改写长度上限三处不一致(prompt:24 / checks.py:41 / 还有 rewrite.py:215-218 fixture 兜底)。
 
@@ -85,11 +86,18 @@
 
 ---
 
-## 5. memory & 后续
+## 5. 实现进度(2026-06-01)
 
-- 设计基线已记 memory `project_phase2_kickoff`。
-- 工作树:本次新增 6 份 nexus 文档(含本文),warm_tech 文档有 1 处改动 —— **均未提交**,等你过目。
-- 下一步等你 §3 拍板后,P0-a 工程债(B2/B4/B5/B7)不依赖任何决策、可立即开工;P0-b/P1 的 provider 与灰度需你先定。
+P0-a(commit ad67fdd)+ 本轮(6 决策解锁的全部代码)已落地、测试绿:**backend 574 passed / frontend 240 passed**。
+- ✅ **已实现并测试**:B2(改写缓存守卫)/ B4(canvas.db 统一路径)/ B5(工具失败标 lifecycle)/ B7(遥测修真)/ B6+D1(生成图默认境内 apimart + execute_node 第二处漂移)/ B8 安全小洞(invite 码脱敏 + admin token compare_digest)/ B3(生成 enqueue 前置 cost_guard + 视频按秒预测)/ D5(改写长度 80–220 五处统一)/ D3(generic 通用代笔 prompt + 一句话主题,旧三套保留)/ D2(REWRITE_ENABLED 运行时可控,默认仍关)。
+- ⏳ **解封就绪但未 flip**(等质量门 D6):改写仍走 fixture 路径,REWRITE_ENABLED 默认 false,CASCADE_REWRITE_UPSTREAM 默认 fixture,REWRITE_PIPELINE_REVISION 仍=1。解封时一次性 bump 到 2 并 flip 三联动(B1)。
+
+## 6. 待办 / Follow-up(高优)
+
+- **[高·安全] cost_guard 身份派生缺口(B8-3)**:`handle_rewrite` / `handle_analysis_shallow` 用 `body.get("user_id"/"run_id")` 当 cost-cap key,COHORT 层只校验共享 invite-code,无 per-user 已认证身份。过 cohort 门者可轮换字段绕 `CASCADE_RUN/USER_DAY_CAP` 刷钱。正确修=服务端签发 per-user 身份(鉴权流改造),超出「小洞」范围,**解封灰度前需 founder 定鉴权模型**;在此之前别把 cost cap 当可信花钱护栏。代码已加 KNOWN 注释锚定。
+  - 注:B3 的生成 cost_guard 用 `ctx.user_id`(WS 已认证会话派生),不受此缺口影响;受影响的是 HTTP 入口的 rewrite/analysis。
+- **[P0-c] prod 4 项凭证轮换**:SSH 私钥 / root 口令 / CF token / CASCADE_ADMIN_TOKEN,上线 Gate,需 founder/SSH。
+- **[cosmetic] 预存在债**:`App.tsx` 有一处 `no-unused-expressions` eslint error(三元表达式当语句,line ~202,**非本轮引入**);事件数文档写 23 实为 21;run_started 生产从不 emit。
 
 ---
 

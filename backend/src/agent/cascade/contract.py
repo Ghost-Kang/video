@@ -36,8 +36,12 @@ ANALYSIS_PIPELINE_REVISION = 3
 # on pipeline_revision; a stored row with an older/missing value (legacy rows
 # backfill to 0) is treated as a miss and regenerated.
 #   1 → fixture/legacy baseline (current, pre-unseal)
-#   bump to 2 at 改写解封 (prompt 审计员→代笔 + flip to llm) — see
-#   docs/nexus/rewrite_quality_standard_2026-05-31.md unseal checklist.
+#   bump to 2 at 改写解封 — bundle ALL pre-staged rewrite changes into that one
+#   bump: prompt 审计员→代笔 + D5 长度 80–220 + D3 通用代笔 prompt/topic +
+#   flip CASCADE_REWRITE_UPSTREAM=llm. Those changes are landing now but stay
+#   DORMANT on the fixture path (REWRITE_ENABLED=false); do NOT bump until the
+#   quality gate passes — see docs/nexus/rewrite_quality_standard_2026-05-31.md
+#   unseal checklist.
 REWRITE_PIPELINE_REVISION = 1
 
 

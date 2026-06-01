@@ -17,6 +17,7 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
+from agent import config
 from agent.config import STORYBOARD_COLUMNS
 from agent.tools.canvas_persistence.db import (
     _DB_DIR,
@@ -356,8 +357,15 @@ def _parse_storyboard(text: str) -> list[dict]:
 # ---------- 节点执行 ----------
 
 
-def execute_node(node_id: str, node_type: NodeType, description: str, image_gen_provider: str = "google") -> dict:
-    """执行节点资产生成。文字节点直接结构化,媒体节点需 approved 状态。"""
+def execute_node(node_id: str, node_type: NodeType, description: str, image_gen_provider: str | None = None) -> dict:
+    """执行节点资产生成。文字节点直接结构化,媒体节点需 approved 状态。
+
+    B6/D1: image_gen_provider 默认 None → 回落 config.IMAGE_GEN_PROVIDER(单一真相源,
+    境内 Apimart)。之前默认硬编码 "google" 是第二处跨境默认漂移:agent 工具/main.py
+    导出此函数,不传第 4 参时会强制 google 写入 node 并据此生图,绕开 config 合规默认。
+    """
+    if image_gen_provider is None:
+        image_gen_provider = config.IMAGE_GEN_PROVIDER
     node = _load_node(node_id)
     if not node:
         return {"error": f"节点 {node_id} 不存在,请先 create"}

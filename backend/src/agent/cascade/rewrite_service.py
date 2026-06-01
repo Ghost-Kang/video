@@ -23,8 +23,10 @@ from agent.cascade.storage import (
 )
 
 
-Niche = Literal["baomam_fushi", "yuer_richang", "jiating_chufang"]
-SUPPORTED_NICHES = {"baomam_fushi", "yuer_richang", "jiating_chufang"}
+# D3 — "generic" 是去 niche 后的单一通用代笔路径(用户填一句话主题驱动)。
+# 三套旧赛道保留兼容(现有数据/测试),新内容默认走 generic。
+Niche = Literal["baomam_fushi", "yuer_richang", "jiating_chufang", "generic"]
+SUPPORTED_NICHES = {"baomam_fushi", "yuer_richang", "jiating_chufang", "generic"}
 
 
 class RewriteShot(BaseModel):
@@ -60,6 +62,7 @@ async def request_rewrite(
     niche: Niche,
     user_id: str,
     run_id: str | None = None,
+    topic: str | None = None,
 ) -> RewriteResult:
     if niche not in SUPPORTED_NICHES:
         raise HardFailure(FailureCode.S5_INVALID_PAYLOAD, f"unsupported niche: {niche}")
@@ -82,7 +85,7 @@ async def request_rewrite(
     if cached:
         return RewriteResult.model_validate_json(cached)
 
-    result = await _rewrite_for_niche(contract, niche)
+    result = await _rewrite_for_niche(contract, niche, topic=topic)
     await save_rewrite(
         result.rewrite_id,
         analysis_id=analysis_id,
@@ -113,10 +116,15 @@ async def request_rewrite(
     return result
 
 
-async def _rewrite_for_niche(contract: CascadeAnalysisContract, niche: str) -> RewriteResult:
+async def _rewrite_for_niche(
+    contract: CascadeAnalysisContract, niche: str, *, topic: str | None = None
+) -> RewriteResult:
     try:
         rewrite_module = importlib.import_module("agent.cascade.rewrite")
-        raw = await rewrite_module.rewrite_for_niche(contract, niche)
+        # D3 — pass the user's one-line topic via extras (rewrite_for_niche
+        # reads extras["topic"]); None/empty is a no-op for legacy niches.
+        extras = {"topic": topic} if topic else None
+        raw = await rewrite_module.rewrite_for_niche(contract, niche, extras=extras)
         return RewriteResult.model_validate(raw)
     except ModuleNotFoundError:
         return _fallback_rewrite(contract, niche)

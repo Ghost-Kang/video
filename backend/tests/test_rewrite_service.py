@@ -47,6 +47,26 @@ def test_happy_path_returns_rewrite_and_event(monkeypatch: pytest.MonkeyPatch, t
     assert len(_events(db_path, "script_rewritten")) == 1
 
 
+def test_generic_niche_with_topic(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """D3 — request_rewrite accepts niche='generic' + a one-line topic, round-trips
+    through the service (cache/event) without error."""
+    db_path = _use_tmp_db(monkeypatch, tmp_path)
+    analysis_id = asyncio.run(_analysis())
+    result = asyncio.run(
+        request_rewrite(
+            analysis_id=analysis_id,
+            niche="generic",
+            user_id="u1",
+            run_id="r1",
+            topic="周末露营装备清单",
+        )
+    )
+    assert isinstance(result, RewriteResult)
+    assert result.niche == "generic"
+    assert "周末露营装备清单" in result.script_markdown
+    assert len(_events(db_path, "script_rewritten")) == 1
+
+
 def test_unknown_analysis_raises_lookup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _use_tmp_db(monkeypatch, tmp_path)
     with pytest.raises(LookupError):

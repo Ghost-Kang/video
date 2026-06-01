@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import os
 import time
@@ -167,6 +168,17 @@ async def handle_anchor_reuse_post(qs: dict, body: dict, anchor_id: str) -> tupl
 
 
 async def handle_rewrite(qs: dict, body: dict) -> tuple[int, dict, str]:
+    # B8 cost_guard identity gap (KNOWN, do NOT silently "fix" by faking server
+    # identity here): user_id/run_id are taken straight from the client body and
+    # used as the cost-cap keys. The HTTP gate (_check_auth) only verifies a
+    # *shared* cohort invite-code — there is no per-user authenticated session at
+    # this layer to derive a trusted user_id from. An attacker who passes the
+    # cohort gate can therefore rotate user_id/run_id per request to evade the
+    # per-user-day and per-run caps in cost_guard (i.e. spend real money). The
+    # correct fix is an auth-flow change (bind requests to a server-issued,
+    # per-user identity), which is out of scope for B8's "small holes" and must
+    # not be hacked in here. Tracked as a follow-up in
+    # docs/nexus/phase2_kickoff_synthesis_2026-05-31.md §6.
     user_id = str(body.get("user_id") or "default")
     run_id = str(body.get("run_id") or "default")
     await cost_guard.cost_guard(user_id, run_id, cost_guard.PREDICT_REWRITE_CNY)
@@ -201,6 +213,12 @@ async def handle_analysis_shallow(qs: dict, body: dict) -> tuple[int, dict, str]
     source_url = str(body.get("source_url") or "").strip()
     if not source_url:
         return 400, {"error": "source_url_required"}, "Bad Request"
+    # B8 cost_guard identity gap (KNOWN — see handle_rewrite for the full note):
+    # user_id/run_id come from the client body and are used as the cost-cap keys.
+    # The cohort invite-code gate is not a per-user identity, so a caller past the
+    # gate can rotate these fields to evade the per-user/per-run spend caps. Fixing
+    # this requires a server-derived identity (auth-flow change), intentionally out
+    # of scope for B8. Follow-up tracked in the phase2 synthesis doc §6.
     user_id = str(body.get("user_id") or "default")
     run_id = str(body.get("run_id") or "default")
     await cost_guard.cost_guard(user_id, run_id, cost_guard.PREDICT_ANALYSIS_CNY)
@@ -567,7 +585,12 @@ def _check_auth(method: str, path: str, headers: dict[str, str]) -> tuple[int, d
             if config.IS_PROD_LIKE:
                 return 403, {"error": "admin_not_configured"}, "Forbidden"
             return None
-        if headers.get("x-admin-token", "") == config.ADMIN_TOKEN:
+        # B8: constant-time compare to remove the timing side-channel that a
+        # plain `==` exposes (early-exit on first mismatched byte leaks token
+        # length/prefix to an attacker measuring response time). config.ADMIN_TOKEN
+        # is guaranteed non-empty here (the `not config.ADMIN_TOKEN` guard above
+        # already returned). compare_digest is given two str values (ASCII-safe).
+        if hmac.compare_digest(headers.get("x-admin-token", ""), config.ADMIN_TOKEN):
             return None
         return 401, {"error": "admin_token_required"}, "Unauthorized"
     # COHORT (default)

@@ -60,6 +60,46 @@ def test_prompt_file_exists_and_non_empty(niche):
     assert "{CONTRACT_JSON}" in text
 
 
+# --- D3: generic (去 niche) 通用代笔 prompt + 一句话主题 ---
+
+
+def test_generic_prompt_exists_with_topic_and_contract_placeholders():
+    text = load_prompt("generic")
+    assert len(text) > 200
+    assert "硬约束" in text
+    assert "{CONTRACT_JSON}" in text
+    assert "{TOPIC}" in text  # 主题占位符,通用路径核心
+
+
+def test_generic_fixture_rewrite_runs_and_respects_topic():
+    """generic niche 走 fixture 路径不抛(不再 KeyError on visual_palette),
+    且用户一句话主题注入到改写稿的 rationale note。"""
+    # reuse any existing fixture contract as the source
+    src = _fixture_paths("baomam_fushi")[0]
+    contract = _load_contract(src)
+    result = asyncio.run(
+        rewrite_for_niche(contract, "generic", extras={"topic": "三分钟搞定的减脂早餐"})
+    )
+    assert result["niche"] == "generic"
+    assert 3 <= len(result["shots"]) <= 5
+    assert 80 <= len(result["script_markdown"]) <= 220  # D5 bound holds for generic too
+    # topic surfaced in the rationale marker
+    assert "三分钟搞定的减脂早餐" in result["script_markdown"]
+    # no forbidden brand/jargon terms leaked
+    text = _all_text(result)
+    for term in FORBIDDEN_TERMS:
+        assert term not in text, f"forbidden term leaked: {term}"
+
+
+def test_generic_fixture_rewrite_without_topic_is_fine():
+    """无主题(topic 缺省)也不应抛——沿用原片主题的中性兜底。"""
+    src = _fixture_paths("yuer_richang")[0]
+    contract = _load_contract(src)
+    result = asyncio.run(rewrite_for_niche(contract, "generic"))
+    assert result["niche"] == "generic"
+    assert 3 <= len(result["shots"]) <= 5
+
+
 # --- Mechanical acceptance checks (the §3 bar) ---
 
 

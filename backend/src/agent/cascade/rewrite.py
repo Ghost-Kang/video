@@ -30,6 +30,10 @@ _NICHE_LABELS: dict[str, str] = {
     "baomam_fushi": "宝妈辅食",
     "yuer_richang": "育儿日常",
     "jiating_chufang": "家庭厨房",
+    # D3 — 去 niche 定位(929cb21 清理宝妈/育儿/厨房后)。"generic" = 单一通用
+    # 代笔路径,适配任意短视频;由用户填的一句话主题(extras["topic"])驱动,
+    # 而非赛道模板。三套旧 niche 保留兼容(现有数据/测试),新内容走 generic。
+    "generic": "通用",
 }
 
 # Brand-guardrail forbidden terms (subset; the prompt enforces the full list).
@@ -115,7 +119,7 @@ def _fixture_rewrite(
     # (#6, pairwise Jaccard ≤ 0.5) passes. Each tuple slot is unique to its
     # shot index; we attach the cleaned scene visual to keep some source flavor
     # but lead with the niche-shot-specific anchor.
-    visual_palette: dict[str, tuple[str, ...]] = {
+    visual_palette: tuple[str, ...] = {
         "baomam_fushi": (
             "暖色家庭厨房俯拍,餐椅特写,食材碗摆台",
             "木质砧板特写,妈妈手切食材,自然光",
@@ -133,6 +137,14 @@ def _fixture_rewrite(
             "砧板食材近景,刀工手部特写,光线侧射",
             "炒锅侧拍,火光跳跃,油烟升腾",
             "成品装盘近景,斜 45° 蒸汽特写,拉丝/出汁",
+        ),
+        # D3 generic — niche-agnostic shot anchors; topic 注入由下方 note + LLM
+        # 路径承担,fixture 这里给中性可拍构图,避免赛道味。
+        "generic": (
+            "主体正面中景,自然光,主角开场直面镜头",
+            "关键细节特写,手部动作或物件,浅景深",
+            "过程/对比镜头,前后或步骤切换,节奏推进",
+            "成果/反应特写,情绪落点,收尾召唤互动",
         ),
     }[niche]
 
@@ -200,11 +212,13 @@ def _fixture_rewrite(
             if replaced_any:
                 warnings.append(f"nutrient guard: cross-category foods scrubbed to keep '{keep_cat}'")
 
+    topic = str(extras.get("topic") or "").strip()
+    change_desc = f"改:贴合你的主题「{topic}」" if topic else f"改:换成{label}视角和家庭场景"
     note_parts = [
         f"保留:{contract.viral_analysis.replicable_formula[:40]}",
         f"hook_pattern_id={hook_pattern_id or '(unset)'}",
         f"classification={classification}",
-        f"改:换成{label}视角和家庭场景",
+        change_desc,
     ]
     note = "<!-- " + " | ".join(note_parts) + " -->"
     body_lines = [note]
@@ -212,10 +226,11 @@ def _fixture_rewrite(
         body_lines.append(f"{shot['shot_index']}. {shot['dialogue']}")
         body_lines.append(f"   画面:{shot['visual']}")
     script_markdown = "### 改写脚本\n" + "\n".join(body_lines)
+    # D5: 长度上限统一 80–220 字(手机一拇指可读、一口气念完的口播节奏)。
     if len(script_markdown) < 80:
         script_markdown += "\n" + (f"({label}版,贴近自家场景。" * 3)
-    if len(script_markdown) > 600:
-        script_markdown = script_markdown[:597] + "..."
+    if len(script_markdown) > 220:
+        script_markdown = script_markdown[:217] + "..."
 
     # confidence ceiling for negative_ref per prompt spec
     base_confidence = max(0.5, min(1.0, contract.confidence - 0.05))
@@ -274,7 +289,10 @@ def _default_dialogue(niche: str, shot_index: int) -> str:
         return ("这次换个做法,看看宝宝吃不吃" if shot_index == 1 else "你家宝宝吃这个吗,评论区告诉我")
     if niche == "yuer_richang":
         return ("当妈第 N 次破防,但他这句话又把我治愈了" if shot_index == 1 else "你被娃哪句话戳过")
-    return "在家也能做出餐厅的味道,这次你试试看"
+    if niche == "jiating_chufang":
+        return "在家也能做出餐厅的味道,这次你试试看"
+    # generic — niche 无关的开场/互动兜底
+    return ("先别划走,这条我替你拆明白了" if shot_index == 1 else "你会怎么做,评论区聊聊")
 
 
 _JSON_RETRY_NUDGE = (
@@ -320,6 +338,9 @@ async def _llm_rewrite(
     prompt = prompt.replace("{SOURCE_CLASSIFICATION}", str(extras.get("source_classification") or "positive"))
     prompt = prompt.replace("{SOURCE_TITLE}", str(extras.get("source_title") or ""))
     prompt = prompt.replace("{SOURCE_AUTHOR}", str(extras.get("source_author") or ""))
+    # D3 — 用户填的一句话主题(generic 通用代笔路径用;旧 niche prompt 无 {TOPIC}
+    # 占位则此 replace 为 no-op,向后兼容)。空主题替换为中性提示。
+    prompt = prompt.replace("{TOPIC}", str(extras.get("topic") or "(未指定,沿用原片主题)"))
 
     raw_text = _invoke_llm(prompt)
     try:
@@ -407,7 +428,7 @@ def _normalize_llm_output(
         len(shots) < 3
         or len(shots) > 5
         or any(w.startswith("forbidden terms scrubbed") for w in warnings)
-        or not (80 <= len(data["script_markdown"]) <= 600)
+        or not (80 <= len(data["script_markdown"]) <= 220)  # D5: 统一 80–220
     )
     if hard_violation:
         confidence = min(confidence, 0.4)

@@ -38,7 +38,7 @@ def run_checks(result: Mapping[str, Any], niche: str, source_title: str = "") ->
     shots = result.get("shots", []) or []
     classification = str(result.get("source_classification") or "positive")
 
-    out.append(CheckResult("script_length_80_600", 80 <= len(script) <= 600, f"len={len(script)}"))
+    out.append(CheckResult("script_length_80_220", 80 <= len(script) <= 220, f"len={len(script)}"))
     out.append(CheckResult("shot_count_3_5", 3 <= len(shots) <= 5, f"count={len(shots)}"))
 
     text_all = script + "\n" + "\n".join(

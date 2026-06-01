@@ -24,7 +24,11 @@ DOUBAO_MODEL = os.getenv("DOUBAO_MODEL", "doubao-seed-2-0-pro-260215")
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3-flash-preview")
 
 # -------- 图片生成 --------
-IMAGE_GEN_PROVIDER = os.getenv("IMAGE_GEN_PROVIDER", "google")  # "apimart" | "google"
+# B6/D1 (PIPL §38 合规): 默认走境内 Apimart。改写已隔离境内 doubao,生成图也不能
+# 裸奔跨境 —— 30 人 Beta 处理真实用户数据,默认 provider 必须境内。跨境 Gemini 仍
+# 可经 IMAGE_GEN_PROVIDER=google 显式开启(双轨保留)。
+# TODO(合规): 跨境 Gemini 上线前需补「用户跨境数据传输同意」条款 UI/记录,本次未做。
+IMAGE_GEN_PROVIDER = os.getenv("IMAGE_GEN_PROVIDER", "apimart")  # "apimart"(境内默认) | "google"(跨境,需显式)
 IMAGE_GEN_API_KEY = os.getenv("IMAGE_GEN_API_KEY")
 IMAGE_GEN_BASE_URL = os.getenv("IMAGE_GEN_BASE_URL", "https://api.apimart.ai")
 IMAGE_GEN_MODEL = os.getenv("IMAGE_GEN_MODEL", "gpt-image-2")
