@@ -114,8 +114,19 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("用法: uv run python scripts/eval_generic_real_urls.py <urls.txt> [topics.txt]")
         sys.exit(1)
-    urls = [l.strip() for l in Path(sys.argv[1]).read_text(encoding="utf-8").splitlines() if l.strip()]
+    # skip blank lines AND # comment lines (the urls file ships with instructions)
+    urls = [
+        l.strip()
+        for l in Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
+        if l.strip() and not l.lstrip().startswith("#")
+    ]
     topics = []
     if len(sys.argv) > 2:
-        topics = [l.rstrip("\n") for l in Path(sys.argv[2]).read_text(encoding="utf-8").splitlines()]
+        # topics align by URL index; keep # lines out but preserve blank-line slots
+        # is hard once comments are stripped — so topics file should be comment-free.
+        topics = [
+            l.rstrip("\n")
+            for l in Path(sys.argv[2]).read_text(encoding="utf-8").splitlines()
+            if not l.lstrip().startswith("#")
+        ]
     asyncio.run(main(urls, topics))
