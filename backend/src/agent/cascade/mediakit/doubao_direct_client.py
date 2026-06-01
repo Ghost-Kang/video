@@ -150,26 +150,41 @@ async def analyze_video_direct(
 # ---------- internals ----------
 
 
+def _resp_body_snippet(response: httpx.Response, limit: int = 400) -> str:
+    """A short, log-safe slice of ARK's error body. For S8 (http_400) this is the
+    ONLY thing that explains WHY 火山 rejected (video too long? bad format? frames?).
+    Newlines collapsed so it stays one log line; truncated to keep logs sane."""
+    try:
+        text = (response.text or "").strip().replace("\n", " ")
+    except Exception:  # pragma: no cover - defensive (body already consumed/binary)
+        return "<no body>"
+    return text[:limit] + ("…" if len(text) > limit else "")
+
+
 def _raise_for_status(response: httpx.Response) -> None:
-    """Map non-2xx ARK responses to HardFailures. None of these are retried."""
+    """Map non-2xx ARK responses to HardFailures. None of these are retried.
+    Every refusal carries a body snippet so S8 is diagnosable from logs."""
     if response.status_code in (401, 403):
         raise HardFailure(
             FailureCode.S8_UPSTREAM_REFUSED,
-            f"auth_refused: {response.status_code}",
+            f"auth_refused: {response.status_code} | body: {_resp_body_snippet(response)}",
         )
     if response.status_code == 429:
-        raise HardFailure(FailureCode.S8_UPSTREAM_REFUSED, "rate_limit")
+        raise HardFailure(
+            FailureCode.S8_UPSTREAM_REFUSED,
+            f"rate_limit | body: {_resp_body_snippet(response)}",
+        )
     if response.status_code >= 500:
         raise HardFailure(
             FailureCode.S8_UPSTREAM_REFUSED,
-            f"upstream_5xx_{response.status_code}",
+            f"upstream_5xx_{response.status_code} | body: {_resp_body_snippet(response)}",
         )
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         raise HardFailure(
             FailureCode.S8_UPSTREAM_REFUSED,
-            f"upstream_http_{response.status_code}",
+            f"upstream_http_{response.status_code} | body: {_resp_body_snippet(response)}",
         ) from exc
 
 
