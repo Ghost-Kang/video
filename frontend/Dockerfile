@@ -32,6 +32,11 @@ RUN --mount=type=cache,target=/root/.npm \
     npm ci --no-audit --no-fund --registry=${NPM_REGISTRY}
 
 COPY frontend/ ./
+# 改写解封(2026-06-01):Vite 构建期把 VITE_REWRITE_ENABLED 烤进 bundle
+# (import.meta.env.VITE_REWRITE_ENABLED;rewriteAccess.resolveRewriteEnabled 读它)。
+# 全量开 = "true";一键关回 = 改 build-arg 为 "false" 重建。默认 false(安全)。
+ARG VITE_REWRITE_ENABLED=false
+ENV VITE_REWRITE_ENABLED=${VITE_REWRITE_ENABLED}
 RUN npm run build
 
 # ---

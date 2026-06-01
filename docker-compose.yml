@@ -55,6 +55,9 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        # 改写解封全量开(2026-06-01)。一键关回:设 false 重建 frontend。
+        VITE_REWRITE_ENABLED: ${VITE_REWRITE_ENABLED:-true}
     container_name: cascade-frontend
     restart: unless-stopped
     logging:

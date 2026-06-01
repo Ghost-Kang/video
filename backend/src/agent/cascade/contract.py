@@ -35,14 +35,13 @@ ANALYSIS_PIPELINE_REVISION = 3
 # analysis-revision guard was built to prevent. load_recent_rewrite now filters
 # on pipeline_revision; a stored row with an older/missing value (legacy rows
 # backfill to 0) is treated as a miss and regenerated.
-#   1 → fixture/legacy baseline (current, pre-unseal)
-#   bump to 2 at 改写解封 — bundle ALL pre-staged rewrite changes into that one
-#   bump: prompt 审计员→代笔 + D5 长度 80–400 + D3 通用代笔 prompt/topic +
-#   flip CASCADE_REWRITE_UPSTREAM=llm. Those changes are landing now but stay
-#   DORMANT on the fixture path (REWRITE_ENABLED=false); do NOT bump until the
-#   quality gate passes — see docs/nexus/rewrite_quality_standard_2026-05-31.md
-#   unseal checklist.
-REWRITE_PIPELINE_REVISION = 1
+#   1 → fixture/legacy baseline (pre-unseal)
+#   2 → 改写解封 (2026-06-01): generic 代笔 prompt(D3)+ 四要素 prompt 调优 +
+#       D5 长度 80–400 + flip CASCADE_REWRITE_UPSTREAM=llm + 前端 REWRITE_ENABLED
+#       全量开。质量门已过(eval: 机械100% / realism 4.70 / kept 100% / ad_risk 0,
+#       founder D6 5/5 锚点)。bump 到 2 作废 24h 内的旧 fixture 缓存,首批用户即见
+#       真改写,不套娃。
+REWRITE_PIPELINE_REVISION = 2
 
 
 class Platform(str, Enum):
