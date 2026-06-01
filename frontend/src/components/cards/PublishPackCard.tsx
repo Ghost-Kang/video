@@ -24,7 +24,8 @@ export function PublishPackCard({ script, analysis }: Props) {
   const rewriteShots = useCanvasStore((s) => s.rewriteShots);
   const niche = useNicheStore((s) => s.niche);
   const titles = getPublishTitles(analysis, rewriteShots, niche);
-  const tags = getPublishTags(niche);
+  // P2 去 niche:传 analysis 让无 niche 时标签从 theme 派生(不再默认辅食)。
+  const tags = getPublishTags(niche, analysis);
 
   const handleCopy = async () => {
     const payload = buildPublishPack(script, analysis, [], rewriteShots, niche);

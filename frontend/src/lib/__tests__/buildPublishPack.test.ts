@@ -68,4 +68,46 @@ describe("buildPublishPack", () => {
     // 第二条来自另一镜,不是源片 hook。
     expect(titles[1]).toBe("换个颜色试试");
   });
+
+  // ── P2 去 niche 化(2026-06-01):任意视频不再套辅食标签 ──────────────
+
+  it("derives tags from analysis theme when niche is unknown (no baomam default)", () => {
+    const petAnalysis = {
+      ...MOCK_BAOMAM_ANALYSIS,
+      viral_analysis: { ...MOCK_BAOMAM_ANALYSIS.viral_analysis, theme: "趣味动物观察" },
+    };
+    // niche=null + 有 theme → 标签来自 theme,绝不出现辅食/宝妈
+    const tags = getPublishTags(null, petAnalysis);
+    expect(tags.length).toBeGreaterThanOrEqual(5);
+    expect(tags.join(" ")).toContain("#趣味动物观察");
+    expect(tags.join(" ")).not.toMatch(/辅食|宝妈|宝宝/);
+  });
+
+  it("generic niche → generic tagline, never the hardcoded niche tagline", () => {
+    // 无改写 + 无源 hook/climax → 第 3 条(tagline)应是通用句,不是辅食专属句。
+    const blankAnalysis = {
+      ...MOCK_BAOMAM_ANALYSIS,
+      viral_analysis: { ...MOCK_BAOMAM_ANALYSIS.viral_analysis, hook: "", climax: "", theme: "" },
+    };
+    const titles = getPublishTitles(blankAnalysis, [], "generic");
+    // 旧实现 niche=generic 不在表里 → niceNiche 默认 baomam → 塞「新手妈妈也能照着做」
+    expect(titles).not.toContain("新手妈妈也能照着做");
+    expect(titles).toContain("照着这条思路拍你自己的"); // 通用 tagline
+  });
+
+  it("scrubs forbidden terms from the rewritten script before clipboard (P2 hole)", () => {
+    // 改写稿里混进禁词 → 复制前必须被 scrub 掉(之前只 stripHookCode 不 scrub)
+    const dirtyScript = "用这个神器三步搞定，营养师都推荐";
+    const payload = buildPublishPack(dirtyScript, MOCK_BAOMAM_ANALYSIS);
+    const [body] = payload.split("—— 用 Cascade 做的");
+    for (const term of FORBIDDEN_TERMS) {
+      expect(body).not.toMatch(new RegExp(term, "i"));
+    }
+  });
+
+  it("degrades gracefully when no shot images (no broken 待补充 link)", () => {
+    const payload = buildPublishPack(buildDefaultScript(MOCK_BAOMAM_ANALYSIS), MOCK_BAOMAM_ANALYSIS, []);
+    expect(payload).not.toContain("镜头 1: 待补充");
+    expect(payload).toContain("草稿图生成后自动填入");
+  });
 });
