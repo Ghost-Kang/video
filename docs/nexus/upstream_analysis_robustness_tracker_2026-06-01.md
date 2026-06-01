@@ -51,11 +51,22 @@ NO_PROXY="ark.cn-beijing.volces.com,.douyin.com,.douyinvod.com,.iesdouyin.com" \
 - Phase 2 Gate「热点→创作转化≥15%」会被分析失败率拖累 → 这是 Gate 相关债。
 
 ## 5. 跟踪状态
-- [x] **P1 S5 JSON 修复(#10)已落地** — `doubao_direct_client._repair_json`:json.loads
-      失败时先做保守结构修复(去尾逗号 / 相邻 token 间补缺失逗号),修复后再解析,
-      仍失败才 S5。只动结构标点不动值;合法 JSON 不被误改(逗号已在处不匹配)。
-      5 条单测覆盖(test_doubao_direct_client.py,16 passed)。**#10 的确证根因
-      (`Expecting ',' delimiter`)正是此修复目标。**
+- [~] **P1 S5 JSON 修复(#10)= 部分修复 + 真线上确证(修正先前过度声明)**。
+      `_repair_json` 做保守结构修复(去尾逗号 / 相邻 token 补缺失逗号),catch 部分形态。
+      **但 2026-06-01 prod 真实验证(URL #1 分析)暴露:`Expecting ',' delimiter` 在
+      一次分析里连发 2 次(attempt 1/3、2/3),`_repair_json` 没救回,靠 retry 第 3 次
+      才成功**。→ 说明此形态 regex 修不了。读位置(line N col 10,行首键处)+ 形态推断:
+      **最可能是中文台词值里的未转义引号**(如 `"dialogue": "他说"你好""`)——结构 regex
+      无法区分哪对引号是结构、哪对在值内,**根本修不了**;唯一稳妥解 = `json-repair` 库
+      或靠 retry 重roll(模型重出一版通常就干净)。
+      **已落地的安全改进**(commit 见下):① S5 失败信息附 `_json_error_window`(失败点
+      ±60 字 + `⟪HERE⟫` 标记)→ 以后 #10 在 prod 日志里**可见真凶**,不再瞎猜;
+      ② `_MAX_JSON_ATTEMPTS` 改 env 可调(`DOUBAO_DIRECT_JSON_ATTEMPTS`)→ prod 不重新
+      部署就能调 retry 深度(注意:每次 attempt 是整次 ARK 调用 ~40s,3×≈120s 已接近
+      180s turn 预算,调高需同步 turn timeout)。
+      **真正的解(P1)**:抓一条 `near:` 日志确认形态 → 接 `json-repair` 库(pure-py、
+      MIT、专治此类),比手写 regex 稳。founder 在外未擅自加依赖(需 uv.lock 重锁 + 镜像
+      pin + 测试),留作下个迭代。**现状对 Beta 可接受**:retry 兜底 + 失败有可恢复 UI(铁律)。
 - [x] **adapter scenes 兜底全路径审计 = 已足够鲁棒**(2026-06-01)。逐项确认:
       ① 逐幕额外杂键 → 白名单过滤(adapter.py:150-155,`extra="forbid"` 不再炸);
       ② 全部受约束 string 字段 → 截断到 contract 上限(3 个显式 + 16 个 `_SCENE_TEXT_MAXLEN`);
@@ -70,5 +81,13 @@ NO_PROXY="ark.cn-beijing.volces.com,.douyin.com,.douyinvod.com,.iesdouyin.com" \
 - [ ] 修复后重跑 eval_generic_real_urls(同 15 URL)验证失败率 <10%
       —— **#10 类(JSON 格式)预期已修;重跑可量化降幅**。
 
-*本跟踪不阻断改写解封(已 GO)。改写解封后,生成/发布 leg 继续按 master plan 推进;
-本债在 P1 生成 leg 期间或之前并行修。JSON 修复(#10)已随 2026-06-01 部署上线。*
+## 6. 2026-06-01 prod 真实验证(改写-发布闭环上线后)
+prod 容器内 service 层 e2e(URL #1 → analyze → generic rewrite + topic「港式菠萝包」):
+- ✅ **generic 改写引擎线上跑通**:niche=generic、topic 生效(shot1 = 菠萝包文案)、
+  骨架四要素保留(`强视觉开场→步骤→成果→争议结尾` 换成菠萝包主题)、shots=4、
+  conf=0.9、cost=¥0.022、model=doubao-seed-2-0-pro-260215(升级模型)。
+- ⚠️ 同一次 analyze 触发上面 §5 的 #10 形态(`Expecting ',' delimiter` ×2 → retry 第3次过)。
+  → 这就是把「#10 已修」修正为「部分修 + 日志可诊断 + 靠 retry」的实证来源。
+
+*本跟踪不阻断改写解封(已 GO)。改写-发布闭环已 2026-06-01 上线并验证(见 §6)。
+#10 部分修 + 诊断窗口已上线;proper fix(json-repair 库)留 P1,现状 Beta 可接受。*

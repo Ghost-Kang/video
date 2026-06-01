@@ -398,3 +398,18 @@ def test_repair_json_fixes_common_doubao_glitches(bad):
 def test_repair_json_leaves_valid_json_parseable():
     good = '{"a": "x", "scenes": [{"i": 1}, {"i": 2}]}'
     assert json.loads(_repair_json(good)) == json.loads(good)
+
+
+def test_json_error_window_marks_failure_point():
+    # 不可 regex-修复的 doubao 形态(Chinese 值里未转义引号),用于 #10 日志诊断。
+    from agent.cascade.mediakit.doubao_direct_client import _json_error_window
+
+    bad = '{"dialogue": "他说"你好"", "next": "v"}'
+    try:
+        json.loads(bad)
+        raise AssertionError("expected JSONDecodeError")
+    except json.JSONDecodeError as exc:
+        window = _json_error_window(bad, exc)
+        assert "⟪HERE⟫" in window
+        # 窗口应包含失败点附近的真实片段,便于人工判型
+        assert "你好" in window or "dialogue" in window

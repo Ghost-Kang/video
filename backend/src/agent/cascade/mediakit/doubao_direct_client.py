@@ -49,7 +49,11 @@ _TIMEOUT_S = float(os.getenv("DOUBAO_DIRECT_TIMEOUT_S", "165") or "165")
 # (e.g. a missing delimiter mid-output) that hard-fails the whole analysis. Such
 # glitches almost always clear on a re-request, so retry the call a few times
 # before giving up. Only invalid-JSON (S5) is retried — auth/timeout/5xx are not.
-_MAX_JSON_ATTEMPTS = 3
+# Env-overridable so prod can tune retry depth without a redeploy (mirrors
+# _TIMEOUT_S). Each attempt is a full ARK vision call (~30-50s), so keep the
+# product attempts×per-call comfortably inside the 180s turn budget — 3 is the
+# safe default; raise only alongside the turn timeout.
+_MAX_JSON_ATTEMPTS = int(os.getenv("DOUBAO_DIRECT_JSON_ATTEMPTS", "3") or "3")
 _RETRY_SLEEP_S = 0.4  # patched to 0 in tests
 _VIDEO_FPS = 1
 _VIDEO_MAX_FRAMES = 60
@@ -254,9 +258,17 @@ def _parse_model_payload(response_json: dict[str, Any]) -> dict[str, Any]:
         try:
             parsed = json.loads(repaired)
         except json.JSONDecodeError:
+            # Surface a window around the original error position so #10-class
+            # malformations are diagnosable from logs. The bare exception text
+            # never showed WHAT doubao emitted (missing comma? unescaped quote
+            # inside a Chinese dialogue value? stray token?) — without that we
+            # can't extend _repair_json precisely and are stuck guessing. The
+            # retry loop (caller) re-rolls on this S5; the window just makes the
+            # rare all-attempts-fail case (the true #10) actionable.
             raise HardFailure(
                 FailureCode.S5_INVALID_PAYLOAD,
-                f"doubao_direct: assistant content not JSON: {first_exc}",
+                f"doubao_direct: assistant content not JSON: {first_exc} "
+                f"| near: {_json_error_window(text, first_exc)}",
             ) from first_exc
     if not isinstance(parsed, dict):
         raise HardFailure(
@@ -264,6 +276,20 @@ def _parse_model_payload(response_json: dict[str, Any]) -> dict[str, Any]:
             "doubao_direct: assistant content is not a JSON object",
         )
     return parsed
+
+
+def _json_error_window(text: str, exc: json.JSONDecodeError, span: int = 60) -> str:
+    """A short, log-safe slice of `text` around the parse-error position, with the
+    exact failure point marked ``⟪HERE⟫``. Lets us see WHAT doubao malformed
+    without dumping the whole ~12KB payload. Newlines escaped so it stays one line."""
+    pos = getattr(exc, "pos", 0) or 0
+    start = max(0, pos - span)
+    end = min(len(text), pos + span)
+    before = text[start:pos].replace("\n", "\\n")
+    after = text[pos:end].replace("\n", "\\n")
+    prefix = "…" if start > 0 else ""
+    suffix = "…" if end < len(text) else ""
+    return f"{prefix}{before}⟪HERE⟫{after}{suffix}"
 
 
 def _repair_json(text: str) -> str:
