@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -35,7 +36,15 @@ ARK_CHAT_COMPLETIONS_URL = (
 PROMPT_PATH = (
     Path(__file__).resolve().parents[2] / "prompts" / "doubao_direct_analyze.md"
 )
-_TIMEOUT_S = 120.0
+# ARK full-contract vision generation (10 viral dims + 14-per-scene + per-scene
+# timeline) is heavy: a content-rich ~50s video measured ~119s end-to-end, right
+# at the old 120.0 ceiling → S7_UPSTREAM_TIMEOUT fired on the临界 case (both the
+# showcase generator AND normal users analyzing busy videos). The upstream agent
+# turn allows 180s (RUN_TURN_TIMEOUT_S) and the frontend backstop is 210s, so the
+# ARK call was the *tightest* limit, wasting that headroom. Default raised to 165s
+# (comfortably inside the 180s turn budget); env-overridable for prod tuning
+# without a redeploy.
+_TIMEOUT_S = float(os.getenv("DOUBAO_DIRECT_TIMEOUT_S", "165") or "165")
 # ARK vision is non-deterministic and occasionally emits a malformed JSON body
 # (e.g. a missing delimiter mid-output) that hard-fails the whole analysis. Such
 # glitches almost always clear on a re-request, so retry the call a few times

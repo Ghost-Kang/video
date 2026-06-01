@@ -198,8 +198,10 @@ def test_happy_path_parses_full_contract_shape(monkeypatch) -> None:
     assert video_part["video_url"]["url"] == "https://cdn.test/v.mp4"
     assert video_part["video_url"]["fps"] == 1
     assert video_part["video_url"]["max_frames"] == 60
-    # 120s timeout asserted via the AsyncClient constructor kwarg
-    assert _FakeAsyncClient.last_timeout == 120.0
+    # ARK call timeout asserted via the AsyncClient constructor kwarg. Raised
+    # 120→165s (busy ~50s video measured ~119s, was hitting the old ceiling);
+    # env-overridable via DOUBAO_DIRECT_TIMEOUT_S. Must stay < RUN_TURN_TIMEOUT_S.
+    assert _FakeAsyncClient.last_timeout == doubao_direct_client._TIMEOUT_S == 165.0
 
 
 def test_strips_json_fence_defensively(monkeypatch) -> None:
@@ -267,6 +269,21 @@ def test_timeout_maps_s7(monkeypatch) -> None:
             )
         )
     assert exc.value.code == FailureCode.S7_UPSTREAM_TIMEOUT
+
+
+def test_timeout_ordering_invariant() -> None:
+    """The ARK call timeout must stay STRICTLY below the agent-turn timeout, which
+    in turn stays below the frontend hard-timeout backstop. If ARK ≥ turn, the
+    turn aborts mid-ARK-call and the user never gets the S7 (or a slow-but-valid
+    result), wasting the headroom the turn budget was meant to give. This pins the
+    fix for the ~119s busy-video timeout: ARK 165 < turn 180 (< frontend 210)."""
+    from agent.transport.agent_runner import RUN_TURN_TIMEOUT_S
+
+    assert doubao_direct_client._TIMEOUT_S < RUN_TURN_TIMEOUT_S, (
+        f"ARK timeout {doubao_direct_client._TIMEOUT_S}s must be < turn "
+        f"{RUN_TURN_TIMEOUT_S}s so the ARK call can finish (or cleanly S7) "
+        f"inside the turn budget"
+    )
 
 
 def _bad_json_response() -> httpx.Response:
