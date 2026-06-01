@@ -245,17 +245,43 @@ def _parse_model_payload(response_json: dict[str, Any]) -> dict[str, Any]:
     text = _extract_json_object(text)
     try:
         parsed = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise HardFailure(
-            FailureCode.S5_INVALID_PAYLOAD,
-            f"doubao_direct: assistant content not JSON: {exc}",
-        ) from exc
+    except json.JSONDecodeError as first_exc:
+        # Robustness (S5 fix): doubao occasionally emits *almost*-valid JSON —
+        # trailing commas, or a missing comma between two values. Rather than
+        # hard-fail (then burn a full re-request retry, which often repeats the
+        # same glitch), attempt a conservative in-house repair first.
+        repaired = _repair_json(text)
+        try:
+            parsed = json.loads(repaired)
+        except json.JSONDecodeError:
+            raise HardFailure(
+                FailureCode.S5_INVALID_PAYLOAD,
+                f"doubao_direct: assistant content not JSON: {first_exc}",
+            ) from first_exc
     if not isinstance(parsed, dict):
         raise HardFailure(
             FailureCode.S5_INVALID_PAYLOAD,
             "doubao_direct: assistant content is not a JSON object",
         )
     return parsed
+
+
+def _repair_json(text: str) -> str:
+    """Conservative repair of the JSON glitches doubao actually emits. Best-effort
+    string surgery — only touches structural punctuation, never values:
+      1) trailing commas before } or ]  (``…"a",}`` → ``…"a"}``)
+      2) missing comma between adjacent values: ``}{`` ``]"`` ``"[`` etc., and the
+         common ``"…" \n "…"`` (newline-separated string members with no comma)
+    If a fix doesn't help, json.loads still raises and the caller falls back to S5.
+    """
+    out = text
+    # 1) trailing commas before closing bracket/brace (incl. whitespace between)
+    out = re.sub(r",(\s*[}\]])", r"\1", out)
+    # 2) missing comma between a closed string/brace/bracket/number and the next
+    #    opening quote/brace/bracket across whitespace+newline.
+    out = re.sub(r'("\s*)\n(\s*")', r'\1,\n\2', out)          # "a"\n"b" → "a",\n"b"
+    out = re.sub(r'([}\]"0-9])\s*\n(\s*[{\["])', r'\1,\n\2', out)  # }\n{ ]\n" etc.
+    return out
 
 
 def _content_text(content: Any) -> str:

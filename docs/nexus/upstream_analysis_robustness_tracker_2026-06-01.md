@@ -51,10 +51,24 @@ NO_PROXY="ark.cn-beijing.volces.com,.douyin.com,.douyinvod.com,.iesdouyin.com" \
 - Phase 2 Gate「热点→创作转化≥15%」会被分析失败率拖累 → 这是 Gate 相关债。
 
 ## 5. 跟踪状态
-- [ ] P1 拉 #2/#8/#10 原始模型输出诊断 S5 根因
-- [ ] P1 S5 JSON 修复 / scenes 兜底加固
-- [ ] P2 抓 #5/#13 的 ARK 400 body 诊断 S8
+- [x] **P1 S5 JSON 修复(#10)已落地** — `doubao_direct_client._repair_json`:json.loads
+      失败时先做保守结构修复(去尾逗号 / 相邻 token 间补缺失逗号),修复后再解析,
+      仍失败才 S5。只动结构标点不动值;合法 JSON 不被误改(逗号已在处不匹配)。
+      5 条单测覆盖(test_doubao_direct_client.py,16 passed)。**#10 的确证根因
+      (`Expecting ',' delimiter`)正是此修复目标。**
+- [x] **adapter scenes 兜底全路径审计 = 已足够鲁棒**(2026-06-01)。逐项确认:
+      ① 逐幕额外杂键 → 白名单过滤(adapter.py:150-155,`extra="forbid"` 不再炸);
+      ② 全部受约束 string 字段 → 截断到 contract 上限(3 个显式 + 16 个 `_SCENE_TEXT_MAXLEN`);
+      ③ timestamp → clamp 负值 / clamp 超 duration / bump 倒挂 / drop 不可救 / 重排 / 重编号;
+      ④ scene_index → 排序/drop 后一律 1..N 重写;⑤ 数量 → pad 到 ≥3 / 截到 ≤12。
+      → **tracker 原先「#2/#8 = scenes 校验失败」是读码推断,非确证**;现有兜底已覆盖所有
+      已知 scenes 失败形态。**不再盲加投机兜底**(铁律:investigate before guess)。
+- [ ] **P1 #2/#8 待确证** — 现有兜底覆盖不到的某字段。**唯一确证手段 = 拉这两条原始
+      ARK 输出**(需 1-2 次 doubao vision 调用 + 本地 NO_PROXY)。founder 在外,未擅自
+      烧 ARK 预算;留作下次 eval 重跑时顺带 `print(response.text)` 抓原文 → 对症补。
+- [ ] P2 抓 #5/#13 的 ARK 400 body 诊断 S8(同上,需 ARK 调用,留待重跑)
 - [ ] 修复后重跑 eval_generic_real_urls(同 15 URL)验证失败率 <10%
+      —— **#10 类(JSON 格式)预期已修;重跑可量化降幅**。
 
 *本跟踪不阻断改写解封(已 GO)。改写解封后,生成/发布 leg 继续按 master plan 推进;
-本债在 P1 生成 leg 期间或之前并行修。*
+本债在 P1 生成 leg 期间或之前并行修。JSON 修复(#10)已随 2026-06-01 部署上线。*

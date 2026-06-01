@@ -370,3 +370,31 @@ def test_cost_guard_constant_aligned_with_module() -> None:
     from agent.cascade import cost_guard as cg
 
     assert PREDICT_DOUBAO_DIRECT_CNY == cg.PREDICT_DOUBAO_DIRECT_CNY == 0.50
+
+
+# --- S5 robustness: _repair_json (2026-06-01, eval exposed doubao JSON glitches) ---
+
+
+import pytest as _pytest  # noqa: E402
+from agent.cascade.mediakit.doubao_direct_client import _repair_json  # noqa: E402
+
+
+@_pytest.mark.parametrize(
+    "bad",
+    [
+        '{"a": "x", "b": "y",}',            # trailing comma before }
+        '{"a": [1, 2, 3,]}',                # trailing comma before ]
+        '{"a": "x"\n"b": "y"}',             # missing comma between newline-sep strings
+        '{"scenes": [{"i":1}\n{"i":2}]}',   # missing comma between objects
+    ],
+)
+def test_repair_json_fixes_common_doubao_glitches(bad):
+    # the bad input must NOT parse, but the repaired one must
+    with _pytest.raises(json.JSONDecodeError):
+        json.loads(bad)
+    json.loads(_repair_json(bad))  # raises if repair failed
+
+
+def test_repair_json_leaves_valid_json_parseable():
+    good = '{"a": "x", "scenes": [{"i": 1}, {"i": 2}]}'
+    assert json.loads(_repair_json(good)) == json.loads(good)
