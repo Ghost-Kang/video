@@ -92,12 +92,36 @@ P0-a(commit ad67fdd)+ 本轮(6 决策解锁的全部代码)已落地、测试绿
 - ✅ **已实现并测试**:B2(改写缓存守卫)/ B4(canvas.db 统一路径)/ B5(工具失败标 lifecycle)/ B7(遥测修真)/ B6+D1(生成图默认境内 apimart + execute_node 第二处漂移)/ B8 安全小洞(invite 码脱敏 + admin token compare_digest)/ B3(生成 enqueue 前置 cost_guard + 视频按秒预测)/ D5(改写长度 80–220 五处统一)/ D3(generic 通用代笔 prompt + 一句话主题,旧三套保留)/ D2(REWRITE_ENABLED 运行时可控,默认仍关)。
 - ⏳ **解封就绪但未 flip**(等质量门 D6):改写仍走 fixture 路径,REWRITE_ENABLED 默认 false,CASCADE_REWRITE_UPSTREAM 默认 fixture,REWRITE_PIPELINE_REVISION 仍=1。解封时一次性 bump 到 2 并 flip 三联动(B1)。
 
-## 6. 待办 / Follow-up(高优)
+## 6. 三项收尾进度(2026-06-01,founder 指「1 2 3 先完成」)
 
-- **[高·安全] cost_guard 身份派生缺口(B8-3)**:`handle_rewrite` / `handle_analysis_shallow` 用 `body.get("user_id"/"run_id")` 当 cost-cap key,COHORT 层只校验共享 invite-code,无 per-user 已认证身份。过 cohort 门者可轮换字段绕 `CASCADE_RUN/USER_DAY_CAP` 刷钱。正确修=服务端签发 per-user 身份(鉴权流改造),超出「小洞」范围,**解封灰度前需 founder 定鉴权模型**;在此之前别把 cost cap 当可信花钱护栏。代码已加 KNOWN 注释锚定。
-  - 注:B3 的生成 cost_guard 用 `ctx.user_id`(WS 已认证会话派生),不受此缺口影响;受影响的是 HTTP 入口的 rewrite/analysis。
-- **[P0-c] prod 4 项凭证轮换**:SSH 私钥 / root 口令 / CF token / CASCADE_ADMIN_TOKEN,上线 Gate,需 founder/SSH。
-- **[cosmetic] 预存在债**:`App.tsx` 有一处 `no-unused-expressions` eslint error(三元表达式当语句,line ~202,**非本轮引入**);事件数文档写 23 实为 21;run_started 生产从不 emit。
+> 这三项性质不同:能自主做完的已做完;**本质需 founder/SSH/鉴权决策的,只能就绪化 + 写清 runbook,不能假装完成**。
+
+### ① D6 改写质量人工锚点 —— ✅ 工具就绪,待 founder 标
+- 已建样例生成器 `backend/scripts/d6_generate_rewrite_samples.py`:对一组通用主题跑 **generic 通用代笔**改写,产出可勾选 worksheet(`docs/nexus/founder_log/d6_rewrite_anchors_<date>.md`)。
+- `--mode fixture`(默认,免费确定性)已验证管线通;**`--mode llm`(真 doubao 境内,有 API 成本)未自动跑** —— 烧钱 + 主题应由 founder 定,不擅自触发。
+- **待 founder**:`uv run python scripts/d6_generate_rewrite_samples.py --mode llm`(或给我主题集 + 授权我跑),然后在 worksheet 勾「✅ 我会发」。被标 ✅ 的样例 = judge 校准锚点 + 解封质量门人类基线。
+- 注:fixture 模式输出会暴露模板套娃局限(借用源台词,与新主题不贴)——这正是为何锚点必须用 llm 模式跑,印证了「改写解封前必须接真模型」。
+
+### ② prod 4 项凭证轮换 —— 🔶 代码就绪 + 泄露已从 memory 脱敏,轮换本身需 founder/SSH
+- **代码侧已就绪**:`CASCADE_ADMIN_TOKEN` 走 `os.getenv`(config.py:101),B8 已改常量时间比较 —— 换值即生效,无需改码。
+- **泄露面已收敛**:`reference_prod_server` memory 里的 root 口令 / CF token / SSH 指纹明文已**脱敏删除**(2026-06-01),并补了轮换 runbook。**注意:脱敏 memory ≠ 撤销泄露**,真正消除暴露必须轮换 prod 上的 secret 本身。
+- **待 founder(不可自动化——irreversible prod ops + 需 SSH/console/CF dashboard)**:① 重生 SSH keypair 换 prod authorized_keys;② 经 console 改 root 口令;③ CF dashboard 撤销+新建 token 更新 cloudflared.service;④ prod .env 换 `CASCADE_ADMIN_TOKEN` + 重启 backend。runbook 见 memory `reference_prod_server`。
+
+### ③ cost_guard 身份派生缺口(B8-3)—— 🔶 已锚定 + 出设计,真修需鉴权决策
+- **核实真相(比原判断更严重)**:不只 HTTP 入口——**WS 入口的 `user_id` 也来自客户端**(`ws_server.py` 取 `auth.user_id`,仅靠*共享* invite_code 把门,无 per-user 身份)。即全系统**没有任何服务端签发的 per-user 身份**;cost cap 的 user/run key 全是客户端自报,过 cohort 门者可轮换字段绕 `CASCADE_RUN/USER_DAY_CAP` 刷钱。
+- 故修正先前说法:B3 的 WS 路径用 `ctx.user_id`,比 HTTP per-message 取 body 稍好(连接时定、不可逐请求轮换),但**底层身份仍是客户端自称的**,非真正可信。
+- **代码已加 KNOWN 注释**锚定(http_router 两处)。**真修 = 引入 per-user 鉴权(server 签发 token/session)**,这是一次鉴权架构改造,**需 founder 先定模型**(每用户独立邀请码?注册登录?签发短期 token?),不是「小洞」补丁能解决,也不该我擅自塞进鉴权流。设计选项见 §6.1。
+
+#### 6.1 B8-3 鉴权模型选项(待 founder 选,供解封灰度前定)
+| 选项 | 做法 | 代价 | 适合 |
+|------|------|------|------|
+| A 每用户独立邀请码 | INVITE_CODES 从「共享集合」改「码→user_id 映射」,user_id 由码反查(非客户端传) | 小改:ws_server + http _check_auth 查映射;邀请码发放要一人一码 | 内测/小灰度最省,直接堵刷钱 |
+| B 服务端签发短期 token | 邀请码换一次性登录 → 签发 HMAC/JWT 短 token,后续请求带 token,user_id 从 token 解 | 中:加签发端点 + 校验中间件 + 前端存 token | Beta 规模、可控会话 |
+| C 完整注册登录 | 账号体系 + 密码/OAuth | 大 | Phase 3 商业化才值得 |
+> 推荐 **A**(内测期最小改动即可让 cost cap 可信),Beta 扩量再上 B。无论哪个,都应在**解封灰度前**落地——否则改写/生成接真模型 = 真金白银裸奔在客户端自报身份上。
+
+### [cosmetic] 预存在债(非本轮引入,顺手记)
+`App.tsx` 一处 `no-unused-expressions` eslint error(三元当语句,line ~202);事件数文档写 23 实为 21;run_started 生产从不 emit。
 
 ---
 
