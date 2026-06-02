@@ -13,9 +13,11 @@ import { useWebSocket } from "./hooks/useWebSocket";
 import { shouldHideProToggle, isAdminUser } from "./lib/proViewAccess";
 import { resolveRewriteEnabled } from "./lib/rewriteAccess";
 import { sessionDisplayName } from "./lib/sessionTitle";
+import { trackEvent } from "./lib/eventsApi";
 import { useCanvasStore } from "./store/canvasStore";
 import { useNicheStore } from "./store/nicheStore";
 import { useSessionStore } from "./store/sessionStore";
+import { usePendingCaseStore } from "./store/pendingCaseStore";
 import { useWSStore, synthesizeClientTimeout } from "./store/wsStore";
 import type { WSEvent } from "./types/ws";
 function newSessionId() {
@@ -33,6 +35,10 @@ export default function App({ userId, onLogout }: AppProps) {
   // justSubmitted 始终 false)。autoRewriteFiredFor 再加一层:每个 analysis_id 只发一次。
   const justSubmittedRef = useRef(false);
   const autoRewriteFiredFor = useRef<string | null>(null);
+  // 等待态遥测:waitStart = 本次分析开始的毫秒戳(null = 当前没有在等);
+  // abandonedFired 保证每次等待最多记一次「中途跳出」(切走/隐藏页面)。
+  const waitStartRef = useRef<number | null>(null);
+  const abandonedFiredRef = useRef(false);
   const isProView = searchParams.get("view") === "pro";
   const { sidebarOpen, chatOpen, setSidebarOpen, setChatOpen } = useLayoutState();
   const sessions = useSessionStore((s) => s.sessions);
@@ -47,6 +53,8 @@ export default function App({ userId, onLogout }: AppProps) {
   const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
   const analysis = useCanvasStore((s) => s.analysis);
   const rewriteShots = useCanvasStore((s) => s.rewriteShots);
+  // 分析中沉浸态用:本 thread「用户刚点的那条」案例素材(粘陌生链接时为 null)。
+  const pendingCase = usePendingCaseStore((s) => s.byThread[tid] ?? null);
   const addMessage = useCanvasStore((s) => s.addMessage);
   const clearCanvas = useCanvasStore((s) => s.clear);
   const setCanvas = useCanvasStore((s) => s.setCanvas);
@@ -72,7 +80,21 @@ export default function App({ userId, onLogout }: AppProps) {
     const niche = useNicheStore.getState().niche;
     sendCommand({ type: "user_message", thread_id: tid, content: text, selected_niche: niche ?? undefined });
     // 标记「本会话刚提交了一条链接」——分析回来后据此判断是否自动改写。
-    if (/https?:\/\//i.test(text)) justSubmittedRef.current = true;
+    if (/https?:\/\//i.test(text)) {
+      justSubmittedRef.current = true;
+      // 失败后换样本重试(同 thread):若新链接与暂存案例不是同一条,清掉暂存,
+      // 别让旧案例封面在沉浸态里冒充「你刚点的这条」。
+      const pc = usePendingCaseStore.getState().byThread[tid];
+      if (pc && pc.source_url !== text) usePendingCaseStore.getState().clearPendingCase(tid);
+      // 等待态遥测起点。
+      waitStartRef.current = Date.now();
+      abandonedFiredRef.current = false;
+      trackEvent(
+        "analysis_wait_started",
+        { has_case: Boolean(usePendingCaseStore.getState().byThread[tid]) },
+        tid,
+      );
+    }
     setLoading(true);
     timerRef.current = setTimeout(() => {
       // W5D3 Bug #6 — 超时时必须同时清掉 loading 和 progress 残留,否则
@@ -84,6 +106,10 @@ export default function App({ userId, onLogout }: AppProps) {
         progressEta: null,
         progressDetail: "",
       });
+      if (waitStartRef.current != null) {
+        trackEvent("analysis_wait_timeout", { elapsed_ms: Date.now() - waitStartRef.current }, tid);
+        waitStartRef.current = null;
+      }
       setFailure(synthesizeClientTimeout());
     }, 300_000);
   }, [addMessage, sendCommand, setFailure, setLoading, tid]);
@@ -181,16 +207,61 @@ export default function App({ userId, onLogout }: AppProps) {
     // 接回自动改写。
     return;
   }, [REWRITE_ENABLED, analysis, loading, rewriteShots, onTriggerRewrite]);
+  // 等待完成遥测:analysis 到达 = 这次等待成功收尾,记端到端耗时。冷加载历史会话
+  // (replay)时 waitStart 为 null,不会误记 —— 只统计用户主动发起的那次等待。
+  useEffect(() => {
+    if (analysis && waitStartRef.current != null) {
+      trackEvent(
+        "analysis_wait_completed",
+        { elapsed_ms: Date.now() - waitStartRef.current, analysis_id: analysis.analysis_id },
+        tid,
+      );
+      waitStartRef.current = null;
+    }
+  }, [analysis, tid]);
+  // 中途跳出遥测:分析进行中页面被切到后台(切 tab / 锁屏 / 关页前多半先 hidden)。
+  // 用 visibilitychange 而非 beforeunload —— 此刻页面仍存活,埋点 fetch 能发出去。
+  // 每次等待最多记一次(abandonedFiredRef)。
+  useEffect(() => {
+    const onVis = () => {
+      if (
+        document.visibilityState === "hidden" &&
+        loading &&
+        waitStartRef.current != null &&
+        !abandonedFiredRef.current
+      ) {
+        abandonedFiredRef.current = true;
+        trackEvent(
+          "analysis_wait_abandoned",
+          { reason: "hidden", elapsed_ms: Date.now() - waitStartRef.current },
+          tid,
+        );
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [loading, tid]);
   const switchSession = useCallback((id: string) => {
     if (id === tid) return;
+    // 离开仍在分析的会话也算一次中途跳出(此刻 loading 还是 true)。
+    if (loading && waitStartRef.current != null && !abandonedFiredRef.current) {
+      abandonedFiredRef.current = true;
+      trackEvent(
+        "analysis_wait_abandoned",
+        { reason: "switch_session", elapsed_ms: Date.now() - waitStartRef.current },
+        tid,
+      );
+    }
+    waitStartRef.current = null;
     clearTimeout(timerRef.current ?? undefined);
     setLoading(false);
     resetThinking();
     clearCanvas();
     setCanvas({ nodes: {}, edges: [] });
     navigate(`/chat/${id}`);
-  }, [clearCanvas, navigate, resetThinking, setCanvas, setLoading, tid]);
+  }, [clearCanvas, navigate, resetThinking, setCanvas, setLoading, tid, loading]);
   const deleteSession = useCallback((id: string) => {
+    usePendingCaseStore.getState().clearPendingCase(id);
     deleteSessionLocal(id);
     sendCommand({ type: "delete_session", thread_id: id });
   }, [deleteSessionLocal, sendCommand]);
@@ -208,7 +279,8 @@ export default function App({ userId, onLogout }: AppProps) {
   const toggleProView = useCallback(() => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      next.get("view") === "pro" ? next.delete("view") : next.set("view", "pro");
+      if (next.get("view") === "pro") next.delete("view");
+      else next.set("view", "pro");
       return next;
     });
   }, [setSearchParams]);
@@ -230,7 +302,7 @@ export default function App({ userId, onLogout }: AppProps) {
               <Canvas onPositionChange={(pos) => sendCommand({ ...pos, thread_id: tid })} onCreateEdge={actions.handleCreateEdge} onDeleteEdge={actions.handleDeleteEdge} />
               {selectedNodeId && <NodeDetail actions={actions} />}
             </>
-          ) : <CardStack onGenerateFirstFrame={onGenerateFirstFrame} onTriggerRewrite={onTriggerRewrite} onGenerateShotVideo={onGenerateShotVideo} onComposeFilm={onComposeFilm} />}
+          ) : <CardStack onGenerateFirstFrame={onGenerateFirstFrame} onTriggerRewrite={onTriggerRewrite} onGenerateShotVideo={onGenerateShotVideo} onComposeFilm={onComposeFilm} pendingCase={pendingCase} thinking={thinking} />}
         </div>
         {showDock && (chatOpen ? (
           <ChatPanel messages={messages} streaming={streaming} thinking={thinking} onSend={sendChatMessage} loading={loading} onToggleCollapse={() => setChatOpen(false)} />

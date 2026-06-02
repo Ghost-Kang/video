@@ -37,7 +37,7 @@ describe("ChatPanel 5-state machine (W5D3)", () => {
     expect(screen.queryByText("发送")).not.toBeInTheDocument();
   });
 
-  it("state=running: loading=true + no analysis → progress card + no input", () => {
+  it("state=running: loading=true + no analysis → dock 轻提示(进度真理之源在主画面) + no input", () => {
     render(
       <ChatPanel
         {...baseProps}
@@ -51,9 +51,10 @@ describe("ChatPanel 5-state machine (W5D3)", () => {
 
     expect(screen.getByTestId("side-title")).toHaveAttribute("data-state", "running");
     expect(screen.getByTestId("side-title")).toHaveTextContent(COPY.side_title_running);
-    expect(screen.getByTestId("analysis-progress")).toBeInTheDocument();
-    // progressbar role + aria-valuenow 应该存在
-    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    // 进度条/阶段/95%逃生已上移到主画面 AnalyzingHero;dock 只留一句轻提示,不再重复。
+    expect(screen.getByTestId("side-running")).toHaveTextContent(COPY.side_running_dock_hint);
+    expect(screen.queryByTestId("analysis-progress")).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(screen.queryByTestId("refine-textarea")).not.toBeInTheDocument();
   });
 
@@ -179,5 +180,6 @@ describe("ChatPanel 5-state machine (W5D3)", () => {
     );
     expect(screen.getByTestId("side-title")).toHaveAttribute("data-state", "failed");
     expect(screen.queryByTestId("analysis-progress")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("side-running")).not.toBeInTheDocument();
   });
 });

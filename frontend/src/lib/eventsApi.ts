@@ -1,5 +1,34 @@
 import { apiFetch } from "./apiClient";
 
+/**
+ * Fire-and-forget 埋点。失败(网络/鉴权)绝不影响用户体验 —— 静默吞掉。
+ * 用 localStorage 里的 rhtv_user 作 user_id(与 buildDiagnostic 一致),取不到退 "default"。
+ * 观测用,不在关键路径上。
+ */
+export function trackEvent(
+  event_name: string,
+  payload: Record<string, unknown> = {},
+  runId?: string | null,
+): void {
+  let user_id = "default";
+  try {
+    user_id = localStorage.getItem("rhtv_user") || "default";
+  } catch {
+    /* private mode — fall back to default */
+  }
+  try {
+    apiFetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event_name, user_id, run_id: runId ?? null, payload }),
+    }).catch(() => {
+      /* 异步失败(网络/鉴权)静默吞 */
+    });
+  } catch {
+    /* 同步异常(如测试环境无 fetch)也吞掉 —— 埋点绝不影响调用方控制流 */
+  }
+}
+
 export interface EventRow {
   id: number;
   ts: string;

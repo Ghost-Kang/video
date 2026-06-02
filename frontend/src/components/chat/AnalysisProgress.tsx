@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useWSStore } from "../../store/wsStore";
 import { COPY } from "../../lib/cardCopy";
+import { trackEvent } from "../../lib/eventsApi";
 import { useCanvasStore } from "../../store/canvasStore";
 import { synthesizeClientTimeout } from "../../store/wsStore";
 
@@ -190,7 +191,17 @@ export function AnalysisProgress({ thinking, startedAtMs }: Props) {
     elapsed >= PIN_ESCAPE_THRESHOLD_SEC &&
     elapsed >= snoozeEndElapsed;
 
+  // 软提示弹出记一次(去重)—— 配合下方两个 action 算「弹出后继续等 vs 换一条」分布。
+  const pinShownRef = useRef(false);
+  useEffect(() => {
+    if (pinned && !pinShownRef.current) {
+      pinShownRef.current = true;
+      trackEvent("pin_escape_shown", { elapsed_sec: Math.round(elapsed) });
+    }
+  }, [pinned, elapsed]);
+
   const handleSwitch = () => {
+    trackEvent("pin_escape_action", { action: "switch", elapsed_sec: Math.round(elapsed) });
     // 主动跳出 — 合成 failure(超时同义),让 ChatPanel 切到 failed 状态、给样本 chips。
     useCanvasStore
       .getState()
@@ -198,6 +209,7 @@ export function AnalysisProgress({ thinking, startedAtMs }: Props) {
   };
 
   const handleWait = () => {
+    trackEvent("pin_escape_action", { action: "wait", elapsed_sec: Math.round(elapsed) });
     setSnoozeEndElapsed(elapsed + PIN_ESCAPE_SNOOZE_SEC);
   };
 
@@ -215,7 +227,7 @@ export function AnalysisProgress({ thinking, startedAtMs }: Props) {
         >
           {remaining > 0
             ? `${COPY.side_running_eta_prefix}${remaining}${COPY.side_running_eta_suffix}`
-            : COPY.side_running_finishing}
+            : `${STAGE_LABEL[stage]} · ${COPY.side_running_finishing}`}
         </span>
         <span className="text-[11px] text-stone-500 dark:text-stone-400 tabular">
           {Math.round(percent)}%
@@ -243,21 +255,23 @@ export function AnalysisProgress({ thinking, startedAtMs }: Props) {
         >
           <p className="mb-2">{COPY.pin_escape_warning}</p>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleSwitch}
-              data-testid="pin-escape-switch"
-              className="rounded-full border border-[#7c2d12] dark:border-[#ea580c] px-3 py-1 text-[11px] text-[#7c2d12] dark:text-[#ea580c] hover:bg-[#7c2d12]/5 dark:hover:bg-[#ea580c]/10 transition-colors font-inherit"
-            >
-              {COPY.pin_escape_switch}
-            </button>
+            {/* 反转语序:「继续等」升为推荐主操作(陶土橙填充),「换一条」降为次选(灰描边)。
+                慢的时候站在用户这边等,而不是把「换一条」摆显眼位置劝退。 */}
             <button
               type="button"
               onClick={handleWait}
               data-testid="pin-escape-wait"
-              className="rounded-full border border-stone-300 dark:border-stone-700 px-3 py-1 text-[11px] text-stone-500 dark:text-stone-400 hover:border-stone-500 dark:hover:border-stone-500 transition-colors font-inherit"
+              className="rounded-full bg-[#7c2d12] dark:bg-[#ea580c] px-3 py-1 text-[11px] text-[#faf8f3] hover:bg-[#9a3412] dark:hover:bg-[#c2410c] transition-colors font-inherit"
             >
               {COPY.pin_escape_wait}
+            </button>
+            <button
+              type="button"
+              onClick={handleSwitch}
+              data-testid="pin-escape-switch"
+              className="rounded-full border border-stone-300 dark:border-stone-700 px-3 py-1 text-[11px] text-stone-500 dark:text-stone-400 hover:border-stone-500 dark:hover:border-stone-500 transition-colors font-inherit"
+            >
+              {COPY.pin_escape_switch}
             </button>
           </div>
         </div>

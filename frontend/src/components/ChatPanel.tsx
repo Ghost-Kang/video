@@ -4,7 +4,6 @@ import { extractThreadId } from "../lib/errorReporter";
 import { useToastStore } from "../store/toastStore";
 import { useCanvasStore } from "../store/canvasStore";
 import { SampleUrlChips } from "./onboarding/SampleUrlChips";
-import { AnalysisProgress } from "./chat/AnalysisProgress";
 import {
   deriveChatPanelState,
   type ChatPanelState,
@@ -222,8 +221,30 @@ export function ChatPanel({
           </div>
         )}
 
-        {/* State 2 — 拆解中。进度条 + 阶段 + 剩余秒。无输入框(中断没意义)。 */}
-        {state === "running" && <AnalysisProgress thinking={thinking} />}
+        {/* State 2 — 拆解中。进度真理之源(进度条+阶段+95%逃生)已上移到主画面
+            AnalyzingHero,避免双实例。dock 这里只留一句轻提示 + 最后一条实时 label,
+            把视线引导到上方,不再重复进度条。无输入框(中断没意义)。 */}
+        {state === "running" && (
+          <div
+            className="anim-fade-in rounded-2xl border border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-900/70 p-4 text-[12.5px] leading-[1.6] text-stone-600 dark:text-stone-400"
+            data-testid="side-running"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="inline-flex items-center gap-2">
+              <span className="relative inline-flex h-1.5 w-1.5">
+                <span className="absolute inset-0 rounded-full bg-[#ea580c] anim-pulse-ring" />
+                <span className="relative h-1.5 w-1.5 rounded-full bg-[#ea580c]" />
+              </span>
+              {COPY.side_running_dock_hint}
+            </span>
+            {thinking.length > 0 && (
+              <p className="mt-2 truncate text-[11px] text-stone-400 dark:text-stone-500">
+                {thinking[thinking.length - 1]}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* State 3 — 出错了。banner + 「再试一条样本」+ 「告诉客服这条」。 */}
         {state === "failed" && failure && (

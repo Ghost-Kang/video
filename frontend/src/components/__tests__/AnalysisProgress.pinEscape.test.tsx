@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeAll, afterEach, beforeEach } from "vite
 import { render, screen, fireEvent } from "@testing-library/react";
 import { AnalysisProgress } from "../chat/AnalysisProgress";
 import { useCanvasStore } from "../../store/canvasStore";
+import { COPY } from "../../lib/cardCopy";
 
 beforeAll(() => {
   // matchMedia stub for prefersReducedMotion — default to NOT reduced.
@@ -50,7 +51,7 @@ describe("AnalysisProgress 95% pin escape (W5D3)", () => {
     render(<AnalysisProgress thinking={[]} startedAtMs={startedAtMs} />);
     const escape = screen.getByTestId("pin-escape");
     expect(escape).toBeInTheDocument();
-    expect(escape).toHaveTextContent("比预期慢");
+    expect(escape).toHaveTextContent(COPY.pin_escape_warning);
     expect(screen.getByTestId("pin-escape-switch")).toBeInTheDocument();
     expect(screen.getByTestId("pin-escape-wait")).toBeInTheDocument();
   });

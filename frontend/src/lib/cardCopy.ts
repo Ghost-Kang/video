@@ -59,7 +59,7 @@ export const COPY = {
   tags_label: "话题标签",
 
   onboarding_title: "粘条爆款链接,看懂它为什么火",
-  onboarding_subtitle: "粘一条链接,几十秒后看到完整拆解",
+  onboarding_subtitle: "粘一条链接,通常一分钟内看懂它为什么火",
   onboarding_step1_title: "粘条爆款链接",
   onboarding_step1_desc: "抖音链接,直接复制粘贴(整段分享文案也行)",
   onboarding_step2_title: "看完整拆解",
@@ -159,6 +159,19 @@ export const COPY = {
   side_running_done_mark: "✓",
   side_running_pending_mark: "○",
 
+  // ── 分析中沉浸态(AnalyzingHero,主画面)──────────────────────────
+  // 把「用户刚点的那条」连续地带进等待态:封面 + 逐幕扫描 + 已拆出的钩子。
+  analyzing_hero_title_case: "正在拆解你刚点的这条",
+  analyzing_hero_title_generic: "正在拆解你这条",
+  analyzing_hero_subtitle: "AI 正在一幕一幕看完它,找出它为什么火 —— 多数 1 分钟内出结果",
+  analyzing_hero_scanning: "逐幕扫描中",
+  analyzing_hero_scene_prefix: "第 ",
+  analyzing_hero_scene_suffix: " 幕",
+  analyzing_hero_hook_label: "已经拆出的钩子",
+  analyzing_hero_generic_note: "你粘的这条正在逐幕进入分析,马上把「为什么火」摆给你看",
+  // dock running 降级提示(进度真理之源已上移到主画面 AnalyzingHero)
+  side_running_dock_hint: "正在逐幕拆解,进度和实时画面在上方 ↑",
+
   // 状态 3:出错了
   side_failed_retry_sample: "再试一条样本",
   side_failed_report: "告诉客服这条",
@@ -171,9 +184,11 @@ export const COPY = {
   // 状态 5(refine)输入框 placeholder — 替换原「想改哪里,直接说」
   side_refine_placeholder: "想改哪儿就告诉我,比如「开头再短一点」",
 
-  // ── 95% pin escape(W5D3 founder feedback)─────────────────────
+  // ── 95% pin escape(W5D3 founder feedback;W6 话术反转)──────────
   // 进度条卡 95% 超过 90s 时,顶出来一段软提示。
-  pin_escape_warning: "比预期慢,要不要换一条试试?",
+  // 旧文案「比预期慢,要不要换一条试试?」在用户焦虑时把锅甩给这条视频/用户的选择;
+  // 改成安抚 + 解释(信息量大=拆得更值),并把「继续等」升为推荐主操作、「换一条」降为次选。
+  pin_escape_warning: "这条信息量有点大,AI 还在逐幕抠细节 —— 已经到最后一步了,再给它一点点时间。",
   pin_escape_switch: "换一条",
   pin_escape_wait: "继续等",
 
@@ -244,7 +259,7 @@ export const COPY = {
   sample_cases_header: "没有链接?先看看我们能拆出什么",
   sample_case_tag: "真实拆解",
   sample_case_hook: "钩子",
-  sample_case_cta: "点开看完整拆解",
+  sample_case_cta: "看 AI 怎么逐幕拆这条",
 } as const;
 
 /** Terms that must never appear in card-stack UI copy or DOM. */

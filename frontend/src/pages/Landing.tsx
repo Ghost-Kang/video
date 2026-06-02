@@ -11,6 +11,7 @@ import { useParallax } from "../hooks/useParallax";
 import { useLiveStats } from "../hooks/useLiveStats";
 import { COPY } from "../lib/cardCopy";
 import type { SampleCase } from "../lib/sampleCases";
+import { usePendingCaseStore } from "../store/pendingCaseStore";
 
 function sessionId() {
   return `session-${Date.now().toString(36)}`;
@@ -31,9 +32,13 @@ export function Landing() {
     [navigate],
   );
 
-  // 样例卡 = 一条真实已拆解的视频。点开走真链接管线(命中缓存秒出完整分析)。
+  // 样例卡 = 一条真实已拆解的视频。点开走真链接管线(命中缓存多半秒出)。
+  // 关键:把这张卡的完整素材(封面/逐幕 clip/标题/钩子)按目标 thread 存一份,
+  // 让 /chat 的「分析中」态能把「用户刚点的那条」连续地带进等待态(AnalyzingHero)。
   const pickCase = (c: SampleCase) => {
-    fadeNavigate(`/chat/${sessionId()}?source_url=${encodeURIComponent(c.source_url)}`);
+    const sid = sessionId();
+    usePendingCaseStore.getState().setPendingCase(sid, c);
+    fadeNavigate(`/chat/${sid}?source_url=${encodeURIComponent(c.source_url)}`);
   };
   const submitUrl = (url: string) => {
     fadeNavigate(`/chat/${sessionId()}?source_url=${encodeURIComponent(url)}`);
@@ -75,7 +80,7 @@ export function Landing() {
               className="anim-fade-up inline-block"
               style={{ animationDelay: "260ms" }}
             >
-              <span className="text-shimmer-clay italic inline-block px-1.5">30 秒</span>
+              <span className="text-shimmer-clay italic inline-block px-1.5">1 分钟</span>
               <span>拆给你看</span>
             </span>
           </h1>
@@ -115,7 +120,7 @@ export function Landing() {
               <span className="absolute inset-0 rounded-full bg-emerald-500 anim-pulse-ring" />
               <span className="relative h-1.5 w-1.5 rounded-full bg-emerald-500" />
             </span>
-            平均拆解约 30 秒
+            多数 1 分钟内出结果
           </p>
 
           <ConsentGate>

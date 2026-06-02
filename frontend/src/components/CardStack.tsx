@@ -12,7 +12,9 @@ import { COPY } from "../lib/cardCopy";
 import { ConfidenceBanner } from "./feedback/ConfidenceBanner";
 import { FailureBanner } from "./feedback/FailureBanner";
 import { OnboardingSteps } from "./onboarding/OnboardingSteps";
+import { AnalyzingHero } from "./AnalyzingHero";
 import { resolveRewriteEnabled } from "../lib/rewriteAccess";
+import type { SampleCase } from "../lib/sampleCases";
 
 interface CardStackProps {
   onGenerateFirstFrame?: (sceneIndex: number) => void;
@@ -22,13 +24,17 @@ interface CardStackProps {
   onGenerateShotVideo?: (shotIndex: number) => void;
   /** 合成整片。 */
   onComposeFilm?: () => void;
+  /** 分析中沉浸态:用户刚点的那条案例素材(粘陌生链接时为 null)。 */
+  pendingCase?: SampleCase | null;
+  /** Director 实时 tool_call label,透传给内嵌进度组件。 */
+  thinking?: string[];
 }
 
 // 2026-05-30 toprador 对齐重设计:分析输出 = 爆点分析(总结+主题+维度网格) +
 // 视频分析(逐幕网格)。维度齐全但结构清晰、好理解(founder 实测 toprador 样例为准)。
 // 改写「你的版本」本轮暂挂 —— 不渲染 CTA/改写脚本/发布包(代码保留,见 wsStore +
 // rewrite_service,随时可重接)。源逐镜/音频/成本旧抽屉也撤掉(逐幕已含这些维度)。
-export function CardStack({ onTriggerRewrite, onGenerateFirstFrame, onGenerateShotVideo, onComposeFilm }: CardStackProps = {}) {
+export function CardStack({ onTriggerRewrite, onGenerateFirstFrame, onGenerateShotVideo, onComposeFilm, pendingCase, thinking }: CardStackProps = {}) {
   const analysis = useCanvasStore((s) => s.analysis);
   const failure = useCanvasStore((s) => s.failure);
   const loading = useWSStore((s) => s.loading);
@@ -45,10 +51,16 @@ export function CardStack({ onTriggerRewrite, onGenerateFirstFrame, onGenerateSh
   const { ref: headerRef, inView: headerInView } = useInView<HTMLHeadingElement>();
 
   if (!analysis) {
+    // 分析中 → 沉浸骨架(把用户刚点的那条带进等待态 + 内嵌进度真理之源)。
+    // 取代旧的「静态两步说明卡 step2」—— 那张卡在分析时装死还反向叫用户粘链接。
+    if (loading) {
+      return <AnalyzingHero caseData={pendingCase ?? null} thinking={thinking ?? []} />;
+    }
+    // 纯 idle(空会话等粘链接):仍是两步说明卡,但只高亮 step1。
     return (
       <main className="flex-1 overflow-y-auto bg-transparent p-6">
         <div className="mx-auto max-w-[640px] pt-6 pb-12">
-          <OnboardingSteps currentStep={loading ? 2 : 1} />
+          <OnboardingSteps currentStep={1} />
         </div>
       </main>
     );
