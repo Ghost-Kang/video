@@ -730,9 +730,16 @@ def _normalize_scenes(data: dict[str, Any], warnings: list[Warning_]) -> None:
         s["timestamp_start"] = new_start
         s["timestamp_end"] = new_end
 
-    # If the bumps disturbed monotonicity (e.g., scene i's bumped end > scene i+1's start),
-    # re-sort and re-index. Emit W5_TIMESTAMPS_SORTED if order actually changes.
-    if any_clamped and len(normalized) > 1:
+    # Enforce strict non-overlap before validation — UNCONDITIONALLY (len>1), not
+    # only after clamping. 2026-06-01 prod diag (#2) confirmed the model itself
+    # emits *overlapping* ranges that each pass per-scene clamping (within
+    # duration, end>start) yet still violate the contract's _timestamps_monotonic
+    # check (scenes[i].start < scenes[i-1].end). The initial sort orders by START,
+    # which does NOT prevent overlap — so this snap pass must always run, else
+    # overlapping scenes reach the validator → S5_INVALID_PAYLOAD (the real #2 root
+    # cause; previously gated behind `any_clamped` and thus skipped for clean-clamp
+    # overlaps). Re-sort + snap + re-index; emit W5_TIMESTAMPS_SORTED if order moves.
+    if len(normalized) > 1:
         before = [s["timestamp_start"] for s in normalized]
         normalized = sorted(normalized, key=lambda s: s["timestamp_start"])
         after = [s["timestamp_start"] for s in normalized]
@@ -741,7 +748,7 @@ def _normalize_scenes(data: dict[str, Any], warnings: list[Warning_]) -> None:
                 Warning_(
                     code=WarningCode.W5_TIMESTAMPS_SORTED.value,
                     field="scenes",
-                    message="post-clamp re-sort changed scene order",
+                    message="re-sorted by timestamp_start before overlap snap",
                     severity=Severity.INFO,
                 )
             )

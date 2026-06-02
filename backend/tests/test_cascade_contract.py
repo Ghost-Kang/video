@@ -153,6 +153,26 @@ def test_recoverable_sorts_unsorted_scenes() -> None:
     assert any(w.code == WarningCode.W5_TIMESTAMPS_SORTED.value for w in contract.warnings)
 
 
+def test_adapter_snaps_model_emitted_overlap_without_clamp() -> None:
+    # 2026-06-01 prod diag #2 root cause: the model emits OVERLAPPING scenes that
+    # each pass per-scene clamping (within duration, end>start) — i.e. start <
+    # prev_end with no value needing a clamp. Before the fix the overlap-snap pass
+    # was gated behind `any_clamped` and thus SKIPPED, so the overlap reached the
+    # contract's _timestamps_monotonic validator → S5_INVALID_PAYLOAD. Now snapped
+    # unconditionally.
+    raw = _load(SYNTH / "baomam_fushi" / "001.json")
+    # scene1 now ends at 19.0 while scene2 starts at 4.5 → overlap. 19.0 <=
+    # duration_s(38) and > 0.0, and starts stay ascending (0,4.5,11,18,28) so NO
+    # clamp fires and the initial sort is a no-op — exactly the prod #2 shape.
+    raw["scenes"][0]["timestamp_end"] = 19.0
+    contract = normalize_analysis_result(raw)  # must NOT raise S5
+    # Output is strictly non-overlapping / monotonic
+    for i in range(1, len(contract.scenes)):
+        assert contract.scenes[i].timestamp_start >= contract.scenes[i - 1].timestamp_end
+    # scene_index re-derived 1..N contiguous
+    assert [s.scene_index for s in contract.scenes] == list(range(1, len(contract.scenes) + 1))
+
+
 def test_recoverable_low_confidence_fills_fallbacks() -> None:
     raw = _load(SYNTH / "edge_low_confidence.json")
     contract = normalize_analysis_result(raw)

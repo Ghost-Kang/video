@@ -55,6 +55,13 @@ _TIMEOUT_S = float(os.getenv("DOUBAO_DIRECT_TIMEOUT_S", "165") or "165")
 # safe default; raise only alongside the turn timeout.
 _MAX_JSON_ATTEMPTS = int(os.getenv("DOUBAO_DIRECT_JSON_ATTEMPTS", "3") or "3")
 _RETRY_SLEEP_S = 0.4  # patched to 0 in tests
+# Output token cap. 2026-06-01 prod diag (#10) confirmed the real S5
+# `Expecting ',' delimiter` at EOF was MODEL OUTPUT TRUNCATION — the full contract
+# (10 viral dims + up to 12 scenes × ~24 fields, Chinese text) overran ARK's small
+# DEFAULT max_tokens, so the JSON ended mid-array. max_tokens is a CAP not a target
+# (you only pay for tokens actually generated), so a generous cap is free and lets
+# the full contract complete. doubao-seed-2-0-pro supports 16K output. Env-tunable.
+_MAX_OUTPUT_TOKENS = int(os.getenv("DOUBAO_DIRECT_MAX_TOKENS", "16384") or "16384")
 _VIDEO_FPS = 1
 _VIDEO_MAX_FRAMES = 60
 _VIDEO_MAX_PIXELS = 518_400  # mirrors viral_overlay.py — keeps token spend honest
@@ -102,7 +109,7 @@ async def analyze_video_direct(
         "Content-Type": "application/json",
     }
 
-    last_invalid: HardFailure | None = None
+    last_retryable: HardFailure | None = None
     async with httpx.AsyncClient(timeout=_TIMEOUT_S) as client:
         for attempt in range(1, _MAX_JSON_ATTEMPTS + 1):
             try:
@@ -122,7 +129,23 @@ async def analyze_video_direct(
                     f"doubao_direct transport_error: {exc}",
                 ) from exc
 
-            _raise_for_status(response)  # auth/429/5xx/other → S8, not retried
+            try:
+                _raise_for_status(response)  # auth/429/5xx/400 → S8
+            except HardFailure as exc:
+                # Prod diag #5: 火山 sometimes returns http_400 "Timeout while
+                # connecting: <video_url>" — a TRANSIENT failure to fetch the
+                # douyin CDN URL, not a real rejection. Re-request (ARK re-fetches,
+                # often warm next time). Hard rejections (bad format/too long/auth)
+                # are NOT transient → propagate immediately.
+                if _is_transient_s8(exc) and attempt < _MAX_JSON_ATTEMPTS:
+                    last_retryable = exc
+                    print(
+                        f"[doubao_direct] transient S8 (attempt {attempt}/"
+                        f"{_MAX_JSON_ATTEMPTS}), retrying: {exc.debug_detail[:200]}"
+                    )
+                    await asyncio.sleep(_RETRY_SLEEP_S * attempt)
+                    continue
+                raise
 
             try:
                 parsed = _parse_response_json(response)
@@ -130,7 +153,7 @@ async def analyze_video_direct(
                 # Only transient invalid-JSON (S5) is retried; re-request the
                 # model — non-determinism usually yields valid JSON next time.
                 if exc.code == FailureCode.S5_INVALID_PAYLOAD and attempt < _MAX_JSON_ATTEMPTS:
-                    last_invalid = exc
+                    last_retryable = exc
                     print(
                         f"[doubao_direct] invalid JSON (attempt {attempt}/"
                         f"{_MAX_JSON_ATTEMPTS}), retrying: {exc.debug_detail}"
@@ -142,12 +165,23 @@ async def analyze_video_direct(
             _clamp_confidence(parsed)
             return parsed
 
-    # Exhausted retries on invalid JSON.
-    assert last_invalid is not None  # loop always sets it before falling through
-    raise last_invalid
+    # Exhausted retries (invalid JSON or transient S8).
+    assert last_retryable is not None  # loop always sets it before falling through
+    raise last_retryable
 
 
 # ---------- internals ----------
+
+
+def _is_transient_s8(exc: HardFailure) -> bool:
+    """True when an S8 refusal is TRANSIENT — ARK failed to *fetch* the video_url
+    in time (prod diag #5: http_400 InvalidParameter "Timeout while connecting:
+    <video_url>") — rather than a hard rejection (bad format / too long / auth /
+    rate-limit). Only transient ones are worth a re-request. Deliberately narrow
+    (exact 火山 phrase) to avoid retry-storming genuine rejections."""
+    if exc.code != FailureCode.S8_UPSTREAM_REFUSED:
+        return False
+    return "timeout while connecting" in (exc.debug_detail or "").lower()
 
 
 def _resp_body_snippet(response: httpx.Response, limit: int = 400) -> str:
@@ -237,6 +271,8 @@ def _request_body(direct_mp4_url: str) -> dict[str, Any]:
             },
         ],
         "stream": False,
+        # Prevent mid-output truncation of the full contract (prod diag #10).
+        "max_tokens": _MAX_OUTPUT_TOKENS,
     }
 
 

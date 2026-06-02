@@ -372,6 +372,67 @@ def test_cost_guard_constant_aligned_with_module() -> None:
     assert PREDICT_DOUBAO_DIRECT_CNY == cg.PREDICT_DOUBAO_DIRECT_CNY == 0.50
 
 
+# --- prod diag 2026-06-01: #10 truncation (max_tokens) + #5 transient S8 retry ---
+
+
+def test_request_body_sets_max_tokens(monkeypatch) -> None:
+    """#10 root cause = model output truncation (ARK default max_tokens too small
+    for the full contract). Request must carry an explicit generous cap."""
+    _setup(monkeypatch)
+    _FakeAsyncClient.response = _ark_response(200, _model_payload())
+    asyncio.run(analyze_video_direct("https://cdn.test/v.mp4", user_id="u", run_id="r"))
+    body = _FakeAsyncClient.last_json
+    assert body["max_tokens"] == doubao_direct_client._MAX_OUTPUT_TOKENS
+    assert body["max_tokens"] >= 8192  # comfortably above a 12-scene contract
+
+
+_TRANSIENT_S8_BODY = {
+    "error": {
+        "code": "InvalidParameter",
+        "message": "Timeout while connecting: https://aweme.snssdk.com/aweme/v1/playwm/?video_id=x",
+        "param": "video_url",
+        "type": "BadRequest",
+    }
+}
+
+
+def test_transient_s8_timeout_connecting_is_retried_then_succeeds(monkeypatch) -> None:
+    """#5: 火山 http_400 'Timeout while connecting: <video_url>' is a transient
+    fetch failure → re-request; the next good response yields the contract."""
+    _setup(monkeypatch)
+    _FakeAsyncClient.responses = [
+        _ark_response(400, body=_TRANSIENT_S8_BODY),
+        _ark_response(200, _model_payload()),
+    ]
+    result = asyncio.run(analyze_video_direct("https://cdn.test/v.mp4", user_id="u", run_id="r"))
+    assert len(result["scenes"]) == 3
+    assert _FakeAsyncClient.calls == 2  # one retry on the transient S8
+
+
+def test_transient_s8_exhausts_then_maps_s8(monkeypatch) -> None:
+    """Persistent transient S8 → retried up to the budget, then S8 (with body)."""
+    _setup(monkeypatch)
+    _FakeAsyncClient.response = _ark_response(400, body=_TRANSIENT_S8_BODY)
+    with pytest.raises(HardFailure) as exc:
+        asyncio.run(analyze_video_direct("https://cdn.test/v.mp4", user_id="u", run_id="r"))
+    assert exc.value.code == FailureCode.S8_UPSTREAM_REFUSED
+    assert "Timeout while connecting" in exc.value.debug_detail
+    assert _FakeAsyncClient.calls == doubao_direct_client._MAX_JSON_ATTEMPTS
+
+
+def test_hard_s8_400_is_not_retried(monkeypatch) -> None:
+    """A NON-transient http_400 (real rejection) must fail fast — no retry spend."""
+    _setup(monkeypatch)
+    _FakeAsyncClient.response = _ark_response(
+        400, body={"error": {"code": "InvalidParameter", "message": "video too long", "type": "BadRequest"}}
+    )
+    with pytest.raises(HardFailure) as exc:
+        asyncio.run(analyze_video_direct("https://cdn.test/v.mp4", user_id="u", run_id="r"))
+    assert exc.value.code == FailureCode.S8_UPSTREAM_REFUSED
+    assert "video too long" in exc.value.debug_detail
+    assert _FakeAsyncClient.calls == 1  # not retried
+
+
 # --- S5 robustness: _repair_json (2026-06-01, eval exposed doubao JSON glitches) ---
 
 
