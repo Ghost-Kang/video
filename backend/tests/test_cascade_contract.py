@@ -173,6 +173,28 @@ def test_adapter_snaps_model_emitted_overlap_without_clamp() -> None:
     assert [s.scene_index for s in contract.scenes] == list(range(1, len(contract.scenes) + 1))
 
 
+def test_adapter_post_drop_pad_clone_is_de_overlapped() -> None:
+    # 2026-06-01 prod diag #2 (real root cause): a scene with start >= duration_s
+    # is DROPPED, leaving < 3 scenes, so the post-drop pad clones the last scene
+    # *verbatim* (same timestamps) → the clone overlaps it. Before the fix the
+    # post-drop pad ran AFTER the snap, so the overlapping clone reached the
+    # validator → S5 (observed: [(1,0,5.4),(2,5.4,19),(3,5.4,19)]). Now the snap
+    # is the FINAL step and de-overlaps the clone.
+    raw = _load(SYNTH / "baomam_fushi" / "001.json")
+    raw["duration_s"] = 30
+    raw["scenes"] = raw["scenes"][:3]
+    raw["scenes"][0]["timestamp_start"], raw["scenes"][0]["timestamp_end"] = 0.0, 5.4
+    raw["scenes"][1]["timestamp_start"], raw["scenes"][1]["timestamp_end"] = 5.4, 19.0
+    # 3rd scene starts past duration → dropped → triggers post-drop pad (clone).
+    raw["scenes"][2]["timestamp_start"], raw["scenes"][2]["timestamp_end"] = 35.0, 40.0
+    contract = normalize_analysis_result(raw)  # must NOT raise S5
+    assert len(contract.scenes) >= 3  # padded back to the contract minimum
+    # No overlap survives; indices contiguous 1..N
+    for i in range(1, len(contract.scenes)):
+        assert contract.scenes[i].timestamp_start >= contract.scenes[i - 1].timestamp_end
+    assert [s.scene_index for s in contract.scenes] == list(range(1, len(contract.scenes) + 1))
+
+
 def test_recoverable_low_confidence_fills_fallbacks() -> None:
     raw = _load(SYNTH / "edge_low_confidence.json")
     contract = normalize_analysis_result(raw)

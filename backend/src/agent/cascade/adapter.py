@@ -744,15 +744,50 @@ def _normalize_scenes(data: dict[str, Any], warnings: list[Warning_]) -> None:
         s["timestamp_start"] = new_start
         s["timestamp_end"] = new_end
 
-    # Enforce strict non-overlap before validation — UNCONDITIONALLY (len>1), not
-    # only after clamping. 2026-06-01 prod diag (#2) confirmed the model itself
-    # emits *overlapping* ranges that each pass per-scene clamping (within
-    # duration, end>start) yet still violate the contract's _timestamps_monotonic
-    # check (scenes[i].start < scenes[i-1].end). The initial sort orders by START,
-    # which does NOT prevent overlap — so this snap pass must always run, else
-    # overlapping scenes reach the validator → S5_INVALID_PAYLOAD (the real #2 root
-    # cause; previously gated behind `any_clamped` and thus skipped for clean-clamp
-    # overlaps). Re-sort + snap + re-index; emit W5_TIMESTAMPS_SORTED if order moves.
+    # Drop the unsalvageable scenes collected during the per-scene clamp pass.
+    # MUST run BEFORE the snap below: drop_indices index into `normalized` in its
+    # clamp-pass order, still intact here (no re-sort yet). 2026-06-01 prod diag
+    # (#2): when this ran AFTER the snap's re-sort, (a) the indices were stale and
+    # (b) the post-drop pad clone (below) was appended *after* the snap, so its
+    # overlapping timestamps never got de-overlapped → S5 at _timestamps_monotonic
+    # (observed: scenes=[(1,0,5.4),(2,5.4,19),(3,5.4,19)] — clone overlapped #2).
+    if drop_indices:
+        normalized = [s for i, s in enumerate(normalized) if i not in set(drop_indices)]
+        # W5D3 CR-P0 — degenerate case: ALL scenes had timestamp_start >=
+        # duration_s, so the drop pass emptied the list. The original pad
+        # loop's `and normalized` guard is correct to prevent IndexError but
+        # silently no-ops, leaving the contract to hard-fail later at
+        # `scenes: list[Scene] = Field(..., min_length=3)` validation. That's
+        # the *same failure* W5D2's recovery was supposed to prevent. Raise an
+        # explicit HardFailure so the user gets a real hint instead of a
+        # silent S5_INVALID_PAYLOAD.
+        if not normalized:
+            raise HardFailure(
+                FailureCode.S5_INVALID_PAYLOAD,
+                "all scenes had timestamp_start >= duration_s; nothing to pad from",
+            )
+        # Post-drop pad — if drops left us below 3, clone last scene to hit min.
+        # The clone copies the last scene's timestamps (→ overlap), but the snap
+        # pass below now runs AFTER this and de-overlaps it. scene_index is left
+        # for the snap's final re-index to assign.
+        while len(normalized) < 3:
+            normalized.append(dict(normalized[-1]))
+            warnings.append(
+                Warning_(
+                    code=WarningCode.W18_SCENES_PADDED.value,
+                    field="scenes",
+                    message="post-drop pad: added clone of last scene to reach min 3",
+                    severity=Severity.WARN,
+                )
+            )
+
+    # Enforce strict non-overlap — FINAL step, UNCONDITIONALLY (len>1). Runs AFTER
+    # all pad/drop mutations so it de-overlaps BOTH (a) the model's own overlapping
+    # ranges (each passes per-scene clamping yet violates _timestamps_monotonic) and
+    # (b) pad clones (head-pad + post-drop pad both clone a scene's timestamps
+    # verbatim). Sorting by START alone does NOT prevent overlap, so this must always
+    # run; earlier it was gated behind `any_clamped` AND placed before the post-drop
+    # pad, which let #2 escape (prod diag 2026-06-01). Re-sort + snap + re-index.
     if len(normalized) > 1:
         before = [s["timestamp_start"] for s in normalized]
         normalized = sorted(normalized, key=lambda s: s["timestamp_start"])
@@ -783,42 +818,9 @@ def _normalize_scenes(data: dict[str, Any], warnings: list[Warning_]) -> None:
                 normalized[i]["timestamp_start"] = prev_end
                 if normalized[i]["timestamp_end"] <= prev_end:
                     normalized[i]["timestamp_end"] = prev_end + 0.1
-        # Re-index 1..N after sort
-        for idx, s in enumerate(normalized, start=1):
-            s["scene_index"] = idx
-
-    # Drop the unsalvageable scenes collected during the timestamp pass.
-    if drop_indices:
-        normalized = [s for i, s in enumerate(normalized) if i not in set(drop_indices)]
-        # Re-index 1..N after drop
-        for idx, s in enumerate(normalized, start=1):
-            s["scene_index"] = idx
-        # W5D3 CR-P0 — degenerate case: ALL scenes had timestamp_start >=
-        # duration_s, so the drop pass emptied the list. The original pad
-        # loop's `and normalized` guard is correct to prevent IndexError but
-        # silently no-ops, leaving the contract to hard-fail later at
-        # `scenes: list[Scene] = Field(..., min_length=3)` validation. That's
-        # the *same failure* W5D2's recovery was supposed to prevent. Raise an
-        # explicit HardFailure so the user gets a real hint instead of a
-        # silent S5_INVALID_PAYLOAD.
-        if not normalized:
-            raise HardFailure(
-                FailureCode.S5_INVALID_PAYLOAD,
-                "all scenes had timestamp_start >= duration_s; nothing to pad from",
-            )
-        # Post-drop pad — if drops left us below 3, clone last scene to hit min.
-        while len(normalized) < 3:
-            clone = dict(normalized[-1])
-            clone["scene_index"] = len(normalized) + 1
-            normalized.append(clone)
-            warnings.append(
-                Warning_(
-                    code=WarningCode.W18_SCENES_PADDED.value,
-                    field="scenes",
-                    message=f"post-drop pad: added clone of last scene to reach min 3",
-                    severity=Severity.WARN,
-                )
-            )
+    # Re-index 1..N (covers re-sort, drop, and pad clones in one place).
+    for idx, s in enumerate(normalized, start=1):
+        s["scene_index"] = idx
 
     data["scenes"] = normalized
 
