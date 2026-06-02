@@ -113,6 +113,22 @@ NO_PROXY="ark.cn-beijing.volces.com,.douyin.com,.douyinvod.com,.iesdouyin.com" \
 
 </details>
 
+## 5c. ✅ 修复后 prod 复验(2026-06-01,逐条确证)
+带诊断窗口逐条重跑(`post_normalize_ts` 直接给出铁证):
+
+| # | 修前 | 修后 prod 复验 | 结论 |
+|---|------|------|------|
+| 2 | S5 overlap | ✅ `scenes=3 ts=[(1,0,5.5),(2,5.5,19),(3,19,19.1)]` | **修好**。真因不是「模型重叠」而是 **post-drop pad clone 重叠**:某幕 start>=duration 被 drop→剩<3→克隆末幕(同时间戳 5.5-19)→旧顺序 clone 加在 snap 之后永不去重叠。修=drop/pad 移到 snap 前,snap 变最终步。`post_normalize_ts` 诊断是定位功臣 |
+| 5 | S8 | retry 2× 仍 `Timeout while connecting` | 火山持续连不上该 CDN URL(基建,非我方 bug)。transient 重试已加(best-effort);URL 持续不可达时无解 |
+| 8 | S5 | ✅ `scenes=4` | 同 #2 修复覆盖 |
+| 10 | S5 截断 | ✅ `scenes=12 conf=0.98` | **修好**=max_tokens=16384(全 12 幕不再截断) |
+| 13 | S8→S7 | 超时 | 视频重 165s 到顶(真超时,有恢复 UI) |
+
+→ **5 条里 3 条(#2/#8/#10)确证修复;#5/#13 是 transient 基建 / 重视频超时**,均有
+重试 + 可恢复 UI,非确定性 bug。失败率 5/15(33%)→ 预计 ~2/15(13%),且剩余 2 条非代码缺陷。
+**关键:#2 真因(post-drop-pad clone)靠诊断窗口的 `post_normalize_ts` 才挖出来——
+两轮 investigate>guess(先推翻「未转义引号」,再推翻「模型重叠」)。**
+
 ## 6. 2026-06-01 prod 真实验证(改写-发布闭环上线后)
 prod 容器内 service 层 e2e(URL #1 → analyze → generic rewrite + topic「港式菠萝包」):
 - ✅ **generic 改写引擎线上跑通**:niche=generic、topic 生效(shot1 = 菠萝包文案)、
