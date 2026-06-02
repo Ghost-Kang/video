@@ -114,5 +114,48 @@
 
 ---
 
+## 5. 视频闭环(2026-06-01 加,PHASED_PLAN P2-1 + P2-9)
+
+闭环补成 **分析 → 改写 → 草稿图 → 图生视频(每镜)→ 合成整片 → 发布**。两段新工具,都
+**异步**(Seedance poll 上限 900s ≫ 180s agent turn → 提交后丢后台 poll,完成推帧)。
+
+```
+图生视频(单镜):
+①前端 RewriteShotCard「生成视频」(草稿图出图后才出;image-grounded)
+   → App.onGenerateShotVideo → [generate_shot_video: shot_index=N]
+②框架层 Director §0.7b → cascade_generate_shot_video(最近 rw_id, N)
+③模块 load_shot_image(草稿图 URL)→ cost_guard(5s≈¥1.5)→ SeedanceProvider.submit
+   (image_urls=[草稿图], 5s, 16:9)→ 返回 task_id(立即返回 submitted)
+④后台 asyncio.create_task(_poll_shot_video):poll 几分钟 → 下载落 /media/<rid>/shot_<i>.mp4
+   持久 → record_shot_video → notify.send_to_user(shot_video_returned {video_url})
+⑤前端 wsStore → canvasStore.setRewriteShotVideo → RewriteShotCard 渲染 <video poster=草稿图>
+
+合成整片:
+①前端「合成整片」(任一镜有视频后出现)→ [compose_film]
+②Director §0.7c → cascade_compose_film(rw_id)
+③load_shot_assets 取本地分镜片 → 后台 compose_local_files(ffmpeg concat,本地不重下载)
+   → 落 /media/<rid>/film.mp4 → record_film → 推 film_returned
+④前端 setFilm → CardStack「成片」<video> 播放器 + 发布包带成片链接
+```
+
+**新增件**:
+- 持久化 `cascade/persistence/shot_assets_repo.py`(`shot_assets` 草稿图/视频 URL per 镜 +
+  `rewrite_films` 整片);会话重载 `_replay_results` 重放(资产已落 /media 持久)。
+- 工具 `cascade_generate_shot_video` / `cascade_compose_film`(`tools/cascade.py`),幂等
+  (已生成则回推已存 URL,不重复烧钱)。
+- WS 帧 `shot_video_returned` / `film_returned`。前端 RewriteShot `videoUrl/videoError` +
+  canvasStore `filmUrl`。
+- 复用(没重造):`tools/video_generation.SeedanceProvider`(**ARK key,无需新密钥**)、
+  `tools/compose`(ffmpeg)、`mediakit/clip_extractor.media_root`。
+
+**两个要点**:
+1. **视频不另设密钥**:Seedance 用 prod 已设的 `ARK_API_KEY`;合成是本地 ffmpeg(免费)。
+   但视频 image-grounded 于草稿图 → 全链仍需 apimart `IMAGE_GEN_API_KEY`(草稿图)。
+2. **Seedance 拒真人图**(`PrivacyInformation`)→ apimart **AI 草稿图(合成、无真人)正好绕开**;
+   这也是「为何要先草稿图再视频」而非直接拿源帧的原因。prod 实测:萌宠草稿图(无真人)
+   → 5s 720p 视频(含音频)~123s 出片。
+
+---
+
 *配套:[`phase2_gap_analysis_2026-06-01.md`](phase2_gap_analysis_2026-06-01.md)(剩余 TODO)·
 [`architecture_phase1_phase2_design_2026-05-31.md`](architecture_phase1_phase2_design_2026-05-31.md)(更细的通信/生命周期设计)。*

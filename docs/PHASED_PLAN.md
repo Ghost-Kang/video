@@ -202,7 +202,7 @@ Naval 视角：先证 specific knowledge，再加杠杆。
 
 | # | Deliverable | 备注 |
 |---|---|---|
-| P2-1 | 完整视频生成链路（Kling + Seedance image-grounded video） | 不做完整 60s 合成，先做单镜头视频 |
+| P2-1 | 完整视频生成链路（Kling + Seedance image-grounded video） | ✅ **已建(2026-06-01)**：单镜 image-grounded 图生视频(Seedance 2.0,ARK key)。prod 实测 5s 720p 出片~123s。详见 docs/nexus/architecture_layers_2026-06-01.md §视频闭环 |
 | P2-2 | 锚点三视图（仅当 P1 用户真的复用了才升级） | 否则保留单图 |
 | P2-3 | 单 Tab 的 `/topics` 雷达（60s 热搜 + 新榜，二合一） | 不做 6 Tab |
 | P2-4 | 浅分析 + 深分析的 4 层渐进 UX | 砍到 2 层（浅 + 深进画布） |
@@ -210,7 +210,7 @@ Naval 视角：先证 specific knowledge，再加杠杆。
 | P2-6 | TTS（火山豆包，仅当 Phase 1 用户提出强需求） | 否则推到 Phase 3 |
 | P2-7 | 字幕（从 dialogue 直接出 SRT，不做时码精修） | |
 | P2-8 | 最小 BGM 推荐（关键词 → CC0 库） | 不做 ducking |
-| P2-9 | 简单 ffmpeg 合成（多镜头 + 字幕，无 BGM 也可发布） | |
+| P2-9 | 简单 ffmpeg 合成（多镜头 + 字幕，无 BGM 也可发布） | ✅ **已建(2026-06-01,多镜拼接)**：cascade_compose_film → compose_local_files(ffmpeg concat)→ /media/<rid>/film.mp4。**字幕/BGM 留后续**(Seedance 每片自带音频) |
 | P2-10 | 25 个核心事件埋点（events 表） | Metabase 暂不部署 |
 | P2-11 | 30 人 Beta 招募 + 反馈通道 | |
 

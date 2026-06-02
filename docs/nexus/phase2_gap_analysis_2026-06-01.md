@@ -13,21 +13,26 @@
 >   **14/15 OK,失败率 33%→7%**(达成 Beta <10%)。详见
 >   [`upstream_analysis_robustness_tracker_2026-06-01.md`](upstream_analysis_robustness_tracker_2026-06-01.md)。
 >
-> **闭环现状 = 分析✅ → 改写✅ → [生成草稿图 🟡 唯一缺口] → 发布✅**
-> 即「分析→改写→拿去发文案」的**最小闭环已 user-visible 可跑**。唯一未通的工程段是
-> **P1 生成草稿图 leg**:后端 `cascade_generate_first_frame` 工具已在,但**前端没接** ——
-> `RewriteShotCard` 不渲染图、无「生成草稿图」按钮、无四态状态机。
+> - ✅ **生成草稿图 leg = 完成**(RewriteShotCard 四态 + 后端 cascade_generate_first_frame;
+>   失败友好提示 fail-fast)。
+> - ✅ **视频闭环 = 完成(2026-06-01)**:图生视频(Seedance,ARK key,prod 实测出片)+
+>   整片合成(ffmpeg)。详见 [`architecture_layers_2026-06-01.md`](architecture_layers_2026-06-01.md) §5 +
+>   PHASED_PLAN P2-1/P2-9。
+>
+> **闭环现状 = 分析✅ → 改写✅ → 草稿图✅ → 图生视频✅ → 合成整片✅ → 发布✅(全段工程完成)**
+> 端到端代码全通、prod 部署 + 各段实测(改写/分析/视频均 prod 真验)。
 >
 > **剩余 TODO(更新后)**:
-> 1. 🟢【工程·我可做】**P1 生成草稿图 leg 前端接线**(RewriteShotCard 加生成按钮+图渲染 +
->    四态 PENDING/POLLING/DONE/FAILED + reconnect 重建 + store 持图)— 闭环唯一缺的工程段。
+> 1. 🔴【founder】**设 apimart `IMAGE_GEN_API_KEY`**(prod)—— 草稿图段缺它,而视频
+>    image-grounded 于草稿图 → 这是全链端到端跑通的唯一硬阻断。视频用 ARK key(已设)。
 > 2. 🔴【founder】**P0-c prod 凭证轮换**(SSH/console,正式 Beta 前硬 Gate)。
-> 3. ⚪【founder 决策】配额付费免费额度数字(freemium ¥0 / Pro ¥39)。
+> 3. ⚪【founder 决策】配额付费免费额度数字(freemium ¥0 / Pro ¥39)—— 视频成本更高,
+>    建议随视频上线定额度(每镜草稿图~¥1.5 + 5s 视频~¥1.5)。
 > 4. ⚪【并行】INTV 用户访谈(招 12 人)+ Phase 1 Gate 8 指标量化。
-> 5. ⚪【闭环后】P3:视频生成 / 25 事件埋点对齐。
-> 6. ⚪【可选】改写按 cohort 灰度(现全量;要灰度需后端握手下发 rewrite_enabled flag)。
+> 5. ⚪【后续】视频:字幕(SRT)/ BGM / TTS(P2-6/7/8);25 事件埋点对齐(P2-10)。
+> 6. ⚪【可选】改写/视频按 cohort 灰度(现全量)。
 >
-> 下方原文(§1-§5)保留存档,但「改写未解封 / 发布未动」等结论已被上面取代。
+> 下方原文(§1-§5)保留存档,但「改写未解封 / 发布未动 / 生成缺口」等结论已被上面取代。
 
 ---
 
