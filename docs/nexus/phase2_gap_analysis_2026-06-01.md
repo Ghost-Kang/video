@@ -1,5 +1,37 @@
 # Phase 2 发布目标 · 差距分析(2026-06-01)
 
+> ## ⚠️ UPDATE(同日晚,本文 §1-§5 已部分过时 —— 以本 UPDATE 为准)
+> 本文写于今天早些,之后又推进了一批工作。**变更**(读码 + prod 验证核实):
+> - ✅ **P0-b 改写真解封 = 已完成上线**(原 §2 列为最强阻塞)。`CASCADE_REWRITE_UPSTREAM=llm`
+>   (prod)+ `REWRITE_PIPELINE_REVISION=2` + 前端 flag 全量 true + **去 niche generic 触发链
+>   全栈接回**(工具加 topic / director 认 generic+[rewrite_topic:] / RewriteCTA / CardStack
+>   渲染改写区)。质量门已过(eval 机械100%/realism4.70/kept100%/ad_risk0 + founder D6 5/5)。
+>   prod service 层验证:generic+topic「港式菠萝包」骨架四要素保留。
+> - ✅ **P2 发布 leg = 基本完成**(原 §2 列「未动」)。PublishPackCard 接回 CardStack;
+>   buildPublishPack 已去 niche(theme 派生)+ 复制前 scrubUiForbidden(原「禁词可漏」已堵)。
+> - ✅ **分析鲁棒性**:#2/#8/#10 修复(post-drop-pad clone 重叠 / 输出截断),重跑 eval
+>   **14/15 OK,失败率 33%→7%**(达成 Beta <10%)。详见
+>   [`upstream_analysis_robustness_tracker_2026-06-01.md`](upstream_analysis_robustness_tracker_2026-06-01.md)。
+>
+> **闭环现状 = 分析✅ → 改写✅ → [生成草稿图 🟡 唯一缺口] → 发布✅**
+> 即「分析→改写→拿去发文案」的**最小闭环已 user-visible 可跑**。唯一未通的工程段是
+> **P1 生成草稿图 leg**:后端 `cascade_generate_first_frame` 工具已在,但**前端没接** ——
+> `RewriteShotCard` 不渲染图、无「生成草稿图」按钮、无四态状态机。
+>
+> **剩余 TODO(更新后)**:
+> 1. 🟢【工程·我可做】**P1 生成草稿图 leg 前端接线**(RewriteShotCard 加生成按钮+图渲染 +
+>    四态 PENDING/POLLING/DONE/FAILED + reconnect 重建 + store 持图)— 闭环唯一缺的工程段。
+> 2. 🔴【founder】**P0-c prod 凭证轮换**(SSH/console,正式 Beta 前硬 Gate)。
+> 3. ⚪【founder 决策】配额付费免费额度数字(freemium ¥0 / Pro ¥39)。
+> 4. ⚪【并行】INTV 用户访谈(招 12 人)+ Phase 1 Gate 8 指标量化。
+> 5. ⚪【闭环后】P3:视频生成 / 25 事件埋点对齐。
+> 6. ⚪【可选】改写按 cohort 灰度(现全量;要灰度需后端握手下发 rewrite_enabled flag)。
+>
+> 下方原文(§1-§5)保留存档,但「改写未解封 / 发布未动」等结论已被上面取代。
+
+---
+
+
 **作者**: PM(Claude)· **方法**: 对照 [`phase2_master_plan_2026-05-31.md`](phase2_master_plan_2026-05-31.md) build order + 今天 13 个 commit + 逐项读码核验(非记忆)
 **关联**: [`phase2_kickoff_synthesis_2026-05-31.md`](phase2_kickoff_synthesis_2026-05-31.md) · [`../PHASED_PLAN.md`](../PHASED_PLAN.md) §5.3 Gate
 
