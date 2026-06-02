@@ -447,6 +447,8 @@ class TestCascadeGenerateFirstFrame:
         monkeypatch.setattr(cascade_tools, "cost_guard", fake_cost_guard)
         monkeypatch.setattr(cascade_tools, "emit", fake_emit)
         monkeypatch.setattr(cascade_tools, "_make_image_provider", lambda: provider)
+        # 生图密钥默认置为非空,跳过 fail-fast「未配置」检查(该检查单独测)。
+        monkeypatch.setattr("agent.config.IMAGE_GEN_API_KEY", "test-image-key")
         return provider
 
     def test_happy_path_returns_url_and_pushes_ws(self, monkeypatch):
@@ -539,7 +541,13 @@ class TestCascadeGenerateFirstFrame:
         }))
 
         assert result["error"] == "S7_UPSTREAM_TIMEOUT"
-        assert ws.sent == []
+        # 生成草稿图 leg:失败推**单镜** error 帧(让该镜头即时翻「失败/重试」,不等前端
+        # 75s 超时),不是全局 analysis_failed(不 nuke 结果页)。
+        assert len(ws.sent) == 1
+        assert ws.sent[0]["type"] == "shot_first_frame_returned"
+        assert ws.sent[0]["shot_index"] == 1
+        assert ws.sent[0]["image_url"] == ""
+        assert ws.sent[0]["error"]
 
     def test_cost_guard_blocks_before_provider_call(self, monkeypatch):
         ws = FakeWS()
@@ -560,11 +568,39 @@ class TestCascadeGenerateFirstFrame:
 
         assert result["error"] == "S8_UPSTREAM_REFUSED"
         assert provider.calls == []
-        # 2026-06-01 生成草稿图 leg:单张草稿图触顶**不再推全局 analysis_failed 帧**
-        # —— 那会让前端 CardStack 整屏切到 FailureBanner、把分析+改写全藏掉。错误经返回值
-        # 给 Director,在 chat 一句话提示用户(director.md §0.5 复述 message);前端对应镜头
-        # 的草稿图区超时回到「重试」。故此处不推任何全局帧。
-        assert ws.sent == []
+        # 2026-06-01 生成草稿图 leg:单张草稿图触顶推**单镜** error 帧(该镜头即时翻
+        # 「失额度/重试」),**不是全局 analysis_failed**(那会把分析+改写整页 nuke 成
+        # FailureBanner)。Director 也会在 chat 复述 message。
+        assert len(ws.sent) == 1
+        assert ws.sent[0]["type"] == "shot_first_frame_returned"
+        assert ws.sent[0]["shot_index"] == 1
+        assert ws.sent[0]["error"]
+
+    def test_missing_image_key_fails_fast_with_per_shot_error(self, monkeypatch):
+        ws = FakeWS()
+        set_run_ctx({"user_id": "u1", "thread_id": "t1", "ws": ws, "run_id": "run1"})
+
+        rewrite_json = _fake_rewrite_result().model_dump_json()
+        provider = self._install_fakes(
+            monkeypatch,
+            rewrite_json=rewrite_json,
+            provider_result={"url": "should-not-be-used"},
+        )
+        # prod 缺 IMAGE_GEN_API_KEY 的情形:覆盖回空,触发 fail-fast。
+        monkeypatch.setattr("agent.config.IMAGE_GEN_API_KEY", "")
+
+        result = asyncio.run(cascade_generate_first_frame.ainvoke({
+            "rewrite_id": "rw_fake",
+            "shot_index": 1,
+        }))
+
+        assert result["error"] == "IMAGE_GEN_NOT_CONFIGURED"
+        assert provider.calls == []  # 不浪费 provider 往返
+        # 即时推单镜友好提示(不等 75s 超时;不 nuke 结果页)
+        assert len(ws.sent) == 1
+        assert ws.sent[0]["type"] == "shot_first_frame_returned"
+        assert ws.sent[0]["shot_index"] == 1
+        assert "管理员" in ws.sent[0]["error"]
 
 
 # ---------- cascade_ask (W4D5) ----------

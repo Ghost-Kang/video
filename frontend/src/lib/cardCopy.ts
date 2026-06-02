@@ -84,8 +84,9 @@ export const COPY = {
   // 生成草稿图 leg(改写镜头的画面参考)
   shot_draft_generate: "生成草稿图",
   shot_draft_generating: "正在生成草稿图…",
-  shot_draft_failed: "生成失败",
   shot_draft_retry: "重试",
+  // 前端兜底超时文案(正常失败用后端下发的友好提示;这条只在帧丢失时出现)。
+  shot_draft_timeout: "生成有点慢,点重试试试",
 
   rewrite_cta_header: "改成你自己的版本",
   rewrite_cta_hint: "套用这条的爆款骨架, 帮你改成你自己的脚本 — 想拍什么主题填一句(选填)",

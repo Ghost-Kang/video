@@ -251,18 +251,20 @@ class RewriteReturnedEvent(_Base):
 
 
 class ShotFirstFrameReturnedEvent(_Base):
-    """Pushed by `cascade_generate_first_frame` after a per-shot image succeeds.
+    """Pushed by `cascade_generate_first_frame` per-shot — success OR failure.
 
-    Frontend matches `shot_index` against `shots[].scene_index` and patches in
-    `image_url` so the matching ShotCard re-renders without a full payload
-    refresh.
+    Frontend matches `shot_index` against the rewrite shot and patches in either
+    `image_url` (success → render image) or `error` (failure → flip that shot to a
+    friendly "失败/重试" state INSTANTLY, instead of waiting on the frontend timeout).
+    Per-shot so a single draft-image failure never nukes the whole result page.
     """
 
     type: Literal["shot_first_frame_returned"]
     thread_id: str
     rewrite_id: str
     shot_index: int
-    image_url: str
+    image_url: str = ""             # success → url; failure → ""
+    error: Optional[str] = None     # failure → user-friendly message; success → None
 
 
 class AnalysisAnswerReturnedEvent(_Base):

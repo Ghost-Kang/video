@@ -38,6 +38,7 @@ interface CanvasStore {
   setRewriteShots: (shots: RewriteShot[]) => void;
   updateShotFirstFrame: (scene_index: number, url: string) => void;
   updateRewriteShotFirstFrame: (shot_index: number, url: string) => void;
+  setRewriteShotFirstFrameError: (shot_index: number, error: string | null) => void;
   setFailure: (failure: FailurePayload | null) => void;
   loadFromAnalysis: (analysis: CascadeAnalysisContract) => void;
   clear: () => void;
@@ -108,11 +109,23 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
       ),
     })),
 
-  // 生成草稿图 leg:把首帧 URL 打到对应 shot_index 的改写镜头上(RewriteShotCard 渲染)。
+  // 生成草稿图 leg:把首帧 URL 打到对应 shot_index 的改写镜头上(成功 → 清除任何旧错误)。
   updateRewriteShotFirstFrame: (shot_index, url) =>
     set((s) => ({
       rewriteShots: s.rewriteShots.map((sh) =>
-        sh.shot_index === shot_index ? { ...sh, firstFrameUrl: url } : sh
+        sh.shot_index === shot_index
+          ? { ...sh, firstFrameUrl: url, firstFrameError: undefined }
+          : sh
+      ),
+    })),
+
+  // 生成失败/重试:置(error 字符串)或清(null)对应镜头的错误态。
+  setRewriteShotFirstFrameError: (shot_index, error) =>
+    set((s) => ({
+      rewriteShots: s.rewriteShots.map((sh) =>
+        sh.shot_index === shot_index
+          ? { ...sh, firstFrameError: error ?? undefined }
+          : sh
       ),
     })),
 

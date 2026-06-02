@@ -47,4 +47,22 @@ describe("RewriteShotCard · 生成草稿图 leg", () => {
     expect(screen.queryByTestId("rewrite-shot-card-2-generate")).toBeNull();
     expect(screen.queryByText(COPY.shot_draft_generating)).toBeNull();
   });
+
+  it("FAILED:firstFrameError 存在 → 即时显示后端友好提示 + 重试(不等超时)", async () => {
+    const user = userEvent.setup();
+    const onGen = vi.fn();
+    const msg = "草稿图功能还没开通(管理员需配置生图密钥),其他都能正常用";
+    render(
+      <RewriteShotCard
+        shot={{ ...shot, firstFrameError: msg }}
+        onGenerateFirstFrame={onGen}
+      />
+    );
+    // 友好提示直接展示,不显示「生成草稿图」首发按钮
+    expect(screen.getByText(msg)).toBeInTheDocument();
+    expect(screen.queryByTestId("rewrite-shot-card-2-generate")).toBeNull();
+    // 点重试 → 重新触发生成
+    await user.click(screen.getByTestId("rewrite-shot-card-2-retry"));
+    expect(onGen).toHaveBeenCalledWith(2);
+  });
 });

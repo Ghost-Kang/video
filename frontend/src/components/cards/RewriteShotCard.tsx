@@ -3,6 +3,7 @@ import { ImageIcon, RefreshCw } from "lucide-react";
 import type { RewriteShot } from "../../lib/cascadeMapper";
 import { COPY } from "../../lib/cardCopy";
 import { CARD_CLASS } from "../../lib/cardStyles";
+import { useCanvasStore } from "../../store/canvasStore";
 
 interface Props {
   shot: RewriteShot;
@@ -11,48 +12,47 @@ interface Props {
   onGenerateFirstFrame?: (shotIndex: number) => void;
 }
 
-// 生成草稿图等待上限。后端是一次工具调用(provider 内部 submit+poll),前端不轮询;
-// 超时仍无图 → 判 FAILED 给重试入口(后端真失败也会在 chat 提示)。
+// 后端没回任何帧时的兜底超时(正常成功/失败都会推 shot_first_frame_returned,即时翻态;
+// 这里只防"帧丢了/后端挂了"导致转圈不止)。
 const _GEN_TIMEOUT_MS = 75_000;
 
 // 改写后的镜头 — 台词 + 画面描述 + 可选「生成草稿图」(首帧参考)。
-// 草稿图四态:IDLE(按钮)/ PENDING(转圈)/ DONE(图)/ FAILED(重试)。
-// DONE 由 store 的 shot.firstFrameUrl 驱动(WS 帧 shot_first_frame_returned 打进来);
-// PENDING/FAILED 是组件本地瞬态。左竖条橙色 = 这是用户的版本草稿,不是源数据。
+// 草稿图四态:IDLE(按钮)/ PENDING(转圈)/ DONE(图)/ FAILED(后端友好提示 + 重试)。
+// DONE 由 store.firstFrameUrl 驱动;FAILED 由 store.firstFrameError 驱动(后端即时推,
+// 不必等超时);PENDING 是本地瞬态。render 优先级 hasImage > error > generating,故本地
+// generating 无需在 effect 里清(被前两者遮蔽),避开 set-state-in-effect。
 export function RewriteShotCard({ shot, onGenerateFirstFrame }: Props) {
   const [generating, setGenerating] = useState(false);
-  const [failed, setFailed] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setError = useCanvasStore((s) => s.setRewriteShotFirstFrameError);
 
   const hasImage = Boolean(shot.firstFrameUrl);
+  const error = shot.firstFrameError;
 
-  // 图到了(WS 帧 → store.firstFrameUrl)→ 停计时器即可。不在此 setState:render 已按
-  // hasImage 优先(有图就显示图,本地 generating/failed 自然失效),无需同步本地态
-  // (React「you might not need an effect」)。
-  useEffect(() => {
-    if (shot.firstFrameUrl && timerRef.current) {
+  const clearTimer = () => {
+    if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-  }, [shot.firstFrameUrl]);
+  };
 
-  // 卸载清理计时器(防泄漏)。
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    []
-  );
+  // 帧到了(成功 firstFrameUrl 或失败 firstFrameError)→ 停兜底计时器即可(不 setState:
+  // render 已按 hasImage/error 优先,本地 generating 自然失效)。
+  useEffect(() => {
+    if (shot.firstFrameUrl || shot.firstFrameError) clearTimer();
+  }, [shot.firstFrameUrl, shot.firstFrameError]);
+
+  // 卸载清理。
+  useEffect(() => () => clearTimer(), []);
 
   const handleGenerate = () => {
     if (!onGenerateFirstFrame || generating) return;
-    setFailed(false);
+    setError(shot.shot_index, null); // 清旧错误,让 render 落到 generating
     setGenerating(true);
     onGenerateFirstFrame(shot.shot_index);
-    if (timerRef.current) clearTimeout(timerRef.current);
+    clearTimer();
     timerRef.current = setTimeout(() => {
-      setGenerating(false);
-      setFailed(true);
+      setError(shot.shot_index, COPY.shot_draft_timeout);
     }, _GEN_TIMEOUT_MS);
   };
 
@@ -68,6 +68,19 @@ export function RewriteShotCard({ shot, onGenerateFirstFrame }: Props) {
         <div className="aspect-video w-full overflow-hidden rounded-xl bg-stone-100 dark:bg-stone-800 mb-3 flex items-center justify-center">
           {hasImage ? (
             <img src={shot.firstFrameUrl} alt="" className="h-full w-full object-cover" />
+          ) : error ? (
+            <div className="flex flex-col items-center gap-2 px-4 text-center">
+              <p className="text-xs text-stone-500 dark:text-stone-400">{error}</p>
+              <button
+                type="button"
+                onClick={handleGenerate}
+                className={btnClass}
+                data-testid={`rewrite-shot-card-${shot.shot_index}-retry`}
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden />
+                {COPY.shot_draft_retry}
+              </button>
+            </div>
           ) : generating ? (
             <div className="flex flex-col items-center gap-2 text-stone-500 dark:text-stone-400">
               <div
@@ -76,16 +89,6 @@ export function RewriteShotCard({ shot, onGenerateFirstFrame }: Props) {
               />
               <span className="text-sm">{COPY.shot_draft_generating}</span>
             </div>
-          ) : failed ? (
-            <button
-              type="button"
-              onClick={handleGenerate}
-              className={btnClass}
-              data-testid={`rewrite-shot-card-${shot.shot_index}-retry`}
-            >
-              <RefreshCw className="h-4 w-4" aria-hidden />
-              {COPY.shot_draft_failed}·{COPY.shot_draft_retry}
-            </button>
           ) : (
             <button
               type="button"

@@ -27,6 +27,7 @@ from typing import Any, Sequence
 from langchain_core.tools import tool
 from websockets.exceptions import ConnectionClosed, ConnectionClosedOK
 
+from agent import config
 from agent.cascade.analysis_service import request_shallow_analysis
 from agent.cascade.cost_guard import (
     PREDICT_ASK_CNY,
@@ -71,6 +72,25 @@ async def _push_ws(payload: dict[str, Any]) -> None:
     if not user_id:
         return
     await notify.send_to_user(user_id, payload, fallback_ws=ctx.get("ws"))
+
+
+async def _push_shot_error(rewrite_id: str, shot_index: int, message: str) -> None:
+    """Per-shot draft-image failure → flip *that* shot to 失败/重试 instantly via the
+    shot_first_frame_returned frame's `error` field. Deliberately NOT a global
+    analysis_failed (that nukes the whole result page) and not silent (the frontend
+    would otherwise sit on its spinner until the 75s timeout). thread_id empty =
+    RUN_CTX absent (non-WS caller) → skip, the return value still informs the caller."""
+    thread_id = get_run_ctx().get("thread_id") or ""
+    if not thread_id:
+        return
+    await _push_ws({
+        "type": "shot_first_frame_returned",
+        "thread_id": thread_id,
+        "rewrite_id": rewrite_id,
+        "shot_index": shot_index,
+        "image_url": "",
+        "error": message,
+    })
 
 
 async def _push_failure_frame(
@@ -421,38 +441,46 @@ async def cascade_generate_first_frame(rewrite_id: str, shot_index: int) -> dict
             ),
         }
 
-    # 2. Cost guard — refuse before spend.
+    # 1b. Fail fast + friendly when 生图 isn't configured (prod missing
+    # IMAGE_GEN_API_KEY) — don't burn a provider round-trip that returns a cryptic
+    # "invalid API key", and don't make the user sit on the spinner until the 75s
+    # frontend timeout. Push a per-shot error so the card flips to 失败/重试 at once.
+    if not config.IMAGE_GEN_API_KEY:
+        msg = "草稿图功能还没开通(管理员需配置生图密钥),其他都能正常用"
+        await _push_shot_error(rewrite_id, shot_index, msg)
+        return {"error": "IMAGE_GEN_NOT_CONFIGURED", "message": msg}
+
+    # 2. Cost guard — refuse before spend. Per-shot error (NOT a global failure
+    # frame: that nukes the whole result page; NOT silent: else the card spins to
+    # the 75s timeout). Director also surfaces the return value in chat.
     try:
         await cost_guard(user_id=user_id, run_id=run_id or "anonymous", predicted_cost_cny=PREDICT_SHOT_IMAGE_CNY)
     except HardFailure as exc:
-        # 不推全局 failure 帧:那会让前端 CardStack 整屏切到 FailureBanner、把分析+改写
-        # 全藏掉 —— 单张草稿图触顶不该清空整个结果页。错误经返回值给 Director,在 chat
-        # 一句话提示用户(额度不足);前端对应镜头的草稿图区超时回到「重试」即可。
-        return {
-            "error": exc.code.value,
-            "message": exc.hint or "本轮额度不足，先把已生成的内容用起来",
-        }
+        msg = exc.hint or "本轮额度不足，先把已生成的内容用起来"
+        await _push_shot_error(rewrite_id, shot_index, msg)
+        return {"error": exc.code.value, "message": msg}
 
     # 3. Provider call. Wrap, don't modify — see _make_image_provider docstring.
     provider = _make_image_provider()
     prompt = shot.visual
+    _RETRY_MSG = "这张草稿图没生成成功,点重试试试"
     try:
         result = await provider.generate(prompt=prompt, size="16:9", resolution="2k")
     except asyncio.CancelledError:
         raise
     except Exception as exc:  # pragma: no cover - defensive
-        return {
-            "error": "S5_INVALID_PAYLOAD",
-            "message": f"生图调用出错: {exc}",
-        }
+        await _push_shot_error(rewrite_id, shot_index, _RETRY_MSG)
+        return {"error": "S5_INVALID_PAYLOAD", "message": f"生图调用出错: {exc}"}
 
     if "error" in result:
         err = str(result.get("error", ""))
         code = "S7_UPSTREAM_TIMEOUT" if err == "timeout" else "S8_UPSTREAM_REFUSED"
+        await _push_shot_error(rewrite_id, shot_index, _RETRY_MSG)
         return {"error": code, "message": err or "生图失败"}
 
     image_url = result.get("url")
     if not image_url:
+        await _push_shot_error(rewrite_id, shot_index, _RETRY_MSG)
         return {"error": "S5_INVALID_PAYLOAD", "message": "上游未返回 url"}
 
     # 4. Push WS frame so the matching ShotCard re-renders live.

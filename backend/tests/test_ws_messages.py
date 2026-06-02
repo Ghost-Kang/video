@@ -519,14 +519,17 @@ class TestShotFirstFrameReturnedEvent:
         assert dumped["shot_index"] == 3
         ShotFirstFrameReturnedEvent.model_validate(dumped)
 
-    def test_missing_image_url_rejected(self):
-        with pytest.raises(ValidationError):
-            ShotFirstFrameReturnedEvent.model_validate({
-                "type": "shot_first_frame_returned",
-                "thread_id": "t1",
-                "rewrite_id": "rw_x",
-                "shot_index": 1,
-            })
+    def test_failure_frame_carries_error_no_url(self):
+        # 生成草稿图 leg:失败帧带 error、无 image_url(image_url 现可选,默认 "")。
+        msg = ShotFirstFrameReturnedEvent.model_validate({
+            "type": "shot_first_frame_returned",
+            "thread_id": "t1",
+            "rewrite_id": "rw_x",
+            "shot_index": 1,
+            "error": "草稿图功能还没开通(管理员需配置生图密钥)",
+        })
+        assert msg.error and "管理员" in msg.error
+        assert msg.image_url == ""
 
     def test_extra_field_rejected(self):
         with pytest.raises(ValidationError):

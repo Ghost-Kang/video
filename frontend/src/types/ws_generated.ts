@@ -50,7 +50,7 @@ export type Feedback1 = string;
 export type Type12 = "user_message";
 export type ThreadId10 = string;
 export type Content = string;
-export type SelectedNiche = ("baomam_fushi" | "yuer_richang" | "jiating_chufang") | null;
+export type SelectedNiche = ("baomam_fushi" | "yuer_richang" | "jiating_chufang" | "generic") | null;
 export type Type13 = "error";
 export type Code = string;
 export type Message = string;
@@ -104,6 +104,7 @@ export type ThreadId19 = string;
 export type RewriteId = string;
 export type ShotIndex = number;
 export type ImageUrl = string;
+export type Error = string | null;
 export type Type24 = "analysis_answer_returned";
 export type ThreadId20 = string;
 export type AnalysisId1 = string;
@@ -310,18 +311,20 @@ export interface Rewrite {
   [k: string]: unknown;
 }
 /**
- * Pushed by `cascade_generate_first_frame` after a per-shot image succeeds.
+ * Pushed by `cascade_generate_first_frame` per-shot — success OR failure.
  *
- * Frontend matches `shot_index` against `shots[].scene_index` and patches in
- * `image_url` so the matching ShotCard re-renders without a full payload
- * refresh.
+ * Frontend matches `shot_index` against the rewrite shot and patches in either
+ * `image_url` (success → render image) or `error` (failure → flip that shot to a
+ * friendly "失败/重试" state INSTANTLY, instead of waiting on the frontend timeout).
+ * Per-shot so a single draft-image failure never nukes the whole result page.
  */
 export interface ShotFirstFrameReturnedEvent {
   type: Type23;
   thread_id: ThreadId19;
   rewrite_id: RewriteId;
   shot_index: ShotIndex;
-  image_url: ImageUrl;
+  image_url?: ImageUrl;
+  error?: Error;
 }
 /**
  * Pushed by `cascade_ask` after a free-form Q&A LLM call succeeds.

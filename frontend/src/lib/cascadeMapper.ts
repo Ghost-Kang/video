@@ -5,8 +5,10 @@ export interface RewriteShot {
   dialogue: string;
   visual: string;
   // 生成草稿图 leg:首帧图 URL,由 WS 帧 shot_first_frame_returned 打进 store(初始 undefined)。
-  // 组件据此渲染图;PENDING/FAILED 是组件本地瞬态(见 RewriteShotCard)。
   firstFrameUrl?: string;
+  // 生成失败时后端在同一帧带 error(用户向友好提示)→ 该镜头即时翻到「失败/重试」,
+  // 不必等前端 75s 超时。成功或重试时清空。
+  firstFrameError?: string;
 }
 
 export function mapRewriteShotsToScenes(shots: RewriteShot[]): RewriteShot[] {
