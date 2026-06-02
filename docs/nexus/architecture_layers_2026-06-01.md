@@ -149,11 +149,13 @@
   `tools/compose`(ffmpeg)、`mediakit/clip_extractor.media_root`。
 
 **两个要点**:
-1. **视频不另设密钥**:Seedance 用 prod 已设的 `ARK_API_KEY`;合成是本地 ffmpeg(免费)。
-   但视频 image-grounded 于草稿图 → 全链仍需 apimart `IMAGE_GEN_API_KEY`(草稿图)。
-2. **Seedance 拒真人图**(`PrivacyInformation`)→ apimart **AI 草稿图(合成、无真人)正好绕开**;
-   这也是「为何要先草稿图再视频」而非直接拿源帧的原因。prod 实测:萌宠草稿图(无真人)
-   → 5s 720p 视频(含音频)~123s 出片。
+1. **整链一个密钥**(2026-06-02 更新):草稿图也改走**火山 Seedream**(`SeedreamProvider`,
+   `doubao-seedream-4-0-250828`,`{ARK_BASE_URL}/images/generations`)→ 改写/草稿图/图生视频/合成
+   **全用 prod 已设的 `ARK_API_KEY`,无需任何新密钥**。`IMAGE_GEN_PROVIDER` 默认 seedream
+   (apimart 中转 / google 跨境仍可经 env 切)。合成是本地 ffmpeg(免费)。
+2. **Seedance 拒真人图**(`PrivacyInformation`)→ **Seedream AI 草稿图(合成、无真人)正好绕开**;
+   这也是「为何要先草稿图再视频」而非直接拿源帧的原因。**prod 全链实测**:Seedream 草稿图
+   8s 出图 → 喂 Seedance → 5s 720p 视频(含音频)~287s,改写→草稿图→视频 端到端跑通。
 
 ---
 
