@@ -27,7 +27,6 @@ from typing import Any, Sequence
 from langchain_core.tools import tool
 from websockets.exceptions import ConnectionClosed, ConnectionClosedOK
 
-from agent import config
 from agent.cascade.analysis_service import request_shallow_analysis
 from agent.cascade.cost_guard import (
     PREDICT_ASK_CNY,
@@ -59,7 +58,7 @@ from agent.cascade.storage import (
 )
 from agent.llm_factory import current_model_name, get_chat_model
 from agent.tools.compose import _download, compose_local_files
-from agent.tools.generation import ApimartProvider
+from agent.tools.generation import get_provider as _get_image_provider, image_gen_ready
 from agent.tools.video_generation import SeedanceProvider
 from agent.transport.runtime_ctx import get_run_ctx
 
@@ -388,14 +387,12 @@ async def cascade_rewrite(analysis_id: str, niche: str, topic: str = "") -> dict
     }
 
 
-def _make_image_provider() -> ApimartProvider:
-    """Provider factory for first-frame generation.
-
-    Hardcoded to Apimart for Phase 1: it's the cheap submit+poll path the rest
-    of Cascade already uses for shot images. Wrapped (not modified) so we can
-    swap to Google later without touching the tool logic.
-    """
-    return ApimartProvider()
+def _make_image_provider():
+    """Provider factory for first-frame generation — switches on IMAGE_GEN_PROVIDER
+    (seedream 火山 / apimart 中转 / google 跨境). Wrapped so the tool logic doesn't
+    care which backend生图; all expose `.generate(prompt, size, resolution, image_urls)
+    → {url}|{error}`. 2026-06-02: 默认推荐 seedream(复用 ARK key,境内合规一致)。"""
+    return _get_image_provider()
 
 
 @tool
@@ -455,7 +452,7 @@ async def cascade_generate_first_frame(rewrite_id: str, shot_index: int) -> dict
     # IMAGE_GEN_API_KEY) — don't burn a provider round-trip that returns a cryptic
     # "invalid API key", and don't make the user sit on the spinner until the 75s
     # frontend timeout. Push a per-shot error so the card flips to 失败/重试 at once.
-    if not config.IMAGE_GEN_API_KEY:
+    if not image_gen_ready():
         msg = "草稿图功能还没开通(管理员需配置生图密钥),其他都能正常用"
         await _push_shot_error(rewrite_id, shot_index, msg)
         return {"error": "IMAGE_GEN_NOT_CONFIGURED", "message": msg}

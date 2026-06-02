@@ -28,11 +28,18 @@ LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3-flash-preview")
 # 裸奔跨境 —— 30 人 Beta 处理真实用户数据,默认 provider 必须境内。跨境 Gemini 仍
 # 可经 IMAGE_GEN_PROVIDER=google 显式开启(双轨保留)。
 # TODO(合规): 跨境 Gemini 上线前需补「用户跨境数据传输同意」条款 UI/记录,本次未做。
-IMAGE_GEN_PROVIDER = os.getenv("IMAGE_GEN_PROVIDER", "apimart")  # "apimart"(境内默认) | "google"(跨境,需显式)
+# 2026-06-02: 新增 "seedream"(火山豆包图像生成,**复用 ARK_API_KEY**,境内官方,跟
+# 分析/改写/视频 Seedance 同账号同合规)。推荐用它 —— 无需任何新密钥(prod 实测
+# ark.cn-beijing.volces.com/api/v3/images/generations + 现有 ARK key 200 出图)。
+# 默认 seedream(火山官方境内,用已设的 ARK_API_KEY,无需任何新密钥;比 apimart 中转更
+# 合规——后者代理跨境 OpenAI 模型)。可切 apimart(中转)/ google(跨境,需显式)。
+IMAGE_GEN_PROVIDER = os.getenv("IMAGE_GEN_PROVIDER", "seedream")  # "seedream"(默认,境内,ARK key) | "apimart"(中转) | "google"(跨境)
 IMAGE_GEN_API_KEY = os.getenv("IMAGE_GEN_API_KEY")
 IMAGE_GEN_BASE_URL = os.getenv("IMAGE_GEN_BASE_URL", "https://api.apimart.ai")
 IMAGE_GEN_MODEL = os.getenv("IMAGE_GEN_MODEL", "gpt-image-2")
 IMAGE_GEN_GOOGLE_MODEL = os.getenv("IMAGE_GEN_GOOGLE_MODEL", "gemini-3.1-flash-image-preview")
+# Seedream(火山方舟图像)模型;走 ARK_API_KEY + ARK_BASE_URL,无独立密钥。
+SEEDREAM_MODEL = os.getenv("SEEDREAM_MODEL", "doubao-seedream-4-0-250828")
 
 # -------- 落地页案例自动发布(auto-showcase)--------
 # 用户跑完一条分析,达标即自动做成落地页轮播案例(clip 复制到永久 showcase/ 目录

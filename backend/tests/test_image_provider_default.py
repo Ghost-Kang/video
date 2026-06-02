@@ -17,21 +17,25 @@ import pytest
 
 
 def test_config_default_is_domestic(monkeypatch):
-    """No env → config.IMAGE_GEN_PROVIDER == 'apimart' (compliance red line)."""
+    """No env → 默认必须是境内 provider(合规红线)。2026-06-02 默认改 seedream
+    (火山官方境内,比 apimart 中转更合规;两者都境内,跨境 google 必须显式开)。"""
     monkeypatch.delenv("IMAGE_GEN_PROVIDER", raising=False)
     import agent.config as config
 
     importlib.reload(config)
     try:
-        assert config.IMAGE_GEN_PROVIDER == "apimart"
+        assert config.IMAGE_GEN_PROVIDER == "seedream"
+        assert config.IMAGE_GEN_PROVIDER != "google"  # 跨境不能是默认
     finally:
         importlib.reload(config)  # restore ambient
 
 
-def test_get_provider_defaults_to_apimart(monkeypatch):
+def test_get_provider_selects_apimart_when_configured(monkeypatch):
     import agent.tools.generation as gen
+    import agent.config as config
 
-    monkeypatch.setattr(gen, "IMAGE_GEN_PROVIDER", "apimart")
+    # 默认已改 seedream;显式 apimart 仍走 ApimartProvider。
+    monkeypatch.setattr(config, "IMAGE_GEN_PROVIDER", "apimart")
     monkeypatch.setattr(gen, "ApimartProvider", lambda: "APIMART")
     monkeypatch.setattr(gen, "GoogleProvider", lambda: "GOOGLE")
     assert gen.get_provider() == "APIMART"
@@ -39,8 +43,10 @@ def test_get_provider_defaults_to_apimart(monkeypatch):
 
 def test_get_provider_google_only_when_explicit(monkeypatch):
     import agent.tools.generation as gen
+    import agent.config as config
 
-    monkeypatch.setattr(gen, "IMAGE_GEN_PROVIDER", "google")
+    # get_provider 现动态读 config.IMAGE_GEN_PROVIDER(单一来源,resp env/测试)。
+    monkeypatch.setattr(config, "IMAGE_GEN_PROVIDER", "google")
     monkeypatch.setattr(gen, "ApimartProvider", lambda: "APIMART")
     monkeypatch.setattr(gen, "GoogleProvider", lambda: "GOOGLE")
     assert gen.get_provider() == "GOOGLE"

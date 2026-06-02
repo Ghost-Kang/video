@@ -586,7 +586,9 @@ class TestCascadeGenerateFirstFrame:
             rewrite_json=rewrite_json,
             provider_result={"url": "should-not-be-used"},
         )
-        # prod 缺 IMAGE_GEN_API_KEY 的情形:覆盖回空,触发 fail-fast。
+        # "生图未配置"的情形:pin provider=apimart 并清空其 key → image_gen_ready()=False
+        # → fail-fast(默认 provider 已改 seedream,它查 ARK_API_KEY;这里固定测 apimart 路径)。
+        monkeypatch.setattr("agent.config.IMAGE_GEN_PROVIDER", "apimart")
         monkeypatch.setattr("agent.config.IMAGE_GEN_API_KEY", "")
 
         result = asyncio.run(cascade_generate_first_frame.ainvoke({

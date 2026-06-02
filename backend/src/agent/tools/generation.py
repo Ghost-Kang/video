@@ -17,12 +17,15 @@ import requests
 from PIL import Image as PILImage
 
 from agent.config import (
+    ARK_API_KEY,
+    ARK_BASE_URL,
     IMAGE_GEN_API_KEY,
     IMAGE_GEN_BASE_URL,
     IMAGE_GEN_MODEL,
     IMAGE_GEN_GOOGLE_MODEL,
     IMAGE_GEN_PROVIDER,
     GOOGLE_API_KEY,
+    SEEDREAM_MODEL,
 )
 
 
@@ -117,6 +120,65 @@ class ApimartProvider:
         if "error" in submitted:
             return submitted
         return await self.poll(submitted["task_id"])
+
+
+# ─── SeedreamProvider ───────────────────────────────────────────────────────────
+
+
+class SeedreamProvider:
+    """火山豆包 Seedream 图像生成(方舟 ARK)。**复用 ARK_API_KEY**(同分析/改写/视频
+    Seedance,境内官方、合规一致、无需独立密钥)。同步 images API:单次 POST 直接返回
+    图片 URL(不像 apimart 的 submit+poll)。接口对齐 ApimartProvider.generate 以便
+    `_make_image_provider` 透明替换。"""
+
+    # (ratio, resolution) → Seedream 像素 size。doubao-seedream-4.0 范围 [1280x720, 4096x4096]。
+    _SIZE_MAP = {
+        ("16:9", "2k"): "2560x1440", ("16:9", "4k"): "3840x2160",
+        ("9:16", "2k"): "1440x2560", ("9:16", "4k"): "2160x3840",
+        ("1:1", "2k"): "2048x2048", ("1:1", "4k"): "4096x4096",
+    }
+
+    def __init__(self):
+        self._url = ARK_BASE_URL.rstrip("/") + "/images/generations"
+        self._key = ARK_API_KEY
+        self._model = SEEDREAM_MODEL
+
+    def _size(self, size: str, resolution: str) -> str:
+        return self._SIZE_MAP.get((size, (resolution or "").lower()), "2048x2048")
+
+    async def generate(
+        self,
+        prompt: str,
+        size: str = "16:9",
+        resolution: str = "2k",
+        image_urls: list[str] | None = None,
+    ) -> dict:
+        """文生图 / 图生图(传 image_urls 即图生图)→ {url} 或 {error}。"""
+        body: dict = {
+            "model": self._model,
+            "prompt": prompt,
+            "size": self._size(size, resolution),
+            "response_format": "url",
+            "watermark": False,
+        }
+        if image_urls:
+            body["image"] = image_urls if len(image_urls) > 1 else image_urls[0]
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                resp = await client.post(
+                    self._url,
+                    headers={"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"},
+                    json=body,
+                )
+                data = resp.json()
+        except Exception as e:
+            return {"error": f"seedream 调用出错: {e}"}
+        if resp.status_code != 200:
+            return {"error": f"seedream 提交失败 {resp.status_code}: {data}"}
+        try:
+            return {"url": data["data"][0]["url"]}
+        except Exception:
+            return {"error": f"seedream 未返回 url: {data}"}
 
 
 # ─── GoogleProvider ─────────────────────────────────────────────────────────────
@@ -236,8 +298,27 @@ class GoogleProvider:
 # ─── 工厂 ──────────────────────────────────────────────────────────────────────
 
 
-def get_provider() -> ApimartProvider | GoogleProvider:
-    """根据配置返回 provider 实例。"""
-    if IMAGE_GEN_PROVIDER == "google":
+def get_provider() -> ApimartProvider | GoogleProvider | SeedreamProvider:
+    """根据 IMAGE_GEN_PROVIDER 返回 provider 实例(动态读 config,resp env/测试)。"""
+    from agent import config
+
+    p = (config.IMAGE_GEN_PROVIDER or "apimart").lower()
+    if p == "seedream":
+        return SeedreamProvider()
+    if p == "google":
         return GoogleProvider()
     return ApimartProvider()
+
+
+def image_gen_ready() -> bool:
+    """当前生图 provider 的密钥是否就绪(决定 cascade_generate_first_frame 是否 fail-fast)。
+    seedream → ARK_API_KEY;google → GOOGLE_API_KEY;apimart → IMAGE_GEN_API_KEY。
+    动态读 config(而非模块级 from-import 绑定),好让 env 变更/测试 monkeypatch 生效。"""
+    from agent import config
+
+    p = (config.IMAGE_GEN_PROVIDER or "apimart").lower()
+    if p == "seedream":
+        return bool(str(config.ARK_API_KEY or "").strip())
+    if p == "google":
+        return bool(str(config.GOOGLE_API_KEY or "").strip())
+    return bool(str(config.IMAGE_GEN_API_KEY or "").strip())
