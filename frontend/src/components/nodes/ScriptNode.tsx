@@ -1,11 +1,13 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { CanvasNode } from "../../types";
+import { NodeActionBar } from "./NodeActionBar";
 
-export function ScriptNode({ data }: NodeProps) {
+export function ScriptNode({ data, selected }: NodeProps) {
   const node = data.node as CanvasNode;
   const content = node.result?.content as string | undefined;
   return (
     <div style={styles.wrapper}>
+      <NodeActionBar node={node} selected={selected} />
       <Handle type="source" position={Position.Right} />
       <Handle type="target" position={Position.Left} />
       <strong style={styles.title}>{node.title}</strong>

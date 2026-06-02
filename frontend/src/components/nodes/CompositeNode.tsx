@@ -1,12 +1,14 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { CanvasNode } from "../../types";
+import { NodeActionBar } from "./NodeActionBar";
 
-export function CompositeNode({ data }: NodeProps) {
+export function CompositeNode({ data, selected }: NodeProps) {
   const node = data.node as CanvasNode;
   const asset = node.asset_status || "idle";
 
   return (
     <div style={S.wrapper}>
+      <NodeActionBar node={node} selected={selected} />
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
       <strong>{node.title}</strong>

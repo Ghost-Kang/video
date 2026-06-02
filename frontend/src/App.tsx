@@ -7,6 +7,7 @@ import { CanvasChatDock } from "./components/CanvasChatDock";
 import { Header } from "./components/Header";
 import { DarkModeToggle } from "./components/landing/DarkModeToggle";
 import { NodeDetail } from "./components/NodeDetail";
+import { NodeActionsContext } from "./lib/nodeActionsContext";
 import { Sidebar } from "./components/Sidebar";
 import { useLayoutState } from "./hooks/useLayoutState";
 import { useNodeActions } from "./hooks/useNodeActions";
@@ -298,10 +299,10 @@ export default function App({ userId, onLogout }: AppProps) {
         <div className="flex flex-1 overflow-hidden" data-testid="app-main-row">
           {sidebarOpen && <Sidebar sessions={sessions} current={tid} names={names} meta={sessionMeta} onSwitch={switchSession} onRename={renameSession} onDelete={deleteSession} onClearEmpty={clearEmptySessions} />}
           {isProView ? (
-            <>
+            <NodeActionsContext.Provider value={actions}>
               <Canvas onPositionChange={(pos) => sendCommand({ ...pos, thread_id: tid })} onCreateEdge={actions.handleCreateEdge} onDeleteEdge={actions.handleDeleteEdge} />
               {selectedNodeId && <NodeDetail actions={actions} />}
-            </>
+            </NodeActionsContext.Provider>
           ) : <CardStack onGenerateFirstFrame={onGenerateFirstFrame} onTriggerRewrite={onTriggerRewrite} onGenerateShotVideo={onGenerateShotVideo} onComposeFilm={onComposeFilm} pendingCase={pendingCase} thinking={thinking} />}
         </div>
         {chatOpen ? (

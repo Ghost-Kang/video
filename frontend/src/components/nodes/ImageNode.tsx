@@ -1,13 +1,15 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { CanvasNode, AssetStatus } from "../../types";
+import { NodeActionBar } from "./NodeActionBar";
 
-export function ImageNode({ data }: NodeProps) {
+export function ImageNode({ data, selected }: NodeProps) {
   const node = data.node as CanvasNode;
   const asset = node.asset_status || "idle";
   const isGenerating = asset === "generating";
 
   return (
     <div style={S.wrapper}>
+      <NodeActionBar node={node} selected={selected} />
       <Handle type="source" position={Position.Right} />
       <Handle type="target" position={Position.Left} />
       <strong>{node.title}</strong>
