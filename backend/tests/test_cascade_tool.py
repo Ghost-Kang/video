@@ -560,11 +560,11 @@ class TestCascadeGenerateFirstFrame:
 
         assert result["error"] == "S8_UPSTREAM_REFUSED"
         assert provider.calls == []
-        # W5D3 Bug #2 — cost-guard HardFailure now pushes analysis_failed
-        # (stage="first_frame") so ChatPanel can surface the refusal directly.
-        assert len(ws.sent) == 1
-        assert ws.sent[0]["type"] == "analysis_failed"
-        assert ws.sent[0]["stage"] == "first_frame"
+        # 2026-06-01 生成草稿图 leg:单张草稿图触顶**不再推全局 analysis_failed 帧**
+        # —— 那会让前端 CardStack 整屏切到 FailureBanner、把分析+改写全藏掉。错误经返回值
+        # 给 Director,在 chat 一句话提示用户(director.md §0.5 复述 message);前端对应镜头
+        # 的草稿图区超时回到「重试」。故此处不推任何全局帧。
+        assert ws.sent == []
 
 
 # ---------- cascade_ask (W4D5) ----------

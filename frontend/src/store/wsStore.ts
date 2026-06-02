@@ -351,9 +351,12 @@ export const useWSStore = create<WSStore>((set, get) => ({
         });
         break;
       case "shot_first_frame_returned":
-        // 单镜首帧返回 → 把 image_url 打到对应 scene_index 的 ShotCard 上。
+        // 单镜首帧返回 → 打到对应 shot_index。改写镜头(RewriteShotCard,生成草稿图 leg)
+        // 是当前渲染目标;同时兼容旧的源镜头 ShotCard(暂挂,无害)。
         queueMicrotask(() => {
-          useCanvasStore.getState().updateShotFirstFrame(event.shot_index, event.image_url);
+          const cs = useCanvasStore.getState();
+          cs.updateRewriteShotFirstFrame(event.shot_index, event.image_url);
+          cs.updateShotFirstFrame(event.shot_index, event.image_url);
         });
         break;
       case "analysis_answer_returned":

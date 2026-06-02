@@ -24,7 +24,7 @@ interface CardStackProps {
 // 视频分析(逐幕网格)。维度齐全但结构清晰、好理解(founder 实测 toprador 样例为准)。
 // 改写「你的版本」本轮暂挂 —— 不渲染 CTA/改写脚本/发布包(代码保留,见 wsStore +
 // rewrite_service,随时可重接)。源逐镜/音频/成本旧抽屉也撤掉(逐幕已含这些维度)。
-export function CardStack({ onTriggerRewrite }: CardStackProps = {}) {
+export function CardStack({ onTriggerRewrite, onGenerateFirstFrame }: CardStackProps = {}) {
   const analysis = useCanvasStore((s) => s.analysis);
   const failure = useCanvasStore((s) => s.failure);
   const loading = useWSStore((s) => s.loading);
@@ -125,7 +125,11 @@ export function CardStack({ onTriggerRewrite }: CardStackProps = {}) {
               {COPY.your_version_header}
             </h2>
             {rewriteShots.map((shot) => (
-              <RewriteShotCard key={shot.shot_index} shot={shot} />
+              <RewriteShotCard
+                key={shot.shot_index}
+                shot={shot}
+                onGenerateFirstFrame={onGenerateFirstFrame}
+              />
             ))}
           </section>
         )}

@@ -425,8 +425,9 @@ async def cascade_generate_first_frame(rewrite_id: str, shot_index: int) -> dict
     try:
         await cost_guard(user_id=user_id, run_id=run_id or "anonymous", predicted_cost_cny=PREDICT_SHOT_IMAGE_CNY)
     except HardFailure as exc:
-        p = _hardfailure_payload(exc)
-        await _push_failure_frame(p["code"], p["hint"], p["actions"], p["request_id"], stage="first_frame")
+        # 不推全局 failure 帧:那会让前端 CardStack 整屏切到 FailureBanner、把分析+改写
+        # 全藏掉 —— 单张草稿图触顶不该清空整个结果页。错误经返回值给 Director,在 chat
+        # 一句话提示用户(额度不足);前端对应镜头的草稿图区超时回到「重试」即可。
         return {
             "error": exc.code.value,
             "message": exc.hint or "本轮额度不足，先把已生成的内容用起来",

@@ -81,6 +81,11 @@ export const COPY = {
 
   shot_generate_first_frame: "生成首帧",
   shot_generating_first_frame: "正在生成…",
+  // 生成草稿图 leg(改写镜头的画面参考)
+  shot_draft_generate: "生成草稿图",
+  shot_draft_generating: "正在生成草稿图…",
+  shot_draft_failed: "生成失败",
+  shot_draft_retry: "重试",
 
   rewrite_cta_header: "改成你自己的版本",
   rewrite_cta_hint: "套用这条的爆款骨架, 帮你改成你自己的脚本 — 想拍什么主题填一句(选填)",
