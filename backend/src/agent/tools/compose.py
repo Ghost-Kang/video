@@ -36,6 +36,21 @@ def _get_resolution(info: dict) -> tuple[int, int]:
     return (1920, 1080)
 
 
+async def compose_local_files(paths: list[str]) -> bytes | None:
+    """本地分镜片文件 → ffmpeg 拼接 → 返回合成视频 bytes(不下载)。
+
+    视频闭环用:逐镜视频已落 /media 本地,直接读盘拼接,避免重新下载(也避开 ARK
+    临时 URL 过期)。单文件直接读回。
+    """
+    paths = [p for p in paths if p and os.path.exists(p)]
+    if not paths:
+        return None
+    if len(paths) == 1:
+        with open(paths[0], "rb") as f:
+            return f.read()
+    return await _concat_paths(paths)
+
+
 async def compose_videos(video_urls: list[str]) -> bytes | None:
     """下载视频 → ffmpeg 拼接 → 返回合成视频 bytes。"""
     if not video_urls:
@@ -46,16 +61,26 @@ async def compose_videos(video_urls: list[str]) -> bytes | None:
             resp.raise_for_status()
             return resp.content
 
-    tmp_dir = tempfile.mkdtemp(prefix="rhtv_compose_")
+    tmp_dir = tempfile.mkdtemp(prefix="rhtv_dl_")
     try:
-        # 1. 下载 + 探测分辨率
         paths: list[str] = []
-        resolutions: list[tuple[int, int]] = []
         for i, url in enumerate(video_urls):
             path = os.path.join(tmp_dir, f"clip_{i}.mp4")
             print(f"[合成] 下载 clip {i} ...")
             await _download(url, path)
             paths.append(path)
+        return await _concat_paths(paths)
+    finally:
+        import shutil
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+async def _concat_paths(paths: list[str]) -> bytes | None:
+    """ffmpeg 拼接给定本地文件,自动处理混合分辨率,返回 bytes。"""
+    tmp_dir = tempfile.mkdtemp(prefix="rhtv_compose_")
+    try:
+        resolutions: list[tuple[int, int]] = []
+        for i, path in enumerate(paths):
             info = await _probe(path)
             w, h = _get_resolution(info)
             resolutions.append((w, h))

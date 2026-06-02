@@ -15,6 +15,8 @@ class EventName(StrEnum):
     SCRIPT_REWRITTEN = "script_rewritten"
     SHOT_GENERATED = "shot_generated"
     SHOT_FIRST_FRAME_RETURNED = "shot_first_frame_returned"
+    SHOT_VIDEO_RETURNED = "shot_video_returned"
+    FILM_RETURNED = "film_returned"
     PUBLISH_PACK_COPIED = "publish_pack_copied"
     ANCHOR_CREATED = "anchor_created"
     ANCHOR_REUSED = "anchor_reused"

@@ -216,6 +216,27 @@ async def bootstrap_schema(db: aiosqlite.Connection | None = None) -> None:
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_showcase_status_time ON showcase_cases(status, created_at DESC)"
         )
+        # 视频闭环 — per-(rewrite, shot) 生成资产:草稿图 URL + 图生视频 URL。草稿图段
+        # 写 image_url(供视频段 image-grounding);视频段写 video_url(供合成读取)。
+        # 都落 /media 持久(ARK 视频 URL 会过期),reload 后据此重放。
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS shot_assets (
+              rewrite_id  TEXT NOT NULL,
+              shot_index  INTEGER NOT NULL,
+              image_url   TEXT,
+              video_url   TEXT,
+              updated_at  TEXT NOT NULL,
+              PRIMARY KEY (rewrite_id, shot_index)
+            )"""
+        )
+        # 视频闭环 — 每条 rewrite 合成的整片 URL(/media/<rewrite_id>/film.mp4)。
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS rewrite_films (
+              rewrite_id  TEXT PRIMARY KEY,
+              film_url    TEXT NOT NULL,
+              created_at  TEXT NOT NULL
+            )"""
+        )
         await db.commit()
         _BOOTSTRAPPED_PATHS.add(str(path))
     finally:

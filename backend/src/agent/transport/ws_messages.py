@@ -267,6 +267,32 @@ class ShotFirstFrameReturnedEvent(_Base):
     error: Optional[str] = None     # failure → user-friendly message; success → None
 
 
+class ShotVideoReturnedEvent(_Base):
+    """Pushed by the `cascade_generate_shot_video` background poll — per-shot,
+    success OR failure. Frontend matches `shot_index` and patches in `video_url`
+    (success → render `<video>`) or `error` (failure → 失败/重试). Per-shot so one
+    clip failing never nukes the result page. Video gen takes minutes, so this
+    arrives long after the submit turn (pushed via the live registry)."""
+
+    type: Literal["shot_video_returned"]
+    thread_id: str
+    rewrite_id: str
+    shot_index: int
+    video_url: str = ""             # success → /media url; failure → ""
+    error: Optional[str] = None     # failure → user-friendly message; success → None
+
+
+class FilmReturnedEvent(_Base):
+    """Pushed by the `cascade_compose_film` background task when the per-shot clips
+    are concatenated into one film. `film_url` = /media/<rewrite_id>/film.mp4."""
+
+    type: Literal["film_returned"]
+    thread_id: str
+    rewrite_id: str
+    film_url: str = ""
+    error: Optional[str] = None
+
+
 class AnalysisAnswerReturnedEvent(_Base):
     """Pushed by `cascade_ask` after a free-form Q&A LLM call succeeds.
 
@@ -329,6 +355,8 @@ WSOutbound = Annotated[
         AnalysisReturnedEvent,
         RewriteReturnedEvent,
         ShotFirstFrameReturnedEvent,
+        ShotVideoReturnedEvent,
+        FilmReturnedEvent,
         AnalysisAnswerReturnedEvent,
         AnalysisFailedEvent,
         AnalysisProgressEvent,

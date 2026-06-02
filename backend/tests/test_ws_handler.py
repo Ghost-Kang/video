@@ -82,6 +82,11 @@ def isolated_ws(monkeypatch, tmp_path):
     monkeypatch.setattr(store, "_DB_PATH", db_path)
     monkeypatch.setattr(store, "_DB_DIR", tmp_path)
 
+    # cascade 持久化 DB(analyses/rewrites/session_results/shot_assets/...)也要隔离,
+    # 否则跨 test 污染:别的 test 写的 pointer/shot_asset 会被本 test 的 _replay_results
+    # 读出来,多推帧。db_path() 优先读 CASCADE_DB_PATH。
+    monkeypatch.setenv("CASCADE_DB_PATH", str(tmp_path / "cascade.db"))
+
     # _ws_registry 是 module global dict,需要隔离避免 test 互相污染
     monkeypatch.setattr(notify, "_ws_registry", {})
 

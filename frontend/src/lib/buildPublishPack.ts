@@ -50,7 +50,8 @@ export function buildPublishPack(
   analysis: CascadeAnalysisContract,
   shotImages: string[] = [],
   rewriteShots: RewriteShot[] = [],
-  niche?: string | null
+  niche?: string | null,
+  filmUrl?: string
 ): string {
   // titles/tags 已在各自函数里 scrub;script 是改写稿,也可能含禁词 → 复制前最后一道
   // scrub(P2:之前只 stripHookCode 不 scrub,禁词可漏到剪贴板)。
@@ -71,6 +72,9 @@ export function buildPublishPack(
     "",
     "【镜头图】",
     imageLines.length ? imageLines.join("\n") : "(草稿图生成后自动填入)",
+    "",
+    "【成片】",
+    filmUrl ? filmUrl : "(合成整片后自动填入)",
     "",
     "—— 用 Cascade 做的 · cascade.app",
   ];

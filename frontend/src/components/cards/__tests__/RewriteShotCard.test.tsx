@@ -66,3 +66,50 @@ describe("RewriteShotCard · 生成草稿图 leg", () => {
     expect(onGen).toHaveBeenCalledWith(2);
   });
 });
+
+describe("RewriteShotCard · 图生视频 leg", () => {
+  const withImage: RewriteShot = { ...shot, firstFrameUrl: "https://cdn.test/draft.png" };
+
+  it("有草稿图 + onGenerateShotVideo → 出「生成视频」按钮,点击触发", async () => {
+    const user = userEvent.setup();
+    const onVid = vi.fn();
+    render(
+      <RewriteShotCard shot={withImage} onGenerateFirstFrame={vi.fn()} onGenerateShotVideo={onVid} />
+    );
+    const btn = screen.getByTestId("rewrite-shot-card-2-video-generate");
+    expect(btn).toHaveTextContent(COPY.shot_video_generate);
+    await user.click(btn);
+    expect(onVid).toHaveBeenCalledWith(2);
+  });
+
+  it("无草稿图时不出「生成视频」(image-grounded,需先有图)", () => {
+    render(<RewriteShotCard shot={shot} onGenerateFirstFrame={vi.fn()} onGenerateShotVideo={vi.fn()} />);
+    expect(screen.queryByTestId("rewrite-shot-card-2-video-generate")).toBeNull();
+  });
+
+  it("videoUrl 存在 → 渲染 <video>(poster=草稿图),不再出生成视频按钮", () => {
+    render(
+      <RewriteShotCard
+        shot={{ ...withImage, videoUrl: "https://cdn.test/shot.mp4" }}
+        onGenerateFirstFrame={vi.fn()}
+        onGenerateShotVideo={vi.fn()}
+      />
+    );
+    const video = screen.getByTestId("rewrite-shot-card-2-video");
+    expect(video).toHaveAttribute("src", "https://cdn.test/shot.mp4");
+    expect(video).toHaveAttribute("poster", "https://cdn.test/draft.png");
+    expect(screen.queryByTestId("rewrite-shot-card-2-video-generate")).toBeNull();
+  });
+
+  it("videoError 存在 → 即时显示提示 + 视频重试", () => {
+    render(
+      <RewriteShotCard
+        shot={{ ...withImage, videoError: "这条视频没生成成功,点重试试试" }}
+        onGenerateFirstFrame={vi.fn()}
+        onGenerateShotVideo={vi.fn()}
+      />
+    );
+    expect(screen.getByText("这条视频没生成成功,点重试试试")).toBeInTheDocument();
+    expect(screen.getByTestId("rewrite-shot-card-2-video-retry")).toBeInTheDocument();
+  });
+});

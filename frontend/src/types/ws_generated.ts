@@ -105,20 +105,31 @@ export type RewriteId = string;
 export type ShotIndex = number;
 export type ImageUrl = string;
 export type Error = string | null;
-export type Type24 = "analysis_answer_returned";
+export type Type24 = "shot_video_returned";
 export type ThreadId20 = string;
+export type RewriteId1 = string;
+export type ShotIndex1 = number;
+export type VideoUrl = string;
+export type Error1 = string | null;
+export type Type25 = "film_returned";
+export type ThreadId21 = string;
+export type RewriteId2 = string;
+export type FilmUrl = string;
+export type Error2 = string | null;
+export type Type26 = "analysis_answer_returned";
+export type ThreadId22 = string;
 export type AnalysisId1 = string;
 export type Question = string;
 export type Answer = string;
-export type Type25 = "analysis_failed";
-export type ThreadId21 = string;
+export type Type27 = "analysis_failed";
+export type ThreadId23 = string;
 export type Code1 = string;
 export type Hint = string;
 export type Actions = string[];
 export type RequestId = string;
 export type Stage = string;
-export type Type26 = "analysis_progress";
-export type ThreadId22 = string;
+export type Type28 = "analysis_progress";
+export type ThreadId24 = string;
 export type Stage1 = string;
 export type Percent = number;
 export type EtaSeconds = number;
@@ -151,6 +162,8 @@ export interface WSMessages {
     | AnalysisReturnedEvent
     | RewriteReturnedEvent
     | ShotFirstFrameReturnedEvent
+    | ShotVideoReturnedEvent
+    | FilmReturnedEvent
     | AnalysisAnswerReturnedEvent
     | AnalysisFailedEvent
     | AnalysisProgressEvent;
@@ -327,6 +340,32 @@ export interface ShotFirstFrameReturnedEvent {
   error?: Error;
 }
 /**
+ * Pushed by the `cascade_generate_shot_video` background poll — per-shot,
+ * success OR failure. Frontend matches `shot_index` and patches in `video_url`
+ * (success → render `<video>`) or `error` (failure → 失败/重试). Per-shot so one
+ * clip failing never nukes the result page. Video gen takes minutes, so this
+ * arrives long after the submit turn (pushed via the live registry).
+ */
+export interface ShotVideoReturnedEvent {
+  type: Type24;
+  thread_id: ThreadId20;
+  rewrite_id: RewriteId1;
+  shot_index: ShotIndex1;
+  video_url?: VideoUrl;
+  error?: Error1;
+}
+/**
+ * Pushed by the `cascade_compose_film` background task when the per-shot clips
+ * are concatenated into one film. `film_url` = /media/<rewrite_id>/film.mp4.
+ */
+export interface FilmReturnedEvent {
+  type: Type25;
+  thread_id: ThreadId21;
+  rewrite_id: RewriteId2;
+  film_url?: FilmUrl;
+  error?: Error2;
+}
+/**
  * Pushed by `cascade_ask` after a free-form Q&A LLM call succeeds.
  *
  * Carries the analysis_id + the user's question + the bounded (~300 char)
@@ -334,8 +373,8 @@ export interface ShotFirstFrameReturnedEvent {
  * Phase 1, just chat-relay it via the Director's reply).
  */
 export interface AnalysisAnswerReturnedEvent {
-  type: Type24;
-  thread_id: ThreadId20;
+  type: Type26;
+  thread_id: ThreadId22;
   analysis_id: AnalysisId1;
   question: Question;
   answer: Answer;
@@ -349,8 +388,8 @@ export interface AnalysisAnswerReturnedEvent {
  * in frontend/src/types/cascade.ts (code / hint / actions / request_id).
  */
 export interface AnalysisFailedEvent {
-  type: Type25;
-  thread_id: ThreadId21;
+  type: Type27;
+  thread_id: ThreadId23;
   code: Code1;
   hint: Hint;
   actions?: Actions;
@@ -366,8 +405,8 @@ export interface AnalysisFailedEvent {
  * path or older clients).
  */
 export interface AnalysisProgressEvent {
-  type: Type26;
-  thread_id: ThreadId22;
+  type: Type28;
+  thread_id: ThreadId24;
   stage: Stage1;
   percent: Percent;
   eta_seconds: EtaSeconds;

@@ -95,6 +95,14 @@ export default function App({ userId, onLogout }: AppProps) {
   const onGenerateFirstFrame = useCallback((idx: number) => {
     sendChatMessage(`[generate_first_frame: shot_index=${idx}]`);
   }, [sendChatMessage]);
+  // 图生视频(单镜)/ 合成整片 —— bracket 标记由 Director §0.7b/§0.7c 解析,异步生成,
+  // 完成后端推帧自动渲染(视频要几分钟,合成几十秒)。
+  const onGenerateShotVideo = useCallback((idx: number) => {
+    sendChatMessage(`[generate_shot_video: shot_index=${idx}]`);
+  }, [sendChatMessage]);
+  const onComposeFilm = useCallback(() => {
+    sendChatMessage(`[compose_film]`);
+  }, [sendChatMessage]);
   // 「改成你自己的版本」CTA(去 niche 后通用代笔)。bracket 标记由 Director §0.6
   // 解析:`[selected_niche: generic]` → 立即 cascade_rewrite;可选的
   // `[rewrite_topic: ...]` 把一句话主题作为 topic 导向题材。topic 留空 = 纯按源片
@@ -222,7 +230,7 @@ export default function App({ userId, onLogout }: AppProps) {
               <Canvas onPositionChange={(pos) => sendCommand({ ...pos, thread_id: tid })} onCreateEdge={actions.handleCreateEdge} onDeleteEdge={actions.handleDeleteEdge} />
               {selectedNodeId && <NodeDetail actions={actions} />}
             </>
-          ) : <CardStack onGenerateFirstFrame={onGenerateFirstFrame} onTriggerRewrite={onTriggerRewrite} />}
+          ) : <CardStack onGenerateFirstFrame={onGenerateFirstFrame} onTriggerRewrite={onTriggerRewrite} onGenerateShotVideo={onGenerateShotVideo} onComposeFilm={onComposeFilm} />}
         </div>
         {showDock && (chatOpen ? (
           <ChatPanel messages={messages} streaming={streaming} thinking={thinking} onSend={sendChatMessage} loading={loading} onToggleCollapse={() => setChatOpen(false)} />

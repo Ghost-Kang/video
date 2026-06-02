@@ -34,6 +34,8 @@ export type {
   AnalysisReturnedEvent,
   RewriteReturnedEvent,
   ShotFirstFrameReturnedEvent,
+  ShotVideoReturnedEvent,
+  FilmReturnedEvent,
   AnalysisAnswerReturnedEvent,
   AnalysisFailedEvent,
   AnalysisProgressEvent,
@@ -64,6 +66,8 @@ import type {
   AnalysisReturnedEvent,
   RewriteReturnedEvent,
   ShotFirstFrameReturnedEvent,
+  ShotVideoReturnedEvent,
+  FilmReturnedEvent,
   AnalysisAnswerReturnedEvent,
   AnalysisFailedEvent,
   AnalysisProgressEvent,
@@ -168,6 +172,8 @@ export type WSEvent =
   | AnalysisReturnedEventTyped
   | RewriteReturnedEventTyped
   | ShotFirstFrameReturnedEvent
+  | ShotVideoReturnedEvent
+  | FilmReturnedEvent
   | AnalysisAnswerReturnedEvent
   | AnalysisFailedEvent
   | AnalysisProgressEvent;

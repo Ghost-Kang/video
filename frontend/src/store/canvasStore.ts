@@ -22,6 +22,10 @@ interface CanvasStore {
   shots: Scene[];
   /** 改写后的镜头 — 跟 shots 共存,空时不渲染对应区域。 */
   rewriteShots: RewriteShot[];
+  /** 合成整片 URL(/media/<rewrite_id>/film.mp4),空时不渲染成片播放器。 */
+  filmUrl: string;
+  /** 合成在途/失败提示(整片级);空 = 无。 */
+  filmError: string;
   failure: FailurePayload | null;
   setCanvas: (data: { nodes: Record<string, CanvasNode>; edges?: unknown[] }) => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
@@ -39,6 +43,10 @@ interface CanvasStore {
   updateShotFirstFrame: (scene_index: number, url: string) => void;
   updateRewriteShotFirstFrame: (shot_index: number, url: string) => void;
   setRewriteShotFirstFrameError: (shot_index: number, error: string | null) => void;
+  setRewriteShotVideo: (shot_index: number, url: string) => void;
+  setRewriteShotVideoError: (shot_index: number, error: string | null) => void;
+  setFilm: (url: string) => void;
+  setFilmError: (error: string) => void;
   setFailure: (failure: FailurePayload | null) => void;
   loadFromAnalysis: (analysis: CascadeAnalysisContract) => void;
   clear: () => void;
@@ -56,6 +64,8 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
   script: "",
   shots: [],
   rewriteShots: [],
+  filmUrl: "",
+  filmError: "",
   failure: null,
 
   setCanvas: (data) =>
@@ -129,6 +139,28 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
       ),
     })),
 
+  // 图生视频 leg:视频成功(清错误)/ 失败(置友好提示)。
+  setRewriteShotVideo: (shot_index, url) =>
+    set((s) => ({
+      rewriteShots: s.rewriteShots.map((sh) =>
+        sh.shot_index === shot_index
+          ? { ...sh, videoUrl: url, videoError: undefined }
+          : sh
+      ),
+    })),
+  setRewriteShotVideoError: (shot_index, error) =>
+    set((s) => ({
+      rewriteShots: s.rewriteShots.map((sh) =>
+        sh.shot_index === shot_index
+          ? { ...sh, videoError: error ?? undefined }
+          : sh
+      ),
+    })),
+
+  // 合成整片:成功置 URL(清错误)/ 失败置错误提示。
+  setFilm: (url) => set({ filmUrl: url, filmError: "" }),
+  setFilmError: (error) => set({ filmError: error }),
+
   setFailure: (failure) => set({ failure }),
 
   loadFromAnalysis: (analysis) =>
@@ -169,6 +201,8 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
             script: "",
             shots: analysis.scenes,
             rewriteShots: [],
+            filmUrl: "",
+            filmError: "",
             failure: null,
           };
     }),
@@ -184,6 +218,8 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
       script: "",
       shots: [],
       rewriteShots: [],
+      filmUrl: "",
+      filmError: "",
       failure: null,
     }),
 }));

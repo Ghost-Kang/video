@@ -9,6 +9,10 @@ export interface RewriteShot {
   // 生成失败时后端在同一帧带 error(用户向友好提示)→ 该镜头即时翻到「失败/重试」,
   // 不必等前端 75s 超时。成功或重试时清空。
   firstFrameError?: string;
+  // 图生视频 leg:该镜的视频 URL(/media/...),由 shot_video_returned 帧打进(初始 undefined)。
+  videoUrl?: string;
+  // 视频生成失败时后端在同一帧带 error → 该镜视频区即时翻「失败/重试」。
+  videoError?: string;
 }
 
 export function mapRewriteShotsToScenes(shots: RewriteShot[]): RewriteShot[] {

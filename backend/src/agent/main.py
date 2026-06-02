@@ -29,7 +29,9 @@ from agent.tools.canvas import (
 from agent.tools.cascade import (
     cascade_analyze,
     cascade_ask,
+    cascade_compose_film,
     cascade_generate_first_frame,
+    cascade_generate_shot_video,
     cascade_rewrite,
 )
 
@@ -65,6 +67,8 @@ def create_director_agent(checkpointer=None):
             cascade_analyze,
             cascade_rewrite,
             cascade_generate_first_frame,
+            cascade_generate_shot_video,
+            cascade_compose_film,
             cascade_ask,
         ],
         subagents=[

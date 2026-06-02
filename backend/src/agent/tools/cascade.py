@@ -32,8 +32,10 @@ from agent.cascade.analysis_service import request_shallow_analysis
 from agent.cascade.cost_guard import (
     PREDICT_ASK_CNY,
     PREDICT_SHOT_IMAGE_CNY,
+    PREDICT_VIDEO_SECOND_CNY,
     cost_guard,
 )
+from agent.cascade.mediakit.clip_extractor import media_root
 from agent.cascade.event_names import EventName
 from agent.cascade.events import emit
 from agent.cascade.failures import FailureCode, HardFailure
@@ -45,12 +47,20 @@ from agent.cascade.rewrite_service import (
 )
 from agent.cascade.storage import (
     load_analysis,
+    load_film,
     load_rewrite_by_id,
+    load_shot_assets,
+    load_shot_image,
     record_analysis,
+    record_film,
     record_rewrite,
+    record_shot_image,
+    record_shot_video,
 )
 from agent.llm_factory import current_model_name, get_chat_model
+from agent.tools.compose import _download, compose_local_files
 from agent.tools.generation import ApimartProvider
+from agent.tools.video_generation import SeedanceProvider
 from agent.transport.runtime_ctx import get_run_ctx
 
 
@@ -483,6 +493,13 @@ async def cascade_generate_first_frame(rewrite_id: str, shot_index: int) -> dict
         await _push_shot_error(rewrite_id, shot_index, _RETRY_MSG)
         return {"error": "S5_INVALID_PAYLOAD", "message": "上游未返回 url"}
 
+    # 3b. Persist the 草稿图 URL — the video leg (cascade_generate_shot_video) reads
+    # it for image-grounding, and session reload replays it. Best-effort.
+    try:
+        await record_shot_image(rewrite_id, shot_index, image_url)
+    except Exception:
+        pass
+
     # 4. Push WS frame so the matching ShotCard re-renders live.
     if thread_id:
         await _push_ws({
@@ -514,6 +531,294 @@ async def cascade_generate_first_frame(rewrite_id: str, shot_index: int) -> dict
         "image_url": image_url,
         "cost_cny": PREDICT_SHOT_IMAGE_CNY,
     }
+
+
+# ---------- cascade_generate_shot_video + cascade_compose_film (视频闭环) ----------
+
+
+_SHOT_VIDEO_SECONDS = 5  # 单镜短片时长(秒);成本 = 秒 × PREDICT_VIDEO_SECOND_CNY ≈ ¥1.5
+_VIDEO_RETRY_MSG = "这条视频没生成成功,点重试试试"
+
+
+async def _push_shot_video(
+    user_id: str,
+    thread_id: str,
+    rewrite_id: str,
+    shot_index: int,
+    *,
+    video_url: str = "",
+    error: str | None = None,
+) -> None:
+    """Push shot_video_returned to user_id via the live registry. Safe to call from
+    a background poll task (does NOT read RUN_CTX — that turn is long gone; user_id/
+    thread_id are captured at submit time)."""
+    if not thread_id or not user_id:
+        return
+    from agent.transport import notify
+
+    await notify.send_to_user(
+        user_id,
+        {
+            "type": "shot_video_returned",
+            "thread_id": thread_id,
+            "rewrite_id": rewrite_id,
+            "shot_index": shot_index,
+            "video_url": video_url,
+            "error": error,
+        },
+    )
+
+
+async def _poll_shot_video(
+    provider: SeedanceProvider,
+    task_id: str,
+    user_id: str,
+    thread_id: str,
+    rewrite_id: str,
+    shot_index: int,
+) -> None:
+    """后台轮询 Seedance 任务 → 成功下载落 /media 持久 → 持久化 + 推帧。失败推单镜 error。
+    脱离 agent turn 存活(asyncio.create_task);用捕获的 user_id/thread_id,不读 RUN_CTX。"""
+    try:
+        result = await provider.poll(task_id)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[shot_video] poll 异常 rewrite={rewrite_id} shot={shot_index}: {exc}")
+        await _push_shot_video(user_id, thread_id, rewrite_id, shot_index, error=_VIDEO_RETRY_MSG)
+        return
+
+    src_url = result.get("video_url") if isinstance(result, dict) else None
+    if not src_url:
+        await _push_shot_video(user_id, thread_id, rewrite_id, shot_index, error=_VIDEO_RETRY_MSG)
+        return
+
+    # ARK 视频 URL 会过期 → 必须落 /media 持久(合成段读本地文件)。下载失败=视频失败
+    # (不回退临时 URL,否则过期后合成/重看全断)。
+    try:
+        out_dir = media_root() / rewrite_id
+        out_dir.mkdir(parents=True, exist_ok=True)
+        dest = out_dir / f"shot_{shot_index}.mp4"
+        await _download(src_url, str(dest))
+        public_url = f"/media/{rewrite_id}/shot_{shot_index}.mp4"
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[shot_video] 落盘失败 rewrite={rewrite_id} shot={shot_index}: {exc}")
+        await _push_shot_video(user_id, thread_id, rewrite_id, shot_index, error=_VIDEO_RETRY_MSG)
+        return
+
+    try:
+        await record_shot_video(rewrite_id, shot_index, public_url)
+    except Exception:
+        pass
+    await _push_shot_video(user_id, thread_id, rewrite_id, shot_index, video_url=public_url)
+    try:
+        await emit(
+            EventName.SHOT_VIDEO_RETURNED,
+            user_id=user_id,
+            run_id=None,
+            payload={
+                "rewrite_id": rewrite_id,
+                "shot_index": shot_index,
+                "cost_cny": _SHOT_VIDEO_SECONDS * PREDICT_VIDEO_SECOND_CNY,
+            },
+        )
+    except Exception:
+        pass
+
+
+@tool
+async def cascade_generate_shot_video(rewrite_id: str, shot_index: int) -> dict:
+    """根据某镜的草稿图生成一段图生视频(image-grounded,约几分钟,完成后自动推送)。
+
+    **何时调用**：
+    - 用户消息以 `[generate_shot_video: shot_index=<N>]` 开头 → 立刻调本工具,
+      `shot_index` 取标记里的 N,`rewrite_id` 取**最近一次 cascade_rewrite** 的 rw_xxx。
+    - 用户自然语言说「把镜头 X 生成视频」/「这条做成视频」类话 → 同样调本工具。
+
+    **前置**:该镜必须**已经生成过草稿图**(cascade_generate_first_frame)——视频是
+    image-grounded,以草稿图为首帧。没有草稿图会返回 NO_SHOT_IMAGE。
+
+    **参数**：rewrite_id(rw_ 开头)、shot_index(1-based,在该 rewrite 镜头范围内)。
+
+    **返回**：
+    - 已提交:{"shot_index": N, "task_id": "...", "status": "submitted", "message": "..."}
+      ——视频要几分钟,后台生成,好了系统自动推帧渲染。**chat 回复一句「在生成第 N 条镜头
+      的视频了,几分钟后自动出现」即可,不要轮询、不要复述。**
+    - 已有缓存:{"shot_index": N, "video_url": "...", "cached": true}
+    - 失败:{"error": "...", "message": "..."}
+
+    **成本**：约 ¥1.5(5 秒,Seedance)。cost_guard 兜底。
+    """
+    ctx = get_run_ctx()
+    user_id = ctx.get("user_id") or "anonymous"
+    thread_id = ctx.get("thread_id") or ""
+    run_id = ctx.get("run_id")
+
+    raw = await load_rewrite_by_id(rewrite_id)
+    if raw is None:
+        return {"error": "REWRITE_NOT_FOUND", "message": f"找不到 rewrite_id={rewrite_id},请先 cascade_rewrite"}
+    try:
+        rewrite = RewriteResult.model_validate_json(raw)
+    except Exception as exc:  # pragma: no cover - defensive
+        return {"error": "S5_INVALID_PAYLOAD", "message": f"rewrite 解析失败: {exc}"}
+
+    shot = next((s for s in rewrite.shots if s.shot_index == shot_index), None)
+    if shot is None:
+        return {
+            "error": "SHOT_NOT_FOUND",
+            "message": f"镜号 {shot_index} 不在 rewrite={rewrite_id} 范围内(合法 1..{len(rewrite.shots)})",
+        }
+
+    # 幂等:已生成过该镜视频 → 直接回推已存 URL,不重复烧钱。
+    assets = {a["shot_index"]: a for a in await load_shot_assets(rewrite_id)}
+    existing = assets.get(shot_index)
+    if existing and existing.get("video_url"):
+        await _push_shot_video(user_id, thread_id, rewrite_id, shot_index, video_url=existing["video_url"])
+        return {"shot_index": shot_index, "video_url": existing["video_url"], "cached": True}
+
+    # image-grounded → 必须先有草稿图。
+    image_url = (existing or {}).get("image_url") or await load_shot_image(rewrite_id, shot_index)
+    if not image_url:
+        msg = "先生成这条镜头的草稿图,再用它生成视频"
+        await _push_shot_video(user_id, thread_id, rewrite_id, shot_index, error=msg)
+        return {"error": "NO_SHOT_IMAGE", "message": msg}
+
+    # cost guard(5s)。触顶 → 推单镜 error(不 nuke 结果页),Director 也在 chat 提示。
+    try:
+        await cost_guard(
+            user_id=user_id,
+            run_id=run_id or "anonymous",
+            predicted_cost_cny=_SHOT_VIDEO_SECONDS * PREDICT_VIDEO_SECOND_CNY,
+        )
+    except HardFailure as exc:
+        msg = exc.hint or "本轮额度不足,先把已生成的用起来"
+        await _push_shot_video(user_id, thread_id, rewrite_id, shot_index, error=msg)
+        return {"error": exc.code.value, "message": msg}
+
+    # 提交 Seedance(图生视频)。提交快(~1-2s);poll 慢(几分钟)→ 丢后台。
+    provider = SeedanceProvider()
+    try:
+        submitted = await provider.submit(
+            prompt=shot.visual,
+            duration=_SHOT_VIDEO_SECONDS,
+            ratio="16:9",
+            image_urls=[image_url],
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        await _push_shot_video(user_id, thread_id, rewrite_id, shot_index, error=_VIDEO_RETRY_MSG)
+        return {"error": "S5_INVALID_PAYLOAD", "message": f"生视频调用出错: {exc}"}
+
+    if "error" in submitted:
+        await _push_shot_video(user_id, thread_id, rewrite_id, shot_index, error=_VIDEO_RETRY_MSG)
+        return {"error": "S8_UPSTREAM_REFUSED", "message": submitted.get("error", "生视频提交失败")}
+
+    task_id = submitted.get("task_id")
+    # 后台轮询 → 落盘 → 持久化 → 推帧。脱离本 turn 存活。
+    asyncio.create_task(_poll_shot_video(provider, task_id, user_id, thread_id, rewrite_id, shot_index))
+
+    return {
+        "shot_index": shot_index,
+        "task_id": task_id,
+        "status": "submitted",
+        "message": "已开始生成视频,约几分钟,好了自动出现",
+    }
+
+
+async def _push_film(user_id: str, thread_id: str, rewrite_id: str, *, film_url: str = "", error: str | None = None) -> None:
+    if not thread_id or not user_id:
+        return
+    from agent.transport import notify
+
+    await notify.send_to_user(
+        user_id,
+        {"type": "film_returned", "thread_id": thread_id, "rewrite_id": rewrite_id, "film_url": film_url, "error": error},
+    )
+
+
+async def _compose_film_bg(user_id: str, thread_id: str, rewrite_id: str, local_paths: list[str]) -> None:
+    """后台:本地分镜片 ffmpeg 拼接 → 落 /media/<rid>/film.mp4 → 持久化 + 推帧。"""
+    try:
+        data = await compose_local_files(local_paths)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[film] 合成异常 rewrite={rewrite_id}: {exc}")
+        await _push_film(user_id, thread_id, rewrite_id, error="合成失败,稍后重试")
+        return
+    if not data:
+        await _push_film(user_id, thread_id, rewrite_id, error="合成失败,稍后重试")
+        return
+    try:
+        out_dir = media_root() / rewrite_id
+        out_dir.mkdir(parents=True, exist_ok=True)
+        dest = out_dir / "film.mp4"
+        dest.write_bytes(data)
+        film_url = f"/media/{rewrite_id}/film.mp4"
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[film] 落盘失败 rewrite={rewrite_id}: {exc}")
+        await _push_film(user_id, thread_id, rewrite_id, error="合成失败,稍后重试")
+        return
+    try:
+        await record_film(rewrite_id, film_url)
+    except Exception:
+        pass
+    await _push_film(user_id, thread_id, rewrite_id, film_url=film_url)
+    try:
+        await emit(EventName.FILM_RETURNED, user_id=user_id, run_id=None, payload={"rewrite_id": rewrite_id})
+    except Exception:
+        pass
+
+
+@tool
+async def cascade_compose_film(rewrite_id: str) -> dict:
+    """把该 rewrite 已生成的逐镜视频按镜号拼成一条整片(本地 ffmpeg 合成,完成后自动推送)。
+
+    **何时调用**：
+    - 用户消息以 `[compose_film]` 开头 → 立刻调本工具,`rewrite_id` 取最近一次 cascade_rewrite 的 rw_xxx。
+    - 用户说「合成整片」/「拼成一条」类话 → 同样调本工具。
+
+    **前置**:至少有 1 条镜头视频(cascade_generate_shot_video)。
+
+    **返回**:
+    - 已提交:{"status": "composing", "shots": N, "message": "..."} —— 合成要点时间,后台做,
+      好了自动推帧。chat 一句「在合成整片了,稍等」即可。
+    - 已有缓存:{"film_url": "...", "cached": true}
+    - 失败:{"error": "...", "message": "..."}
+
+    **成本**:免费(本地 ffmpeg 拼接,无模型调用)。
+    """
+    ctx = get_run_ctx()
+    user_id = ctx.get("user_id") or "anonymous"
+    thread_id = ctx.get("thread_id") or ""
+
+    raw = await load_rewrite_by_id(rewrite_id)
+    if raw is None:
+        return {"error": "REWRITE_NOT_FOUND", "message": f"找不到 rewrite_id={rewrite_id},请先 cascade_rewrite"}
+
+    # 幂等:已合成 → 直接回推。
+    existing_film = await load_film(rewrite_id)
+    if existing_film:
+        await _push_film(user_id, thread_id, rewrite_id, film_url=existing_film)
+        return {"film_url": existing_film, "cached": True}
+
+    assets = await load_shot_assets(rewrite_id)
+    # 视频 URL 都是 /media/<rid>/shot_<i>.mp4(本地持久)→ 还原本地路径按镜号排序。
+    root = media_root()
+    local_paths: list[str] = []
+    for a in sorted(assets, key=lambda x: x["shot_index"]):
+        vu = a.get("video_url")
+        if not vu:
+            continue
+        rel = vu[len("/media/"):] if vu.startswith("/media/") else None
+        if rel:
+            local_paths.append(str(root / rel))
+    if not local_paths:
+        return {"error": "NO_SHOT_VIDEOS", "message": "还没有镜头视频,先把镜头生成视频再合成整片"}
+
+    asyncio.create_task(_compose_film_bg(user_id, thread_id, rewrite_id, local_paths))
+    return {"status": "composing", "shots": len(local_paths), "message": "在合成整片了,稍等几十秒自动出现"}
 
 
 # ---------- cascade_ask (W4D5) ----------
@@ -681,5 +986,7 @@ __all__ = [
     "cascade_analyze",
     "cascade_rewrite",
     "cascade_generate_first_frame",
+    "cascade_generate_shot_video",
+    "cascade_compose_film",
     "cascade_ask",
 ]

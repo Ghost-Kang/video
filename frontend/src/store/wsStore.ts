@@ -363,6 +363,22 @@ export const useWSStore = create<WSStore>((set, get) => ({
           }
         });
         break;
+      case "shot_video_returned":
+        // 图生视频(后台几分钟后)→ 成功打 videoUrl,失败打 videoError(即时翻态)。
+        queueMicrotask(() => {
+          const cs = useCanvasStore.getState();
+          if (event.error) cs.setRewriteShotVideoError(event.shot_index, event.error);
+          else if (event.video_url) cs.setRewriteShotVideo(event.shot_index, event.video_url);
+        });
+        break;
+      case "film_returned":
+        // 合成整片(后台)→ 成功打 filmUrl,失败打 filmError。
+        queueMicrotask(() => {
+          const cs = useCanvasStore.getState();
+          if (event.error) cs.setFilmError(event.error);
+          else if (event.film_url) cs.setFilm(event.film_url);
+        });
+        break;
       case "analysis_answer_returned":
         canvas.addMessage("agent", event.answer);
         set({

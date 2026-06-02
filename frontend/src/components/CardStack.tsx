@@ -18,16 +18,22 @@ interface CardStackProps {
   onGenerateFirstFrame?: (sceneIndex: number) => void;
   /** 触发通用改写;topic 为可选的一句话主题(去 niche 后无赛道参数)。 */
   onTriggerRewrite?: (topic?: string) => void;
+  /** 图生视频(单镜)。 */
+  onGenerateShotVideo?: (shotIndex: number) => void;
+  /** 合成整片。 */
+  onComposeFilm?: () => void;
 }
 
 // 2026-05-30 toprador 对齐重设计:分析输出 = 爆点分析(总结+主题+维度网格) +
 // 视频分析(逐幕网格)。维度齐全但结构清晰、好理解(founder 实测 toprador 样例为准)。
 // 改写「你的版本」本轮暂挂 —— 不渲染 CTA/改写脚本/发布包(代码保留,见 wsStore +
 // rewrite_service,随时可重接)。源逐镜/音频/成本旧抽屉也撤掉(逐幕已含这些维度)。
-export function CardStack({ onTriggerRewrite, onGenerateFirstFrame }: CardStackProps = {}) {
+export function CardStack({ onTriggerRewrite, onGenerateFirstFrame, onGenerateShotVideo, onComposeFilm }: CardStackProps = {}) {
   const analysis = useCanvasStore((s) => s.analysis);
   const failure = useCanvasStore((s) => s.failure);
   const loading = useWSStore((s) => s.loading);
+  const filmUrl = useCanvasStore((s) => s.filmUrl);
+  const filmError = useCanvasStore((s) => s.filmError);
   // 改写-发布闭环依赖的状态 + 灰度门。**全部 hook 必须在下面的 early return 之前** —
   // React rules of hooks(把 hook 放在 `!analysis` return 之后,analysis 到达时
   // hook 数变化 → #310 崩溃被错误边界吞成空白页)。
@@ -64,6 +70,8 @@ export function CardStack({ onTriggerRewrite, onGenerateFirstFrame }: CardStackP
   // 改写在途:解封开、还没改写结果、但有运行中的 run(用户刚点了 CTA)。此窗口
   // 别再显示 CTA(防双发),给一句「正在帮你改…」。
   const rewritePending = REWRITE_ENABLED && !hasRewrite && loading;
+  // 视频闭环:有任一镜出了视频 → 可「合成整片」。
+  const hasAnyShotVideo = rewriteShots.some((s) => Boolean(s.videoUrl));
 
   return (
     <main className="relative flex-1 overflow-y-auto bg-transparent p-4 md:p-6">
@@ -129,8 +137,48 @@ export function CardStack({ onTriggerRewrite, onGenerateFirstFrame }: CardStackP
                 key={shot.shot_index}
                 shot={shot}
                 onGenerateFirstFrame={onGenerateFirstFrame}
+                onGenerateShotVideo={onGenerateShotVideo}
               />
             ))}
+          </section>
+        )}
+
+        {/* 合成整片:任一镜出了视频后出现「合成整片」;成片用 <video> 播放器展示。 */}
+        {REWRITE_ENABLED && hasRewrite && onComposeFilm && (hasAnyShotVideo || filmUrl) && (
+          <section className="space-y-3">
+            <h2 className="font-serif-cn text-lg text-stone-900 dark:text-stone-50 px-1 pt-2">
+              {COPY.film_header}
+            </h2>
+            {filmUrl ? (
+              <video
+                src={filmUrl}
+                controls
+                playsInline
+                className="w-full rounded-2xl bg-black aspect-video"
+                data-testid="film-player"
+              />
+            ) : filmError ? (
+              <div className="rounded-2xl border border-stone-200 dark:border-stone-700 bg-white/50 dark:bg-stone-900/40 px-4 py-5 text-center">
+                <p className="mb-2 text-sm text-stone-500 dark:text-stone-400">{filmError}</p>
+                <button
+                  type="button"
+                  onClick={onComposeFilm}
+                  className="inline-flex items-center gap-2 rounded-lg bg-white/80 dark:bg-stone-900/60 hover:bg-white dark:hover:bg-stone-900 px-4 py-2 text-sm font-medium text-stone-700 dark:text-stone-200 shadow-sm border border-stone-200 dark:border-stone-700 transition-colors"
+                  data-testid="film-retry"
+                >
+                  {COPY.film_retry}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onComposeFilm}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-[#7c2d12] dark:bg-[#ea580c] text-white px-4 py-3 text-[15px] font-medium hover:opacity-90 transition-opacity"
+                data-testid="compose-film"
+              >
+                {COPY.film_compose}
+              </button>
+            )}
           </section>
         )}
 

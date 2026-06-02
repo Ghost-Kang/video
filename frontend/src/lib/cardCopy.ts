@@ -87,6 +87,16 @@ export const COPY = {
   shot_draft_retry: "重试",
   // 前端兜底超时文案(正常失败用后端下发的友好提示;这条只在帧丢失时出现)。
   shot_draft_timeout: "生成有点慢,点重试试试",
+  // 图生视频 leg(草稿图 → 视频)
+  shot_video_generate: "生成视频",
+  shot_video_generating: "生成视频中·约几分钟",
+  shot_video_timeout: "视频生成有点久,点重试",
+  // 合成整片
+  film_compose: "合成整片",
+  film_composing: "合成整片中…",
+  film_header: "成片",
+  film_timeout: "合成有点久,点重试",
+  film_retry: "重试",
 
   rewrite_cta_header: "改成你自己的版本",
   rewrite_cta_hint: "套用这条的爆款骨架, 帮你改成你自己的脚本 — 想拍什么主题填一句(选填)",

@@ -204,6 +204,40 @@ async def _replay_results(ctx: WSCtx, thread_id: str) -> None:
         except Exception as exc:
             print(f"[replay] rewrite {rewrite_id} failed: {exc}")
 
+        # 视频闭环:重放已生成的草稿图 / 逐镜视频 / 整片(都已落 /media 持久)。
+        # 必须在 rewrite_returned 之后(前端先建好 rewriteShots,再被这些帧 patch)。
+        try:
+            for a in await cascade_storage.load_shot_assets(rewrite_id):
+                if a.get("image_url"):
+                    await send_json(
+                        ctx.ws,
+                        type="shot_first_frame_returned",
+                        thread_id=thread_id,
+                        rewrite_id=rewrite_id,
+                        shot_index=a["shot_index"],
+                        image_url=a["image_url"],
+                    )
+                if a.get("video_url"):
+                    await send_json(
+                        ctx.ws,
+                        type="shot_video_returned",
+                        thread_id=thread_id,
+                        rewrite_id=rewrite_id,
+                        shot_index=a["shot_index"],
+                        video_url=a["video_url"],
+                    )
+            film_url = await cascade_storage.load_film(rewrite_id)
+            if film_url:
+                await send_json(
+                    ctx.ws,
+                    type="film_returned",
+                    thread_id=thread_id,
+                    rewrite_id=rewrite_id,
+                    film_url=film_url,
+                )
+        except Exception as exc:
+            print(f"[replay] shot assets {rewrite_id} failed: {exc}")
+
 
 # ---------- canvas edges ----------
 #

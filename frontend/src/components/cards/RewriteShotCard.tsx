@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ImageIcon, RefreshCw } from "lucide-react";
+import { ImageIcon, RefreshCw, Clapperboard } from "lucide-react";
 import type { RewriteShot } from "../../lib/cascadeMapper";
 import { COPY } from "../../lib/cardCopy";
 import { CARD_CLASS } from "../../lib/cardStyles";
@@ -7,53 +7,70 @@ import { useCanvasStore } from "../../store/canvasStore";
 
 interface Props {
   shot: RewriteShot;
-  /** 生成草稿图:发 [generate_first_frame: shot_index=N];Director 用最近 rewrite_id 调工具。
-   *  不传 = 不显示草稿图区(灰度关 / 调用方不支持时向后兼容)。 */
+  /** 生成草稿图:发 [generate_first_frame: shot_index=N]。 */
   onGenerateFirstFrame?: (shotIndex: number) => void;
+  /** 图生视频:发 [generate_shot_video: shot_index=N](需先有草稿图)。 */
+  onGenerateShotVideo?: (shotIndex: number) => void;
 }
 
-// 后端没回任何帧时的兜底超时(正常成功/失败都会推 shot_first_frame_returned,即时翻态;
-// 这里只防"帧丢了/后端挂了"导致转圈不止)。
-const _GEN_TIMEOUT_MS = 75_000;
+// 草稿图:同步生成(~30s),75s 兜底。视频:后台几分钟,12min 兜底(正常靠后端推帧翻态)。
+const _IMG_TIMEOUT_MS = 75_000;
+const _VIDEO_TIMEOUT_MS = 12 * 60_000;
 
-// 改写后的镜头 — 台词 + 画面描述 + 可选「生成草稿图」(首帧参考)。
-// 草稿图四态:IDLE(按钮)/ PENDING(转圈)/ DONE(图)/ FAILED(后端友好提示 + 重试)。
-// DONE 由 store.firstFrameUrl 驱动;FAILED 由 store.firstFrameError 驱动(后端即时推,
-// 不必等超时);PENDING 是本地瞬态。render 优先级 hasImage > error > generating,故本地
-// generating 无需在 effect 里清(被前两者遮蔽),避开 set-state-in-effect。
-export function RewriteShotCard({ shot, onGenerateFirstFrame }: Props) {
-  const [generating, setGenerating] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const setError = useCanvasStore((s) => s.setRewriteShotFirstFrameError);
+// 改写后的镜头 — 台词 + 画面描述 + 草稿图(image)+ 图生视频(video,以草稿图为首帧)。
+// 媒体区:有视频 → <video>(poster=草稿图);否则草稿图四态。视频控件:草稿图出图后才出现
+// (image-grounded),四态(IDLE/PENDING/DONE/FAILED)。DONE/FAILED 由 store 驱动(后端推帧),
+// PENDING 本地瞬态;render 优先级避开 set-state-in-effect。
+export function RewriteShotCard({ shot, onGenerateFirstFrame, onGenerateShotVideo }: Props) {
+  const [imgGenerating, setImgGenerating] = useState(false);
+  const [vidGenerating, setVidGenerating] = useState(false);
+  const imgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vidTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setImgError = useCanvasStore((s) => s.setRewriteShotFirstFrameError);
+  const setVidError = useCanvasStore((s) => s.setRewriteShotVideoError);
 
   const hasImage = Boolean(shot.firstFrameUrl);
-  const error = shot.firstFrameError;
+  const hasVideo = Boolean(shot.videoUrl);
+  const imgError = shot.firstFrameError;
+  const vidError = shot.videoError;
 
-  const clearTimer = () => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
+  // 帧到了 → 停对应兜底计时器(不 setState:render 按 has*/error 优先,本地 generating 自然失效)。
+  useEffect(() => {
+    if ((shot.firstFrameUrl || shot.firstFrameError) && imgTimer.current) {
+      clearTimeout(imgTimer.current);
+      imgTimer.current = null;
     }
+  }, [shot.firstFrameUrl, shot.firstFrameError]);
+  useEffect(() => {
+    if ((shot.videoUrl || shot.videoError) && vidTimer.current) {
+      clearTimeout(vidTimer.current);
+      vidTimer.current = null;
+    }
+  }, [shot.videoUrl, shot.videoError]);
+  useEffect(
+    () => () => {
+      if (imgTimer.current) clearTimeout(imgTimer.current);
+      if (vidTimer.current) clearTimeout(vidTimer.current);
+    },
+    []
+  );
+
+  const genImage = () => {
+    if (!onGenerateFirstFrame || imgGenerating) return;
+    setImgError(shot.shot_index, null);
+    setImgGenerating(true);
+    onGenerateFirstFrame(shot.shot_index);
+    if (imgTimer.current) clearTimeout(imgTimer.current);
+    imgTimer.current = setTimeout(() => setImgError(shot.shot_index, COPY.shot_draft_timeout), _IMG_TIMEOUT_MS);
   };
 
-  // 帧到了(成功 firstFrameUrl 或失败 firstFrameError)→ 停兜底计时器即可(不 setState:
-  // render 已按 hasImage/error 优先,本地 generating 自然失效)。
-  useEffect(() => {
-    if (shot.firstFrameUrl || shot.firstFrameError) clearTimer();
-  }, [shot.firstFrameUrl, shot.firstFrameError]);
-
-  // 卸载清理。
-  useEffect(() => () => clearTimer(), []);
-
-  const handleGenerate = () => {
-    if (!onGenerateFirstFrame || generating) return;
-    setError(shot.shot_index, null); // 清旧错误,让 render 落到 generating
-    setGenerating(true);
-    onGenerateFirstFrame(shot.shot_index);
-    clearTimer();
-    timerRef.current = setTimeout(() => {
-      setError(shot.shot_index, COPY.shot_draft_timeout);
-    }, _GEN_TIMEOUT_MS);
+  const genVideo = () => {
+    if (!onGenerateShotVideo || vidGenerating) return;
+    setVidError(shot.shot_index, null);
+    setVidGenerating(true);
+    onGenerateShotVideo(shot.shot_index);
+    if (vidTimer.current) clearTimeout(vidTimer.current);
+    vidTimer.current = setTimeout(() => setVidError(shot.shot_index, COPY.shot_video_timeout), _VIDEO_TIMEOUT_MS);
   };
 
   const btnClass =
@@ -65,39 +82,60 @@ export function RewriteShotCard({ shot, onGenerateFirstFrame }: Props) {
       data-testid={`rewrite-shot-card-${shot.shot_index}`}
     >
       {onGenerateFirstFrame && (
-        <div className="aspect-video w-full overflow-hidden rounded-xl bg-stone-100 dark:bg-stone-800 mb-3 flex items-center justify-center">
-          {hasImage ? (
+        <div className="aspect-video w-full overflow-hidden rounded-xl bg-stone-100 dark:bg-stone-800 mb-2 flex items-center justify-center">
+          {hasVideo ? (
+            <video
+              src={shot.videoUrl}
+              poster={shot.firstFrameUrl}
+              controls
+              playsInline
+              className="h-full w-full object-cover"
+              data-testid={`rewrite-shot-card-${shot.shot_index}-video`}
+            />
+          ) : hasImage ? (
             <img src={shot.firstFrameUrl} alt="" className="h-full w-full object-cover" />
-          ) : error ? (
+          ) : imgError ? (
             <div className="flex flex-col items-center gap-2 px-4 text-center">
-              <p className="text-xs text-stone-500 dark:text-stone-400">{error}</p>
-              <button
-                type="button"
-                onClick={handleGenerate}
-                className={btnClass}
-                data-testid={`rewrite-shot-card-${shot.shot_index}-retry`}
-              >
+              <p className="text-xs text-stone-500 dark:text-stone-400">{imgError}</p>
+              <button type="button" onClick={genImage} className={btnClass} data-testid={`rewrite-shot-card-${shot.shot_index}-retry`}>
                 <RefreshCw className="h-4 w-4" aria-hidden />
                 {COPY.shot_draft_retry}
               </button>
             </div>
-          ) : generating ? (
+          ) : imgGenerating ? (
             <div className="flex flex-col items-center gap-2 text-stone-500 dark:text-stone-400">
-              <div
-                className="h-6 w-6 animate-spin rounded-full border-2 border-stone-300 border-t-[#7c2d12] dark:border-t-[#ea580c]"
-                aria-hidden
-              />
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-stone-300 border-t-[#7c2d12] dark:border-t-[#ea580c]" aria-hidden />
               <span className="text-sm">{COPY.shot_draft_generating}</span>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={handleGenerate}
-              className={btnClass}
-              data-testid={`rewrite-shot-card-${shot.shot_index}-generate`}
-            >
+            <button type="button" onClick={genImage} className={btnClass} data-testid={`rewrite-shot-card-${shot.shot_index}-generate`}>
               <ImageIcon className="h-4 w-4" aria-hidden />
               {COPY.shot_draft_generate}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 视频控件 — 草稿图出图后才出现(image-grounded);有视频后不再显示(播放器已在媒体区)。 */}
+      {onGenerateShotVideo && hasImage && !hasVideo && (
+        <div className="mb-3 flex items-center justify-center">
+          {vidError ? (
+            <div className="flex flex-col items-center gap-1.5 text-center">
+              <p className="text-xs text-stone-500 dark:text-stone-400">{vidError}</p>
+              <button type="button" onClick={genVideo} className={btnClass} data-testid={`rewrite-shot-card-${shot.shot_index}-video-retry`}>
+                <RefreshCw className="h-4 w-4" aria-hidden />
+                {COPY.shot_draft_retry}
+              </button>
+            </div>
+          ) : vidGenerating ? (
+            <span className="inline-flex items-center gap-2 text-sm text-stone-500 dark:text-stone-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#7c2d12] dark:bg-[#ea580c] animate-pulse" aria-hidden />
+              {COPY.shot_video_generating}
+            </span>
+          ) : (
+            <button type="button" onClick={genVideo} className={btnClass} data-testid={`rewrite-shot-card-${shot.shot_index}-video-generate`}>
+              <Clapperboard className="h-4 w-4" aria-hidden />
+              {COPY.shot_video_generate}
             </button>
           )}
         </div>
