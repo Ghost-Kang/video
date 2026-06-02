@@ -180,6 +180,32 @@ class SeedreamProvider:
         except Exception:
             return {"error": f"seedream 未返回 url: {data}"}
 
+    # ── worker pipeline 协议适配(submit/poll)──────────────────────────────────
+    # 画布 worker(image_pipeline)按 apimart/google 的「submit → 拿 task_id → poll」
+    # 异步任务模式调用,但 seedream 是同步单次 generate。这里把 generate 包成
+    # submit/poll:submit 内部同步出图后用伪 task_id 缓存,poll 取走。
+    # (修 Phase 1 遗留断点:worker 默认 provider=seedream 却无 submit/poll → 画布生图从未跑通)
+    _pending: dict[str, dict] = {}
+    _seq: int = 0
+
+    async def submit(
+        self,
+        prompt: str,
+        size: str = "16:9",
+        resolution: str = "2k",
+        image_urls: list[str] | None = None,
+    ) -> dict:
+        result = await self.generate(prompt, size, resolution, image_urls)
+        if result.get("error"):
+            return {"error": result["error"]}
+        SeedreamProvider._seq += 1
+        task_id = f"seedream-{SeedreamProvider._seq}"
+        SeedreamProvider._pending[task_id] = result
+        return {"task_id": task_id}
+
+    async def poll(self, task_id: str) -> dict:
+        return SeedreamProvider._pending.pop(task_id, {"error": "seedream: no pending result"})
+
 
 # ─── GoogleProvider ─────────────────────────────────────────────────────────────
 

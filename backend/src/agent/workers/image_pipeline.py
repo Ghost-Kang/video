@@ -15,9 +15,15 @@ from agent.workers.s3 import download_and_upload, upload_bytes_to_s3
 
 
 def make_image_provider(name: str):
-    """按 provider 名构造 image provider 实例。"""
-    from agent.tools.generation import ApimartProvider, GoogleProvider
+    """按 provider 名构造 image provider 实例。
 
+    seedream(默认,境内,复用 ARK key)此前缺失 → fallback 到 apimart(常无 key)导致
+    画布生图从未跑通。补上 seedream 分支,与 cascade 侧 generation.get_provider() 对齐。
+    """
+    from agent.tools.generation import ApimartProvider, GoogleProvider, SeedreamProvider
+
+    if name == "seedream":
+        return SeedreamProvider()
     if name == "google":
         return GoogleProvider()
     return ApimartProvider()
