@@ -196,6 +196,11 @@ export const COPY = {
   dock_collapse_label: "收起对话",
   dock_expand_label: "展开对话",
   dock_history_label: "历史",
+  // pro-view 画布创作对话 dock(CanvasChatDock)
+  canvas_dock_title: "对话创作",
+  canvas_dock_hint: "告诉导演你想做什么 —— 比如「做一支 30 秒赛博朋克短片,主角是男侦探」。导演会在画布上搭好 策划书 → 角色 → 场景 → 分镜 → 视频,你逐个审核、生成。",
+  canvas_dock_placeholder: "描述你想创作的视频…",
+  canvas_dock_thinking_prefix: "导演正在",
   messages_overlay_title: "对话历史",
   messages_overlay_close: "收起历史",
   url_show_full: "展开完整链接",

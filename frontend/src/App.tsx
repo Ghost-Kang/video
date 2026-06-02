@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Canvas } from "./components/Canvas";
 import { CardStack } from "./components/CardStack";
 import { ChatPanel } from "./components/ChatPanel";
+import { CanvasChatDock } from "./components/CanvasChatDock";
 import { Header } from "./components/Header";
 import { DarkModeToggle } from "./components/landing/DarkModeToggle";
 import { NodeDetail } from "./components/NodeDetail";
@@ -286,10 +287,9 @@ export default function App({ userId, onLogout }: AppProps) {
   }, [setSearchParams]);
   const proToggle = useMemo(() => isAdminUser(userId) ? toggleProView : undefined, [toggleProView, userId]);
   // W5D3 layout reform — chat from right rail → bottom dock.
-  // Pro view (`?view=pro`) skips the dock entirely: it has its own Canvas
-  // and the dock would just stuff the screen. Mobile keeps the dock at
-  // bottom (full-width, collapsed-by-default toggle via `chatOpen`).
-  const showDock = !isProView;
+  // 非 pro-view 用 ChatPanel(CardStack 拆解配套的 5 状态机);pro-view 用
+  // CanvasChatDock(自由对话驱动 Director 在画布编排锚点级联)。两者都走底部
+  // dock,fab 收起/展开共用 chatOpen。
   return (
     <div className="relative flex flex-col h-screen bg-[var(--color-paper)] dark:bg-stone-950 text-stone-900 dark:text-stone-100 transition-colors duration-500">
       <DarkModeToggle />
@@ -304,13 +304,17 @@ export default function App({ userId, onLogout }: AppProps) {
             </>
           ) : <CardStack onGenerateFirstFrame={onGenerateFirstFrame} onTriggerRewrite={onTriggerRewrite} onGenerateShotVideo={onGenerateShotVideo} onComposeFilm={onComposeFilm} pendingCase={pendingCase} thinking={thinking} />}
         </div>
-        {showDock && (chatOpen ? (
-          <ChatPanel messages={messages} streaming={streaming} thinking={thinking} onSend={sendChatMessage} loading={loading} onToggleCollapse={() => setChatOpen(false)} />
+        {chatOpen ? (
+          isProView ? (
+            <CanvasChatDock messages={messages} streaming={streaming} thinking={thinking} onSend={sendChatMessage} loading={loading} onToggleCollapse={() => setChatOpen(false)} />
+          ) : (
+            <ChatPanel messages={messages} streaming={streaming} thinking={thinking} onSend={sendChatMessage} loading={loading} onToggleCollapse={() => setChatOpen(false)} />
+          )
         ) : (
           <button onClick={() => setChatOpen(true)} className="absolute bottom-6 right-6 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 dark:bg-[#7c2d12] text-[#faf8f3] shadow-[0_6px_20px_-4px_rgba(28,25,23,0.25)] dark:shadow-[0_6px_20px_-4px_rgba(124,45,18,0.5)] hover:scale-105 active:scale-95 transition-transform duration-200" title="问导演" aria-label="问导演" type="button" data-testid="dock-fab">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 4h12M3 9h12M3 14h8" strokeLinecap="round" /></svg>
           </button>
-        ))}
+        )}
       </div>
     </div>
   );
