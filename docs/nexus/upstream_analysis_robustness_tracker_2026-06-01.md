@@ -76,8 +76,8 @@ NO_PROXY="ark.cn-beijing.volces.com,.douyin.com,.douyinvod.com,.iesdouyin.com" \
 - [x] **#5 transient S8 → 定向重试**(仅 `Timeout while connecting` 重试;3 个测试覆盖
       重试成功 / 耗尽 / 硬拒绝不重试)。S8 body snippet 已上线(诊断用)。
 - [ ] **#13 S7 真超时**:视频重 165s 到顶,有恢复 UI,暂不强修(调高需同步 turn 预算)。
-- [ ] **重跑 eval_generic_real_urls 量化降幅**(同 15 URL)验证失败率 <10%。已部署 prod,
-      建议下次顺手重跑确认 #2/#5/#10 真降。
+- [x] **重跑 eval 量化降幅(15 URL)= 14/15 OK,失败率 33%→7%**(见 §5d)。达成 <10%。
+      唯一失败 #5 = 火山连不上 CDN(基建,非代码)。
 
 <details><summary>早期条目(留档,部分已被 §1b 推翻)</summary>
 
@@ -128,6 +128,25 @@ NO_PROXY="ark.cn-beijing.volces.com,.douyin.com,.douyinvod.com,.iesdouyin.com" \
 重试 + 可恢复 UI,非确定性 bug。失败率 5/15(33%)→ 预计 ~2/15(13%),且剩余 2 条非代码缺陷。
 **关键:#2 真因(post-drop-pad clone)靠诊断窗口的 `post_normalize_ts` 才挖出来——
 两轮 investigate>guess(先推翻「未转义引号」,再推翻「模型重叠」)。**
+
+## 5d. ✅ 修复后全量重跑 eval(2026-06-01,15 条)
+prod 容器 `request_shallow_analysis` 跑全部 15 条 URL,统计失败率:
+
+```
+SCORECARD: 14/15 OK | fail=1/15 (7%) codes=['S8_UPSTREAM_REFUSED']
+```
+
+- **失败率 33%(5/15)→ 7%(1/15)**,达成 Beta 目标 <10%。✅
+- 唯一失败 = **#5(`pykgmulFYDg`)S8**:火山持续 `Timeout while connecting` 抖音 CDN
+  URL(transient 重试 2× 仍连不上)—— **基建/URL 可达性,非代码缺陷**;换天/换 URL 变体
+  可能就过。
+- **9 条全新跑(90–150s,非缓存)全过**(#3/#4/#6/#7/#9/#11/#12/#14/#15)→ 不是靠缓存
+  撑场,fixed pipeline 真在重新跑通(scenes 4–12 不等,#10 拿到满 12 幕=截断修复实证)。
+- 缓存命中 0s 的(#1/#2/#8/#10/#13)反映既有成功(含 #2/#8/#10 修复结果);#13 之前 S7
+  超时,现缓存为 OK scenes=8(那次超时是 transient,后续快跑已过)。
+
+→ **健康债清偿**:分析失败率压到 7%,30 人 Beta 放量前的 Gate 风险解除。剩余 #5 类
+transient S8 已有重试 + 可恢复 UI 兜底,持续观测诊断窗口日志即可。
 
 ## 6. 2026-06-01 prod 真实验证(改写-发布闭环上线后)
 prod 容器内 service 层 e2e(URL #1 → analyze → generic rewrite + topic「港式菠萝包」):
