@@ -160,7 +160,21 @@ def normalize_analysis_result(raw: Any) -> CascadeAnalysisContract:
         return CascadeAnalysisContract(**data)
     except ValidationError as e:
         # Last-mile: anything still invalid is a payload problem we couldn't salvage.
-        raise HardFailure(FailureCode.S5_INVALID_PAYLOAD, str(e)) from e
+        # Diagnostic: when scenes fail, append the post-normalize (start,end,idx)
+        # list so a lingering monotonicity/overlap escape is debuggable from logs
+        # (prod diag: #2 still failed despite the unconditional snap — need to see
+        # exactly what reached the validator).
+        detail = str(e)
+        if "scenes" in detail:
+            sc = data.get("scenes")
+            if isinstance(sc, list):
+                ts = [
+                    (s.get("scene_index"), s.get("timestamp_start"), s.get("timestamp_end"))
+                    for s in sc
+                    if isinstance(s, dict)
+                ]
+                detail = f"{detail} | post_normalize_ts={ts}"
+        raise HardFailure(FailureCode.S5_INVALID_PAYLOAD, detail) from e
 
 
 # ---------- field-level normalizers ----------
