@@ -24,7 +24,12 @@ from typing import Any, Literal, Optional, TypedDict
 
 from agent.cascade.persistence.db import _connect, utc_now_rfc3339
 
-RunStatus = Literal["running", "done", "failed"]
+# "awaiting_review" (P2) — the Director paused at an autonomous interrupt gate
+# (HumanInTheLoopMiddleware). NOT terminal: the turn resumes on the user's
+# decision (resume_agent). The pending review payload lives in the LangGraph
+# checkpoint (the single source of truth), so reconnect replay reads it back via
+# aget_state — no separate column needed here.
+RunStatus = Literal["running", "done", "failed", "awaiting_review"]
 
 
 class RunState(TypedDict):
@@ -86,6 +91,24 @@ async def mark_done(thread_id: str) -> None:
 async def mark_failed(thread_id: str, failure: dict[str, Any] | None) -> None:
     _runs[thread_id] = {"status": "failed", "updated_at": time.time(), "failure": failure}
     await _set_terminal(thread_id, "failed", failure)
+
+
+async def mark_awaiting_review(thread_id: str) -> None:
+    """Pause a thread at an autonomous interrupt gate. NON-terminal: the row was
+    already `running` (mark_running at turn start); we flip it to awaiting_review
+    and clear any failure. The pending review payload is NOT stored here — it
+    lives in the LangGraph checkpoint (reconnect replay reads it via aget_state)."""
+    _runs[thread_id] = {"status": "awaiting_review", "updated_at": time.time(), "failure": None}
+    now = utc_now_rfc3339()
+    db = await _connect()
+    try:
+        await db.execute(
+            "UPDATE run_lifecycle SET status = 'awaiting_review', failure = NULL, updated_at = ? WHERE thread_id = ?",
+            (now, thread_id),
+        )
+        await db.commit()
+    finally:
+        await db.close()
 
 
 async def _set_terminal(thread_id: str, status: str, failure: dict | None) -> None:

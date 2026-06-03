@@ -15,6 +15,13 @@ export interface NodeActions {
     generateAudio?: boolean,
   ) => void;
   handleUpdateNodeStatus: (nodeId: string, nodeStatus: NodeStatus) => void;
+  /** time-travel 回溯(P2 slice-2)— 重生节点:快照旧版 → 清 + 入队 → 标脏下游。
+   *  与 handleExecuteNode 的区别:execute_node 只生成,不快照、不标脏下游。 */
+  handleRegenerateNode: (nodeId: string) => void;
+  /** time-travel 回溯(P2 slice-2b)— 拉取节点版本快照(只读),回 node_versions_returned。 */
+  handleListNodeVersions: (nodeId: string) => void;
+  /** time-travel 回溯(P2 slice-2c)— 回滚节点到某旧版(快照当前→换回旧产物→标脏下游)。 */
+  handleRestoreNodeVersion: (nodeId: string, versionSeq: number) => void;
   handleOptimizePrompt: (nodeId: string, prompt: string, feedback: string) => void;
   handleCreateEdge: (source: string, target: string) => void;
   handleDeleteEdge: (edgeId: string) => void;
@@ -56,6 +63,27 @@ export function useNodeActions(
     [sendCommand, threadId],
   );
 
+  const handleRegenerateNode = useCallback(
+    (nodeId: string) => {
+      sendCommand({ type: "regenerate_node", thread_id: threadId, node_id: nodeId });
+    },
+    [sendCommand, threadId],
+  );
+
+  const handleListNodeVersions = useCallback(
+    (nodeId: string) => {
+      sendCommand({ type: "list_node_versions", thread_id: threadId, node_id: nodeId });
+    },
+    [sendCommand, threadId],
+  );
+
+  const handleRestoreNodeVersion = useCallback(
+    (nodeId: string, versionSeq: number) => {
+      sendCommand({ type: "restore_node_version", thread_id: threadId, node_id: nodeId, version_seq: versionSeq });
+    },
+    [sendCommand, threadId],
+  );
+
   const handleOptimizePrompt = useCallback(
     (nodeId: string, prompt: string, feedback: string) => {
       sendCommand({ type: "optimize_prompt", thread_id: threadId, node_id: nodeId, prompt, feedback });
@@ -83,11 +111,14 @@ export function useNodeActions(
       handleReview,
       handleExecuteNode,
       handleUpdateNodeStatus,
+      handleRegenerateNode,
+      handleListNodeVersions,
+      handleRestoreNodeVersion,
       handleOptimizePrompt,
       handleCreateEdge,
       handleDeleteEdge,
       handleReorderEdge,
     }),
-    [handleReview, handleExecuteNode, handleUpdateNodeStatus, handleOptimizePrompt, handleCreateEdge, handleDeleteEdge, handleReorderEdge],
+    [handleReview, handleExecuteNode, handleUpdateNodeStatus, handleRegenerateNode, handleListNodeVersions, handleRestoreNodeVersion, handleOptimizePrompt, handleCreateEdge, handleDeleteEdge, handleReorderEdge],
   );
 }

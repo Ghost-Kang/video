@@ -12,6 +12,9 @@ export interface CanvasNode {
   node_status: NodeStatus;
   asset_status: AssetStatus;
   result: Record<string, unknown> | null;
+  // time-travel 回溯(P2 slice-2)— 上游被重生后,下游产物已过时(需重生)。后端
+  // canvas_data 永远带此字段(默认 false),见 canvas.py get_canvas_state / canvas_data。
+  needs_regen: boolean;
   subtype: string | null;
   shot_no: string | null;
   image_gen_provider: string | null;

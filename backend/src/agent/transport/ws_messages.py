@@ -129,6 +129,56 @@ class OptimizePromptMsg(_Base):
     feedback: str
 
 
+class RegenerateNodeMsg(_Base):
+    """time-travel 回溯(P2 slice-2)— 重生一个节点:旧产物快照存版本 → 清 + 入队重生
+    → 下游标脏。worker 按边读父节点最新 result 作参考,所以下游自动反映新上游。
+    needs_regen / 重生进度经现有 canvas_updated 快照回前端,无需新 outbound 帧。"""
+
+    type: Literal["regenerate_node"]
+    thread_id: str = Field(min_length=1)
+    node_id: str
+
+
+class ListNodeVersionsMsg(_Base):
+    """time-travel 回溯(P2 slice-2b)— 拉取一个节点的产物版本快照(append-only 旧版)。
+    回 `node_versions_returned`。只读,不改画布、不入队。前端 NodeVersionHistory 用它
+    渲染历史 + 「当前 vs 选中旧版」对比。"""
+
+    type: Literal["list_node_versions"]
+    thread_id: str = Field(min_length=1)
+    node_id: str
+
+
+class RestoreNodeVersionMsg(_Base):
+    """time-travel 回溯(P2 slice-2c)— 回滚节点到某旧版:快照当前(不丢)→ 换回旧产物
+    → 标脏下游。回 canvas_updated + node_versions_returned(列表已含刚归档的当前)。
+    回滚换的是已生成的旧产物,不调模型/不入队/不花钱,故无 cost guard。"""
+
+    type: Literal["restore_node_version"]
+    thread_id: str = Field(min_length=1)
+    node_id: str
+    version_seq: int
+
+
+class ReviewDecisionMsg(_Base):
+    """P2 审核闸门 — 用户对 `review_required` 的决策(approve/edit/reject)。
+
+    `decisions` 与 review_required.reviews **同序、同数量**(HumanInTheLoopMiddleware
+    硬要求 len(decisions)==被拦工具数)。每个 decision 形如:
+      {"type": "approve"} |
+      {"type": "edit", "edited_action": {"name": str, "args": {...}}} |
+      {"type": "reject", "message"?: str}
+    结构由后端 middleware 校验,这里只保证非空 + 字典列表。"""
+
+    type: Literal["review_decision"]
+    thread_id: str = Field(min_length=1)
+    decisions: list[dict[str, Any]] = Field(min_length=1)
+    # 绑定本次决策属于哪一轮 review(对应 review_required.interrupt_id)。空=不绑定
+    # (legacy)。resume_agent 用它挡掉「对已结闸门的陈旧/重复决策被套用到下一个级联
+    # 闸门」(review #3)。
+    interrupt_id: str = ""
+
+
 class UserMessageMsg(_Base):
     type: Literal["user_message"]
     thread_id: str = Field(min_length=1)
@@ -154,6 +204,10 @@ WSInbound = Annotated[
         ExecuteNodeMsg,
         UpdateNodeStatusMsg,
         OptimizePromptMsg,
+        RegenerateNodeMsg,
+        ListNodeVersionsMsg,
+        RestoreNodeVersionMsg,
+        ReviewDecisionMsg,
         UserMessageMsg,
     ],
     Field(discriminator="type"),
@@ -181,8 +235,10 @@ class SessionStateEvent(_Base):
     messages: list[dict[str, Any]]
     canvas: dict[str, Any] | None = None
     # W5D4 — run lifecycle for reconnect resume:
-    # "running" | "done" | "failed" | "idle". Lets the client stop an orphaned
-    # 95% spinner when the terminal WS frame was lost to a mid-run disconnect.
+    # "running" | "done" | "failed" | "idle" | "awaiting_review" (P2). Lets the
+    # client stop an orphaned 95% spinner when the terminal WS frame was lost to a
+    # mid-run disconnect; awaiting_review additionally triggers a review_required
+    # replay (handle_get_session_state) so a reconnect re-shows the approval card.
     run_status: str = "idle"
     # Present (FailurePayload-shaped: code/hint/actions/request_id) when
     # run_status == "failed", so the client can replay the failure UI.
@@ -193,6 +249,18 @@ class CanvasUpdatedEvent(_Base):
     type: Literal["canvas_updated"]
     thread_id: str
     canvas: dict[str, Any] | None = None
+
+
+class NodeVersionsReturnedEvent(_Base):
+    """time-travel 回溯(P2 slice-2b)— 某节点的产物版本快照列表(versions_repo.list_versions),
+    按 version_seq 升序。回应 `list_node_versions`。每项形如:
+      {version_seq, description, result, asset_status, reason, created_at}。
+    前端 NodeVersionHistory 渲染历史 + 「当前(节点 live result)vs 选中旧版」对比。"""
+
+    type: Literal["node_versions_returned"]
+    thread_id: str
+    node_id: str
+    versions: list[dict[str, Any]]
 
 
 class PromptOptimizedEvent(_Base):
@@ -342,9 +410,27 @@ class AnalysisFailedEvent(_Base):
     stage: str = "analysis"  # "analysis" | "rewrite" | "first_frame" | "ask"
 
 
+class ReviewRequiredEvent(_Base):
+    """P2 审核闸门 — Director **自主**调生成工具触发 LangGraph interrupt,graph 暂停,
+    推此帧让前端弹审核卡。`reviews` 每项一条被拦的工具调用(同序),前端按 allowed_decisions
+    给按钮,用户决策回 `review_decision`(decisions 与 reviews 同序同数)。
+
+    `reviews[i]` = {tool: str, label: str(中文友好), args: dict(待执行参数),
+                    allowed_decisions: list[str]}。
+    显式点「生成」(CardStack [generate_*] 标记)不会触发此帧 —— 后端自动批准。"""
+
+    type: Literal["review_required"]
+    thread_id: str
+    reviews: list[dict[str, Any]]
+    summary: str = ""
+    # LangGraph interrupt id,绑定本轮 review;前端在 review_decision 回带。
+    interrupt_id: str = ""
+
+
 WSOutbound = Annotated[
     Union[
         ErrorEvent,
+        ReviewRequiredEvent,
         SessionListEvent,
         SessionStateEvent,
         CanvasUpdatedEvent,
@@ -380,5 +466,9 @@ INBOUND_MODELS: dict[str, type[_Base]] = {
     "execute_node": ExecuteNodeMsg,
     "update_node_status": UpdateNodeStatusMsg,
     "optimize_prompt": OptimizePromptMsg,
+    "regenerate_node": RegenerateNodeMsg,
+    "list_node_versions": ListNodeVersionsMsg,
+    "restore_node_version": RestoreNodeVersionMsg,
+    "review_decision": ReviewDecisionMsg,
     "user_message": UserMessageMsg,
 }

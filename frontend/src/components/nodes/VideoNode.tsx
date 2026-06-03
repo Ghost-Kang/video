@@ -1,6 +1,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { CanvasNode } from "../../types";
 import { NodeActionBar } from "./NodeActionBar";
+import { NeedsRegenBadge } from "./NeedsRegenBadge";
 
 export function VideoNode({ data, selected }: NodeProps) {
   const node = data.node as CanvasNode;
@@ -27,6 +28,7 @@ export function VideoNode({ data, selected }: NodeProps) {
         <div style={styles.placeholder}>🎬 等待生成</div>
       )}
       <span style={styles.badge(node.node_status)}>{node.node_status}</span>
+      <NeedsRegenBadge node={node} />
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }

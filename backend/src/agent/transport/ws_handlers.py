@@ -32,9 +32,13 @@ from agent.transport.ws_messages import (
     DeleteSessionsMsg,
     ExecuteNodeMsg,
     GetSessionStateMsg,
+    ListNodeVersionsMsg,
     ListSessionsMsg,
     OptimizePromptMsg,
+    RegenerateNodeMsg,
     ReorderEdgeMsg,
+    RestoreNodeVersionMsg,
+    ReviewDecisionMsg,
     ReviewNodeMsg,
     UpdateNodeStatusMsg,
     UpdatePositionMsg,
@@ -79,6 +83,23 @@ async def _run_agent_serialized(ctx: WSCtx, msg: UserMessageMsg) -> None:
             msg.content,
             ctx.ws,
             selected_niche=msg.selected_niche,
+        )
+
+
+async def _resume_agent_serialized(ctx: WSCtx, msg: ReviewDecisionMsg) -> None:
+    """Resume a paused (awaiting-review) Director turn under the SAME per-thread
+    lock as run_agent. The lock serializes a resume against a concurrent
+    user_message so they never drive the same LangGraph checkpoint at once (a
+    double-click resume / race would otherwise corrupt the paused state)."""
+    lock = _get_thread_run_lock(msg.thread_id)
+    async with lock:
+        await agent_runner.resume_agent(
+            ctx.user_id,
+            ctx.pool,
+            msg.thread_id,
+            msg.decisions,
+            ctx.ws,
+            interrupt_id=msg.interrupt_id,
         )
 
 
@@ -164,6 +185,26 @@ async def handle_get_session_state(ctx: WSCtx, msg: GetSessionStateMsg) -> None:
     # rewrite_returned are the same frames the cascade tool pushes live, so the
     # frontend renders them through its existing handlers (zero UI change).
     await _replay_results(ctx, msg.thread_id)
+    # P2 — if the run is paused at a review gate, re-push the approval card so a
+    # reconnect (or reload) re-shows it instead of leaving the user stuck.
+    if run_status == "awaiting_review":
+        await _maybe_replay_review(ctx, msg.thread_id)
+
+
+async def _maybe_replay_review(ctx: WSCtx, thread_id: str) -> None:
+    """Reconnect replay of the pending review card. The review payload lives in the
+    LangGraph checkpoint (single source of truth); pool the agent, read it via
+    aget_state, and re-push `review_required`. Best-effort — never blocks
+    session_state. If no interrupt is pending (already resumed), do nothing."""
+    try:
+        entry = await ctx.pool.get(ctx.user_id, thread_id)
+        snap = await entry["agent"].aget_state(entry["config"])
+        if snap.interrupts:
+            intr = snap.interrupts[0]
+            frame = agent_runner._build_review_frame(thread_id, intr.value, intr.id or "")
+            await send_json(ctx.ws, **frame)
+    except Exception as exc:  # best-effort; replay never blocks session_state
+        print(f"[replay] review for thread={thread_id} failed: {exc}")
 
 
 async def _replay_results(ctx: WSCtx, thread_id: str) -> None:
@@ -366,6 +407,97 @@ async def handle_execute_node(ctx: WSCtx, msg: ExecuteNodeMsg) -> None:
     await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
 
 
+async def handle_regenerate_node(ctx: WSCtx, msg: RegenerateNodeMsg) -> None:
+    """time-travel 回溯(P2 slice-2)— 重生节点:快照旧版 → 清 + 入队 → 标脏下游。
+    媒体节点走与 execute_node 同一道 enqueue-time cost guard(server-derived user_id,
+    不可绕);worker 重生时按边读父节点最新 result 作参考,下游自动反映新上游。"""
+
+    def _load() -> dict | None:
+        canvas_tools.set_thread_id(msg.thread_id)
+        return canvas_tools._load_node(msg.node_id)
+
+    node = await asyncio.to_thread(_load)
+    if node is None:
+        # 节点不存在:回推当前快照即可,不报错(可能已被删/陈旧点击)。
+        snapshot = await asyncio.to_thread(canvas_data, msg.thread_id)
+        await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
+        return
+
+    node_type = node.get("type")
+    # 媒体节点重生要花钱 → enqueue 前 cost guard(同 execute_node)。文字节点免费,跳过。
+    if node_type in ("image", "video"):
+        # 重生用节点已存的时长(video),没有就按 5s 估;图按 1 张。
+        video_seconds = 0.0
+        if node_type == "video":
+            video_seconds = float((node.get("result") or {}).get("duration") or 5)
+        predicted = cost_guard.predict_generation_cost(
+            node_type,
+            n_images=1 if node_type == "image" else 0,
+            video_seconds=video_seconds,
+        )
+        try:
+            await cost_guard.cost_guard(ctx.user_id, msg.thread_id, predicted)
+        except HardFailure as exc:
+            await send_json(
+                ctx.ws,
+                type="analysis_failed",
+                thread_id=msg.thread_id,
+                code=exc.code.value,
+                hint=exc.hint or "生成预算超限,请稍后再试或联系我们。",
+                actions=list(exc.actions) or ["REPORT"],
+                request_id=exc.request_id,
+                stage="generation",
+            )
+            return
+
+    def _work() -> dict | None:
+        canvas_tools.set_thread_id(msg.thread_id)
+        canvas_tools.regenerate_node(msg.node_id)
+        return canvas_data(msg.thread_id)
+
+    snapshot = await asyncio.to_thread(_work)
+    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
+
+
+async def handle_list_node_versions(ctx: WSCtx, msg: ListNodeVersionsMsg) -> None:
+    """time-travel 回溯(P2 slice-2b)— 只读拉取节点的产物版本快照,回 node_versions_returned。
+    user_id 走连接 auth 时设的 ContextVar(to_thread 复制上下文),不可由客户端伪造。"""
+
+    def _work() -> list[dict]:
+        canvas_tools.set_thread_id(msg.thread_id)
+        return canvas_tools.list_versions(msg.node_id)
+
+    versions = await asyncio.to_thread(_work)
+    await send_json(
+        ctx.ws,
+        type="node_versions_returned",
+        thread_id=msg.thread_id,
+        node_id=msg.node_id,
+        versions=versions,
+    )
+
+
+async def handle_restore_node_version(ctx: WSCtx, msg: RestoreNodeVersionMsg) -> None:
+    """time-travel 回溯(P2 slice-2c)— 回滚节点到某旧版:快照当前 → 换回旧产物 → 标脏下游。
+    回 canvas_updated(节点新产物 + 下游 needs_regen)+ node_versions_returned(列表已含刚
+    归档的当前,免得 NodeVersionHistory 因 asset_status 没变而漏掉新版)。不调模型 → 无 cost guard。"""
+
+    def _work() -> tuple[dict | None, list[dict]]:
+        canvas_tools.set_thread_id(msg.thread_id)
+        canvas_tools.restore_node_version(msg.node_id, msg.version_seq)
+        return canvas_data(msg.thread_id), canvas_tools.list_versions(msg.node_id)
+
+    snapshot, versions = await asyncio.to_thread(_work)
+    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
+    await send_json(
+        ctx.ws,
+        type="node_versions_returned",
+        thread_id=msg.thread_id,
+        node_id=msg.node_id,
+        versions=versions,
+    )
+
+
 async def handle_update_node_status(ctx: WSCtx, msg: UpdateNodeStatusMsg) -> None:
     print(f"[状态] update_node_status node={msg.node_id} → {msg.node_status}")
 
@@ -399,6 +531,21 @@ async def handle_optimize_prompt(ctx: WSCtx, msg: OptimizePromptMsg) -> None:
 
 async def handle_user_message(ctx: WSCtx, msg: UserMessageMsg) -> None:
     print(f"[用户] thread={msg.thread_id} niche={msg.selected_niche} {msg.content[:80]}...")
+    # P2 — refuse a new message while a review gate is pending on this thread.
+    # Feeding fresh {messages:[...]} input to a graph paused at an interrupt
+    # silently DISCARDS the pending gated tool call (and a later 确认生成 no-ops).
+    # The frontend scrim already blocks this in the UI; this is defense-in-depth
+    # for non-UI paths (a second tab, a queued/reconnect resend). Cache-only read
+    # (sync, hot-path cheap): an awaiting_review thread is recent + in cache.
+    st = run_state.get(msg.thread_id)
+    if st is not None and st.get("status") == "awaiting_review":
+        await send_json(
+            ctx.ws,
+            type="error",
+            code="review_pending",
+            message="有一步生成在等你确认,先点「确认生成」或「先不生成」再继续。",
+        )
+        return
     # 仅在用户带 niche 时记一条 telemetry — 让 /admin/events 能看到 WS 字段
     # 真的端到端打通了(不依赖 LLM 走到 rewrite 才能验证)。emit 失败不应阻塞
     # 用户消息流(telemetry 是 best-effort)。
@@ -413,6 +560,14 @@ async def handle_user_message(ctx: WSCtx, msg: UserMessageMsg) -> None:
         except Exception as exc:
             print(f"[telemetry] niche_selected emit failed: {exc}")
     asyncio.create_task(_run_agent_serialized(ctx, msg))
+    await send_json(ctx.ws, type="processing", thread_id=msg.thread_id)
+
+
+async def handle_review_decision(ctx: WSCtx, msg: ReviewDecisionMsg) -> None:
+    """P2 审核闸门 — 用户对暂停的生成做了 approve/edit/reject 决策 → resume graph。
+    与 user_message 一样:后台 task 串行执行(同线程锁),立即回 processing。"""
+    print(f"[审核] review_decision thread={msg.thread_id} decisions={len(msg.decisions)}")
+    asyncio.create_task(_resume_agent_serialized(ctx, msg))
     await send_json(ctx.ws, type="processing", thread_id=msg.thread_id)
 
 
@@ -434,6 +589,10 @@ HANDLERS: dict[str, tuple[type, HandlerFn]] = {
     "execute_node": (ExecuteNodeMsg, handle_execute_node),
     "update_node_status": (UpdateNodeStatusMsg, handle_update_node_status),
     "optimize_prompt": (OptimizePromptMsg, handle_optimize_prompt),
+    "regenerate_node": (RegenerateNodeMsg, handle_regenerate_node),
+    "list_node_versions": (ListNodeVersionsMsg, handle_list_node_versions),
+    "restore_node_version": (RestoreNodeVersionMsg, handle_restore_node_version),
+    "review_decision": (ReviewDecisionMsg, handle_review_decision),
     "user_message": (UserMessageMsg, handle_user_message),
 }
 

@@ -14,10 +14,18 @@ from __future__ import annotations
 
 import asyncio
 import json
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from langchain_core.messages import AIMessageChunk
+
+
+def _clean_state() -> SimpleNamespace:
+    """A StateSnapshot stub with no pending interrupt — models the flag-off /
+    no-gate production path. _drive_turn calls aget_state after each stream pass
+    to detect interrupts; the fakes must answer it (real CompiledStateGraph does)."""
+    return SimpleNamespace(interrupts=())
 
 from agent.tools import canvas as canvas_tools
 from agent.transport import agent_runner
@@ -47,6 +55,9 @@ class FakeAgent:
         assert version == "v2"
         for msg, meta in self._chunks:
             yield {"data": (msg, meta)}
+
+    async def aget_state(self, config):
+        return _clean_state()
 
 
 class FakePool:
@@ -133,6 +144,9 @@ class TestHappyPath:
                 captured["user_id"] = canvas_tools._current_user_id.get()
                 captured["thread_id"] = canvas_tools._current_thread_id.get()
                 yield {"data": (AIMessageChunk(content="x"), {})}
+
+            async def aget_state(self, config):
+                return _clean_state()
 
         ws = FakeWS()
         pool = FakePool(CapturingAgent())  # type: ignore[arg-type]
@@ -314,6 +328,9 @@ class TestToolFailureLifecycle:
                 # Simulate cascade._push_failure_frame writing to the live ctx.
                 get_run_ctx()["tool_failure"] = failure
                 yield {"data": (AIMessageChunk(content="分析失败了"), {})}
+
+            async def aget_state(self, config):
+                return _clean_state()
 
         ws = FakeWS()
         asyncio.run(run_agent("u1", FakePool(ToolFailingAgent()), "t1", "hi", ws))  # type: ignore[arg-type]

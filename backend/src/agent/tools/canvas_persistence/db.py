@@ -105,6 +105,7 @@ def _db() -> sqlite3.Connection:
             generation_attempt_count INTEGER NOT NULL DEFAULT 0,
             generation_lease_until TEXT,
             generation_next_retry_at TEXT,
+            needs_regen INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (user_id, thread_id, node_id)
         )"""
     )
@@ -117,6 +118,22 @@ def _db() -> sqlite3.Connection:
             target TEXT NOT NULL,
             position INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (user_id, thread_id, edge_id)
+        )"""
+    )
+    # time-travel 回溯(canvas 统筹 P2 slice-2)— 节点产物的版本快照,append-only。
+    # 「回上游改重生下游」前把下游当前产物快照存一行,旧版本不丢(2b 做新旧对比 UI)。
+    db.execute(
+        """CREATE TABLE IF NOT EXISTS canvas_node_versions (
+            user_id TEXT NOT NULL DEFAULT 'default',
+            thread_id TEXT NOT NULL,
+            node_id TEXT NOT NULL,
+            version_seq INTEGER NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            result TEXT,
+            asset_status TEXT NOT NULL DEFAULT 'idle',
+            reason TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, thread_id, node_id, version_seq)
         )"""
     )
 
@@ -134,6 +151,7 @@ def _db() -> sqlite3.Connection:
             ("generation_attempt_count", "INTEGER NOT NULL DEFAULT 0"),
             ("generation_lease_until", "TEXT"),
             ("generation_next_retry_at", "TEXT"),
+            ("needs_regen", "INTEGER NOT NULL DEFAULT 0"),
         ]:
             try:
                 db.execute(f"ALTER TABLE canvas_nodes ADD COLUMN {col} {defn}")

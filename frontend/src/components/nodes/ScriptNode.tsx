@@ -1,6 +1,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { CanvasNode } from "../../types";
 import { NodeActionBar } from "./NodeActionBar";
+import { NeedsRegenBadge } from "./NeedsRegenBadge";
 
 export function ScriptNode({ data, selected }: NodeProps) {
   const node = data.node as CanvasNode;
@@ -17,6 +18,7 @@ export function ScriptNode({ data, selected }: NodeProps) {
         <p style={styles.desc}>{node.description.slice(0, 100)}</p>
       ) : null}
       <span style={styles.badge(node.node_status)}>{node.node_status}</span>
+      <NeedsRegenBadge node={node} />
     </div>
   );
 }

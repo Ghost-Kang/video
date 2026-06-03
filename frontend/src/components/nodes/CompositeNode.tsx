@@ -1,6 +1,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { CanvasNode } from "../../types";
 import { NodeActionBar } from "./NodeActionBar";
+import { NeedsRegenBadge } from "./NeedsRegenBadge";
 
 export function CompositeNode({ data, selected }: NodeProps) {
   const node = data.node as CanvasNode;
@@ -23,6 +24,7 @@ export function CompositeNode({ data, selected }: NodeProps) {
 
       <span style={S.badge(node.node_status)}>{node.node_status}</span>
       {asset !== "idle" && <span style={S.assetBadge(asset)}>{asset}</span>}
+      <NeedsRegenBadge node={node} />
     </div>
   );
 }

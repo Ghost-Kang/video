@@ -22,8 +22,29 @@ export function NodeActionBar({ node, selected }: { node: CanvasNode; selected?:
   const confirmed = node.node_status === "confirmed";
   const desc = node.description || (node.result?.prompt as string) || "";
 
-  const genLabel =
-    asset === "done" ? "↻ 重生" : node.type === "composite" ? "🎬 合成" : "⚡ 生成";
+  // time-travel 回溯(P2 slice-2):确有产物可取代时(asset done,或被上游重生标脏且仍存旧
+  // result)→ 走 regenerate_node(快照旧版 → 清 + 入队 → 标脏下游)。首次生成走 execute_node
+  // (无旧版可存;下游此时本就没产物,标脏无意义)。此前两条路都错调 execute_node,
+  // 「↻ 重生」既不快照也不标脏下游。
+  //
+  // `!!node.result` 守卫:后端 _mark_descendants_stale 的 has_asset 把「首次生成就失败」
+  // (result=null、asset=failed/timeout)的节点也标 needs_regen —— 那种节点没有旧版可存,
+  // 当它「重生」会写一条 result=null 的垃圾版本快照;此处当首次生成(execute 重试)更对。
+  const isRegen = !!node.result && (asset === "done" || node.needs_regen);
+  const genLabel = isRegen ? "↻ 重生" : node.type === "composite" ? "🎬 合成" : "⚡ 生成";
+  const onGen = () =>
+    isRegen
+      ? actions.handleRegenerateNode(node.id)
+      : actions.handleExecuteNode(node.id, node.type, desc);
+  // tooltip 跟 label/action 一致:isRegen 才说「重生」,否则说「生成」(stale 但无旧产物的
+  // 节点走生成,不能食言说重生)。
+  const genTitle = isRegen
+    ? node.needs_regen
+      ? "上游已变,产物过时 —— 重生按新上游刷新(旧版自动存档,下游连带标记需重生)"
+      : "重生此节点(旧版自动存档,下游连带标记需重生)"
+    : node.needs_regen
+      ? "上游已变,此节点尚无产物 —— 生成即按新上游"
+      : "生成此节点的图 / 视频";
 
   return (
     <NodeToolbar isVisible={!!selected} position={Position.Top}>
@@ -41,9 +62,9 @@ export function NodeActionBar({ node, selected }: { node: CanvasNode; selected?:
         {isMedia && confirmed && asset !== "generating" && (
           <button
             type="button"
-            style={S.btnPrimary}
-            title="生成此节点的图 / 视频"
-            onClick={() => actions.handleExecuteNode(node.id, node.type, desc)}
+            style={node.needs_regen ? S.btnStale : S.btnPrimary}
+            title={genTitle}
+            onClick={onGen}
           >
             {genLabel}
           </button>
@@ -80,5 +101,16 @@ const S: Record<string, React.CSSProperties> = {
     background: "#7c2d12",
     cursor: "pointer",
     color: "#faf8f3",
+  },
+  // 节点被标脏(needs_regen)时,重生 CTA 用琥珀强调,呼应 NeedsRegenBadge。
+  btnStale: {
+    fontSize: 11,
+    padding: "3px 9px",
+    borderRadius: 6,
+    border: "1px solid #b45309",
+    background: "#f59e0b",
+    cursor: "pointer",
+    color: "#fff",
+    fontWeight: 600,
   },
 };

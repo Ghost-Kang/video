@@ -7,6 +7,7 @@ import { CanvasChatDock } from "./components/CanvasChatDock";
 import { Header } from "./components/Header";
 import { DarkModeToggle } from "./components/landing/DarkModeToggle";
 import { NodeDetail } from "./components/NodeDetail";
+import { ReviewGate } from "./components/ReviewGate";
 import { NodeActionsContext } from "./lib/nodeActionsContext";
 import { Sidebar } from "./components/Sidebar";
 import { useLayoutState } from "./hooks/useLayoutState";
@@ -317,6 +318,8 @@ export default function App({ userId, onLogout }: AppProps) {
           </button>
         )}
       </div>
+      {/* P2 审核闸门 — Director 自主生成需用户确认时弹出(覆盖 CardStack / 画布两种视图)。 */}
+      <ReviewGate threadId={tid} sendCommand={sendCommand} />
     </div>
   );
 }

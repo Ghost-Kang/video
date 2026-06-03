@@ -96,7 +96,7 @@ export interface SessionStateEventTyped extends Omit<SessionStateEvent, "message
   // ws_messages.SessionStateEvent (run `scripts/sync-ws-types.sh` to also pick
   // these up in the generated ws_generated.ts). Lets the client stop an orphaned
   // 95% spinner when the terminal frame was lost to a mid-run disconnect.
-  run_status?: "running" | "done" | "failed" | "idle";
+  run_status?: "running" | "done" | "failed" | "idle" | "awaiting_review";
   failure?: {
     code: string;
     hint: string;
@@ -142,6 +142,80 @@ export interface DeleteSessionsMsg {
   thread_ids: string[];
 }
 
+/** time-travel 回溯(P2 slice-2)— 重生一个节点:旧产物快照存版本 → 清 + 入队重生 →
+ *  下游标脏。对应后端 ws_messages.RegenerateNodeMsg。手写在此(非 ws_generated)以免为
+ *  单个命令重跑 schema 生成器(同 DeleteSessionsMsg / ReviewDecisionMsg 的先例)。
+ *  进度 / needs_regen 经现有 canvas_updated 快照回前端,无需新 outbound 帧。 */
+export interface RegenerateNodeMsg {
+  type: "regenerate_node";
+  thread_id: string;
+  node_id: string;
+}
+
+/** 一条产物版本快照(后端 versions_repo.list_versions 的一项)。append-only,按 version_seq 升序。 */
+export interface NodeVersion {
+  version_seq: number;
+  description: string;
+  result: Record<string, unknown> | null;
+  asset_status: string;
+  reason: string;
+  created_at: string;
+}
+
+/** time-travel 回溯(P2 slice-2b)— 前端 → 服务端:拉取一个节点的版本快照(只读)。
+ *  回 node_versions_returned。手写(非 ws_generated),同 RegenerateNodeMsg 先例。 */
+export interface ListNodeVersionsMsg {
+  type: "list_node_versions";
+  thread_id: string;
+  node_id: string;
+}
+
+/** time-travel 回溯(P2 slice-2c)— 前端 → 服务端:回滚节点到某旧版(快照当前→换回旧产物→
+ *  标脏下游)。回 canvas_updated + node_versions_returned。换的是已成产物,不调模型/不花钱。 */
+export interface RestoreNodeVersionMsg {
+  type: "restore_node_version";
+  thread_id: string;
+  node_id: string;
+  version_seq: number;
+}
+
+/** time-travel 回溯(P2 slice-2b)— 服务端 → 前端:某节点的版本快照列表(升序)。
+ *  对应后端 NodeVersionsReturnedEvent;NodeVersionHistory 渲染历史 + 当前 vs 旧版对比。 */
+export interface NodeVersionsReturnedEvent {
+  type: "node_versions_returned";
+  thread_id: string;
+  node_id: string;
+  versions: NodeVersion[];
+}
+
+/** P2 审核闸门 — 一条被拦的生成工具调用(对应后端 _build_review_frame 的 reviews[i])。 */
+export interface ReviewItem {
+  tool: string;
+  label: string;
+  args: Record<string, unknown>;
+  allowed_decisions: string[];
+}
+
+/** 服务端 → 前端:Director 自主生成触发 interrupt,弹审核卡。手写(非 ws_generated)。 */
+export interface ReviewRequiredEvent {
+  type: "review_required";
+  thread_id: string;
+  reviews: ReviewItem[];
+  summary: string;
+  /** 绑定本轮 review 的 LangGraph interrupt id;review_decision 回带,防陈旧决策套用到下一闸门。 */
+  interrupt_id: string;
+}
+
+/** 前端 → 服务端:用户对 review_required 的决策(与 reviews 同序同数)。
+ *  decision = {type:"approve"} | {type:"edit",edited_action:{name,args}} | {type:"reject",message?}。 */
+export interface ReviewDecisionMsg {
+  type: "review_decision";
+  thread_id: string;
+  decisions: Record<string, unknown>[];
+  /** 回带 review_required.interrupt_id,绑定本次决策属于哪一轮。 */
+  interrupt_id: string;
+}
+
 /** 客户端 → 服务端 命令。Codex-D 把 useWebSocket 的 12 个 sendXxx 收敛到 sendCommand<T extends WSCommand>。*/
 export type WSCommand =
   | AuthMsg
@@ -157,11 +231,17 @@ export type WSCommand =
   | ExecuteNodeMsg
   | UpdateNodeStatusMsg
   | OptimizePromptMsg
+  | RegenerateNodeMsg
+  | ListNodeVersionsMsg
+  | RestoreNodeVersionMsg
+  | ReviewDecisionMsg
   | UserMessageMsg;
 
 /** 服务端 → 客户端 推送。app 用 switch on `event.type` 分发。*/
 export type WSEvent =
   | ErrorEvent
+  | ReviewRequiredEvent
+  | NodeVersionsReturnedEvent
   | SessionListEventTyped
   | SessionStateEventTyped
   | CanvasUpdatedEventTyped

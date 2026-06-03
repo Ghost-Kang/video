@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { useCanvasStore } from "./canvasStore";
+import { useReviewStore } from "./reviewStore";
 import { useSessionStore } from "./sessionStore";
 import { useToastStore, type ToastAction } from "./toastStore";
 import type { WSEvent } from "../types/ws";
@@ -90,6 +91,8 @@ export function normalizeFailurePayload(
 const ERROR_CODE_TITLES: Record<string, string> = {
   invalid_command: "请求格式不对",
   malformed_json: "数据格式不对",
+  // P2 — backend refused a new message while a review gate is pending.
+  review_pending: "先确认这一步生成",
 };
 
 const TOOL_LABELS: Record<string, string> = {
@@ -273,6 +276,10 @@ export const useWSStore = create<WSStore>((set, get) => ({
       case "canvas_updated":
         if (event.canvas) queueMicrotask(() => canvas.setCanvas(event.canvas!));
         break;
+      case "node_versions_returned":
+        // time-travel 回溯(P2 slice-2b)— 缓存该节点的版本快照,供 NodeVersionHistory 对比。
+        queueMicrotask(() => canvas.setNodeVersions(event.node_id, event.versions));
+        break;
       case "processing":
         break;
       case "session_state": {
@@ -281,8 +288,16 @@ export const useWSStore = create<WSStore>((set, get) => ({
         // W5D4 — resume terminal run state on reconnect. Without this, a run
         // whose terminal frame (agent_response / analysis_failed) was lost to a
         // mid-run disconnect leaves the dock spinning at 95% forever.
-        // run_status: "running" | "done" | "failed" | "idle".
+        // run_status: "running" | "done" | "failed" | "idle" | "awaiting_review".
         const rs = event.run_status;
+        // P2 — drop a stale review card if this thread is no longer awaiting
+        // review (resolved on another tab, or reloaded after deciding). When it
+        // IS awaiting_review, the backend re-pushes review_required right after
+        // this frame, so reviewStore gets repopulated.
+        if (rs !== "awaiting_review") {
+          const rv = useReviewStore.getState();
+          if (rv.pending?.threadId === event.thread_id) rv.clear();
+        }
         if (rs === "failed" && event.failure) {
           const f = event.failure;
           set({ loading: false, thinking: [] });
@@ -438,6 +453,19 @@ export const useWSStore = create<WSStore>((set, get) => ({
           // Clear any in-flight streaming so it doesn't visually compete
           // with the failure banner.
           useCanvasStore.setState({ streamingContent: "" });
+        });
+        break;
+      case "review_required":
+        // P2 审核闸门 — Director 自主生成被 LangGraph interrupt 拦下,弹审核卡。
+        // 清掉 loading/thinking(回合没结束但在等用户,spinner 该停),把卡交给
+        // reviewStore;<ReviewGate/> 渲染 approve/reject。显式点生成不会走到这里
+        // (后端自动批准),所以出现这帧 = Director 真的想自主烧钱,需用户拍板。
+        set({ loading: false, thinking: [] });
+        useReviewStore.getState().setPending({
+          threadId: event.thread_id,
+          reviews: event.reviews,
+          summary: event.summary,
+          interruptId: event.interrupt_id,
         });
         break;
       case "prompt_optimized":
