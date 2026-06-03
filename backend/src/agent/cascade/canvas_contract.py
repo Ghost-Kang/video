@@ -34,6 +34,8 @@ class CanvasNode(BaseModel):
     generation_attempt_count: int = 0
     generation_lease_until: str | None = None
     generation_next_retry_at: str | None = None
+    # time-travel 回溯(P2 slice-2)— 上游被重生后,下游标 True(产物已过时,需重生)。
+    needs_regen: bool = False
     user_id: str
     thread_id: str
     x: float | None = None

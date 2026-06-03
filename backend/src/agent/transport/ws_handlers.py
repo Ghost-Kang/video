@@ -34,6 +34,7 @@ from agent.transport.ws_messages import (
     GetSessionStateMsg,
     ListSessionsMsg,
     OptimizePromptMsg,
+    RegenerateNodeMsg,
     ReorderEdgeMsg,
     ReviewDecisionMsg,
     ReviewNodeMsg,
@@ -404,6 +405,58 @@ async def handle_execute_node(ctx: WSCtx, msg: ExecuteNodeMsg) -> None:
     await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
 
 
+async def handle_regenerate_node(ctx: WSCtx, msg: RegenerateNodeMsg) -> None:
+    """time-travel 回溯(P2 slice-2)— 重生节点:快照旧版 → 清 + 入队 → 标脏下游。
+    媒体节点走与 execute_node 同一道 enqueue-time cost guard(server-derived user_id,
+    不可绕);worker 重生时按边读父节点最新 result 作参考,下游自动反映新上游。"""
+
+    def _load() -> dict | None:
+        canvas_tools.set_thread_id(msg.thread_id)
+        return canvas_tools._load_node(msg.node_id)
+
+    node = await asyncio.to_thread(_load)
+    if node is None:
+        # 节点不存在:回推当前快照即可,不报错(可能已被删/陈旧点击)。
+        snapshot = await asyncio.to_thread(canvas_data, msg.thread_id)
+        await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
+        return
+
+    node_type = node.get("type")
+    # 媒体节点重生要花钱 → enqueue 前 cost guard(同 execute_node)。文字节点免费,跳过。
+    if node_type in ("image", "video"):
+        # 重生用节点已存的时长(video),没有就按 5s 估;图按 1 张。
+        video_seconds = 0.0
+        if node_type == "video":
+            video_seconds = float((node.get("result") or {}).get("duration") or 5)
+        predicted = cost_guard.predict_generation_cost(
+            node_type,
+            n_images=1 if node_type == "image" else 0,
+            video_seconds=video_seconds,
+        )
+        try:
+            await cost_guard.cost_guard(ctx.user_id, msg.thread_id, predicted)
+        except HardFailure as exc:
+            await send_json(
+                ctx.ws,
+                type="analysis_failed",
+                thread_id=msg.thread_id,
+                code=exc.code.value,
+                hint=exc.hint or "生成预算超限,请稍后再试或联系我们。",
+                actions=list(exc.actions) or ["REPORT"],
+                request_id=exc.request_id,
+                stage="generation",
+            )
+            return
+
+    def _work() -> dict | None:
+        canvas_tools.set_thread_id(msg.thread_id)
+        canvas_tools.regenerate_node(msg.node_id)
+        return canvas_data(msg.thread_id)
+
+    snapshot = await asyncio.to_thread(_work)
+    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
+
+
 async def handle_update_node_status(ctx: WSCtx, msg: UpdateNodeStatusMsg) -> None:
     print(f"[状态] update_node_status node={msg.node_id} → {msg.node_status}")
 
@@ -495,6 +548,7 @@ HANDLERS: dict[str, tuple[type, HandlerFn]] = {
     "execute_node": (ExecuteNodeMsg, handle_execute_node),
     "update_node_status": (UpdateNodeStatusMsg, handle_update_node_status),
     "optimize_prompt": (OptimizePromptMsg, handle_optimize_prompt),
+    "regenerate_node": (RegenerateNodeMsg, handle_regenerate_node),
     "review_decision": (ReviewDecisionMsg, handle_review_decision),
     "user_message": (UserMessageMsg, handle_user_message),
 }

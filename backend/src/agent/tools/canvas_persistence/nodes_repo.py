@@ -32,6 +32,10 @@ def _row_to_node(row: sqlite3.Row) -> dict:
         "generation_attempt_count": row["generation_attempt_count"] or 0,
         "generation_lease_until": row["generation_lease_until"],
         "generation_next_retry_at": row["generation_next_retry_at"],
+        # Defensive: a row from before the needs_regen migration won't have the
+        # column. The ALTER runs at db-init, but guard anyway so a stale handle
+        # never KeyErrors the whole canvas read.
+        "needs_regen": bool(row["needs_regen"]) if "needs_regen" in row.keys() else False,
         "user_id": row["user_id"],
         "thread_id": row["thread_id"],
         "x": row["x"],
@@ -83,6 +87,7 @@ def _upsert_node(node: dict, *, user_id: str | None = None, thread_id: str | Non
         node.get("generation_lease_until"),
         node.get("generation_next_retry_at"),
         node.get("x"), node.get("y"),
+        int(bool(node.get("needs_regen", False))),
         uid, tid, node["id"],
     )
     cursor = db.execute(
@@ -91,14 +96,14 @@ def _upsert_node(node: dict, *, user_id: str | None = None, thread_id: str | Non
            result=?, subtype=?, shot_no=?, image_gen_provider=?,
            generation_status=?, generation_task_id=?, generation_error=?,
            generation_attempt_count=?, generation_lease_until=?, generation_next_retry_at=?,
-           x=?, y=?
+           x=?, y=?, needs_regen=?
            WHERE user_id=? AND thread_id=? AND node_id=?""",
         values,
     )
     if cursor.rowcount == 0:
         db.execute(
-            """INSERT INTO canvas_nodes (user_id, thread_id, node_id, type, title, description, status, node_status, asset_status, result, subtype, shot_no, image_gen_provider, generation_status, generation_task_id, generation_error, generation_attempt_count, generation_lease_until, generation_next_retry_at, x, y)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO canvas_nodes (user_id, thread_id, node_id, type, title, description, status, node_status, asset_status, result, subtype, shot_no, image_gen_provider, generation_status, generation_task_id, generation_error, generation_attempt_count, generation_lease_until, generation_next_retry_at, x, y, needs_regen)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 uid, tid, node["id"], node["type"], node["title"],
                 node.get("description", ""), node.get("status", "pending"),
@@ -112,6 +117,7 @@ def _upsert_node(node: dict, *, user_id: str | None = None, thread_id: str | Non
                 node.get("generation_lease_until"),
                 node.get("generation_next_retry_at"),
                 node.get("x"), node.get("y"),
+                int(bool(node.get("needs_regen", False))),
             ),
         )
     db.commit()

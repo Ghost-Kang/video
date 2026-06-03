@@ -129,6 +129,16 @@ class OptimizePromptMsg(_Base):
     feedback: str
 
 
+class RegenerateNodeMsg(_Base):
+    """time-travel 回溯(P2 slice-2)— 重生一个节点:旧产物快照存版本 → 清 + 入队重生
+    → 下游标脏。worker 按边读父节点最新 result 作参考,所以下游自动反映新上游。
+    needs_regen / 重生进度经现有 canvas_updated 快照回前端,无需新 outbound 帧。"""
+
+    type: Literal["regenerate_node"]
+    thread_id: str = Field(min_length=1)
+    node_id: str
+
+
 class ReviewDecisionMsg(_Base):
     """P2 审核闸门 — 用户对 `review_required` 的决策(approve/edit/reject)。
 
@@ -173,6 +183,7 @@ WSInbound = Annotated[
         ExecuteNodeMsg,
         UpdateNodeStatusMsg,
         OptimizePromptMsg,
+        RegenerateNodeMsg,
         ReviewDecisionMsg,
         UserMessageMsg,
     ],
@@ -420,6 +431,7 @@ INBOUND_MODELS: dict[str, type[_Base]] = {
     "execute_node": ExecuteNodeMsg,
     "update_node_status": UpdateNodeStatusMsg,
     "optimize_prompt": OptimizePromptMsg,
+    "regenerate_node": RegenerateNodeMsg,
     "review_decision": ReviewDecisionMsg,
     "user_message": UserMessageMsg,
 }

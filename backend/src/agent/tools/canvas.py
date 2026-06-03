@@ -50,6 +50,7 @@ from agent.tools.canvas_persistence.nodes_repo import (
     _update_node_result,
     _upsert_node,
 )
+from agent.tools.canvas_persistence.versions_repo import list_versions, snapshot_version
 
 
 NodeType = Literal["script", "image", "video", "composite"]
@@ -416,6 +417,7 @@ def get_canvas_state(node_id: str = "") -> dict:
             "asset_status": n.get("asset_status", "idle"), "subtype": n.get("subtype"),
             "description": n.get("description", ""),
             "result": n.get("result"),
+            "needs_regen": n.get("needs_regen", False),
             "generation_status": n.get("generation_status"),
             "generation_task_id": n.get("generation_task_id"),
             "generation_error": n.get("generation_error"),
@@ -434,6 +436,7 @@ def get_canvas_state(node_id: str = "") -> dict:
             "asset_status": n.get("asset_status", "idle"), "subtype": n.get("subtype"),
             "description": n.get("description", ""),
             "result": n.get("result"),
+            "needs_regen": n.get("needs_regen", False),
             "shot_no": n.get("shot_no"),
             "image_gen_provider": n.get("image_gen_provider"),
             "generation_status": n.get("generation_status"),
@@ -484,6 +487,76 @@ def enqueue_generation(node_id: str) -> dict | None:
     node["generation_next_retry_at"] = None
     _upsert_node(node)
     return node
+
+
+# ---------- time-travel 回溯(P2 slice-2):回上游改 → 标脏下游 → 重生 ----------
+
+
+def _descendants(node_id: str) -> list[str]:
+    """node_id 的所有下游节点(沿 source→target 边 BFS,去重、不含自身)。
+
+    画布 DAG 在 canvas.db 侧库(不在 LangGraph checkpoint),所以「重生下游」是画布
+    级遍历,不是 LangGraph time-travel。有环也安全(visited 去重)。"""
+    edges = _load_all_edges()
+    children: dict[str, list[str]] = {}
+    for e in edges:
+        children.setdefault(e["source"], []).append(e["target"])
+    seen: set[str] = set()
+    queue = list(children.get(node_id, []))
+    while queue:
+        nid = queue.pop(0)
+        if nid in seen:
+            continue
+        seen.add(nid)
+        queue.extend(children.get(nid, []))
+    seen.discard(node_id)  # 环路下自身可能被遍历到 —— 保证「不含自身」
+    return list(seen)
+
+
+def _mark_descendants_stale(node_id: str) -> list[str]:
+    """把 node_id 的所有下游标 needs_regen=1(上游产物已变,下游过时)。
+    只标「已有产物」的下游(asset_status done/failed/timeout 或有 result)—— 还没生成的
+    下游本就要生成,标脏无意义。返回被标脏的节点 id。"""
+    stale: list[str] = []
+    for nid in _descendants(node_id):
+        node = _load_node(nid)
+        if not node:
+            continue
+        has_asset = bool(node.get("result")) or node.get("asset_status") in ("done", "failed", "timeout")
+        if not has_asset or node.get("needs_regen"):
+            continue
+        node["needs_regen"] = True
+        _upsert_node(node)
+        stale.append(nid)
+    return stale
+
+
+def regenerate_node(node_id: str, reason: str = "regenerate") -> dict | None:
+    """重生一个节点:先把当前产物**快照存版本**(旧版本不丢),再清产物 + 入队重生,
+    并把其下游标脏(上游变了,下游需重生)。worker 重生时按边读父节点最新 result.url
+    作参考(锚点级联已 live,见 image_pipeline),所以下游自动反映新上游。
+
+    返回更新后的节点(含 needs_regen 已清);节点不存在返回 None。"""
+    node = _load_node(node_id)
+    if not node:
+        return None
+    # 1. 快照旧版本(覆盖前)。best-effort:版本写失败不该挡住重生。
+    try:
+        snapshot_version(node, reason)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[regenerate] snapshot 失败 node={node_id}: {exc}")
+    # 2. 清产物 + 入队(复用 enqueue_generation 的生成队列语义)。needs_regen 清零。
+    node["result"] = None
+    node["asset_status"] = "generating"
+    node["generation_status"] = "pending"
+    node["generation_error"] = None
+    node["generation_lease_until"] = None
+    node["generation_next_retry_at"] = None
+    node["needs_regen"] = False
+    _upsert_node(node)
+    # 3. 标下游脏(这个节点重生 = 下游的参考会变 → 下游过时)。
+    _mark_descendants_stale(node_id)
+    return _load_node(node_id)
 
 
 __all__ = [
