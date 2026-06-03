@@ -294,8 +294,21 @@ export const useWSStore = create<WSStore>((set, get) => ({
               );
             useCanvasStore.setState({ streamingContent: "" });
           });
-        } else if (rs && rs !== "running") {
-          // done / idle — nothing in flight; stop any orphaned spinner.
+        } else if (rs && rs !== "running" && rs !== "idle") {
+          // done / failed / stale / awaiting_review — a genuine server-side
+          // outcome; stop any orphaned spinner.
+          //
+          // NOT "idle": "idle" only means "no run row on the server". For a
+          // freshly-created session (landing → 点案例 → /chat/<sid>?source_url=),
+          // App mount fires get_session_state AND auto-sends the analysis. The
+          // server answers get_session_state "idle" right BEFORE the auto-sent
+          // run registers as "running"; clearing loading on that stale "idle"
+          // collapsed AnalyzingHero back to the静态 idle 卡 mid-analysis (founder
+          // 实测:点案例后无进度、卡静态、最终 S7 超时). "idle" can't distinguish
+          // "never ran" from "client just started one" — so leave loading as-is;
+          // the real terminal frames (analysis_returned / analysis_failed /
+          // agent_response) own the spinner. A truly orphaned idle spinner is
+          // still bounded by the 300s client timeout in App.sendChatMessage.
           set({ loading: false, thinking: [] });
         }
         break;
