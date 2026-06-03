@@ -75,17 +75,8 @@ INTERRUPT_GATE_TOOLS = frozenset(
     if t.strip()
 )
 
-# canvas 统筹 P2 ④ — 长会话上下文降本(SummarizationMiddleware)。长创作会话(分析 +
-# 多镜级联 + 反复改写)token 会爆;开关 ON 时给 Director 挂历史摘要中间件:上下文逼近
-# 模型上限(fraction)时,把旧消息摘要成结构化 context,保留最近 N 条。**默认 OFF** ——
-# 拆细灰度(D5),先 dark-launch、founder 实测调参再开;切换需重启(agent 池构造时读)。
-# 风险:摘要可能丢关键细节(如分析维度)→ keep 要足够大、trigger 要保守,启用前必须真跑验证。
-CANVAS_CONTEXT_MIDDLEWARE = os.getenv("CANVAS_CONTEXT_MIDDLEWARE", "0").strip().lower() not in ("0", "false", "no", "off", "")
-# 触发摘要的绝对 token 阈值(用绝对数而非占比:doubao 模型不暴露 max_input_tokens
-# profile,fraction 会报错)。doubao-seed-2-0 上下文 256K,默认 120K 留足余量。
-CONTEXT_SUMMARY_TRIGGER_TOKENS = int(os.getenv("CONTEXT_SUMMARY_TRIGGER_TOKENS", "120000"))
-# 摘要后保留最近多少条消息(保住近期上下文:分析 + 最近创作步骤)。
-CONTEXT_SUMMARY_KEEP_MESSAGES = int(os.getenv("CONTEXT_SUMMARY_KEEP_MESSAGES", "30"))
+# canvas 统筹 P2 ④ — 长会话上下文降本:由 deepagents 内置 summarization middleware 提供
+# (无条件挂、profile-aware、非破坏式 offload),无需自建 flag/中间件。详见 main.py 注释。
 
 # -------- 视频生成 --------
 VIDEO_GEN_API_KEY = os.getenv("VIDEO_GEN_API_KEY")
