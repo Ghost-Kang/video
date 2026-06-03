@@ -620,7 +620,7 @@ class TestInboundModelsRegistry:
             "reorder_edge", "create_edge", "delete_edge", "update_position",
             "review_node", "execute_node", "update_node_status",
             "optimize_prompt", "regenerate_node", "list_node_versions",
-            "restore_node_version", "regenerate_script_node",
+            "restore_node_version", "regenerate_script_node", "seed_canvas",
             "review_decision", "user_message",
         }
         assert set(INBOUND_MODELS) == expected, (

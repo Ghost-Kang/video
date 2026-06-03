@@ -26,11 +26,13 @@ from agent.transport.ws_handlers import (
     handle_list_node_versions,
     handle_regenerate_script_node,
     handle_restore_node_version,
+    handle_seed_canvas,
 )
 from agent.transport.ws_messages import (
     ListNodeVersionsMsg,
     RegenerateScriptNodeMsg,
     RestoreNodeVersionMsg,
+    SeedCanvasMsg,
 )
 
 
@@ -483,3 +485,28 @@ class TestRegenerateScriptHandler:
         # canvas_updated pushed (harmless), but NO versions frame and NO Director run
         assert "node_versions_returned" not in [m["type"] for m in ctx.ws.sent]
         assert calls == []
+
+
+# ---------- seed_canvas: 分析→画布 桥(P0,item 1) ----------
+
+
+class TestSeedCanvas:
+    def test_seeds_script_node_on_empty_canvas(self):
+        tid = _thread()
+        ctx = WSCtx(user_id="default", ws=_FakeWS(), pool=None)
+        asyncio.run(handle_seed_canvas(ctx, SeedCanvasMsg(type="seed_canvas", thread_id=tid, analysis_id="ana_1")))
+        frame = next(m for m in ctx.ws.sent if m["type"] == "canvas_updated")
+        nodes = list(frame["canvas"]["nodes"].values())
+        assert len(nodes) == 1
+        assert nodes[0]["type"] == "script"
+        assert "我的策划书" in nodes[0]["title"]
+        assert nodes[0]["node_status"] == "reviewing"
+
+    def test_idempotent_when_canvas_not_empty(self):
+        tid = _thread()
+        _mk("existing", type="script", result={"content": "已有", "word_count": 2, "shots": []})
+        ctx = WSCtx(user_id="default", ws=_FakeWS(), pool=None)
+        asyncio.run(handle_seed_canvas(ctx, SeedCanvasMsg(type="seed_canvas", thread_id=tid, analysis_id="")))
+        frame = next(m for m in ctx.ws.sent if m["type"] == "canvas_updated")
+        # 不重复 seed:仍只有原来那一个节点
+        assert list(frame["canvas"]["nodes"].keys()) == ["existing"]

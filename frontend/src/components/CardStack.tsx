@@ -28,13 +28,15 @@ interface CardStackProps {
   pendingCase?: SampleCase | null;
   /** Director 实时 tool_call label,透传给内嵌进度组件。 */
   thinking?: string[];
+  /** canvas 统筹 P0 桥 — 「在画布上做我的版本」:seed 画布起点 + 切到画布视图。 */
+  onSeedCanvas?: () => void;
 }
 
 // 2026-05-30 toprador 对齐重设计:分析输出 = 爆点分析(总结+主题+维度网格) +
 // 视频分析(逐幕网格)。维度齐全但结构清晰、好理解(founder 实测 toprador 样例为准)。
 // 改写「你的版本」本轮暂挂 —— 不渲染 CTA/改写脚本/发布包(代码保留,见 wsStore +
 // rewrite_service,随时可重接)。源逐镜/音频/成本旧抽屉也撤掉(逐幕已含这些维度)。
-export function CardStack({ onTriggerRewrite, onGenerateFirstFrame, onGenerateShotVideo, onComposeFilm, pendingCase, thinking }: CardStackProps = {}) {
+export function CardStack({ onTriggerRewrite, onGenerateFirstFrame, onGenerateShotVideo, onComposeFilm, pendingCase, thinking, onSeedCanvas }: CardStackProps = {}) {
   const analysis = useCanvasStore((s) => s.analysis);
   const failure = useCanvasStore((s) => s.failure);
   const loading = useWSStore((s) => s.loading);
@@ -102,6 +104,23 @@ export function CardStack({ onTriggerRewrite, onGenerateFirstFrame, onGenerateSh
 
         {/* 数据条:镜头 / 时长 / 把握 滚动计数 */}
         <AnalysisStatStrip analysis={analysis} />
+
+        {/* canvas 统筹 P0 桥 —— 「看懂为什么火」↔「做我的版本」丝滑切换入口。
+            点它 → seed 画布起点 + 切到画布视图(画布对普通用户的入口)。 */}
+        {onSeedCanvas && (
+          <button
+            type="button"
+            onClick={onSeedCanvas}
+            data-testid="seed-canvas-cta"
+            className="group flex w-full items-center justify-between gap-3 rounded-2xl border border-[#7c2d12]/30 bg-gradient-to-r from-[#7c2d12] to-[#9a3412] px-5 py-4 text-left text-[#faf8f3] shadow-[0_6px_20px_-6px_rgba(124,45,18,0.4)] transition-transform hover:scale-[1.01] active:scale-[0.99]"
+          >
+            <span>
+              <span className="block text-[15px] font-semibold">🎬 在画布上做我的版本</span>
+              <span className="block text-[12px] text-[#faf8f3]/80">顺势进画布,把它改成你自己的——告诉导演方向,逐镜创作</span>
+            </span>
+            <span className="shrink-0 text-xl transition-transform group-hover:translate-x-0.5">→</span>
+          </button>
+        )}
 
         {/* 爆点分析:总结 + 主题 + 创作者向维度网格 */}
         <ViralAnalysisCard analysis={analysis} />
