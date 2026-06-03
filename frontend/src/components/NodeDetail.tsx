@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import type { CanvasNode, Shot } from "../types";
 import type { NodeActions } from "../hooks/useNodeActions";
 import { useCanvasStore } from "../store/canvasStore";
+import { NodeVersionHistory } from "./NodeVersionHistory";
 
 interface Props {
   actions: NodeActions;
@@ -104,6 +105,9 @@ export function NodeDetail({ actions }: Props) {
         {/* 生成结果 */}
         {isMedia && node.result && <ResultView node={node} />}
         {node.type === "script" && node.result && <ResultView node={node} />}
+
+        {/* 版本历史 + 新旧对比(time-travel 回溯 P2 slice-2b)。key=node.id → 切节点 remount 重置选中态。 */}
+        <NodeVersionHistory key={node.id} node={node} actions={actions} />
       </div>
     </div>
   );

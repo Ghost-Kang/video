@@ -32,6 +32,7 @@ from agent.transport.ws_messages import (
     DeleteSessionsMsg,
     ExecuteNodeMsg,
     GetSessionStateMsg,
+    ListNodeVersionsMsg,
     ListSessionsMsg,
     OptimizePromptMsg,
     RegenerateNodeMsg,
@@ -457,6 +458,24 @@ async def handle_regenerate_node(ctx: WSCtx, msg: RegenerateNodeMsg) -> None:
     await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
 
 
+async def handle_list_node_versions(ctx: WSCtx, msg: ListNodeVersionsMsg) -> None:
+    """time-travel 回溯(P2 slice-2b)— 只读拉取节点的产物版本快照,回 node_versions_returned。
+    user_id 走连接 auth 时设的 ContextVar(to_thread 复制上下文),不可由客户端伪造。"""
+
+    def _work() -> list[dict]:
+        canvas_tools.set_thread_id(msg.thread_id)
+        return canvas_tools.list_versions(msg.node_id)
+
+    versions = await asyncio.to_thread(_work)
+    await send_json(
+        ctx.ws,
+        type="node_versions_returned",
+        thread_id=msg.thread_id,
+        node_id=msg.node_id,
+        versions=versions,
+    )
+
+
 async def handle_update_node_status(ctx: WSCtx, msg: UpdateNodeStatusMsg) -> None:
     print(f"[状态] update_node_status node={msg.node_id} → {msg.node_status}")
 
@@ -549,6 +568,7 @@ HANDLERS: dict[str, tuple[type, HandlerFn]] = {
     "update_node_status": (UpdateNodeStatusMsg, handle_update_node_status),
     "optimize_prompt": (OptimizePromptMsg, handle_optimize_prompt),
     "regenerate_node": (RegenerateNodeMsg, handle_regenerate_node),
+    "list_node_versions": (ListNodeVersionsMsg, handle_list_node_versions),
     "review_decision": (ReviewDecisionMsg, handle_review_decision),
     "user_message": (UserMessageMsg, handle_user_message),
 }

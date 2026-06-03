@@ -139,6 +139,16 @@ class RegenerateNodeMsg(_Base):
     node_id: str
 
 
+class ListNodeVersionsMsg(_Base):
+    """time-travel 回溯(P2 slice-2b)— 拉取一个节点的产物版本快照(append-only 旧版)。
+    回 `node_versions_returned`。只读,不改画布、不入队。前端 NodeVersionHistory 用它
+    渲染历史 + 「当前 vs 选中旧版」对比。"""
+
+    type: Literal["list_node_versions"]
+    thread_id: str = Field(min_length=1)
+    node_id: str
+
+
 class ReviewDecisionMsg(_Base):
     """P2 审核闸门 — 用户对 `review_required` 的决策(approve/edit/reject)。
 
@@ -184,6 +194,7 @@ WSInbound = Annotated[
         UpdateNodeStatusMsg,
         OptimizePromptMsg,
         RegenerateNodeMsg,
+        ListNodeVersionsMsg,
         ReviewDecisionMsg,
         UserMessageMsg,
     ],
@@ -226,6 +237,18 @@ class CanvasUpdatedEvent(_Base):
     type: Literal["canvas_updated"]
     thread_id: str
     canvas: dict[str, Any] | None = None
+
+
+class NodeVersionsReturnedEvent(_Base):
+    """time-travel 回溯(P2 slice-2b)— 某节点的产物版本快照列表(versions_repo.list_versions),
+    按 version_seq 升序。回应 `list_node_versions`。每项形如:
+      {version_seq, description, result, asset_status, reason, created_at}。
+    前端 NodeVersionHistory 渲染历史 + 「当前(节点 live result)vs 选中旧版」对比。"""
+
+    type: Literal["node_versions_returned"]
+    thread_id: str
+    node_id: str
+    versions: list[dict[str, Any]]
 
 
 class PromptOptimizedEvent(_Base):
@@ -432,6 +455,7 @@ INBOUND_MODELS: dict[str, type[_Base]] = {
     "update_node_status": UpdateNodeStatusMsg,
     "optimize_prompt": OptimizePromptMsg,
     "regenerate_node": RegenerateNodeMsg,
+    "list_node_versions": ListNodeVersionsMsg,
     "review_decision": ReviewDecisionMsg,
     "user_message": UserMessageMsg,
 }

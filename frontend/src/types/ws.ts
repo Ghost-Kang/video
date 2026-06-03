@@ -152,6 +152,33 @@ export interface RegenerateNodeMsg {
   node_id: string;
 }
 
+/** 一条产物版本快照(后端 versions_repo.list_versions 的一项)。append-only,按 version_seq 升序。 */
+export interface NodeVersion {
+  version_seq: number;
+  description: string;
+  result: Record<string, unknown> | null;
+  asset_status: string;
+  reason: string;
+  created_at: string;
+}
+
+/** time-travel 回溯(P2 slice-2b)— 前端 → 服务端:拉取一个节点的版本快照(只读)。
+ *  回 node_versions_returned。手写(非 ws_generated),同 RegenerateNodeMsg 先例。 */
+export interface ListNodeVersionsMsg {
+  type: "list_node_versions";
+  thread_id: string;
+  node_id: string;
+}
+
+/** time-travel 回溯(P2 slice-2b)— 服务端 → 前端:某节点的版本快照列表(升序)。
+ *  对应后端 NodeVersionsReturnedEvent;NodeVersionHistory 渲染历史 + 当前 vs 旧版对比。 */
+export interface NodeVersionsReturnedEvent {
+  type: "node_versions_returned";
+  thread_id: string;
+  node_id: string;
+  versions: NodeVersion[];
+}
+
 /** P2 审核闸门 — 一条被拦的生成工具调用(对应后端 _build_review_frame 的 reviews[i])。 */
 export interface ReviewItem {
   tool: string;
@@ -196,6 +223,7 @@ export type WSCommand =
   | UpdateNodeStatusMsg
   | OptimizePromptMsg
   | RegenerateNodeMsg
+  | ListNodeVersionsMsg
   | ReviewDecisionMsg
   | UserMessageMsg;
 
@@ -203,6 +231,7 @@ export type WSCommand =
 export type WSEvent =
   | ErrorEvent
   | ReviewRequiredEvent
+  | NodeVersionsReturnedEvent
   | SessionListEventTyped
   | SessionStateEventTyped
   | CanvasUpdatedEventTyped

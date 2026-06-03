@@ -5,6 +5,8 @@ time-travel)。验证:沿边找下游、重生前快照旧版、重生清产物�
 只标「已有产物」的下游。
 """
 
+import asyncio
+import json
 import uuid
 
 import pytest
@@ -13,6 +15,9 @@ from agent.tools import canvas as canvas_tools
 from agent.tools.canvas import regenerate_node, _descendants, _mark_descendants_stale
 from agent.tools.canvas_persistence import db as canvas_db
 from agent.tools.canvas_persistence.versions_repo import list_versions
+from agent.transport.context import WSCtx
+from agent.transport.ws_handlers import handle_list_node_versions
+from agent.transport.ws_messages import ListNodeVersionsMsg
 
 
 @pytest.fixture(autouse=True)
@@ -151,3 +156,56 @@ class TestMarkStale:
         state = canvas_tools.get_canvas_state()
         down = next(n for n in state["nodes"] if n["id"] == "down")
         assert down["needs_regen"] is True
+
+
+# ---------- WS endpoint: list_node_versions → node_versions_returned (2b) ----------
+
+
+class _FakeWS:
+    def __init__(self) -> None:
+        self.sent: list[dict] = []
+
+    async def send(self, data: str) -> None:
+        self.sent.append(json.loads(data))
+
+
+def _sent_versions(ctx) -> list[dict]:
+    frames = [m for m in ctx.ws.sent if m["type"] == "node_versions_returned"]
+    assert len(frames) == 1
+    return frames[0]
+
+
+class TestListNodeVersionsHandler:
+    def test_returns_snapshots_ascending(self):
+        tid = _thread()
+        _mk("X", asset_status="done", result={"url": "v1.png"})
+        regenerate_node("X")  # snapshots v1 (the old product) before clearing
+        n = canvas_tools._load_node("X")
+        n["result"] = {"url": "v2.png"}
+        n["asset_status"] = "done"
+        canvas_tools._upsert_node(n)
+        regenerate_node("X")  # snapshots v2
+
+        ctx = WSCtx(user_id="default", ws=_FakeWS(), pool=None)
+        asyncio.run(
+            handle_list_node_versions(
+                ctx, ListNodeVersionsMsg(type="list_node_versions", thread_id=tid, node_id="X")
+            )
+        )
+        frame = _sent_versions(ctx)
+        assert frame["node_id"] == "X" and frame["thread_id"] == tid
+        assert [v["version_seq"] for v in frame["versions"]] == [1, 2]
+        assert frame["versions"][0]["result"] == {"url": "v1.png"}
+        assert frame["versions"][1]["result"] == {"url": "v2.png"}
+        assert frame["versions"][0]["reason"] == "regenerate"
+
+    def test_empty_for_node_without_history(self):
+        tid = _thread()
+        _mk("Y", asset_status="done", result={"url": "y.png"})  # never regenerated → no versions
+        ctx = WSCtx(user_id="default", ws=_FakeWS(), pool=None)
+        asyncio.run(
+            handle_list_node_versions(
+                ctx, ListNodeVersionsMsg(type="list_node_versions", thread_id=tid, node_id="Y")
+            )
+        )
+        assert _sent_versions(ctx)["versions"] == []

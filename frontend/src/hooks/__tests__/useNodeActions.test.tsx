@@ -22,4 +22,11 @@ describe("useNodeActions — regenerate", () => {
       expect.objectContaining({ type: "execute_node", thread_id: "t1", node_id: "n1", node_type: "image" }),
     );
   });
+
+  it("handleListNodeVersions sends a list_node_versions command (2b)", () => {
+    const send = vi.fn();
+    const { result } = renderHook(() => useNodeActions("t1", send, vi.fn()));
+    result.current.handleListNodeVersions("n5");
+    expect(send).toHaveBeenCalledWith({ type: "list_node_versions", thread_id: "t1", node_id: "n5" });
+  });
 });

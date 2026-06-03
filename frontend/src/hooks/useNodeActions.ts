@@ -18,6 +18,8 @@ export interface NodeActions {
   /** time-travel 回溯(P2 slice-2)— 重生节点:快照旧版 → 清 + 入队 → 标脏下游。
    *  与 handleExecuteNode 的区别:execute_node 只生成,不快照、不标脏下游。 */
   handleRegenerateNode: (nodeId: string) => void;
+  /** time-travel 回溯(P2 slice-2b)— 拉取节点版本快照(只读),回 node_versions_returned。 */
+  handleListNodeVersions: (nodeId: string) => void;
   handleOptimizePrompt: (nodeId: string, prompt: string, feedback: string) => void;
   handleCreateEdge: (source: string, target: string) => void;
   handleDeleteEdge: (edgeId: string) => void;
@@ -66,6 +68,13 @@ export function useNodeActions(
     [sendCommand, threadId],
   );
 
+  const handleListNodeVersions = useCallback(
+    (nodeId: string) => {
+      sendCommand({ type: "list_node_versions", thread_id: threadId, node_id: nodeId });
+    },
+    [sendCommand, threadId],
+  );
+
   const handleOptimizePrompt = useCallback(
     (nodeId: string, prompt: string, feedback: string) => {
       sendCommand({ type: "optimize_prompt", thread_id: threadId, node_id: nodeId, prompt, feedback });
@@ -94,11 +103,12 @@ export function useNodeActions(
       handleExecuteNode,
       handleUpdateNodeStatus,
       handleRegenerateNode,
+      handleListNodeVersions,
       handleOptimizePrompt,
       handleCreateEdge,
       handleDeleteEdge,
       handleReorderEdge,
     }),
-    [handleReview, handleExecuteNode, handleUpdateNodeStatus, handleRegenerateNode, handleOptimizePrompt, handleCreateEdge, handleDeleteEdge, handleReorderEdge],
+    [handleReview, handleExecuteNode, handleUpdateNodeStatus, handleRegenerateNode, handleListNodeVersions, handleOptimizePrompt, handleCreateEdge, handleDeleteEdge, handleReorderEdge],
   );
 }

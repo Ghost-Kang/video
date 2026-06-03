@@ -276,6 +276,10 @@ export const useWSStore = create<WSStore>((set, get) => ({
       case "canvas_updated":
         if (event.canvas) queueMicrotask(() => canvas.setCanvas(event.canvas!));
         break;
+      case "node_versions_returned":
+        // time-travel 回溯(P2 slice-2b)— 缓存该节点的版本快照,供 NodeVersionHistory 对比。
+        queueMicrotask(() => canvas.setNodeVersions(event.node_id, event.versions));
+        break;
       case "processing":
         break;
       case "session_state": {

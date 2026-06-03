@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { CanvasNode } from "../types";
 import type { CascadeAnalysisContract, FailurePayload, Scene } from "../types/cascade";
 import type { RewriteShot } from "../lib/cascadeMapper";
+import type { NodeVersion } from "../types/ws";
 
 interface Edge {
   id: string;
@@ -13,6 +14,9 @@ interface Edge {
 interface CanvasStore {
   nodes: CanvasNode[];
   edges: Edge[];
+  // time-travel 回溯(P2 slice-2b)— 节点产物版本快照,按 node_id 缓存(node_versions_returned
+  // 填充)。append-only 历史,会话内可安全缓存;clear()(切会话)时清空。
+  nodeVersions: Record<string, NodeVersion[]>;
   messages: { role: "user" | "agent"; content: string }[];
   selectedNodeId: string | null;
   streamingContent: string;
@@ -28,6 +32,7 @@ interface CanvasStore {
   filmError: string;
   failure: FailurePayload | null;
   setCanvas: (data: { nodes: Record<string, CanvasNode>; edges?: unknown[] }) => void;
+  setNodeVersions: (nodeId: string, versions: NodeVersion[]) => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
   addEdge: (edge: Edge) => void;
   removeEdge: (id: string) => void;
@@ -55,6 +60,7 @@ interface CanvasStore {
 export const useCanvasStore = create<CanvasStore>((set) => ({
   nodes: [],
   edges: [],
+  nodeVersions: {},
   messages: [],
   selectedNodeId: null,
   streamingContent: "",
@@ -73,6 +79,9 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
       nodes: Object.values(data.nodes),
       edges: (data.edges || []) as Edge[],
     }),
+
+  setNodeVersions: (nodeId, versions) =>
+    set((s) => ({ nodeVersions: { ...s.nodeVersions, [nodeId]: versions } })),
 
   updateNodePosition: (id, x, y) =>
     set((s) => ({
@@ -211,6 +220,7 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
     set({
       nodes: [],
       edges: [],
+      nodeVersions: {},
       messages: [],
       selectedNodeId: null,
       streamingContent: "",
