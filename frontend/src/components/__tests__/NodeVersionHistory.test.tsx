@@ -21,7 +21,8 @@ function makeNode(over: Partial<CanvasNode> = {}): CanvasNode {
 function makeActions(over: Partial<NodeActions> = {}): NodeActions {
   return {
     handleReview: vi.fn(), handleExecuteNode: vi.fn(), handleUpdateNodeStatus: vi.fn(),
-    handleRegenerateNode: vi.fn(), handleListNodeVersions: vi.fn(), handleOptimizePrompt: vi.fn(),
+    handleRegenerateNode: vi.fn(), handleListNodeVersions: vi.fn(), handleRestoreNodeVersion: vi.fn(),
+    handleOptimizePrompt: vi.fn(),
     handleCreateEdge: vi.fn(), handleDeleteEdge: vi.fn(), handleReorderEdge: vi.fn(), ...over,
   };
 }
@@ -85,5 +86,45 @@ describe("NodeVersionHistory (2b)", () => {
     fireEvent.click(screen.getByTestId("version-row-1"));
     const imgs = within(screen.getByTestId("version-compare")).getAllByRole("img").map((i) => i.getAttribute("src"));
     expect(imgs).toEqual(["current.png", "v1.png"]);
+  });
+
+  it("restores the auto-selected (latest) version when the restore button is clicked (2c)", () => {
+    useCanvasStore.setState({ nodeVersions: { n1: VERSIONS } });
+    const actions = makeActions();
+    render(<NodeVersionHistory node={makeNode({ result: { url: "current.png" } })} actions={actions} />);
+    fireEvent.click(screen.getByTestId("restore-button"));
+    expect(actions.handleRestoreNodeVersion).toHaveBeenCalledWith("n1", 2); // latest old version
+  });
+
+  it("restores the version the user switched to (2c)", () => {
+    useCanvasStore.setState({ nodeVersions: { n1: VERSIONS } });
+    const actions = makeActions();
+    render(<NodeVersionHistory node={makeNode({ result: { url: "current.png" } })} actions={actions} />);
+    fireEvent.click(screen.getByTestId("version-row-1"));
+    fireEvent.click(screen.getByTestId("restore-button"));
+    expect(actions.handleRestoreNodeVersion).toHaveBeenCalledWith("n1", 1);
+  });
+
+  it("disables the restore button while the node is generating — race guard (2c)", () => {
+    useCanvasStore.setState({ nodeVersions: { n1: VERSIONS } });
+    const actions = makeActions();
+    render(<NodeVersionHistory node={makeNode({ asset_status: "generating", result: null })} actions={actions} />);
+    const btn = screen.getByTestId("restore-button") as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    fireEvent.click(btn);
+    expect(actions.handleRestoreNodeVersion).not.toHaveBeenCalled();
+  });
+
+  it("resets the compare selection after restore so it auto-advances to the freshly-archived version (2c)", () => {
+    useCanvasStore.setState({ nodeVersions: { n1: VERSIONS } });
+    render(<NodeVersionHistory node={makeNode({ result: { url: "current.png" } })} actions={makeActions()} />);
+    fireEvent.click(screen.getByTestId("version-row-1")); // pin v1 → old col = v1.png
+    expect(
+      within(screen.getByTestId("version-compare")).getAllByRole("img").map((i) => i.getAttribute("src")),
+    ).toEqual(["current.png", "v1.png"]);
+    fireEvent.click(screen.getByTestId("restore-button")); // restore resets selection → back to latest
+    expect(
+      within(screen.getByTestId("version-compare")).getAllByRole("img").map((i) => i.getAttribute("src")),
+    ).toEqual(["current.png", "v2.png"]);
   });
 });

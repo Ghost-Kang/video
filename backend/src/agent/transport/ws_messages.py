@@ -149,6 +149,17 @@ class ListNodeVersionsMsg(_Base):
     node_id: str
 
 
+class RestoreNodeVersionMsg(_Base):
+    """time-travel 回溯(P2 slice-2c)— 回滚节点到某旧版:快照当前(不丢)→ 换回旧产物
+    → 标脏下游。回 canvas_updated + node_versions_returned(列表已含刚归档的当前)。
+    回滚换的是已生成的旧产物,不调模型/不入队/不花钱,故无 cost guard。"""
+
+    type: Literal["restore_node_version"]
+    thread_id: str = Field(min_length=1)
+    node_id: str
+    version_seq: int
+
+
 class ReviewDecisionMsg(_Base):
     """P2 审核闸门 — 用户对 `review_required` 的决策(approve/edit/reject)。
 
@@ -195,6 +206,7 @@ WSInbound = Annotated[
         OptimizePromptMsg,
         RegenerateNodeMsg,
         ListNodeVersionsMsg,
+        RestoreNodeVersionMsg,
         ReviewDecisionMsg,
         UserMessageMsg,
     ],
@@ -456,6 +468,7 @@ INBOUND_MODELS: dict[str, type[_Base]] = {
     "optimize_prompt": OptimizePromptMsg,
     "regenerate_node": RegenerateNodeMsg,
     "list_node_versions": ListNodeVersionsMsg,
+    "restore_node_version": RestoreNodeVersionMsg,
     "review_decision": ReviewDecisionMsg,
     "user_message": UserMessageMsg,
 }

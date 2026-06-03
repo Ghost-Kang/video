@@ -23,7 +23,14 @@ def snapshot_version(
     """把 node 的**当前**产物快照成一行,返回新 version_seq。
 
     在 regenerate 覆盖节点产物**之前**调用 —— 旧版本(description+result+asset_status)
-    存档,2b 可回看/对比。版本号每节点自增(MAX+1)。"""
+    存档,2b 可回看/对比。版本号每节点自增(MAX+1)。
+
+    **无产物不存**:result=None 没什么可归档。regenerate/restore 在 mid-generation
+    (节点已被清成 result=None/asset=generating)时可能传进没产物的 node,跳过避免写
+    result=None 的 junk 归档行(否则 NodeVersionHistory 默认选中它、回滚到它会把节点弄成
+    product-less 卡死)。返回 0 表示未写。"""
+    if node.get("result") is None:
+        return 0
     uid, tid = _resolve_ids(user_id, thread_id)
     db = _db()
     try:

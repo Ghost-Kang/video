@@ -48,6 +48,8 @@ function makeActions(over: Partial<NodeActions> = {}): NodeActions {
     handleExecuteNode: vi.fn(),
     handleUpdateNodeStatus: vi.fn(),
     handleRegenerateNode: vi.fn(),
+    handleListNodeVersions: vi.fn(),
+    handleRestoreNodeVersion: vi.fn(),
     handleOptimizePrompt: vi.fn(),
     handleCreateEdge: vi.fn(),
     handleDeleteEdge: vi.fn(),

@@ -37,6 +37,7 @@ from agent.transport.ws_messages import (
     OptimizePromptMsg,
     RegenerateNodeMsg,
     ReorderEdgeMsg,
+    RestoreNodeVersionMsg,
     ReviewDecisionMsg,
     ReviewNodeMsg,
     UpdateNodeStatusMsg,
@@ -476,6 +477,27 @@ async def handle_list_node_versions(ctx: WSCtx, msg: ListNodeVersionsMsg) -> Non
     )
 
 
+async def handle_restore_node_version(ctx: WSCtx, msg: RestoreNodeVersionMsg) -> None:
+    """time-travel 回溯(P2 slice-2c)— 回滚节点到某旧版:快照当前 → 换回旧产物 → 标脏下游。
+    回 canvas_updated(节点新产物 + 下游 needs_regen)+ node_versions_returned(列表已含刚
+    归档的当前,免得 NodeVersionHistory 因 asset_status 没变而漏掉新版)。不调模型 → 无 cost guard。"""
+
+    def _work() -> tuple[dict | None, list[dict]]:
+        canvas_tools.set_thread_id(msg.thread_id)
+        canvas_tools.restore_node_version(msg.node_id, msg.version_seq)
+        return canvas_data(msg.thread_id), canvas_tools.list_versions(msg.node_id)
+
+    snapshot, versions = await asyncio.to_thread(_work)
+    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
+    await send_json(
+        ctx.ws,
+        type="node_versions_returned",
+        thread_id=msg.thread_id,
+        node_id=msg.node_id,
+        versions=versions,
+    )
+
+
 async def handle_update_node_status(ctx: WSCtx, msg: UpdateNodeStatusMsg) -> None:
     print(f"[状态] update_node_status node={msg.node_id} → {msg.node_status}")
 
@@ -569,6 +591,7 @@ HANDLERS: dict[str, tuple[type, HandlerFn]] = {
     "optimize_prompt": (OptimizePromptMsg, handle_optimize_prompt),
     "regenerate_node": (RegenerateNodeMsg, handle_regenerate_node),
     "list_node_versions": (ListNodeVersionsMsg, handle_list_node_versions),
+    "restore_node_version": (RestoreNodeVersionMsg, handle_restore_node_version),
     "review_decision": (ReviewDecisionMsg, handle_review_decision),
     "user_message": (UserMessageMsg, handle_user_message),
 }

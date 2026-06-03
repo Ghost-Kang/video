@@ -559,6 +559,59 @@ def regenerate_node(node_id: str, reason: str = "regenerate") -> dict | None:
     return _load_node(node_id)
 
 
+def restore_node_version(
+    node_id: str, version_seq: int, reason: str = "restore"
+) -> dict | None:
+    """回滚节点到某个旧版本(time-travel 回溯 P2 slice-2c):先把**当前**产物快照存版本
+    (current 不丢 → 回滚可逆,append-only),再把节点产物换成 version_seq 的旧版,最后标脏
+    下游(产物变了,下游过时)。
+
+    回滚是**换回已生成的旧产物**(media 的 result.url 指向 media_root 里仍在的文件),
+    不调模型、不入队、不花钱 —— 故无 cost guard(区别于 regenerate_node)。
+
+    拒绝/无效一律返回 None(由 handler 回推当前快照,不报错):节点不存在、生成在途、
+    版本不存在、或目标版本无产物。"""
+    node = _load_node(node_id)
+    if not node:
+        return None
+    # 生成在途时拒绝回滚:worker 完成后是无 guard 的 load-modify-write(image_pipeline →
+    # update_generation_state/_update_node_result),会盖掉回滚结果并留陈旧 generation_task_id。
+    # 前端也禁用按钮兜一道(NodeVersionHistory),这里是后端硬闸防竞态。
+    if node.get("generation_status") in ("pending", "submitted", "polling"):
+        return None
+    target = next(
+        (v for v in list_versions(node_id) if v["version_seq"] == version_seq), None
+    )
+    if target is None:
+        return None
+    # 回滚目标必须有产物 —— 不能回滚到「无产物」的旧版(历史 junk 行 / 失败快照),否则把
+    # 节点弄成 product-less。snapshot_version 已从源头跳过 null,新版本不会再有 junk;此处
+    # 兼容守旧库里可能残留的 null 行。
+    if target.get("result") is None:
+        return None
+    # 1. 快照**当前**产物(覆盖前)。best-effort:版本写失败不挡回滚;snapshot_version 自身
+    #    跳过 result=None,不写 junk。
+    try:
+        snapshot_version(node, reason)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[restore] snapshot 失败 node={node_id}: {exc}")
+    # 2. 换回旧产物。target.result 非空(上面已 guard)→ asset_status 一律置终态 done,不照抄
+    #    归档值(归档时可能是 failed/timeout);清 generation_task_id 防陈旧 worker 回写。
+    node["result"] = target["result"]
+    node["description"] = target.get("description", node.get("description", ""))
+    node["asset_status"] = "done"
+    node["generation_status"] = "done"
+    node["generation_task_id"] = None
+    node["generation_error"] = None
+    node["generation_lease_until"] = None
+    node["generation_next_retry_at"] = None
+    node["needs_regen"] = False
+    _upsert_node(node)
+    # 3. 标下游脏(本节点产物变了 → 下游参考过时)。
+    _mark_descendants_stale(node_id)
+    return _load_node(node_id)
+
+
 __all__ = [
     # types
     "NodeType",

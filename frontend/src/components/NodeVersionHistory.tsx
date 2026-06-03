@@ -31,6 +31,11 @@ export function NodeVersionHistory({ node, actions }: { node: CanvasNode; action
     selectedSeq ?? (versions && versions.length ? versions[versions.length - 1].version_seq : null);
   const selected = versions?.find((v) => v.version_seq === effectiveSeq) ?? null;
 
+  // 生成在途禁用回滚:后端会硬拒(worker 完成会盖掉回滚结果),前端先禁按钮兜一道。
+  const inFlight =
+    node.asset_status === "generating" ||
+    ["pending", "submitted", "polling"].includes(node.generation_status);
+
   return (
     <section style={S.section} data-testid="node-version-history">
       <div style={S.label}>版本历史{versions ? ` (${versions.length})` : ""}</div>
@@ -76,6 +81,27 @@ export function NodeVersionHistory({ node, actions }: { node: CanvasNode; action
                 <div style={S.muted}>
                   {fmtTime(selected.created_at)} · {selected.asset_status}
                 </div>
+                {/* 2c 一键回滚:换回此旧版(当前自动存档,可再切回);下游标记需重生。
+                    单击即回滚 —— 与 NodeActionBar「↻ 重生」同为一键级联,且回滚可逆(更安全)。 */}
+                <button
+                  type="button"
+                  disabled={inFlight}
+                  style={inFlight ? S.restoreBtnDisabled : S.restoreBtn}
+                  title={
+                    inFlight
+                      ? "生成中 —— 完成后才能回滚"
+                      : "回滚到此版 —— 当前产物自动存档(可再切回);下游会标记需重生"
+                  }
+                  onClick={() => {
+                    actions.handleRestoreNodeVersion(node.id, selected.version_seq);
+                    // 回滚后清掉手动选中 —— 待 node_versions_returned 回来,对比自动前进到
+                    // 刚归档的「回滚前」产物(否则两栏会显示同一张图,见 2c review)。
+                    setSelectedSeq(null);
+                  }}
+                  data-testid="restore-button"
+                >
+                  ↩ 回滚到此版
+                </button>
               </div>
             </div>
           )}
@@ -177,5 +203,27 @@ const S: Record<string, React.CSSProperties> = {
     textAlign: "center",
     background: "#f4f4f5",
     borderRadius: 4,
+  },
+  restoreBtn: {
+    marginTop: 2,
+    fontSize: 11,
+    padding: "4px 8px",
+    borderRadius: 6,
+    border: "1px solid #7c2d12",
+    background: "#7c2d12",
+    color: "#faf8f3",
+    cursor: "pointer",
+    fontWeight: 600,
+  },
+  restoreBtnDisabled: {
+    marginTop: 2,
+    fontSize: 11,
+    padding: "4px 8px",
+    borderRadius: 6,
+    border: "1px solid #e4e4e7",
+    background: "#f4f4f5",
+    color: "#a1a1aa",
+    cursor: "not-allowed",
+    fontWeight: 600,
   },
 };

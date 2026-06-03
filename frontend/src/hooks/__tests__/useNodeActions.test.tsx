@@ -29,4 +29,11 @@ describe("useNodeActions — regenerate", () => {
     result.current.handleListNodeVersions("n5");
     expect(send).toHaveBeenCalledWith({ type: "list_node_versions", thread_id: "t1", node_id: "n5" });
   });
+
+  it("handleRestoreNodeVersion sends a restore_node_version command (2c)", () => {
+    const send = vi.fn();
+    const { result } = renderHook(() => useNodeActions("t1", send, vi.fn()));
+    result.current.handleRestoreNodeVersion("n5", 2);
+    expect(send).toHaveBeenCalledWith({ type: "restore_node_version", thread_id: "t1", node_id: "n5", version_seq: 2 });
+  });
 });

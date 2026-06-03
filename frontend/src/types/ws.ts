@@ -170,6 +170,15 @@ export interface ListNodeVersionsMsg {
   node_id: string;
 }
 
+/** time-travel 回溯(P2 slice-2c)— 前端 → 服务端:回滚节点到某旧版(快照当前→换回旧产物→
+ *  标脏下游)。回 canvas_updated + node_versions_returned。换的是已成产物,不调模型/不花钱。 */
+export interface RestoreNodeVersionMsg {
+  type: "restore_node_version";
+  thread_id: string;
+  node_id: string;
+  version_seq: number;
+}
+
 /** time-travel 回溯(P2 slice-2b)— 服务端 → 前端:某节点的版本快照列表(升序)。
  *  对应后端 NodeVersionsReturnedEvent;NodeVersionHistory 渲染历史 + 当前 vs 旧版对比。 */
 export interface NodeVersionsReturnedEvent {
@@ -224,6 +233,7 @@ export type WSCommand =
   | OptimizePromptMsg
   | RegenerateNodeMsg
   | ListNodeVersionsMsg
+  | RestoreNodeVersionMsg
   | ReviewDecisionMsg
   | UserMessageMsg;
 
