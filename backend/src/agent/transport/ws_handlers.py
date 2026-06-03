@@ -35,6 +35,7 @@ from agent.transport.ws_messages import (
     ListSessionsMsg,
     OptimizePromptMsg,
     ReorderEdgeMsg,
+    ReviewDecisionMsg,
     ReviewNodeMsg,
     UpdateNodeStatusMsg,
     UpdatePositionMsg,
@@ -79,6 +80,23 @@ async def _run_agent_serialized(ctx: WSCtx, msg: UserMessageMsg) -> None:
             msg.content,
             ctx.ws,
             selected_niche=msg.selected_niche,
+        )
+
+
+async def _resume_agent_serialized(ctx: WSCtx, msg: ReviewDecisionMsg) -> None:
+    """Resume a paused (awaiting-review) Director turn under the SAME per-thread
+    lock as run_agent. The lock serializes a resume against a concurrent
+    user_message so they never drive the same LangGraph checkpoint at once (a
+    double-click resume / race would otherwise corrupt the paused state)."""
+    lock = _get_thread_run_lock(msg.thread_id)
+    async with lock:
+        await agent_runner.resume_agent(
+            ctx.user_id,
+            ctx.pool,
+            msg.thread_id,
+            msg.decisions,
+            ctx.ws,
+            interrupt_id=msg.interrupt_id,
         )
 
 
@@ -164,6 +182,26 @@ async def handle_get_session_state(ctx: WSCtx, msg: GetSessionStateMsg) -> None:
     # rewrite_returned are the same frames the cascade tool pushes live, so the
     # frontend renders them through its existing handlers (zero UI change).
     await _replay_results(ctx, msg.thread_id)
+    # P2 — if the run is paused at a review gate, re-push the approval card so a
+    # reconnect (or reload) re-shows it instead of leaving the user stuck.
+    if run_status == "awaiting_review":
+        await _maybe_replay_review(ctx, msg.thread_id)
+
+
+async def _maybe_replay_review(ctx: WSCtx, thread_id: str) -> None:
+    """Reconnect replay of the pending review card. The review payload lives in the
+    LangGraph checkpoint (single source of truth); pool the agent, read it via
+    aget_state, and re-push `review_required`. Best-effort — never blocks
+    session_state. If no interrupt is pending (already resumed), do nothing."""
+    try:
+        entry = await ctx.pool.get(ctx.user_id, thread_id)
+        snap = await entry["agent"].aget_state(entry["config"])
+        if snap.interrupts:
+            intr = snap.interrupts[0]
+            frame = agent_runner._build_review_frame(thread_id, intr.value, intr.id or "")
+            await send_json(ctx.ws, **frame)
+    except Exception as exc:  # best-effort; replay never blocks session_state
+        print(f"[replay] review for thread={thread_id} failed: {exc}")
 
 
 async def _replay_results(ctx: WSCtx, thread_id: str) -> None:
@@ -399,6 +437,21 @@ async def handle_optimize_prompt(ctx: WSCtx, msg: OptimizePromptMsg) -> None:
 
 async def handle_user_message(ctx: WSCtx, msg: UserMessageMsg) -> None:
     print(f"[用户] thread={msg.thread_id} niche={msg.selected_niche} {msg.content[:80]}...")
+    # P2 — refuse a new message while a review gate is pending on this thread.
+    # Feeding fresh {messages:[...]} input to a graph paused at an interrupt
+    # silently DISCARDS the pending gated tool call (and a later 确认生成 no-ops).
+    # The frontend scrim already blocks this in the UI; this is defense-in-depth
+    # for non-UI paths (a second tab, a queued/reconnect resend). Cache-only read
+    # (sync, hot-path cheap): an awaiting_review thread is recent + in cache.
+    st = run_state.get(msg.thread_id)
+    if st is not None and st.get("status") == "awaiting_review":
+        await send_json(
+            ctx.ws,
+            type="error",
+            code="review_pending",
+            message="有一步生成在等你确认,先点「确认生成」或「先不生成」再继续。",
+        )
+        return
     # 仅在用户带 niche 时记一条 telemetry — 让 /admin/events 能看到 WS 字段
     # 真的端到端打通了(不依赖 LLM 走到 rewrite 才能验证)。emit 失败不应阻塞
     # 用户消息流(telemetry 是 best-effort)。
@@ -413,6 +466,14 @@ async def handle_user_message(ctx: WSCtx, msg: UserMessageMsg) -> None:
         except Exception as exc:
             print(f"[telemetry] niche_selected emit failed: {exc}")
     asyncio.create_task(_run_agent_serialized(ctx, msg))
+    await send_json(ctx.ws, type="processing", thread_id=msg.thread_id)
+
+
+async def handle_review_decision(ctx: WSCtx, msg: ReviewDecisionMsg) -> None:
+    """P2 审核闸门 — 用户对暂停的生成做了 approve/edit/reject 决策 → resume graph。
+    与 user_message 一样:后台 task 串行执行(同线程锁),立即回 processing。"""
+    print(f"[审核] review_decision thread={msg.thread_id} decisions={len(msg.decisions)}")
+    asyncio.create_task(_resume_agent_serialized(ctx, msg))
     await send_json(ctx.ws, type="processing", thread_id=msg.thread_id)
 
 
@@ -434,6 +495,7 @@ HANDLERS: dict[str, tuple[type, HandlerFn]] = {
     "execute_node": (ExecuteNodeMsg, handle_execute_node),
     "update_node_status": (UpdateNodeStatusMsg, handle_update_node_status),
     "optimize_prompt": (OptimizePromptMsg, handle_optimize_prompt),
+    "review_decision": (ReviewDecisionMsg, handle_review_decision),
     "user_message": (UserMessageMsg, handle_user_message),
 }
 

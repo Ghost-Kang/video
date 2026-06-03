@@ -39,6 +39,25 @@ _prompts_dir = Path(__file__).resolve().parent / "prompts"
 _DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
 
+def build_interrupt_on() -> dict | None:
+    """审核闸门配置:受管控的生成工具 → LangGraph 原生 interrupt(approve/edit/reject)。
+
+    读 `config.CANVAS_INTERRUPT_GATE`(默认 OFF) + `INTERRUPT_GATE_TOOLS`。返回 None
+    表示不挂闸门(deepagents 不加 HumanInTheLoopMiddleware,行为与今天完全一致)。
+    单独成函数,方便 pool / 测试按需构造带闸门的 agent,不依赖进程环境变量。
+
+    `respond` 决策(替工具回话、跳过执行)对生成工具无意义,故只放 approve/edit/reject。
+    """
+    from agent.config import CANVAS_INTERRUPT_GATE, INTERRUPT_GATE_TOOLS
+
+    if not CANVAS_INTERRUPT_GATE or not INTERRUPT_GATE_TOOLS:
+        return None
+    return {
+        name: {"allowed_decisions": ["approve", "edit", "reject"]}
+        for name in INTERRUPT_GATE_TOOLS
+    }
+
+
 def _make_backend() -> CompositeBackend:
     return CompositeBackend(
         default=StateBackend(),
@@ -51,8 +70,14 @@ def _make_backend() -> CompositeBackend:
     )
 
 
-def create_director_agent(checkpointer=None):
-    """创建导演 agent，单 agent 承担全部创作角色。"""
+def create_director_agent(checkpointer=None, interrupt_on: dict | None = "default"):
+    """创建导演 agent，单 agent 承担全部创作角色。
+
+    `interrupt_on`:None=不挂闸门;dict=显式闸门配置(测试用);默认哨兵 "default"
+    =从 config 读(`build_interrupt_on()`),让生产走开关、测试可显式覆盖而不碰环境变量。
+    """
+    if interrupt_on == "default":
+        interrupt_on = build_interrupt_on()
     model = get_chat_model()
     system_prompt = (_prompts_dir / "director.md").read_text(encoding="utf-8")
     canvas_prompt = (_prompts_dir / "canvas-manager.md").read_text(encoding="utf-8")
@@ -83,6 +108,7 @@ def create_director_agent(checkpointer=None):
         backend=_make_backend(),
         name="director",
         checkpointer=checkpointer,
+        interrupt_on=interrupt_on,
     )
 
 

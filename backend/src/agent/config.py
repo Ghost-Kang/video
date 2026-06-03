@@ -56,6 +56,25 @@ AUTO_SHOWCASE_MAX = int(os.getenv("AUTO_SHOWCASE_MAX", "10") or "10")
 # 自动发布案例至少需要几幕成功抽到 clip(无 clip 的卡退化成静态,落地页轮播体验差)。
 AUTO_SHOWCASE_MIN_CLIPS = int(os.getenv("AUTO_SHOWCASE_MIN_CLIPS", "3") or "3")
 
+# -------- 审核闸门(LangGraph interrupt,canvas 统筹 P2 slice-1)--------
+# 把「烧钱的生成工具」从 director.md 的口头约定(「只创建不执行 / 跑过头」)升级为
+# LangGraph 原生 interrupt() 审核闸门:Director **自主**调生成工具前 graph 真的暂停,
+# 前端弹审核卡,用户确认/拒绝后 Command(resume) 续跑。默认 OFF —— 拆细灰度(D5),
+# 先 dark-launch、充分测试再开;开关切换需重启进程(agent 实例池在构造时读)。
+# 注意:用户显式点「生成」(CardStack 的 [generate_*] 标记)会被 run_agent 自动批准,
+# 不弹二次确认 —— 闸门只拦「自主烧钱」,不拦「用户已点的生成」。
+CANVAS_INTERRUPT_GATE = os.getenv("CANVAS_INTERRUPT_GATE", "0").strip().lower() not in ("0", "false", "no", "off", "")
+# 受闸门管控的工具名(逗号分隔可覆盖)。默认 = 三个会真的花钱/不可逆的生成工具。
+# compose 本身免费,但「合成成片」是叙事终点闸门(plan §3 成片闸门),一并纳入。
+INTERRUPT_GATE_TOOLS = frozenset(
+    t.strip()
+    for t in os.getenv(
+        "INTERRUPT_GATE_TOOLS",
+        "cascade_generate_first_frame,cascade_generate_shot_video,cascade_compose_film",
+    ).split(",")
+    if t.strip()
+)
+
 # -------- 视频生成 --------
 VIDEO_GEN_API_KEY = os.getenv("VIDEO_GEN_API_KEY")
 VIDEO_GEN_BASE_URL = os.getenv("VIDEO_GEN_BASE_URL")
