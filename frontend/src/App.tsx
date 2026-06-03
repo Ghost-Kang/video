@@ -7,6 +7,7 @@ import { CanvasChatDock } from "./components/CanvasChatDock";
 import { Header } from "./components/Header";
 import { DarkModeToggle } from "./components/landing/DarkModeToggle";
 import { NodeDetail } from "./components/NodeDetail";
+import { AnchorSidebar } from "./components/anchors/AnchorSidebar";
 import { ReviewGate } from "./components/ReviewGate";
 import { NodeActionsContext } from "./lib/nodeActionsContext";
 import { Sidebar } from "./components/Sidebar";
@@ -312,6 +313,8 @@ export default function App({ userId, onLogout }: AppProps) {
           {isProView ? (
             <NodeActionsContext.Provider value={actions}>
               <Canvas onPositionChange={(pos) => sendCommand({ ...pos, thread_id: tid })} onCreateEdge={actions.handleCreateEdge} onDeleteEdge={actions.handleDeleteEdge} />
+              {/* P1 锚点级联护城河:跨片角色/场景锚点复用侧栏(自取数据,画布创作时可见) */}
+              <AnchorSidebar />
               {selectedNodeId && <NodeDetail actions={actions} />}
             </NodeActionsContext.Provider>
           ) : <CardStack onGenerateFirstFrame={onGenerateFirstFrame} onTriggerRewrite={onTriggerRewrite} onGenerateShotVideo={onGenerateShotVideo} onComposeFilm={onComposeFilm} pendingCase={pendingCase} thinking={thinking} onSeedCanvas={onSeedCanvas} />}
