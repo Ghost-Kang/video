@@ -15,6 +15,9 @@ export interface NodeActions {
     generateAudio?: boolean,
   ) => void;
   handleUpdateNodeStatus: (nodeId: string, nodeStatus: NodeStatus) => void;
+  /** time-travel 回溯(P2 slice-2)— 重生节点:快照旧版 → 清 + 入队 → 标脏下游。
+   *  与 handleExecuteNode 的区别:execute_node 只生成,不快照、不标脏下游。 */
+  handleRegenerateNode: (nodeId: string) => void;
   handleOptimizePrompt: (nodeId: string, prompt: string, feedback: string) => void;
   handleCreateEdge: (source: string, target: string) => void;
   handleDeleteEdge: (edgeId: string) => void;
@@ -56,6 +59,13 @@ export function useNodeActions(
     [sendCommand, threadId],
   );
 
+  const handleRegenerateNode = useCallback(
+    (nodeId: string) => {
+      sendCommand({ type: "regenerate_node", thread_id: threadId, node_id: nodeId });
+    },
+    [sendCommand, threadId],
+  );
+
   const handleOptimizePrompt = useCallback(
     (nodeId: string, prompt: string, feedback: string) => {
       sendCommand({ type: "optimize_prompt", thread_id: threadId, node_id: nodeId, prompt, feedback });
@@ -83,11 +93,12 @@ export function useNodeActions(
       handleReview,
       handleExecuteNode,
       handleUpdateNodeStatus,
+      handleRegenerateNode,
       handleOptimizePrompt,
       handleCreateEdge,
       handleDeleteEdge,
       handleReorderEdge,
     }),
-    [handleReview, handleExecuteNode, handleUpdateNodeStatus, handleOptimizePrompt, handleCreateEdge, handleDeleteEdge, handleReorderEdge],
+    [handleReview, handleExecuteNode, handleUpdateNodeStatus, handleRegenerateNode, handleOptimizePrompt, handleCreateEdge, handleDeleteEdge, handleReorderEdge],
   );
 }

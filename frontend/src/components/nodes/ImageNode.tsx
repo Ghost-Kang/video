@@ -1,6 +1,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { CanvasNode, AssetStatus } from "../../types";
 import { NodeActionBar } from "./NodeActionBar";
+import { NeedsRegenBadge } from "./NeedsRegenBadge";
 
 export function ImageNode({ data, selected }: NodeProps) {
   const node = data.node as CanvasNode;
@@ -27,6 +28,7 @@ export function ImageNode({ data, selected }: NodeProps) {
 
       <span style={S.badge(node.node_status)}>{node.node_status}</span>
       {asset !== "idle" && <span style={S.assetBadge(asset)} className={isGenerating ? "badge-pulse" : ""}>{asset}</span>}
+      <NeedsRegenBadge node={node} />
 
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }

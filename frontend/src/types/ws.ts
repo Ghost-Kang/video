@@ -142,6 +142,16 @@ export interface DeleteSessionsMsg {
   thread_ids: string[];
 }
 
+/** time-travel 回溯(P2 slice-2)— 重生一个节点:旧产物快照存版本 → 清 + 入队重生 →
+ *  下游标脏。对应后端 ws_messages.RegenerateNodeMsg。手写在此(非 ws_generated)以免为
+ *  单个命令重跑 schema 生成器(同 DeleteSessionsMsg / ReviewDecisionMsg 的先例)。
+ *  进度 / needs_regen 经现有 canvas_updated 快照回前端,无需新 outbound 帧。 */
+export interface RegenerateNodeMsg {
+  type: "regenerate_node";
+  thread_id: string;
+  node_id: string;
+}
+
 /** P2 审核闸门 — 一条被拦的生成工具调用(对应后端 _build_review_frame 的 reviews[i])。 */
 export interface ReviewItem {
   tool: string;
@@ -185,6 +195,7 @@ export type WSCommand =
   | ExecuteNodeMsg
   | UpdateNodeStatusMsg
   | OptimizePromptMsg
+  | RegenerateNodeMsg
   | ReviewDecisionMsg
   | UserMessageMsg;
 
