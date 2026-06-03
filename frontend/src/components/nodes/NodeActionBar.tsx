@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { NodeToolbar, Position } from "@xyflow/react";
 import type { CanvasNode } from "../../types";
 import { NodeActionsContext } from "../../lib/nodeActionsContext";
@@ -14,6 +14,9 @@ import { NodeActionsContext } from "../../lib/nodeActionsContext";
  */
 export function NodeActionBar({ node, selected }: { node: CanvasNode; selected?: boolean }) {
   const actions = useContext(NodeActionsContext);
+  // 脚本重生反馈表单的本地态(2d)。hooks 必须在任何 early return 之前(rules-of-hooks)。
+  const [scriptRegenOpen, setScriptRegenOpen] = useState(false);
+  const [scriptFeedback, setScriptFeedback] = useState("");
   if (!actions) return null;
 
   const asset = node.asset_status || "idle";
@@ -46,30 +49,82 @@ export function NodeActionBar({ node, selected }: { node: CanvasNode; selected?:
       ? "上游已变,此节点尚无产物 —— 生成即按新上游"
       : "生成此节点的图 / 视频";
 
+  // 脚本重生(2d):脚本内容由 Director 写,无生成 worker → 点重生弹反馈框,提交后后端快照旧版
+  // + 标脏下游 + 触发 Director 按反馈重写。任何有内容的脚本节点都可重写。
+  const isScript = node.type === "script" && !!node.result;
+  const submitScriptRegen = () => {
+    actions.handleRegenerateScriptNode(node.id, scriptFeedback.trim());
+    setScriptRegenOpen(false);
+    setScriptFeedback("");
+  };
+  const closeScriptRegen = () => {
+    setScriptRegenOpen(false);
+    setScriptFeedback("");
+  };
+
   return (
     <NodeToolbar isVisible={!!selected} position={Position.Top}>
-      <div style={S.bar}>
-        {reviewing && (
-          <button
-            type="button"
-            style={S.btn}
-            title="确认此节点,解锁下游创建"
-            onClick={() => actions.handleUpdateNodeStatus(node.id, "confirmed")}
-          >
-            ✓ 确认
+      {isScript && scriptRegenOpen ? (
+        <div
+          style={S.form}
+          className="nodrag nopan"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <input
+            autoFocus
+            className="nodrag"
+            style={S.input}
+            value={scriptFeedback}
+            onChange={(e) => setScriptFeedback(e.target.value)}
+            placeholder="怎么改?(可留空=自动)"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitScriptRegen();
+              else if (e.key === "Escape") closeScriptRegen();
+            }}
+            data-testid="script-regen-input"
+          />
+          <button type="button" style={S.btn} onClick={closeScriptRegen}>
+            取消
           </button>
-        )}
-        {isMedia && confirmed && asset !== "generating" && (
-          <button
-            type="button"
-            style={node.needs_regen ? S.btnStale : S.btnPrimary}
-            title={genTitle}
-            onClick={onGen}
-          >
-            {genLabel}
+          <button type="button" style={S.btnPrimary} onClick={submitScriptRegen} data-testid="script-regen-submit">
+            重生
           </button>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div style={S.bar}>
+          {reviewing && (
+            <button
+              type="button"
+              style={S.btn}
+              title="确认此节点,解锁下游创建"
+              onClick={() => actions.handleUpdateNodeStatus(node.id, "confirmed")}
+            >
+              ✓ 确认
+            </button>
+          )}
+          {isMedia && confirmed && asset !== "generating" && (
+            <button
+              type="button"
+              style={node.needs_regen ? S.btnStale : S.btnPrimary}
+              title={genTitle}
+              onClick={onGen}
+            >
+              {genLabel}
+            </button>
+          )}
+          {isScript && (
+            <button
+              type="button"
+              style={node.needs_regen ? S.btnStale : S.btnPrimary}
+              title="重写策划书 —— 让导演按你的反馈重写(旧版自动存档,可对比/回滚;下游标记需重生)"
+              onClick={() => setScriptRegenOpen(true)}
+              data-testid="script-regen-open"
+            >
+              ↻ 重生
+            </button>
+          )}
+        </div>
+      )}
     </NodeToolbar>
   );
 }
@@ -112,5 +167,25 @@ const S: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     color: "#fff",
     fontWeight: 600,
+  },
+  // 脚本重生反馈表单(2d)。
+  form: {
+    display: "flex",
+    gap: 6,
+    alignItems: "center",
+    background: "#fff",
+    border: "1px solid #d4d4d8",
+    borderRadius: 8,
+    padding: 4,
+    boxShadow: "0 2px 10px rgba(0,0,0,0.10)",
+  },
+  input: {
+    fontSize: 11,
+    padding: "3px 8px",
+    borderRadius: 6,
+    border: "1px solid #d4d4d8",
+    outline: "none",
+    width: 180,
+    color: "#18181b",
   },
 };

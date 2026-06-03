@@ -620,9 +620,21 @@ class TestInboundModelsRegistry:
             "reorder_edge", "create_edge", "delete_edge", "update_position",
             "review_node", "execute_node", "update_node_status",
             "optimize_prompt", "regenerate_node", "list_node_versions",
-            "restore_node_version", "review_decision", "user_message",
+            "restore_node_version", "regenerate_script_node",
+            "review_decision", "user_message",
         }
         assert set(INBOUND_MODELS) == expected, (
             f"INBOUND_MODELS keys drift: extra={set(INBOUND_MODELS) - expected}, "
             f"missing={expected - set(INBOUND_MODELS)}"
         )
+
+    def test_wsinbound_union_covers_every_inbound_model(self):
+        """WSInbound 判别联合必须含 INBOUND_MODELS 里的每个模型 —— 否则 TypeAdapter(WSInbound)
+        会误拒一个合法消息(曾漏 DeleteSessionsMsg:在 INBOUND_MODELS/HANDLERS/前端都有、唯独
+        不在 union 里)。守住这条防再漂移。"""
+        from typing import get_args
+
+        union = get_args(WSInbound)[0]  # Annotated[Union[...], meta] → 取 Union[...]
+        members = set(get_args(union))
+        missing = set(INBOUND_MODELS.values()) - members
+        assert not missing, f"WSInbound union 漏了 INBOUND_MODELS 里的模型: {[m.__name__ for m in missing]}"

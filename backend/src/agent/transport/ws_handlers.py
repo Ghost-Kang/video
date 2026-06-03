@@ -36,6 +36,7 @@ from agent.transport.ws_messages import (
     ListSessionsMsg,
     OptimizePromptMsg,
     RegenerateNodeMsg,
+    RegenerateScriptNodeMsg,
     ReorderEdgeMsg,
     RestoreNodeVersionMsg,
     ReviewDecisionMsg,
@@ -498,6 +499,53 @@ async def handle_restore_node_version(ctx: WSCtx, msg: RestoreNodeVersionMsg) ->
     )
 
 
+async def handle_regenerate_script_node(ctx: WSCtx, msg: RegenerateScriptNodeMsg) -> None:
+    """time-travel 回溯(P2 slice-2d)— 重生 script(策划书)节点:快照旧内容 + 标脏下游,
+    再触发 Director 按 feedback 重写(脚本无生成 worker → 走 agent,不入生成队列)。
+
+    回 canvas_updated(下游 needs_regen)+ node_versions_returned(含刚归档的旧内容);
+    Director 异步 update_canvas_node 写新内容后,再经 agent 流 + canvas_updated 推回。"""
+    # 与 user_message 同:审核闸门待决时拒绝(喂新输入会丢掉被拦的工具调用)。
+    st = run_state.get(msg.thread_id)
+    if st is not None and st.get("status") == "awaiting_review":
+        await send_json(
+            ctx.ws,
+            type="error",
+            code="review_pending",
+            message="有一步生成在等你确认,先点「确认生成」或「先不生成」再继续。",
+        )
+        return
+
+    def _work() -> tuple[dict | None, dict | None, list[dict]]:
+        canvas_tools.set_thread_id(msg.thread_id)
+        regenerated = canvas_tools.regenerate_script_node(msg.node_id)
+        return regenerated, canvas_data(msg.thread_id), canvas_tools.list_versions(msg.node_id)
+
+    regenerated, snapshot, versions = await asyncio.to_thread(_work)
+    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
+    if regenerated is None:
+        # 非 script / 无内容 —— 不是可重写脚本,不触发 Director。
+        return
+    await send_json(
+        ctx.ws,
+        type="node_versions_returned",
+        thread_id=msg.thread_id,
+        node_id=msg.node_id,
+        versions=versions,
+    )
+
+    # 触发 Director 重写(异步,与 user_message 同一条 per-thread serialized agent 路径)。
+    fb = (msg.feedback or "").strip()
+    fb_clause = f"用户的修改反馈:{fb}" if fb else "参考当前分析与上游,产出一版更有钩子的策划书"
+    instruction = (
+        f"【重写策划书】{fb_clause}。请用 update_canvas_node 更新策划书节点 {msg.node_id} 的"
+        f"完整内容(description=新的完整策划书 Markdown)。用户已在画布上点「重生」授权,"
+        f"直接重写、不必再向用户确认。"
+    )
+    synth = UserMessageMsg(type="user_message", thread_id=msg.thread_id, content=instruction)
+    asyncio.create_task(_run_agent_serialized(ctx, synth))
+
+
 async def handle_update_node_status(ctx: WSCtx, msg: UpdateNodeStatusMsg) -> None:
     print(f"[状态] update_node_status node={msg.node_id} → {msg.node_status}")
 
@@ -592,6 +640,7 @@ HANDLERS: dict[str, tuple[type, HandlerFn]] = {
     "regenerate_node": (RegenerateNodeMsg, handle_regenerate_node),
     "list_node_versions": (ListNodeVersionsMsg, handle_list_node_versions),
     "restore_node_version": (RestoreNodeVersionMsg, handle_restore_node_version),
+    "regenerate_script_node": (RegenerateScriptNodeMsg, handle_regenerate_script_node),
     "review_decision": (ReviewDecisionMsg, handle_review_decision),
     "user_message": (UserMessageMsg, handle_user_message),
 }

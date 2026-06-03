@@ -599,19 +599,49 @@ def restore_node_version(
         snapshot_version(node, reason)
     except Exception as exc:  # pragma: no cover - defensive
         print(f"[restore] snapshot 失败 node={node_id}: {exc}")
-    # 2. 换回旧产物。target.result 非空(上面已 guard)→ asset_status 一律置终态 done,不照抄
-    #    归档值(归档时可能是 failed/timeout);清 generation_task_id 防陈旧 worker 回写。
+    # 2. 换回旧产物。
     node["result"] = target["result"]
     node["description"] = target.get("description", node.get("description", ""))
-    node["asset_status"] = "done"
-    node["generation_status"] = "done"
-    node["generation_task_id"] = None
-    node["generation_error"] = None
-    node["generation_lease_until"] = None
-    node["generation_next_retry_at"] = None
+    if node.get("type") == "script":
+        # 脚本无生成生命周期 —— asset_status 保持归档值(通常 idle),**不**照媒体置 done,
+        # 也不碰 generation_*(否则 NodeVersionHistory 会显误导的「asset: done」)。
+        node["asset_status"] = target.get("asset_status", "idle")
+    else:
+        # 媒体:target.result 非空(上面已 guard)→ asset_status 一律置终态 done,不照抄归档值
+        # (归档时可能是 failed/timeout);清 generation_task_id 防陈旧 worker 回写。
+        node["asset_status"] = "done"
+        node["generation_status"] = "done"
+        node["generation_task_id"] = None
+        node["generation_error"] = None
+        node["generation_lease_until"] = None
+        node["generation_next_retry_at"] = None
     node["needs_regen"] = False
     _upsert_node(node)
     # 3. 标下游脏(本节点产物变了 → 下游参考过时)。
+    _mark_descendants_stale(node_id)
+    return _load_node(node_id)
+
+
+def regenerate_script_node(node_id: str, reason: str = "regenerate-script") -> dict | None:
+    """脚本重生的 time-travel 记账(P2 slice-2d):快照当前策划书内容(旧版不丢)+ 标脏下游。
+
+    脚本内容由 Director 写(create/update_canvas_node 的 description),**没有生成 worker** ——
+    与 regenerate_node(媒体:清产物→入队→worker 重生)不同,这里**不清内容、不入队**:
+    内容保留(用户在新版落地前仍看得到旧策划书),实际重写由 handler 触发 Director 异步
+    `update_canvas_node` 覆盖。此函数只做快照 + 标脏。
+
+    节点不存在 / 非 script / 无内容(没什么可快照)返回 None。"""
+    node = _load_node(node_id)
+    if not node or node.get("type") != "script" or node.get("result") is None:
+        return None
+    try:
+        snapshot_version(node, reason)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[regenerate-script] snapshot 失败 node={node_id}: {exc}")
+    # 用户主动重写 = 这个脚本不再「待重生」(镜像 regenerate_node 清自身 needs_regen)。
+    # 否则脚本若本身是被标脏的下游,重写后「⚠ 需重生」徽标会永远卡着、诱发无限重生。
+    node["needs_regen"] = False
+    _upsert_node(node)
     _mark_descendants_stale(node_id)
     return _load_node(node_id)
 

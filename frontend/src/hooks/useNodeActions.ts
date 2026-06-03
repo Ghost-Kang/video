@@ -22,6 +22,8 @@ export interface NodeActions {
   handleListNodeVersions: (nodeId: string) => void;
   /** time-travel 回溯(P2 slice-2c)— 回滚节点到某旧版(快照当前→换回旧产物→标脏下游)。 */
   handleRestoreNodeVersion: (nodeId: string, versionSeq: number) => void;
+  /** time-travel 回溯(P2 slice-2d)— 重生 script 节点:后端快照+标脏 → Director 按 feedback 重写。 */
+  handleRegenerateScriptNode: (nodeId: string, feedback: string) => void;
   handleOptimizePrompt: (nodeId: string, prompt: string, feedback: string) => void;
   handleCreateEdge: (source: string, target: string) => void;
   handleDeleteEdge: (edgeId: string) => void;
@@ -84,6 +86,13 @@ export function useNodeActions(
     [sendCommand, threadId],
   );
 
+  const handleRegenerateScriptNode = useCallback(
+    (nodeId: string, feedback: string) => {
+      sendCommand({ type: "regenerate_script_node", thread_id: threadId, node_id: nodeId, feedback });
+    },
+    [sendCommand, threadId],
+  );
+
   const handleOptimizePrompt = useCallback(
     (nodeId: string, prompt: string, feedback: string) => {
       sendCommand({ type: "optimize_prompt", thread_id: threadId, node_id: nodeId, prompt, feedback });
@@ -114,11 +123,12 @@ export function useNodeActions(
       handleRegenerateNode,
       handleListNodeVersions,
       handleRestoreNodeVersion,
+      handleRegenerateScriptNode,
       handleOptimizePrompt,
       handleCreateEdge,
       handleDeleteEdge,
       handleReorderEdge,
     }),
-    [handleReview, handleExecuteNode, handleUpdateNodeStatus, handleRegenerateNode, handleListNodeVersions, handleRestoreNodeVersion, handleOptimizePrompt, handleCreateEdge, handleDeleteEdge, handleReorderEdge],
+    [handleReview, handleExecuteNode, handleUpdateNodeStatus, handleRegenerateNode, handleListNodeVersions, handleRestoreNodeVersion, handleRegenerateScriptNode, handleOptimizePrompt, handleCreateEdge, handleDeleteEdge, handleReorderEdge],
   );
 }

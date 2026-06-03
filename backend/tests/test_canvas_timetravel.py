@@ -14,6 +14,7 @@ import pytest
 from agent.tools import canvas as canvas_tools
 from agent.tools.canvas import (
     regenerate_node,
+    regenerate_script_node,
     restore_node_version,
     _descendants,
     _mark_descendants_stale,
@@ -21,8 +22,16 @@ from agent.tools.canvas import (
 from agent.tools.canvas_persistence import db as canvas_db
 from agent.tools.canvas_persistence.versions_repo import list_versions
 from agent.transport.context import WSCtx
-from agent.transport.ws_handlers import handle_list_node_versions, handle_restore_node_version
-from agent.transport.ws_messages import ListNodeVersionsMsg, RestoreNodeVersionMsg
+from agent.transport.ws_handlers import (
+    handle_list_node_versions,
+    handle_regenerate_script_node,
+    handle_restore_node_version,
+)
+from agent.transport.ws_messages import (
+    ListNodeVersionsMsg,
+    RegenerateScriptNodeMsg,
+    RestoreNodeVersionMsg,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -354,3 +363,123 @@ class TestRestoreNodeVersionHandler:
         # fresh list includes the just-archived current (p2) as v2
         assert [v["version_seq"] for v in ver_frame["versions"]] == [1, 2]
         assert ver_frame["versions"][1]["result"] == {"url": "p2.png"}
+
+
+# ---------- script regen: snapshot content + mark stale + trigger Director (2d) ----------
+
+
+class TestRegenerateScript:
+    def test_snapshots_content_marks_stale_keeps_content(self):
+        # 脚本重生只做 time-travel 记账:快照旧内容 + 标脏下游,不清内容(Director 异步覆盖前
+        # 用户仍看得到旧策划书)。
+        _thread()
+        _mk("S", type="script", asset_status="idle",
+            result={"content": "old 策划书", "word_count": 3, "shots": []})
+        _mk("D", type="image", asset_status="done", result={"url": "d.png"})
+        _edge("S", "D")
+        out = regenerate_script_node("S")
+        assert out is not None
+        assert out["result"] == {"content": "old 策划书", "word_count": 3, "shots": []}  # unchanged
+        versions = list_versions("S")
+        assert [v["version_seq"] for v in versions] == [1]
+        assert versions[0]["result"]["content"] == "old 策划书"
+        assert versions[0]["reason"] == "regenerate-script"
+        assert canvas_tools._load_node("D")["needs_regen"] is True  # downstream staled
+
+    def test_non_script_or_empty_returns_none(self):
+        _thread()
+        _mk("img", type="image", asset_status="done", result={"url": "x.png"})  # not script
+        _mk("empty", type="script", asset_status="idle", result=None)           # script, no content
+        assert regenerate_script_node("img") is None
+        assert regenerate_script_node("empty") is None
+        assert regenerate_script_node("nope") is None  # missing
+        assert list_versions("empty") == []  # nothing snapshotted
+
+    def test_clears_scripts_own_needs_regen(self):
+        # 脚本本身被标脏(它是某重生上游的下游)→ 用户重写后,它自己的「需重生」必须清掉,
+        # 否则徽标永远卡着(镜像 regenerate_node 清自身 needs_regen)。
+        _thread()
+        _mk("S", type="script", asset_status="idle", needs_regen=True,
+            result={"content": "old", "word_count": 3, "shots": []})
+        out = regenerate_script_node("S")
+        assert out is not None
+        assert out["needs_regen"] is False
+
+
+class TestRestoreScriptVersion:
+    def test_restore_keeps_script_asset_status_idle_not_done(self):
+        # 回滚脚本版本不能照媒体把 asset_status 置 done(脚本无生成生命周期),否则 compare
+        # 面板显误导的「asset: done」。
+        _thread()
+        _mk("S", type="script", asset_status="idle",
+            result={"content": "v1", "word_count": 2, "shots": []})
+        regenerate_script_node("S")  # archives v1 (asset_status idle)
+        n = canvas_tools._load_node("S")
+        n["result"] = {"content": "v2", "word_count": 2, "shots": []}
+        canvas_tools._upsert_node(n)  # current = v2 (still idle)
+
+        restored = restore_node_version("S", 1)
+        assert restored["result"]["content"] == "v1"
+        assert restored["asset_status"] == "idle"  # NOT 'done'
+        # 媒体回滚仍置 done(回归保护)
+        _mk("img", type="image", asset_status="done", result={"url": "m1.png"})
+        regenerate_node("img")
+        m = canvas_tools._load_node("img"); m["result"] = {"url": "m2.png"}; m["asset_status"] = "done"
+        m["generation_status"] = "done"; canvas_tools._upsert_node(m)
+        assert restore_node_version("img", 1)["asset_status"] == "done"
+
+
+class TestRegenerateScriptHandler:
+    def test_sends_frames_and_triggers_director(self, monkeypatch):
+        calls = []
+
+        async def _fake_run_agent(user_id, pool, thread_id, content, ws, selected_niche=None):
+            calls.append({"thread_id": thread_id, "content": content})
+
+        monkeypatch.setattr("agent.transport.agent_runner.run_agent", _fake_run_agent)
+
+        tid = _thread()
+        _mk("S", type="script", asset_status="idle",
+            result={"content": "old", "word_count": 3, "shots": []})
+        ctx = WSCtx(user_id="default", ws=_FakeWS(), pool=None)
+        msg = RegenerateScriptNodeMsg(
+            type="regenerate_script_node", thread_id=tid, node_id="S", feedback="更钩子"
+        )
+
+        async def _drive():
+            await handle_regenerate_script_node(ctx, msg)
+            await asyncio.sleep(0.05)  # let the create_task'd Director run fire
+
+        asyncio.run(_drive())
+
+        types = [m["type"] for m in ctx.ws.sent]
+        assert "canvas_updated" in types and "node_versions_returned" in types
+        assert len(calls) == 1
+        assert "【重写策划书】" in calls[0]["content"]
+        assert "S" in calls[0]["content"]        # node_id in the instruction
+        assert "更钩子" in calls[0]["content"]    # feedback woven in
+
+    def test_non_script_no_director_trigger(self, monkeypatch):
+        calls = []
+
+        async def _fake_run_agent(*a, **k):
+            calls.append(1)
+
+        monkeypatch.setattr("agent.transport.agent_runner.run_agent", _fake_run_agent)
+
+        tid = _thread()
+        _mk("img", type="image", asset_status="done", result={"url": "x.png"})
+        ctx = WSCtx(user_id="default", ws=_FakeWS(), pool=None)
+        msg = RegenerateScriptNodeMsg(
+            type="regenerate_script_node", thread_id=tid, node_id="img", feedback=""
+        )
+
+        async def _drive():
+            await handle_regenerate_script_node(ctx, msg)
+            await asyncio.sleep(0.05)
+
+        asyncio.run(_drive())
+
+        # canvas_updated pushed (harmless), but NO versions frame and NO Director run
+        assert "node_versions_returned" not in [m["type"] for m in ctx.ws.sent]
+        assert calls == []

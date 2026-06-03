@@ -50,6 +50,7 @@ function makeActions(over: Partial<NodeActions> = {}): NodeActions {
     handleRegenerateNode: vi.fn(),
     handleListNodeVersions: vi.fn(),
     handleRestoreNodeVersion: vi.fn(),
+    handleRegenerateScriptNode: vi.fn(),
     handleOptimizePrompt: vi.fn(),
     handleCreateEdge: vi.fn(),
     handleDeleteEdge: vi.fn(),
@@ -137,5 +138,67 @@ describe("NodeActionBar — regenerate vs generate routing", () => {
     renderBar(makeNode({ node_status: "reviewing", asset_status: "done" }), actions);
     expect(screen.getByText("✓ 确认")).toBeInTheDocument();
     expect(screen.queryByText("↻ 重生")).toBeNull();
+  });
+
+  // ---- script regenerate via Director feedback (2d) ----
+
+  function scriptNode(over: Partial<CanvasNode> = {}) {
+    return makeNode({ type: "script", node_status: "confirmed", asset_status: "idle", result: { content: "old 策划书" }, ...over });
+  }
+
+  it("shows ↻ 重生 on a script node that has content", () => {
+    renderBar(scriptNode(), makeActions());
+    expect(screen.getByTestId("script-regen-open")).toHaveTextContent("重生");
+  });
+
+  it("hides ↻ 重生 on a script node with no content", () => {
+    renderBar(scriptNode({ result: null }), makeActions());
+    expect(screen.queryByTestId("script-regen-open")).toBeNull();
+  });
+
+  it("opens the feedback form and submits typed feedback to handleRegenerateScriptNode", () => {
+    const actions = makeActions();
+    renderBar(scriptNode(), actions);
+    fireEvent.click(screen.getByTestId("script-regen-open"));
+    fireEvent.change(screen.getByTestId("script-regen-input"), { target: { value: "更钩子" } });
+    fireEvent.click(screen.getByTestId("script-regen-submit"));
+    expect(actions.handleRegenerateScriptNode).toHaveBeenCalledWith("n1", "更钩子");
+  });
+
+  it("submits empty feedback as '' (auto rewrite)", () => {
+    const actions = makeActions();
+    renderBar(scriptNode(), actions);
+    fireEvent.click(screen.getByTestId("script-regen-open"));
+    fireEvent.click(screen.getByTestId("script-regen-submit"));
+    expect(actions.handleRegenerateScriptNode).toHaveBeenCalledWith("n1", "");
+  });
+
+  it("cancel closes the form without regenerating", () => {
+    const actions = makeActions();
+    renderBar(scriptNode(), actions);
+    fireEvent.click(screen.getByTestId("script-regen-open"));
+    fireEvent.click(screen.getByText("取消"));
+    expect(screen.queryByTestId("script-regen-input")).toBeNull();
+    expect(actions.handleRegenerateScriptNode).not.toHaveBeenCalled();
+  });
+
+  it("Enter in the input submits the feedback", () => {
+    const actions = makeActions();
+    renderBar(scriptNode(), actions);
+    fireEvent.click(screen.getByTestId("script-regen-open"));
+    const input = screen.getByTestId("script-regen-input");
+    fireEvent.change(input, { target: { value: "更钩子" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(actions.handleRegenerateScriptNode).toHaveBeenCalledWith("n1", "更钩子");
+    expect(screen.queryByTestId("script-regen-input")).toBeNull();
+  });
+
+  it("Escape in the input cancels without regenerating", () => {
+    const actions = makeActions();
+    renderBar(scriptNode(), actions);
+    fireEvent.click(screen.getByTestId("script-regen-open"));
+    fireEvent.keyDown(screen.getByTestId("script-regen-input"), { key: "Escape" });
+    expect(screen.queryByTestId("script-regen-input")).toBeNull();
+    expect(actions.handleRegenerateScriptNode).not.toHaveBeenCalled();
   });
 });

@@ -179,6 +179,16 @@ export interface RestoreNodeVersionMsg {
   version_seq: number;
 }
 
+/** time-travel 回溯(P2 slice-2d)— 前端 → 服务端:重生 script(策划书)节点。后端快照旧内容
+ *  + 标脏下游,再触发 Director 按 feedback 重写(脚本无生成 worker,走 agent)。feedback 可空
+ *  (空=按当前上下文自动重写)。新内容随后经 agent 流 + canvas_updated 推回。 */
+export interface RegenerateScriptNodeMsg {
+  type: "regenerate_script_node";
+  thread_id: string;
+  node_id: string;
+  feedback: string;
+}
+
 /** time-travel 回溯(P2 slice-2b)— 服务端 → 前端:某节点的版本快照列表(升序)。
  *  对应后端 NodeVersionsReturnedEvent;NodeVersionHistory 渲染历史 + 当前 vs 旧版对比。 */
 export interface NodeVersionsReturnedEvent {
@@ -234,6 +244,7 @@ export type WSCommand =
   | RegenerateNodeMsg
   | ListNodeVersionsMsg
   | RestoreNodeVersionMsg
+  | RegenerateScriptNodeMsg
   | ReviewDecisionMsg
   | UserMessageMsg;
 

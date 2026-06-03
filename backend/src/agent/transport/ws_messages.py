@@ -160,6 +160,18 @@ class RestoreNodeVersionMsg(_Base):
     version_seq: int
 
 
+class RegenerateScriptNodeMsg(_Base):
+    """time-travel 回溯(P2 slice-2d)— 重生一个 script(策划书)节点:快照旧内容 + 标脏下游,
+    再触发 Director 按 feedback 重写(update_canvas_node)。脚本无生成 worker,故走 agent 而非
+    生成队列。feedback 可空(空=按当前上下文自动重写)。回 canvas_updated + node_versions_returned,
+    Director 重写完再经 agent 流 + canvas_updated 把新内容推回。"""
+
+    type: Literal["regenerate_script_node"]
+    thread_id: str = Field(min_length=1)
+    node_id: str
+    feedback: str = ""
+
+
 class ReviewDecisionMsg(_Base):
     """P2 审核闸门 — 用户对 `review_required` 的决策(approve/edit/reject)。
 
@@ -195,6 +207,7 @@ WSInbound = Annotated[
         AuthMsg,
         ListSessionsMsg,
         DeleteSessionMsg,
+        DeleteSessionsMsg,
         GetSessionStateMsg,
         ReorderEdgeMsg,
         CreateEdgeMsg,
@@ -207,6 +220,7 @@ WSInbound = Annotated[
         RegenerateNodeMsg,
         ListNodeVersionsMsg,
         RestoreNodeVersionMsg,
+        RegenerateScriptNodeMsg,
         ReviewDecisionMsg,
         UserMessageMsg,
     ],
@@ -469,6 +483,7 @@ INBOUND_MODELS: dict[str, type[_Base]] = {
     "regenerate_node": RegenerateNodeMsg,
     "list_node_versions": ListNodeVersionsMsg,
     "restore_node_version": RestoreNodeVersionMsg,
+    "regenerate_script_node": RegenerateScriptNodeMsg,
     "review_decision": ReviewDecisionMsg,
     "user_message": UserMessageMsg,
 }
