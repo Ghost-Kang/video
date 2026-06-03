@@ -515,15 +515,19 @@ def _descendants(node_id: str) -> list[str]:
 
 def _mark_descendants_stale(node_id: str) -> list[str]:
     """把 node_id 的所有下游标 needs_regen=1(上游产物已变,下游过时)。
-    只标「已有产物」的下游(asset_status done/failed/timeout 或有 result)—— 还没生成的
-    下游本就要生成,标脏无意义。返回被标脏的节点 id。"""
+    只标**确有产物**(result 非空)的下游 —— 没产物的下游(从没生成 / 首次生成就失败)本就
+    要生成,没有「过时的产物」可言,标脏只会让它显误导的「需重生」徽标。返回被标脏的节点 id。
+
+    注:从前用 `bool(result) or asset_status in (done/failed/timeout)`,把「首次生成就失败」
+    (result=None、asset=failed/timeout)的下游也标脏 —— 那种节点没产物,2a review 标记、
+    后端 follow-up 修正为只认 `bool(result)`。failed/timeout **但仍存旧 result** 的节点
+    (result 非空)依然会被标。"""
     stale: list[str] = []
     for nid in _descendants(node_id):
         node = _load_node(nid)
         if not node:
             continue
-        has_asset = bool(node.get("result")) or node.get("asset_status") in ("done", "failed", "timeout")
-        if not has_asset or node.get("needs_regen"):
+        if not node.get("result") or node.get("needs_regen"):
             continue
         node["needs_regen"] = True
         _upsert_node(node)

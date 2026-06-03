@@ -143,15 +143,20 @@ class TestRegenerate:
 
 
 class TestMarkStale:
-    def test_only_marks_nodes_with_assets(self):
+    def test_only_marks_nodes_with_a_product(self):
+        # follow-up:只标确有产物(result 非空)的下游。首次生成就失败(result=None)的下游
+        # 没产物可过时,不该标(否则显误导的「需重生」徽标);failed 但仍存旧 result 的会标。
         _thread()
         _mk("root")
-        _mk("done_child", asset_status="done", result={"url": "x"})
-        _mk("failed_child", asset_status="failed")
-        _mk("idle_child", asset_status="idle")
-        _edge("root", "done_child"); _edge("root", "failed_child"); _edge("root", "idle_child")
+        _mk("done_child", asset_status="done", result={"url": "x"})            # 有产物 → 标
+        _mk("failed_no_result", asset_status="failed", result=None)            # 没产物 → 不标
+        _mk("failed_with_result", asset_status="failed", result={"url": "y"})  # 有旧产物 → 标
+        _mk("idle_child", asset_status="idle")                                 # 没产物 → 不标
+        for c in ("done_child", "failed_no_result", "failed_with_result", "idle_child"):
+            _edge("root", c)
         stale = _mark_descendants_stale("root")
-        assert set(stale) == {"done_child", "failed_child"}  # idle has nothing to regen
+        assert set(stale) == {"done_child", "failed_with_result"}
+        assert canvas_tools._load_node("failed_no_result")["needs_regen"] is False
         assert canvas_tools._load_node("idle_child")["needs_regen"] is False
 
     def test_needs_regen_surfaces_to_frontend_and_agent(self):
