@@ -46,6 +46,13 @@ _REQUIRED_FIELDS: dict[str, frozenset[str]] = {
     EventName.NICHE_SELECTED.value: frozenset({"niche", "thread_id"}),
     EventName.UNCAUGHT_EXCEPTION.value: frozenset({"site", "exc_type", "message"}),
     EventName.CLIENT_ERROR.value: frozenset({"kind", "message"}),
+    # 前端遥测:不强制 required 字段(payload 因端而异,宽松摄入,避免缺字段又被 400 拒)。
+    EventName.ANALYSIS_WAIT_STARTED.value: frozenset(),
+    EventName.ANALYSIS_WAIT_COMPLETED.value: frozenset(),
+    EventName.ANALYSIS_WAIT_TIMEOUT.value: frozenset(),
+    EventName.ANALYSIS_WAIT_ABANDONED.value: frozenset(),
+    EventName.PIN_ESCAPE_SHOWN.value: frozenset(),
+    EventName.PIN_ESCAPE_ACTION.value: frozenset(),
 }
 
 _lock = asyncio.Lock()
@@ -80,7 +87,9 @@ async def emit(
             raise ValueError("publish_pack_copied missing required fields")
         missing = []
     else:
-        missing = sorted(_REQUIRED_FIELDS[event_name] - payload.keys())
+        # .get 兜底:enum 里有但 _REQUIRED_FIELDS 没显式列的事件(如 analysis_answer_returned /
+        # shot_video_returned / film_returned)默认无必填字段,而不是 KeyError→500/漏点。
+        missing = sorted(_REQUIRED_FIELDS.get(event_name, frozenset()) - payload.keys())
     if missing:
         raise ValueError(f"{event_name} missing required fields: {', '.join(missing)}")
     if event_name == EventName.FAILURE_EMITTED.value and not str(payload.get("recovery_path_id") or "").strip():

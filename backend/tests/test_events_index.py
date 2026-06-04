@@ -15,6 +15,29 @@ def _use_tmp_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     return db_path
 
 
+def test_frontend_emitted_events_accepted(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Regression (2026-06-04 浏览器真机验证抓出):前端 emit 这 6 个遥测事件,但后端
+    EventName allowlist 漏列 → /api/events 400 拒,等待漏斗丢数据。锁死它们是合法事件,
+    防再被移出 allowlist。"""
+    db_path = _use_tmp_db(monkeypatch, tmp_path)
+    names = [
+        "analysis_wait_started",
+        "analysis_wait_completed",
+        "analysis_wait_timeout",
+        "analysis_wait_abandoned",
+        "pin_escape_shown",
+        "pin_escape_action",
+    ]
+    for n in names:
+        asyncio.run(emit(n, user_id="u1", run_id="r1", payload={}))  # 不抛 ValueError
+    db = sqlite3.connect(str(db_path))
+    got = {r[0] for r in db.execute("SELECT DISTINCT event_name FROM events").fetchall()}
+    db.close()
+    assert set(names) <= got, f"missing from events table: {set(names) - got}"
+
+
 def _seed_events(db_path: Path, count: int = 1000) -> None:
     db = sqlite3.connect(str(db_path))
     rows = [

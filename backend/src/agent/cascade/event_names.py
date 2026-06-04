@@ -42,3 +42,14 @@ class EventName(StrEnum):
     # /api/client_error. Lets founder see cohort 创作者 JS issues without
     # asking the user to paste console output.
     CLIENT_ERROR = "client_error"
+    # 等待态遥测(AnalyzingHero,project_analyzing_wait_redesign)— 分析等待漏斗:
+    # 用户发起分析(started)→ 成功收尾(completed)/ 超时(timeout)/ 中途跳出
+    # (abandoned)。前端已 emit 但后端 allowlist 漏列 → 全被 /api/events 400 拒,漏斗
+    # 有洞(直接影响「Day1 完成首条」与放弃率口径)。2026-06-04 浏览器真机验证抓出补齐。
+    ANALYSIS_WAIT_STARTED = "analysis_wait_started"
+    ANALYSIS_WAIT_COMPLETED = "analysis_wait_completed"
+    ANALYSIS_WAIT_TIMEOUT = "analysis_wait_timeout"
+    ANALYSIS_WAIT_ABANDONED = "analysis_wait_abandoned"
+    # AnalysisProgress pin-escape 观测(进度条「钉住/逃逸」误报排查)。前端 emit,同样漏列。
+    PIN_ESCAPE_SHOWN = "pin_escape_shown"
+    PIN_ESCAPE_ACTION = "pin_escape_action"
