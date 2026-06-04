@@ -82,6 +82,12 @@
   50% { transform: scale(1.05); opacity: 0.8; }
 }
 
+/* ActiveNodeRing — 生成中节点的呼吸光环(只动 box-shadow,不缩放节点本身) */
+@keyframes activeRing {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.0), 0 6px 22px rgba(124, 45, 18, 0.16); }
+  50% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.28), 0 6px 22px rgba(124, 45, 18, 0.16); }
+}
+
 @keyframes textShimmer {
   0%, 100% { background-position: 200% center; }
   50% { background-position: -100% center; }
@@ -346,6 +352,9 @@
   .anim-pulse-ring {
     animation: pulseRing 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
+  .anim-active-ring {
+    animation: activeRing 1.8s ease-in-out infinite;
+  }
   .anim-aurora-1 {
     animation: aurora1 28s ease-in-out infinite, auroraGlow 7s ease-in-out infinite;
   }
@@ -570,6 +579,7 @@
   /* respect reduced motion */
   @media (prefers-reduced-motion: reduce) {
     .anim-fade-up, .anim-fade-in, .anim-drift, .anim-shimmer, .anim-marquee, .anim-pulse-ring,
+    .anim-active-ring,
     .anim-aurora-1, .anim-aurora-2, .anim-spin-slow, .text-shimmer-clay,
     .ripple-dot, .anim-page-out,
     .anim-cta-breathe, .anim-cta-glow, .anim-arrow-nudge, .anim-input-glow,

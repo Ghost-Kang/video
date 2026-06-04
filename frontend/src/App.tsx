@@ -173,6 +173,12 @@ export default function App({ userId, onLogout }: AppProps) {
   useEffect(() => {
     if (!loading) clearTimeout(timerRef.current ?? undefined);
   }, [loading]);
+  // 画布空态卡的「告诉导演」按钮 dispatch open_canvas_chat → 展开底部对话 dock。
+  useEffect(() => {
+    const open = () => setChatOpen(true);
+    window.addEventListener("open_canvas_chat", open);
+    return () => window.removeEventListener("open_canvas_chat", open);
+  }, [setChatOpen]);
   // Landing 上 quick-pick / URL 提交把链接放在 ?source_url= 里跳过来; 等 WS 连通后
   // 自动发出 user_message 触发 cascade,并清掉 query 避免回退时重发。
   const autosentRef = useRef(false);
@@ -345,7 +351,7 @@ export default function App({ userId, onLogout }: AppProps) {
             <ChatPanel messages={messages} streaming={streaming} thinking={thinking} onSend={sendChatMessage} loading={loading} onToggleCollapse={() => setChatOpen(false)} />
           )
         ) : (
-          <button onClick={() => setChatOpen(true)} className="absolute bottom-6 right-6 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 dark:bg-[#7c2d12] text-[#faf8f3] shadow-[0_6px_20px_-4px_rgba(28,25,23,0.25)] dark:shadow-[0_6px_20px_-4px_rgba(124,45,18,0.5)] hover:scale-105 active:scale-95 transition-transform duration-200" title="问导演" aria-label="问导演" type="button" data-testid="dock-fab">
+          <button onClick={() => setChatOpen(true)} className="absolute bottom-6 right-6 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-[#7c2d12] dark:bg-[#7c2d12] text-[#faf8f3] shadow-[0_6px_20px_-4px_rgba(124,45,18,0.45)] dark:shadow-[0_6px_20px_-4px_rgba(124,45,18,0.5)] hover:scale-105 active:scale-95 transition-transform duration-200" title="问导演" aria-label="问导演" type="button" data-testid="dock-fab">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 4h12M3 9h12M3 14h8" strokeLinecap="round" /></svg>
           </button>
         )}

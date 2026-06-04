@@ -1,15 +1,13 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { CanvasNode } from "../../types";
 import { NodeActionBar } from "./NodeActionBar";
-import { NeedsRegenBadge } from "./NeedsRegenBadge";
-
-const STATUS_CN: Record<string, string> = { reviewing: "待确认", confirmed: "已确认" };
+import { StatusChip } from "./StatusChip";
 
 export function VideoNode({ data, selected }: NodeProps) {
   const node = data.node as CanvasNode;
   const isGenerating = node.asset_status === "generating";
   return (
-    <div style={styles.wrapper(selected)}>
+    <div style={styles.wrapper(selected)} className={isGenerating ? "anim-active-ring" : undefined}>
       <NodeActionBar node={node} selected={selected} />
       <Handle type="source" position={Position.Right} />
       <Handle type="target" position={Position.Left} />
@@ -31,15 +29,13 @@ export function VideoNode({ data, selected }: NodeProps) {
         <div style={styles.placeholder}>🎬 等待生成</div>
       )}
       <div style={styles.badgeRow}>
-        <span style={styles.badge(node.node_status)}>{STATUS_CN[node.node_status] ?? node.node_status}</span>
+        <StatusChip node={node} />
       </div>
-      <NeedsRegenBadge node={node} />
     </div>
   );
 }
 
 const CLAY = "#7c2d12";
-const AMBER = "#b45309";
 
 const styles = {
   wrapper: (selected?: boolean): React.CSSProperties => ({
@@ -68,9 +64,4 @@ const styles = {
     background: "rgba(124,45,18,0.04)", border: "1px dashed rgba(124,45,18,0.20)",
   } as React.CSSProperties,
   badgeRow: { marginTop: 8 },
-  badge: (s: string): React.CSSProperties => ({
-    display: "inline-block", padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 500,
-    background: s === "confirmed" ? "rgba(124,45,18,0.10)" : "rgba(180,83,9,0.12)",
-    color: s === "confirmed" ? CLAY : AMBER,
-  }),
 };
