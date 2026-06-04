@@ -70,8 +70,13 @@ _SECTION_PAT = re.compile(r"^##\s+\d+\.\s+\S+\s+\((baomam_fushi|yuer_richang|jia
 _URL_PAT = re.compile(r"^\s*(\d+)\.\s+(https?://\S+)\s*$")
 _COMMENT_OPEN = "<!--"
 _COMMENT_CLOSE = "-->"
-_HOOK_PAT = re.compile(r"钩子模式[::]\s*([H0-9+\(\)\s一-鿿/]+)")
-_TITLE_PAT = re.compile(r"标题[::]\s*[\"']?([^\"'\n]+?)[\"']?\s*$", re.MULTILINE)
+# 抓整行(到行尾),别按字符类截断 —— 否则标题/钩子里出现引号(如 王刚「家常豆腐」源
+# 标题含 '家常豆腐'、钩子含 "宽油")会被旧的 [^"'\n] / [H0-9+()…] 字符类截断:标题整条丢失、
+# 钩子丢掉引号后的第二个 H 码(H2)。改成抓到行尾,标题再 strip 包裹引号,钩子靠 _H_CODE 提码。
+_HOOK_PAT = re.compile(r"钩子模式[::]\s*([^\n]+)")
+_TITLE_PAT = re.compile(r"标题[::]\s*([^\n]+?)\s*$", re.MULTILINE)
+# 包裹标题的引号(ASCII + 中文全角),从首尾剥掉。
+_TITLE_QUOTES = "\"'“”‘’"
 _DATE_PAT = re.compile(r"(\d{4}-\d{2}-\d{2})")
 _AUTHOR_PAT = re.compile(r"@([^\s|()（]+)")
 _H_CODE = re.compile(r"H\d+")
@@ -98,7 +103,10 @@ def _extract_classification(comment: str) -> str:
 
 def _extract_title(comment: str) -> str:
     m = _TITLE_PAT.search(comment)
-    return m.group(1).strip() if m else ""
+    if not m:
+        return ""
+    # 整行抓回后剥掉首尾包裹引号(标题内部的引号原样保留,如 '家常豆腐')。
+    return m.group(1).strip().strip(_TITLE_QUOTES).strip()
 
 
 def _extract_author(comment: str) -> str:
