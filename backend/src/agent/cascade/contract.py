@@ -41,7 +41,12 @@ ANALYSIS_PIPELINE_REVISION = 3
 #       全量开。质量门已过(eval: 机械100% / realism 4.70 / kept 100% / ad_risk 0,
 #       founder D6 5/5 锚点)。bump 到 2 作废 24h 内的旧 fixture 缓存,首批用户即见
 #       真改写,不套娃。
-REWRITE_PIPELINE_REVISION = 2
+#   3 → 质量门 D6 二轮 (2026-06-04): rewrite_generic.md 加「质量五关」(痛点可拍 /
+#       反差非纯标量 / 解法有信息增量 / 效果 show 非 telling / 钩子非凭空 bait)+
+#       confidence 五关任一不过 ≤0.6 硬封顶 + 示例第3镜从 telling 改 show(停止反向
+#       教学)。起因 founder 实测 3/5(❌ 痛点浅/解法不新/效果硬/反差弱/钩子硬)。
+#       bump 到 3 作废 revision=2 缓存,重生后复判达标才解封。
+REWRITE_PIPELINE_REVISION = 3
 
 
 class Platform(str, Enum):
