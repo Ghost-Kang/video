@@ -21,6 +21,7 @@ import { VideoNode } from "./nodes/VideoNode";
 import { CompositeNode } from "./nodes/CompositeNode";
 import { ChapterGroupNode } from "./nodes/ChapterGroupNode";
 import { DeletableEdge } from "./DeletableEdge";
+import { CanvasEmptyState } from "./CanvasEmptyState";
 import type { CanvasNode, WSPositionUpdate } from "../types";
 
 const nodeTypes = {
@@ -293,7 +294,13 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
   }, [canvasNodes, edges, updateNodePosition, onPositionChange]);
 
   return (
-    <div style={{ flex: 1, minWidth: 0, height: "100%", position: "relative" }}>
+    <div style={{ flex: 1, minWidth: 0, height: "100%", position: "relative", overflow: "hidden" }}>
+      {/* aurora 底:两团暖色光晕缓慢漂移(陶土 + 琥珀),藏在点阵之下,给空旷画布一点高级的呼吸感。
+          位于 z0,ReactFlow 透明叠在上面;anim-aurora-* 已在 reduced-motion 注册(铁律⑧)。 */}
+      <div style={S.aurora} aria-hidden>
+        <div style={S.blob1} className="anim-aurora-1" />
+        <div style={S.blob2} className="anim-aurora-2" />
+      </div>
       <ReactFlow
         nodes={rfNodes}
         edges={edges}
@@ -309,6 +316,7 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
           markerEnd: { type: MarkerType.ArrowClosed, color: "rgba(124,45,18,0.55)", width: 16, height: 16 },
         }}
         proOptions={{ hideAttribution: true }}
+        style={{ background: "transparent" }}
         fitView
       >
         {/* 暖色科技底:极淡陶土点阵(替默认黑网格);MiniMap 去掉 —— 它白底盖住画布、
@@ -316,12 +324,41 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
         <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(124,45,18,0.10)" />
         <Controls className="cascade-rf-controls" />
       </ReactFlow>
+      {/* 空画布引导(0 节点时):告诉用户这是创作画布 + 一键唤起导演。 */}
+      {canvasNodes.length === 0 && <CanvasEmptyState />}
       <button onClick={handleAutoLayout} style={S.layoutBtn}>自动排版</button>
     </div>
   );
 }
 
 const S = {
+  aurora: {
+    position: "absolute",
+    inset: 0,
+    zIndex: 0,
+    overflow: "hidden",
+    pointerEvents: "none",
+  } as React.CSSProperties,
+  blob1: {
+    position: "absolute",
+    top: "-12%",
+    left: "-8%",
+    width: "55%",
+    height: "60%",
+    borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(234,88,12,0.10) 0%, rgba(234,88,12,0) 68%)",
+    filter: "blur(40px)",
+  } as React.CSSProperties,
+  blob2: {
+    position: "absolute",
+    bottom: "-15%",
+    right: "-10%",
+    width: "60%",
+    height: "62%",
+    borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(124,45,18,0.08) 0%, rgba(124,45,18,0) 70%)",
+    filter: "blur(44px)",
+  } as React.CSSProperties,
   layoutBtn: {
     position: "absolute",
     top: 12,

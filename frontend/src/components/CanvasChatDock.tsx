@@ -131,7 +131,7 @@ export function CanvasChatDock({
           disabled={loading}
           type="button"
           data-testid="canvas-chat-send"
-          className={`mt-2.5 w-full rounded-xl bg-stone-900 dark:bg-[#7c2d12] py-2.5 text-[13px] font-medium tracking-[0.01em] text-[#faf8f3] transition-all hover:bg-stone-800 dark:hover:bg-[#9a3412] font-inherit ${
+          className={`mt-2.5 w-full rounded-xl bg-[#7c2d12] py-2.5 text-[13px] font-medium tracking-[0.01em] text-[#faf8f3] transition-all hover:bg-[#9a3412] font-inherit ${
             loading ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
           }`}
         >

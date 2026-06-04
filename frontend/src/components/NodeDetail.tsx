@@ -17,7 +17,38 @@ export function NodeDetail({ actions }: Props) {
   const edges = useCanvasStore((s) => s.edges);
   const selectNode = useCanvasStore((s) => s.selectNode);
 
+  // 面板可拖宽(默认 440,边界 360–720)+ 窄屏覆盖式(<760px 浮在画布上,带半透背景)。
+  // 所有 hook 必须在 `if (!node)` early-return 之前(rules-of-hooks 铁律,否则切到无选中
+  // 节点会少调 hook → React #310 白屏)。
+  const [width, setWidth] = useState(440);
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth < 760);
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    const onResize = () => setNarrow(window.innerWidth < 760);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: MouseEvent) => setWidth(Math.min(720, Math.max(360, window.innerWidth - e.clientX)));
+    const onUp = () => setDragging(false);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    document.body.style.userSelect = "none";
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.userSelect = "";
+    };
+  }, [dragging]);
+
   if (!node) return null;
+
+  const panelStyle: React.CSSProperties = narrow
+    ? { ...S.panel, position: "fixed", top: 0, right: 0, bottom: 0, width: "min(92vw, 460px)", zIndex: 60, boxShadow: "-12px 0 40px rgba(124,45,18,0.18)" }
+    : { ...S.panel, width };
 
   // 找上游节点作为参考图 / 待合成视频
   const parentIds = edges
@@ -32,7 +63,18 @@ export function NodeDetail({ actions }: Props) {
   const isMedia = node.type === "image" || node.type === "video" || node.type === "composite";
 
   return (
-    <div style={S.panel}>
+    <>
+      {narrow && <div style={S.backdrop} onClick={() => selectNode(null)} data-testid="nodedetail-backdrop" />}
+      <div style={panelStyle} data-testid="node-detail">
+      {/* 拖宽手柄(窄屏覆盖态不显示)。 */}
+      {!narrow && (
+        <div
+          style={{ ...S.resizeHandle, background: dragging ? "rgba(124,45,18,0.25)" : "transparent" }}
+          onMouseDown={() => setDragging(true)}
+          title="拖动调整宽度"
+          data-testid="nodedetail-resize"
+        />
+      )}
       <div style={S.header}>
         <span style={S.title}>{node.title}</span>
         {isMedia && <NodeStatusToggle node={node} onUpdate={actions.handleUpdateNodeStatus} />}
@@ -109,7 +151,8 @@ export function NodeDetail({ actions }: Props) {
         {/* 版本历史 + 新旧对比(time-travel 回溯 P2 slice-2b)。key=node.id → 切节点 remount 重置选中态。 */}
         <NodeVersionHistory key={node.id} node={node} actions={actions} />
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -366,14 +409,34 @@ const mdComponents = {
 
 const S = {
   panel: {
-    width: "clamp(380px, 32vw, 600px)",
     flexShrink: 0,
+    position: "relative",
     display: "flex",
     flexDirection: "column",
     background: "var(--color-paper, #faf8f3)",
     borderLeft: "1px solid rgba(124,45,18,0.12)",
     boxShadow: "-8px 0 24px rgba(124,45,18,0.05)",
-    overflow: "auto",
+    overflow: "hidden",
+  } as React.CSSProperties,
+
+  resizeHandle: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 6,
+    cursor: "col-resize",
+    zIndex: 2,
+    transition: "background 0.15s",
+  } as React.CSSProperties,
+
+  backdrop: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(28,25,23,0.28)",
+    backdropFilter: "blur(2px)",
+    WebkitBackdropFilter: "blur(2px)",
+    zIndex: 55,
   } as React.CSSProperties,
 
   header: {
@@ -450,8 +513,8 @@ const S = {
     border: "none",
     cursor: "pointer",
     outline: "none",
-    background: v === current ? "#18181b" : "#fff",
-    color: v === current ? "#fff" : "#52525b",
+    background: v === current ? "#7c2d12" : "#fff",
+    color: v === current ? "#faf8f3" : "#52525b",
     borderRight: v === "reviewing" ? "1px solid #d4d4d8" : "none",
   }),
 
@@ -530,13 +593,13 @@ const S = {
   generateBtn: (generating: boolean) => ({
     flex: 1,
     padding: "6px 0",
-    background: generating ? "#a1a1aa" : "#18181b",
-    color: "#fff",
+    background: generating ? "#c4b8a8" : "#7c2d12",
+    color: "#faf8f3",
     border: "none",
     borderRadius: 6,
     cursor: generating ? "not-allowed" : "pointer",
     fontSize: 12,
-    fontWeight: 500,
+    fontWeight: 600,
   }),
 
   agentBtn: {

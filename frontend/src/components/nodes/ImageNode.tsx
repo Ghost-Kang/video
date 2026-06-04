@@ -1,20 +1,14 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import type { CanvasNode, AssetStatus } from "../../types";
+import type { CanvasNode } from "../../types";
 import { NodeActionBar } from "./NodeActionBar";
-import { NeedsRegenBadge } from "./NeedsRegenBadge";
-
-const STATUS_CN: Record<string, string> = { reviewing: "待确认", confirmed: "已确认" };
-const ASSET_CN: Record<string, string> = {
-  generating: "生成中", done: "已生成", failed: "失败重试", timeout: "超时重试", pending: "排队中",
-};
+import { StatusChip } from "./StatusChip";
 
 export function ImageNode({ data, selected }: NodeProps) {
   const node = data.node as CanvasNode;
-  const asset = node.asset_status || "idle";
-  const isGenerating = asset === "generating";
+  const isGenerating = node.asset_status === "generating";
 
   return (
-    <div style={S.wrapper(selected)}>
+    <div style={S.wrapper(selected)} className={isGenerating ? "anim-active-ring" : undefined}>
       <NodeActionBar node={node} selected={selected} />
       <Handle type="source" position={Position.Right} />
       <Handle type="target" position={Position.Left} />
@@ -34,22 +28,13 @@ export function ImageNode({ data, selected }: NodeProps) {
       )}
 
       <div style={S.badgeRow}>
-        <span style={S.badge(node.node_status)}>{STATUS_CN[node.node_status] ?? node.node_status}</span>
-        {asset !== "idle" && (
-          <span style={S.assetBadge(asset)} className={isGenerating ? "anim-cta-breathe" : ""}>
-            {ASSET_CN[asset] ?? asset}
-          </span>
-        )}
+        <StatusChip node={node} />
       </div>
-      <NeedsRegenBadge node={node} />
     </div>
   );
 }
 
 const CLAY = "#7c2d12";
-const AMBER = "#b45309";
-const GREEN = "#15803d";
-const RED = "#b91c1c";
 
 const S = {
   wrapper: (selected?: boolean): React.CSSProperties => ({
@@ -79,16 +64,4 @@ const S = {
     background: "rgba(124,45,18,0.04)", border: "1px dashed rgba(124,45,18,0.20)",
   } as React.CSSProperties,
   badgeRow: { display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" as const },
-  badge: (s: string): React.CSSProperties => ({
-    padding: "2px 8px", borderRadius: 999, fontSize: 10.5, fontWeight: 500,
-    background: s === "confirmed" ? "rgba(124,45,18,0.10)" : "rgba(180,83,9,0.12)",
-    color: s === "confirmed" ? CLAY : AMBER,
-  }),
-  assetBadge: (s: AssetStatus): React.CSSProperties => {
-    const tone = s === "done" ? GREEN : s === "failed" || s === "timeout" ? RED : AMBER;
-    return {
-      padding: "2px 8px", borderRadius: 999, fontSize: 10.5, fontWeight: 500,
-      background: `${tone}1a`, color: tone,
-    };
-  },
 };

@@ -1,15 +1,14 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { CanvasNode } from "../../types";
 import { NodeActionBar } from "./NodeActionBar";
-import { NeedsRegenBadge } from "./NeedsRegenBadge";
-
-const STATUS_CN: Record<string, string> = { reviewing: "待确认", confirmed: "已确认" };
+import { StatusChip } from "./StatusChip";
 
 export function ScriptNode({ data, selected }: NodeProps) {
   const node = data.node as CanvasNode;
   const content = node.result?.content as string | undefined;
+  const isGenerating = node.asset_status === "generating";
   return (
-    <div style={styles.wrapper(selected)}>
+    <div style={styles.wrapper(selected)} className={isGenerating ? "anim-active-ring" : undefined}>
       <NodeActionBar node={node} selected={selected} />
       <Handle type="source" position={Position.Right} />
       <Handle type="target" position={Position.Left} />
@@ -19,14 +18,10 @@ export function ScriptNode({ data, selected }: NodeProps) {
       ) : node.description ? (
         <p style={styles.desc}>{node.description.slice(0, 100)}</p>
       ) : null}
-      <span style={styles.badge(node.node_status)}>{STATUS_CN[node.node_status] ?? node.node_status}</span>
-      <NeedsRegenBadge node={node} />
+      <div style={styles.badgeRow}><StatusChip node={node} /></div>
     </div>
   );
 }
-
-const CLAY = "#7c2d12";
-const AMBER = "#b45309";
 
 const styles = {
   wrapper: (selected?: boolean): React.CSSProperties => ({
@@ -54,14 +49,5 @@ const styles = {
     overflow: "hidden",
   } as React.CSSProperties,
   desc: { color: "#78716c", fontSize: 12, margin: "4px 0" },
-  badge: (s: string): React.CSSProperties => ({
-    display: "inline-block",
-    marginTop: 8,
-    padding: "2px 8px",
-    borderRadius: 999,
-    fontSize: 11,
-    fontWeight: 500,
-    background: s === "confirmed" ? "rgba(124,45,18,0.10)" : "rgba(180,83,9,0.12)",
-    color: s === "confirmed" ? CLAY : AMBER,
-  }),
+  badgeRow: { marginTop: 8 } as React.CSSProperties,
 };
