@@ -18,6 +18,15 @@ describe("buildPublishPack", () => {
     expect(payload.length).toBeLessThan(4096);
   });
 
+  it("keeps correct 镜头 numbers when a middle shot has no draft image (no renumber)", () => {
+    // 镜头 2 缺草稿图 → 镜头 3 仍标「镜头 3」,不被错位重编成「镜头 2」(发布收尾 P2 修复)。
+    const payload = buildPublishPack(buildDefaultScript(MOCK_BAOMAM_ANALYSIS), MOCK_BAOMAM_ANALYSIS, ["https://a", "", "https://c"]);
+    expect(payload).toContain("镜头 1: https://a");
+    expect(payload).toContain("镜头 3: https://c");
+    expect(payload).not.toContain("镜头 2: https://c"); // 不被错位重编号
+    expect(payload).not.toContain("镜头 2:"); // 镜头 2 无图 → 整条跳过
+  });
+
   it("does not include forbidden terms before trailer", () => {
     const payload = buildPublishPack(buildDefaultScript(MOCK_BAOMAM_ANALYSIS), MOCK_BAOMAM_ANALYSIS);
     const [body] = payload.split("—— 用 Cascade 做的");
