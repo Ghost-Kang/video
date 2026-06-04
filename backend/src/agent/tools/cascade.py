@@ -387,6 +387,43 @@ async def cascade_rewrite(analysis_id: str, niche: str, topic: str = "") -> dict
     }
 
 
+async def _emit_generation_cost(
+    *,
+    user_id: str,
+    run_id: str | None,
+    call_kind: str,
+    cost_cny: float,
+    provider: str = "",
+    model: str = "",
+    latency_ms: int = 0,
+    outcome: str = "ok",
+) -> None:
+    """补 GENERATION_COST 事件(2026-06-04 审计 #1-7):生成工具此前只 emit
+    SHOT_*_RETURNED(cost_cny),不 emit GENERATION_COST(cost_fen),于是 sum_generation_cost
+    永远读到 0 → ¥30/天 user 级成本闸 + 成本看板都失效。补上后日级闸生效、成本可见。
+    best-effort(绝不破坏生成);run 级 cap 仍 no-op(run_id 与事件存储错配),不会全局卡死。"""
+    try:
+        await emit(
+            EventName.GENERATION_COST,
+            user_id=user_id,
+            run_id=run_id,
+            payload={
+                "run_id": run_id,
+                "call_kind": call_kind,
+                "provider": provider,
+                "model": model,
+                "cost_fen": int(round(max(0.0, cost_cny) * 100)),
+                "latency_ms": latency_ms,
+                "tokens_in": 0,
+                "tokens_out": 0,
+                "outcome": outcome,
+            },
+        )
+    except Exception:
+        # 遥测绝不破坏用户可见路径。
+        pass
+
+
 def _make_image_provider():
     """Provider factory for first-frame generation — switches on IMAGE_GEN_PROVIDER
     (seedream 火山 / apimart 中转 / google 跨境). Wrapped so the tool logic doesn't
@@ -523,6 +560,12 @@ async def cascade_generate_first_frame(rewrite_id: str, shot_index: int) -> dict
         # Telemetry must never break the user-visible return path.
         pass
 
+    # GENERATION_COST(成本闸 + 看板真正读这个;审计 #1-7)。best-effort。
+    await _emit_generation_cost(
+        user_id=user_id, run_id=run_id, call_kind="shot_image",
+        cost_cny=PREDICT_SHOT_IMAGE_CNY, provider="image",
+    )
+
     return {
         "shot_index": shot_index,
         "image_url": image_url,
@@ -621,6 +664,11 @@ async def _poll_shot_video(
         )
     except Exception:
         pass
+    # GENERATION_COST(成本闸 + 看板;审计 #1-7)。video 是付费 leg,best-effort。
+    await _emit_generation_cost(
+        user_id=user_id, run_id=None, call_kind="shot_video",
+        cost_cny=_SHOT_VIDEO_SECONDS * PREDICT_VIDEO_SECOND_CNY, provider="video",
+    )
 
 
 @tool
