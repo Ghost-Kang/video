@@ -60,13 +60,14 @@ def test_funnel_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
     status, payload, _ = asyncio.run(handle_funnel({}, {}))
     assert status == 200
     users = {x["label"]: x["users"] for x in payload["stages"]}
-    assert users["发起分析"] == 3
+    # 起点 = 分析完成(analysis_returned),不含 wait_started(历史无数据会失真)
+    assert "发起分析" not in users
     assert users["分析完成"] == 2
     assert users["改写"] == 1
     assert users["草稿图"] == 0
     assert users["付费意向"] == 1
     conv = {x["label"]: x["step_conv"] for x in payload["stages"]}
-    assert conv["分析完成"] == round(2 / 3, 3)
+    assert conv["改写"] == round(1 / 2, 3)  # 改写/分析完成
 
 
 def _seed_events(db_path: Path, count: int = 1000) -> None:

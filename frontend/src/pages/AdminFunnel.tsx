@@ -41,7 +41,7 @@ export function AdminFunnel() {
             <div>
               <h1 className="font-serif-cn text-3xl md:text-4xl text-stone-900 dark:text-stone-50">Beta 转化漏斗</h1>
               <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
-                发起 → 分析 → 改写 → 草稿图 → 发布 → 付费意向 · 各阶段去重用户
+                分析 → 改写 → 草稿图 → 发布 → 付费意向 · 各阶段去重用户
               </p>
             </div>
             <button
@@ -86,8 +86,9 @@ export function AdminFunnel() {
           </section>
 
           <p className="text-xs text-stone-500 dark:text-stone-400">
-            口径:每阶段「至少触发过一次该事件的去重 user_id」(近似漏斗,Beta 量足够)。依赖前端遥测事件 —
-            2026-06-04 修了 /api/events allowlist 后才开始有数。付费意向 = interview_logged 且 would_pay_39。
+            口径:每阶段「至少触发过一次该事件的去重 user_id」(近似漏斗,Beta 量足够)。起点用「分析完成」
+            (analysis_returned,长期可靠);「发起/放弃」靠 analysis_wait_started 单独看(2026-06-04 才补进
+            allowlist,随 Beta 累积)。付费意向 = interview_logged 且 would_pay_39。
           </p>
         </div>
       </main>
