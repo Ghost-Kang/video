@@ -29,7 +29,10 @@ export function PublishPackCard({ script, analysis }: Props) {
   const tags = getPublishTags(niche, analysis);
 
   const handleCopy = async () => {
-    const payload = buildPublishPack(script, analysis, [], rewriteShots, niche, filmUrl || undefined);
+    // 发布收尾(P2):把每镜的草稿图 url 接进发布包(此前恒传空 → 发布包永远「待补充」)。
+    // 按镜头顺序对齐(缺图留空字串,buildPublishPack 会按 index 标号后跳过,不错位重编号)。
+    const shotImages = rewriteShots.map((s) => s.firstFrameUrl ?? "");
+    const payload = buildPublishPack(script, analysis, shotImages, rewriteShots, niche, filmUrl || undefined);
     try {
       await navigator.clipboard.writeText(payload);
       apiFetch("/api/events", {

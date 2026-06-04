@@ -58,8 +58,11 @@ export function buildPublishPack(
   const titles = getPublishTitles(analysis, rewriteShots, niche).map(scrubUiForbidden);
   const tags = getPublishTags(niche, analysis);
   const cleanScript = scrubUiForbidden(script.trim());
-  // 镜头图缺失:优雅降级到一句提示,不塞坏链(best-effort,clip 范式)。
-  const imageLines = shotImages.filter(Boolean).map((url, index) => `镜头 ${index + 1}: ${url}`);
+  // 镜头图:按镜头序号(index)逐条列出,缺图的镜头跳过 —— **先按 index 标号再过滤**,这样某镜
+  // 缺草稿图不会把后面的镜头错位重编号(之前 filter→map 会重编);全缺则给提示,不塞坏链。
+  const imageLines = shotImages
+    .map((url, index) => (url ? `镜头 ${index + 1}: ${url}` : null))
+    .filter((line): line is string => line !== null);
   const lines = [
     "【标题候选】",
     titles.map((title, index) => `${index + 1}. ${title}`).join("\n"),
