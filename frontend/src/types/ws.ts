@@ -103,6 +103,9 @@ export interface SessionStateEventTyped extends Omit<SessionStateEvent, "message
     actions: string[];
     request_id: string;
   } | null;
+  // 改写解封灰度 kill-switch:后端 config.REWRITE_ENABLED 权威下发(undefined = 旧后端
+  // 未下发 → resolveRewriteEnabled 下探 VITE flag)。前端据此渲染/隐藏改写区。
+  rewrite_enabled?: boolean;
 }
 
 export interface CanvasUpdatedEventTyped extends Omit<CanvasUpdatedEvent, "canvas"> {
@@ -132,6 +135,9 @@ export interface RewriteReturnedEventTyped extends Omit<RewriteReturnedEvent, "r
     model: string;
     hook_pattern_id?: string;
     source_classification?: string;
+    // confidence 质量闸(D6 二轮):后端 confidence < REWRITE_MIN_CONFIDENCE 时置 true,
+    // 前端拦截不当「你的版本」直接发,提示换源/重生。旧后端无此字段 → undefined = 不拦。
+    quality_gated?: boolean;
   };
 }
 
