@@ -333,9 +333,11 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
         <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(124,45,18,0.10)" />
         <Controls className="cascade-rf-controls" />
         {/* 暖色非阻挡版小地图(bottom-right,与 bottom-left 的 Controls 错开)。半透玻璃 +
-            类型配色 + pannable/zoomable 当导航用;主题色走 CSS 变量(亮/暗都不会变白块,
-            根治创始人最初「白底挡操作」的痛点)。0/1 节点(空态/单节点)不显示,不跟空态卡抢。 */}
-        {canvasNodes.length >= 2 && (
+            类型配色 + pannable/zoomable 当导航用;主题色走 CSS 变量(亮/暗都不会变白块)。
+            **门控 >=8**:画布够忙(导演搭出角色/场景/分镜后)才需要缩略图导航;稀疏的种子
+            画布(2 节点)不显示 —— 否则 fitView 会把它正好扣在策划书节点上,重蹈创始人最初
+            「白块挡操作」的覆辙。够忙时画布溢出视口,缩略图才真有用且不再是死块。 */}
+        {canvasNodes.length >= 8 && (
           <MiniMap
             className="cascade-rf-minimap"
             position="bottom-right"
