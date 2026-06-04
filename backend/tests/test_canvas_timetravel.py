@@ -561,6 +561,20 @@ class TestCancelGeneration:
         assert n2["asset_status"] == "idle"
         assert n2["result"] is None                    # url 没被写进去
 
+    def test_cancel_guard_blocks_retry(self):
+        # in-flight 任务抛错走 schedule_generation_retry —— 已取消的节点不能被拉回 pending 重试。
+        from agent.tools.canvas_persistence.generation_repo import schedule_generation_retry
+
+        tid = _thread()
+        _mk("V", type="video", asset_status="generating")
+        n = canvas_tools._load_node("V")
+        n["generation_status"] = "polling"
+        canvas_tools._upsert_node(n)
+        cancel_node_generation("V")
+        retried = schedule_generation_retry("V", "boom", user_id="default", thread_id=tid)
+        assert retried is False
+        assert canvas_tools._load_node("V")["generation_status"] == "cancelled"  # 没被拉回 pending
+
     def test_regenerate_after_cancel_works(self):
         # 取消后重新生成走 enqueue 直接置 pending,不受取消守卫影响(能正常重启)。
         _thread()

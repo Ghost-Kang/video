@@ -173,6 +173,10 @@ def schedule_generation_retry(
     node = _load_node(node_id, user_id=user_id, thread_id=thread_id)
     if not node:
         return False
+    # 取消守卫(逐镜取消,P2 ③):已取消的节点不重试 —— in-flight 任务抛错也不能把它拉回
+    # pending 再生成一遍(否则取消形同虚设)。
+    if node.get("generation_status") == "cancelled":
+        return False
     attempts = int(node.get("generation_attempt_count") or 0)
     if attempts >= GENERATION_MAX_ATTEMPTS:
         node["generation_status"] = "failed"
