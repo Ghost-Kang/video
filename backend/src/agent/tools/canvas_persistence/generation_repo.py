@@ -173,9 +173,11 @@ def schedule_generation_retry(
     node = _load_node(node_id, user_id=user_id, thread_id=thread_id)
     if not node:
         return False
-    # 取消守卫(逐镜取消,P2 ③):已取消的节点不重试 —— in-flight 任务抛错也不能把它拉回
-    # pending 再生成一遍(否则取消形同虚设)。
-    if node.get("generation_status") == "cancelled":
+    # 终态守卫(bug 审计 2026-06-04 #9):已是终态的节点不重试 —— 不仅 cancelled,
+    # done/failed 也算。否则一条迟到的失败回调能把已成功(done)的节点拉回 pending,
+    # 用户看到「明明好了又转圈」;已 failed 的节点被陈旧回调重新入队也无意义。
+    # 正常流程里此刻状态是 submitted/polling(在途),不受影响。
+    if node.get("generation_status") in ("cancelled", "done", "failed"):
         return False
     attempts = int(node.get("generation_attempt_count") or 0)
     if attempts >= GENERATION_MAX_ATTEMPTS:

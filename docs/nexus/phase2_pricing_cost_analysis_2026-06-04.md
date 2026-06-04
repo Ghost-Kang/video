@@ -36,7 +36,9 @@ caps:`CASCADE_RUN_CAP_CNY=3.0`(单 run)、`CASCADE_USER_DAY_CAP_CNY=30.0`(单用
 
 1. **生成(图+视频)是成本黑洞** —— 占一条成片的 **80%+**:¥9–16 of ¥11–18。分析+改写才 ¥2.2。**钱花在生成,不花在拆解。**
 2. **¥39/月 撑不起「无限生成」** —— 3 条成片 ≈ ¥33–55 成本 > ¥39 收入。**所以 Pro 必须给生成设额度,不能全放开**,否则重度用户直接亏穿。
-3. **🔴 per-run ¥3 cap 是退化的(实际不生效)** —— `agent_runner.py:330/464` 把 run ctx 的 `run_id` 恒设 None,于是 `cost_guard` 的 `_run_cost(None)≈0`,**单 run ¥3 上限形同虚设**(这也正解释了为什么生成能真跑通,而非被 ¥3.70>¥3 卡死)。**真正生效的护栏只剩 `¥30/用户/天`**(`CASCADE_USER_DAY_CAP_CNY`)。含义:① 成本控制比设计的粗(只有日级,没有 per-条/per-run 粒度);② 30 人 Beta 最坏敞口 = 30 × ¥30 = **¥900/天 ≈ ¥2.7w/月**(全员每天打满)。配额付费落地时建议把 per-run 粒度修回来(run_id 真正按 turn 生成),否则免费层的「N/天」配额没有 run 级成本闸去兜底,只能靠日上限。
+3. **🔴 成本守卫在 prod 实际全失效(比"退化"更糟)** —— 后续 16-agent 审计坐实:生成工具根本不 emit `generation_cost` 事件(只 emit `SHOT_*_RETURNED`),而 `sum_generation_cost` 只数 `generation_cost` → prod 实测该事件 = **0** → **连 ¥30/天都在读空表**,成本既没拦也没记录(看不到)。完整 root(run_id=None + 事件类型错配 + 后台任务脱 RUN_CTX)+ 「改错全挂」的修法见 [`phase2_bugclass_audit_2026-06-04.md`](phase2_bugclass_audit_2026-06-04.md) #1-7。下面这条是其中一环:
+
+   **per-run ¥3 cap 退化** —— `agent_runner.py:330/464` 把 run ctx 的 `run_id` 恒设 None,于是 `cost_guard` 的 `_run_cost(None)≈0`,**单 run ¥3 上限形同虚设**(这也正解释了为什么生成能真跑通,而非被 ¥3.70>¥3 卡死)。**真正生效的护栏只剩 `¥30/用户/天`**(`CASCADE_USER_DAY_CAP_CNY`)。含义:① 成本控制比设计的粗(只有日级,没有 per-条/per-run 粒度);② 30 人 Beta 最坏敞口 = 30 × ¥30 = **¥900/天 ≈ ¥2.7w/月**(全员每天打满)。配额付费落地时建议把 per-run 粒度修回来(run_id 真正按 turn 生成),否则免费层的「N/天」配额没有 run 级成本闸去兜底,只能靠日上限。
 
 ## 4. 推荐分层(数字待 founder 定)
 
