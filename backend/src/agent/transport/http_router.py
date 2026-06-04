@@ -116,6 +116,49 @@ async def handle_events_post(qs: dict, body: dict) -> tuple[int, dict, str]:
     return 200, {"ok": True}, "OK"
 
 
+async def handle_funnel(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """Beta 转化漏斗(admin-gated):每阶段去重用户数 + 转化率。
+    阶段:发起分析→分析完成→改写→草稿图→发布→付费意向。
+    口径:每阶段「至少触发过一次该事件的去重 user_id」(非严格顺序漏斗的近似,Beta 量足够)。
+    依赖 analysis_wait_started 等前端遥测事件(2026-06-04 补进 allowlist 后才有数)。"""
+    stages_def = [
+        ("发起分析", EventName.ANALYSIS_WAIT_STARTED.value),
+        ("分析完成", EventName.ANALYSIS_RETURNED.value),
+        ("改写", EventName.SCRIPT_REWRITTEN.value),
+        ("草稿图", EventName.SHOT_FIRST_FRAME_RETURNED.value),
+        ("发布", EventName.PUBLISH_PACK_COPIED.value),
+    ]
+    db = await _connect()
+    try:
+        stages: list[dict] = []
+        for label, ev in stages_def:
+            rows = await db.execute_fetchall(
+                "SELECT COUNT(DISTINCT user_id) FROM events WHERE event_name = ?", (ev,)
+            )
+            stages.append({"label": label, "event": ev, "users": int((rows[0][0] if rows else 0) or 0)})
+        # 付费意向:interview_logged 且 payload.would_pay_39 为真。
+        pay_rows = await db.execute_fetchall(
+            "SELECT user_id, payload_json FROM events WHERE event_name = ?",
+            (EventName.INTERVIEW_LOGGED.value,),
+        )
+        pay_users: set[str] = set()
+        for uid, pj in pay_rows:
+            try:
+                if json.loads(pj or "{}").get("would_pay_39"):
+                    pay_users.add(str(uid))
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+        stages.append({"label": "付费意向", "event": "interview_logged.would_pay_39", "users": len(pay_users)})
+    finally:
+        await db.close()
+    top = stages[0]["users"] or 0
+    for i, s in enumerate(stages):
+        s["pct_of_top"] = round(s["users"] / top, 3) if top else None
+        prev = stages[i - 1]["users"] if i > 0 else None
+        s["step_conv"] = round(s["users"] / prev, 3) if prev else None
+    return 200, {"stages": stages}, "OK"
+
+
 async def handle_anchors_get(qs: dict, body: dict) -> tuple[int, dict, str]:
     user_id = qs.get("user_id", ["default"])[0]
     kind = qs.get("kind", [None])[0]
@@ -557,6 +600,7 @@ EXACT_ROUTES: dict[tuple[str, str], HandlerFn] = {
     ("GET", "/api/creators"): handle_creators,
     ("GET", "/api/events"): handle_events_get,
     ("POST", "/api/events"): handle_events_post,
+    ("GET", "/api/funnel"): handle_funnel,
     ("GET", "/api/anchors"): handle_anchors_get,
     ("POST", "/api/anchors"): handle_anchors_post,
     ("POST", "/api/rewrite"): handle_rewrite,
