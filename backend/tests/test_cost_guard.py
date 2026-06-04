@@ -76,6 +76,27 @@ def test_user_day_cap_blocks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
         asyncio.run(cost_guard("u1", "r2", 0.5))
 
 
+def test_emit_generation_cost_feeds_day_cap(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """审计 #1-7 修复:cascade._emit_generation_cost 让生成成本进 GENERATION_COST 事件,
+    ¥30/天 user 级闸才读得到(此前生成只 emit SHOT_*_RETURNED → cap 读 0 → 失效)。
+    且 run_id=None 安全:拦截来自日级闸,run 级因 run_id 错配保持 no-op(不全局卡死)。"""
+    _use_tmp_db(monkeypatch, tmp_path)
+    from agent.tools.cascade import _emit_generation_cost
+
+    asyncio.run(
+        _emit_generation_cost(
+            user_id="u1", run_id=None, call_kind="shot_image", cost_cny=29.8, provider="image"
+        )
+    )
+    st = asyncio.run(cost_status("u1", "r1"))
+    assert st["user_today_cost_cny"] == 29.8  # 日级成本真读到了
+    # 再生成 ¥1.5 → 累计 > ¥30 → 日级闸拦(而非 run 级)
+    with pytest.raises(HardFailure):
+        asyncio.run(cost_guard("u1", "r2", PREDICT_SHOT_IMAGE_CNY))
+
+
 def test_costs_are_isolated_by_user(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _use_tmp_db(monkeypatch, tmp_path)
     asyncio.run(_cost("u1", "r1", 2_980))
