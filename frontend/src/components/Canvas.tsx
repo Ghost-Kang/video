@@ -4,6 +4,7 @@ import {
   Background,
   BackgroundVariant,
   Controls,
+  MiniMap,
   MarkerType,
   applyNodeChanges,
   type Node,
@@ -35,6 +36,15 @@ const nodeTypes = {
 const edgeTypes = {
   default: DeletableEdge,
 };
+
+// MiniMap 节点配色:沿用四类节点的强调色,缩略图一眼分得清类型(暖色非阻挡版)。
+const MINIMAP_NODE_COLOR: Record<string, string> = {
+  script: "#7c2d12", image: "#ea580c", video: "#f59e0b", composite: "#d4a574",
+};
+function miniMapNodeColor(node: Node): string {
+  if (node.type === "group") return "rgba(124,45,18,0.10)"; // 章节框淡显
+  return MINIMAP_NODE_COLOR[node.type ?? ""] ?? "#a8a29e";
+}
 
 const NODE_W = 200;
 const NODE_H = 120;
@@ -319,10 +329,26 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
         style={{ background: "transparent" }}
         fitView
       >
-        {/* 暖色科技底:极淡陶土点阵(替默认黑网格);MiniMap 去掉 —— 它白底盖住画布、
-            还无法移动「挡操作」(创始人实测)。少量节点不需要缩略图,需要时再做暖色非阻挡版。 */}
+        {/* 暖色科技底:极淡陶土点阵(替默认黑网格)。 */}
         <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(124,45,18,0.10)" />
         <Controls className="cascade-rf-controls" />
+        {/* 暖色非阻挡版小地图(bottom-right,与 bottom-left 的 Controls 错开)。半透玻璃 +
+            类型配色 + pannable/zoomable 当导航用;主题色走 CSS 变量(亮/暗都不会变白块,
+            根治创始人最初「白底挡操作」的痛点)。0/1 节点(空态/单节点)不显示,不跟空态卡抢。 */}
+        {canvasNodes.length >= 2 && (
+          <MiniMap
+            className="cascade-rf-minimap"
+            position="bottom-right"
+            pannable
+            zoomable
+            nodeColor={miniMapNodeColor}
+            nodeStrokeColor="rgba(124,45,18,0.28)"
+            nodeStrokeWidth={2}
+            nodeBorderRadius={3}
+            style={{ width: 168, height: 116 }}
+            ariaLabel="画布缩略图"
+          />
+        )}
       </ReactFlow>
       {/* 空画布引导(0 节点时):告诉用户这是创作画布 + 一键唤起导演。 */}
       {canvasNodes.length === 0 && <CanvasEmptyState />}
