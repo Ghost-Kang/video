@@ -174,12 +174,14 @@ class RegenerateScriptNodeMsg(_Base):
 
 class SeedCanvasMsg(_Base):
     """canvas 统筹 P0 桥 — 「在画布上做我的版本」:从爆点分析顺势进画布。后端在空画布上 seed
-    一个「我的策划书」起点节点(幂等:画布已有节点则不重复 seed),前端切到画布视图。
-    analysis_id 透传备查(当前 seed 不依赖它,后续可据它把分析素材也 seed 成节点)。"""
+    「📊 这条为什么火」参考节点(若带 analysis_summary)+「✍️ 我的策划书」起点节点(幂等:
+    画布已有节点则不重复 seed),前端切到画布视图。analysis_summary 由前端从已加载的分析里
+    拼好传来(主题/为什么火/可复制套路),只作画布上给用户看的参考卡——空则只 seed 策划书节点。"""
 
     type: Literal["seed_canvas"]
     thread_id: str = Field(min_length=1)
     analysis_id: str = ""
+    analysis_summary: str = ""
 
 
 class CancelGenerationMsg(_Base):

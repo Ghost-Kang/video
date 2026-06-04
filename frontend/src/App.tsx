@@ -298,7 +298,19 @@ export default function App({ userId, onLogout }: AppProps) {
   // canvas 统筹 P0 桥 — 「在画布上做我的版本」:从分析顺势进画布。seed 起点节点 + 切到画布视图
   // (?view=pro 任何用户可达;这是画布「解封」给普通用户的入口,D2 双轨:CardStack 仍默认)。
   const onSeedCanvas = useCallback(() => {
-    sendCommand({ type: "seed_canvas", thread_id: tid, analysis_id: analysis?.analysis_id ?? "" });
+    // 富化:把分析摘要(主题/为什么火/可复制套路)带进 seed,后端建「📊 这条为什么火」参考节点
+    // —— 用户进画布就看到创作依据,不是空画布。
+    const va = analysis?.viral_analysis;
+    const summary = va
+      ? [
+          va.theme && `主题:${va.theme}`,
+          va.summary && `为什么火:${va.summary}`,
+          va.replicable_formula && `可复制套路:${va.replicable_formula}`,
+        ]
+          .filter(Boolean)
+          .join("\n\n")
+      : "";
+    sendCommand({ type: "seed_canvas", thread_id: tid, analysis_id: analysis?.analysis_id ?? "", analysis_summary: summary });
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set("view", "pro");
