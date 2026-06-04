@@ -24,9 +24,14 @@
 
 > 这是 Beta 上量前该修的成本控制硬线,但「改错全挂」+ 依赖定价,故列为**需谨慎、带定价决策**的改动,不在本次硬上。
 
+## ✅ 已修(后续低风险轮)
+- **#10 toprador_cache 无 revision 守卫** —— 已修(缓存键编进 ANALYSIS_PIPELINE_REVISION,bump 后旧项自然 miss;无迁移)+ 回归测试。prod 部署。
+
 ## 🟡 低优先级(已记,未修)
 - **#8 update_generation_state 重生竞态**(generation_repo.py:122):重生后旧任务的迟到回写可能盖掉新 pending。需 **task-id fencing**(回写带源 task_id,与节点当前 task_id 不符则跳过)——要改 worker 签名,较 invasive。注:重生路径若已禁在途重生,窗口很小。待与 #1-7 一起做 run_id 体系时一并加 fencing。
-- **#10 toprador_cache 无 revision 守卫**(db.py:152):toprador 上游 schema 变时,旧缓存项(TTL **60s**)仍被返回。实际影响有限(60s 窗口 + schema 极少变)。主分析永久缓存已有 ANALYSIS_PIPELINE_REVISION 守卫;此 60s transient 优先级低。
+
+## 🟡 部分已修(成本守卫)
+- **#1-7 成本守卫** —— 安全子集已修(image+video 补 GENERATION_COST emit → ¥30/天闸 + 看板生效,prod e2e 验过)。run 级 ¥3 cap 仍欠(需 run_id per-turn,更险+依赖定价 ❓7)。详见 [[project_phase2_hardening]] / pricing doc。
 
 ## 方法论留痕
 浏览器真机验证 → 抓 2 真 bug → adversarial workflow 扫同类(每条逐个对抗复核,11→10 确认)。这套「真机抓样本 + workflow 扇出同类」对上量前硬化有效,建议每个大 leg 后跑一次。
