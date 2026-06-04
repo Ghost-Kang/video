@@ -280,6 +280,10 @@ export const useWSStore = create<WSStore>((set, get) => ({
         // time-travel 回溯(P2 slice-2b)— 缓存该节点的版本快照,供 NodeVersionHistory 对比。
         queueMicrotask(() => canvas.setNodeVersions(event.node_id, event.versions));
         break;
+      case "todos_updated":
+        // write_todos→画布进度(P2 ③)— Director 规划进度,渲染成画布顶部进度条。
+        queueMicrotask(() => canvas.setTodos(event.todos));
+        break;
       case "processing":
         break;
       case "session_state": {

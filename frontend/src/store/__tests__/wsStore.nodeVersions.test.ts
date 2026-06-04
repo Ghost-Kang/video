@@ -37,4 +37,24 @@ describe("wsStore node_versions_returned (2b)", () => {
     useCanvasStore.getState().clear();
     expect(useCanvasStore.getState().nodeVersions).toEqual({});
   });
+
+  it("todos_updated lands in canvasStore.todos (P2 ③)", () => {
+    useWSStore.setState({ currentThreadId: "t1" });
+    useWSStore.getState().dispatch(
+      {
+        type: "todos_updated",
+        thread_id: "t1",
+        todos: [
+          { content: "策划书", status: "completed" },
+          { content: "角色三视图", status: "in_progress" },
+        ],
+      },
+      "user_test",
+    );
+    return Promise.resolve().then(() => {
+      const todos = useCanvasStore.getState().todos;
+      expect(todos).toHaveLength(2);
+      expect(todos[1]).toEqual({ content: "角色三视图", status: "in_progress" });
+    });
+  });
 });

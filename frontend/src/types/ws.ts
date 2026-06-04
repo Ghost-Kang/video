@@ -205,6 +205,20 @@ export interface CancelGenerationMsg {
   node_id: string;
 }
 
+/** write_todos→画布进度(P2 ③)— Director 用 deepagents write_todos 规划的一步。 */
+export interface Todo {
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+}
+
+/** 服务端 → 前端:Director 规划进度(策划书→角色→场景→宫格→视频→合成)。每轮 agent
+ *  跑完后端读 agent state["todos"] 推来,前端渲染成画布顶部进度条。手写(非 ws_generated)。 */
+export interface TodosUpdatedEvent {
+  type: "todos_updated";
+  thread_id: string;
+  todos: Todo[];
+}
+
 /** time-travel 回溯(P2 slice-2b)— 服务端 → 前端:某节点的版本快照列表(升序)。
  *  对应后端 NodeVersionsReturnedEvent;NodeVersionHistory 渲染历史 + 当前 vs 旧版对比。 */
 export interface NodeVersionsReturnedEvent {
@@ -271,6 +285,7 @@ export type WSEvent =
   | ErrorEvent
   | ReviewRequiredEvent
   | NodeVersionsReturnedEvent
+  | TodosUpdatedEvent
   | SessionListEventTyped
   | SessionStateEventTyped
   | CanvasUpdatedEventTyped

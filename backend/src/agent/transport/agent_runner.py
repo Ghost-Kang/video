@@ -280,6 +280,29 @@ async def _handle_run_exception(e: Exception, user_id: str, thread_id: str, ws, 
         pass
 
 
+async def _emit_todos(agent, config, user_id: str, thread_id: str, ws) -> None:
+    """write_todos → 画布进度(P2 ③):读 Director agent state 的 todos,推 `todos_updated`
+    给前端进度条。Director 用 deepagents 自带的 `write_todos`(TodoListMiddleware)规划多步
+    创作(策划书→角色→场景→宫格→视频→合成),todos 存在 LangGraph state["todos"](每项
+    {content, status: pending|in_progress|completed})。best-effort:读 state / 推帧失败都不挡主
+    流程;todos 空(本轮没规划)不推,避免清掉前端已显示的进度。"""
+    try:
+        state = await agent.aget_state(config)
+        todos = (getattr(state, "values", None) or {}).get("todos") or []
+    except Exception:  # pragma: no cover - defensive
+        return
+    if not todos:
+        return
+    try:
+        await notify.send_to_user(
+            user_id,
+            {"type": "todos_updated", "thread_id": thread_id, "todos": todos},
+            fallback_ws=ws,
+        )
+    except (ConnectionClosed, ConnectionClosedOK, RuntimeError, OSError):
+        pass
+
+
 async def run_agent(
     user_id: str,
     pool: AgentPool,
@@ -311,6 +334,7 @@ async def run_agent(
     reply = ""
     failed = False  # W5D3 CR-P1: explicit flag replaces magic-string sentinel.
     awaiting_review = False  # P2 — graph paused at an autonomous review gate.
+    entry = None  # set after pool.get; guarded at the bottom for the todos emit.
     await run_state.mark_running(user_id, thread_id)  # W5D4 P0-B — persisted lifecycle
     try:
         # agent 的 tool call 通过 ContextVar 读写正确的用户/会话数据
@@ -407,6 +431,10 @@ async def run_agent(
         except (ConnectionClosed, ConnectionClosedOK, RuntimeError, OSError):
             pass
 
+    # write_todos → 画布进度(P2 ③):本轮结束推 Director 的规划 todos(若有)。
+    if entry is not None:
+        await _emit_todos(entry["agent"], entry["config"], user_id, thread_id, ws)
+
 
 async def resume_agent(
     user_id: str,
@@ -440,6 +468,7 @@ async def resume_agent(
     reply = ""
     failed = False
     awaiting_review = False
+    entry = None  # set after pool.get; guarded at the bottom for the todos emit.
     await run_state.mark_running(user_id, thread_id)  # back to running while resuming
     try:
         canvas_tools.set_user_id(user_id)
@@ -533,6 +562,10 @@ async def resume_agent(
             )
         except (ConnectionClosed, ConnectionClosedOK, RuntimeError, OSError):
             pass
+
+    # write_todos → 画布进度(P2 ③):审核续跑(级联推进)后也同步规划 todos。
+    if entry is not None:
+        await _emit_todos(entry["agent"], entry["config"], user_id, thread_id, ws)
 
 
 async def optimize_prompt(node_id: str, prompt: str, feedback: str) -> str:
