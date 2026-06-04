@@ -514,6 +514,24 @@ class TestSeedCanvas:
         # 不重复 seed:仍只有原来那一个节点
         assert list(frame["canvas"]["nodes"].keys()) == ["existing"]
 
+    def test_richer_seed_with_analysis_summary(self):
+        # 富化:带摘要 → seed 「📊 这条为什么火」(confirmed 参考)+「✍️ 我的策划书」(reviewing 锚)+ 边。
+        tid = _thread()
+        ctx = WSCtx(user_id="default", ws=_FakeWS(), pool=None)
+        summary = "主题:萌宠开箱\n\n为什么火:反差萌 + 三秒钩子"
+        asyncio.run(handle_seed_canvas(ctx, SeedCanvasMsg(
+            type="seed_canvas", thread_id=tid, analysis_id="a1", analysis_summary=summary)))
+        frame = next(m for m in ctx.ws.sent if m["type"] == "canvas_updated")
+        nodes = list(frame["canvas"]["nodes"].values())
+        assert len(nodes) == 2
+        ref = next(n for n in nodes if "为什么火" in n["title"])
+        anchor = next(n for n in nodes if "我的策划书" in n["title"])
+        assert ref["node_status"] == "confirmed" and ref["result"]["content"] == summary
+        assert anchor["node_status"] == "reviewing" and not (anchor["result"] or {}).get("content")
+        # 边:📊 参考 → 我的策划书
+        edges = frame["canvas"]["edges"]
+        assert any(e["source"] == ref["id"] and e["target"] == anchor["id"] for e in edges)
+
 
 # ---------- 逐镜取消(P2 ③ async subagents 可取消)----------
 

@@ -549,16 +549,24 @@ async def handle_regenerate_script_node(ctx: WSCtx, msg: RegenerateScriptNodeMsg
 
 
 async def handle_seed_canvas(ctx: WSCtx, msg: SeedCanvasMsg) -> None:
-    """canvas 统筹 P0 桥 — 「在画布上做我的版本」:在**空画布**上 seed 一个「我的策划书」起点
-    节点(reviewing,空内容),让用户从爆点分析顺势进画布开始创作。幂等:画布已有任何节点
-    (已 seed / 已开始级联)就不重复 seed,只回推当前快照。纯脚手架,不调模型、不触发 Director
-    —— 用户进画布后告诉导演改写方向,既有锚点级联(director.md §2-6)接手。"""
+    """canvas 统筹 P0 桥 — 「在画布上做我的版本」:在**空画布**上 seed 创作起点,让用户从爆点
+    分析顺势进画布。带 analysis_summary 时先 seed「📊 这条为什么火」只读参考节点(confirmed,
+    内容=分析摘要),再 seed「✍️ 我的策划书」创作锚(reviewing,空)并连一条边,用户进画布就
+    看到「为什么火」的依据;不带摘要就只 seed 策划书节点。幂等:画布已有任何节点就不重复 seed。
+    纯脚手架,不调模型、不触发 Director —— 用户给改写方向后既有锚点级联(director.md §2-6)接手。"""
 
     def _work() -> dict | None:
         canvas_tools.set_thread_id(msg.thread_id)
-        existing = canvas_tools._load_all_nodes()
-        if not existing:  # 空画布才 seed,避免重复点击 / 已开始创作时叠加
-            canvas_tools.create_canvas_node("script", "✍️ 我的策划书", description="")
+        if not canvas_tools._load_all_nodes():  # 空画布才 seed
+            summary = (msg.analysis_summary or "").strip()
+            parent_ids = None
+            if summary:
+                # 📊 爆点分析参考(confirmed,只读)—— 给用户看「为什么火」,也给 Director 当上下文。
+                ref = canvas_tools.create_canvas_node("script", "📊 这条为什么火", description=summary)
+                canvas_tools.update_canvas_node(ref["id"], node_status="confirmed", confirmed=True)
+                parent_ids = [ref["id"]]
+            # ✍️ 我的策划书 = 创作锚(reviewing,空,Director 把改写写进这里)。
+            canvas_tools.create_canvas_node("script", "✍️ 我的策划书", description="", parent_ids=parent_ids)
         return canvas_data(msg.thread_id)
 
     snapshot = await asyncio.to_thread(_work)
