@@ -366,11 +366,13 @@ const mdComponents = {
 
 const S = {
   panel: {
-    width: 320,
+    width: "clamp(380px, 32vw, 600px)",
+    flexShrink: 0,
     display: "flex",
     flexDirection: "column",
-    background: "#fff",
-    borderLeft: "1px solid #e4e4e7",
+    background: "var(--color-paper, #faf8f3)",
+    borderLeft: "1px solid rgba(124,45,18,0.12)",
+    boxShadow: "-8px 0 24px rgba(124,45,18,0.05)",
     overflow: "auto",
   } as React.CSSProperties,
 

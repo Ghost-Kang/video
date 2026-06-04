@@ -2,8 +2,8 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import {
   ReactFlow,
   Background,
+  BackgroundVariant,
   Controls,
-  MiniMap,
   applyNodeChanges,
   type Node,
   type OnNodesChange,
@@ -292,7 +292,7 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
   }, [canvasNodes, edges, updateNodePosition, onPositionChange]);
 
   return (
-    <div style={{ flex: 1, height: "100%", position: "relative" }}>
+    <div style={{ flex: 1, minWidth: 0, height: "100%", position: "relative" }}>
       <ReactFlow
         nodes={rfNodes}
         edges={edges}
@@ -302,19 +302,14 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
         onNodeClick={(_e, node) => selectNode(node.id)}
-        defaultEdgeOptions={{ deletable: true, style: { stroke: "#a1a1aa", strokeWidth: 2 } }}
+        defaultEdgeOptions={{ deletable: true, style: { stroke: "rgba(124,45,18,0.4)", strokeWidth: 1.5 } }}
+        proOptions={{ hideAttribution: true }}
         fitView
       >
-        <Background />
-        <Controls />
-        <MiniMap
-          position="bottom-right"
-          style={{ background: "#fafafa", border: "1px solid #e4e4e7", borderRadius: 8 }}
-          nodeColor={(n) => {
-            const t = (n.data?.node as { type?: string })?.type;
-            return t === "script" ? "#18181b" : t === "image" ? "#52525b" : t === "video" ? "#a1a1aa" : t === "composite" ? "#eab308" : "#e4e4e7";
-          }}
-        />
+        {/* 暖色科技底:极淡陶土点阵(替默认黑网格);MiniMap 去掉 —— 它白底盖住画布、
+            还无法移动「挡操作」(创始人实测)。少量节点不需要缩略图,需要时再做暖色非阻挡版。 */}
+        <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(124,45,18,0.10)" />
+        <Controls className="cascade-rf-controls" />
       </ReactFlow>
       <button onClick={handleAutoLayout} style={S.layoutBtn}>自动排版</button>
     </div>
@@ -330,14 +325,17 @@ const S = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#fff",
-    border: "1px solid #e4e4e7",
-    borderRadius: 8,
+    background: "rgba(250,248,243,0.82)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid rgba(124,45,18,0.18)",
+    borderRadius: 12,
     cursor: "pointer",
-    color: "#71717a",
+    color: "#7c2d12",
+    fontWeight: 500,
     fontSize: 13,
-    padding: "0 12px",
+    padding: "0 14px",
     zIndex: 10,
-    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+    boxShadow: "0 2px 10px rgba(124,45,18,0.08)",
   } as React.CSSProperties,
 };

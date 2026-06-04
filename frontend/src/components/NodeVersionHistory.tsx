@@ -174,7 +174,7 @@ const S: Record<string, React.CSSProperties> = {
   seq: { fontSize: 11, fontWeight: 600, color: "#7c2d12", flexShrink: 0, minWidth: 22 },
   reason: { fontSize: 12, color: "#3f3f46", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
   time: { fontSize: 11, color: "#a1a1aa", flexShrink: 0 },
-  compare: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 4 },
+  compare: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 4 },
   col: { display: "flex", flexDirection: "column", gap: 4, minWidth: 0 },
   colHeadNew: { fontSize: 11, fontWeight: 600, color: "#16a34a" },
   colHeadOld: {
