@@ -118,11 +118,12 @@ async def handle_events_post(qs: dict, body: dict) -> tuple[int, dict, str]:
 
 async def handle_funnel(qs: dict, body: dict) -> tuple[int, dict, str]:
     """Beta 转化漏斗(admin-gated):每阶段去重用户数 + 转化率。
-    阶段:发起分析→分析完成→改写→草稿图→发布→付费意向。
+    阶段:分析完成→改写→草稿图→发布→付费意向。
     口径:每阶段「至少触发过一次该事件的去重 user_id」(非严格顺序漏斗的近似,Beta 量足够)。
-    依赖 analysis_wait_started 等前端遥测事件(2026-06-04 补进 allowlist 后才有数)。"""
+    起点用 analysis_returned(长期可靠)而非 analysis_wait_started ——后者 2026-06-04 才补进
+    allowlist,历史无数据,拿它当起点会让分析完成/发起 >100% 失真。发起/放弃靠 wait_started
+    单独看(随 Beta 累积)。"""
     stages_def = [
-        ("发起分析", EventName.ANALYSIS_WAIT_STARTED.value),
         ("分析完成", EventName.ANALYSIS_RETURNED.value),
         ("改写", EventName.SCRIPT_REWRITTEN.value),
         ("草稿图", EventName.SHOT_FIRST_FRAME_RETURNED.value),
