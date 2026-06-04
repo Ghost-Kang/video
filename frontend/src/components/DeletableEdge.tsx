@@ -1,35 +1,30 @@
 import { useState } from "react";
-import { BaseEdge, EdgeLabelRenderer, type EdgeProps } from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from "@xyflow/react";
 
 export function DeletableEdge(props: EdgeProps) {
-  const { id, sourceX, sourceY, targetX, targetY, style = {} } = props;
+  const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, markerEnd } = props;
   const [hovered, setHovered] = useState(false);
-  const midX = (sourceX + targetX) / 2;
-  const midY = (sourceY + targetY) / 2;
+  const [path, midX, midY] = getSmoothStepPath({
+    sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 14,
+  });
+  const baseStroke = (style as Record<string, string>)?.stroke || "rgba(124,45,18,0.4)";
 
   return (
     <>
-      <g
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      >
+      <g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
         <BaseEdge
           id={id}
-          path={`M ${sourceX} ${sourceY} L ${targetX} ${targetY}`}
+          path={path}
+          markerEnd={markerEnd}
           style={{
             ...(style as Record<string, unknown>),
-            stroke: hovered ? "#52525b" : (style as Record<string, string>)?.stroke || "#a1a1aa",
-            strokeWidth: hovered ? 3 : 2,
+            stroke: hovered ? "#7c2d12" : baseStroke,
+            strokeWidth: hovered ? 2.5 : 1.5,
             transition: "stroke 0.15s, stroke-width 0.15s",
           }}
         />
         {/* invisible wide path for easier hover targeting */}
-        <path
-          d={`M ${sourceX} ${sourceY} L ${targetX} ${targetY}`}
-          fill="none"
-          stroke="transparent"
-          strokeWidth={20}
-        />
+        <path d={path} fill="none" stroke="transparent" strokeWidth={20} />
       </g>
       <EdgeLabelRenderer>
         <div
@@ -40,7 +35,7 @@ export function DeletableEdge(props: EdgeProps) {
             width: 20,
             height: 20,
             borderRadius: "50%",
-            background: "#ef4444",
+            background: "#b91c1c",
             color: "#fff",
             border: "none",
             fontSize: 11,

@@ -625,3 +625,48 @@
     background-size: 24px 24px;
   }
 }
+
+/* ── React Flow 控件暖色科技皮(P2 画布 polish)──
+   原生 Controls 是白底黑边的方块,跟暖纸科技风割裂。这里整体玻璃化 + 陶土描边。 */
+.cascade-rf-controls {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 26px -12px rgba(124, 45, 18, 0.3);
+  border: 1px solid rgba(124, 45, 18, 0.16);
+  background: rgba(250, 248, 243, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.cascade-rf-controls .react-flow__controls-button {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(124, 45, 18, 0.1);
+  width: 28px;
+  height: 28px;
+  transition: background 0.15s, color 0.15s;
+}
+.cascade-rf-controls .react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+.cascade-rf-controls .react-flow__controls-button svg {
+  fill: #7c2d12;
+}
+.cascade-rf-controls .react-flow__controls-button:hover {
+  background: rgba(124, 45, 18, 0.08);
+}
+.cascade-rf-controls .react-flow__controls-button:hover svg {
+  fill: #ea580c;
+}
+html.dark .cascade-rf-controls {
+  background: rgba(28, 25, 23, 0.78);
+  border-color: rgba(234, 88, 12, 0.22);
+}
+html.dark .cascade-rf-controls .react-flow__controls-button {
+  border-bottom-color: rgba(234, 88, 12, 0.14);
+}
+html.dark .cascade-rf-controls .react-flow__controls-button svg {
+  fill: #fdba74;
+}
+html.dark .cascade-rf-controls .react-flow__controls-button:hover {
+  background: rgba(234, 88, 12, 0.14);
+}

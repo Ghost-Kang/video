@@ -333,9 +333,8 @@ export default function App({ userId, onLogout }: AppProps) {
               <Canvas onPositionChange={(pos) => sendCommand({ ...pos, thread_id: tid })} onCreateEdge={actions.handleCreateEdge} onDeleteEdge={actions.handleDeleteEdge} />
               {/* P2 ③ write_todos→画布进度:Director 规划进度条(画布顶部,todos 空时不渲染) */}
               <TodoProgress />
-              {/* P1 锚点级联护城河:跨片角色/场景锚点复用侧栏(自取数据,画布创作时可见) */}
-              <AnchorSidebar />
-              {selectedNodeId && <NodeDetail actions={actions} />}
+              {/* 右侧单面板:选中节点 → 节点详情;否则 → 锚点复用侧栏。互斥,不再两块挤一起。 */}
+              {selectedNodeId ? <NodeDetail actions={actions} /> : <AnchorSidebar />}
             </NodeActionsContext.Provider>
           ) : <CardStack onGenerateFirstFrame={onGenerateFirstFrame} onTriggerRewrite={onTriggerRewrite} onGenerateShotVideo={onGenerateShotVideo} onComposeFilm={onComposeFilm} pendingCase={pendingCase} thinking={thinking} onSeedCanvas={onSeedCanvas} />}
         </div>

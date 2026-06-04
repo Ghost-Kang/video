@@ -4,6 +4,7 @@ import {
   Background,
   BackgroundVariant,
   Controls,
+  MarkerType,
   applyNodeChanges,
   type Node,
   type OnNodesChange,
@@ -302,7 +303,11 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
         onNodeClick={(_e, node) => selectNode(node.id)}
-        defaultEdgeOptions={{ deletable: true, style: { stroke: "rgba(124,45,18,0.4)", strokeWidth: 1.5 } }}
+        defaultEdgeOptions={{
+          deletable: true,
+          style: { stroke: "rgba(124,45,18,0.4)", strokeWidth: 1.5 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: "rgba(124,45,18,0.55)", width: 16, height: 16 },
+        }}
         proOptions={{ hideAttribution: true }}
         fitView
       >
