@@ -3,12 +3,15 @@ import { render, screen } from "@testing-library/react";
 import { TodoProgress } from "../TodoProgress";
 import { useCanvasStore } from "../../store/canvasStore";
 
-beforeEach(() => useCanvasStore.setState({ todos: [] }));
+beforeEach(() => useCanvasStore.setState({ todos: [], nodes: [] }));
 
-describe("TodoProgress (P2 ③ write_todos→画布进度)", () => {
-  it("renders nothing when there are no todos", () => {
-    const { container } = render(<TodoProgress />);
-    expect(container.firstChild).toBeNull();
+describe("TodoProgress (P2 六步向导 StageRail)", () => {
+  it("无 todos 时常驻显示六步路线图(让用户先看懂流程)", () => {
+    render(<TodoProgress />);
+    expect(screen.getByTestId("todo-progress")).toHaveTextContent("创作流程 · 0/6");
+    for (const s of ["策划书", "角色", "场景", "分镜", "视频", "合成"]) {
+      expect(screen.getByText(s)).toBeInTheDocument();
+    }
   });
 
   it("renders the plan steps + completed count", () => {
