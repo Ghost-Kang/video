@@ -646,6 +646,31 @@ def regenerate_script_node(node_id: str, reason: str = "regenerate-script") -> d
     return _load_node(node_id)
 
 
+def cancel_node_generation(node_id: str) -> dict | None:
+    """逐镜取消(P2 ③ async subagents 的「可取消」)— 取消一个**在途**的媒体生成。
+
+    把节点 generation_status 置 `cancelled`、asset_status 回 idle、清 task/lease/error;
+    产物保持 None(没生成完)。worker 对这条旧任务的回写被 update_generation_state /
+    _update_node_result 的「取消守卫」拦下(取消优先,防 in-flight 竞态)。重新生成走
+    enqueue 直接置 pending,不受守卫影响。
+
+    只取消在途(generation_status ∈ pending/submitted/polling);不在途返回 None。
+    返回更新后的节点;节点不存在返回 None。"""
+    node = _load_node(node_id)
+    if not node:
+        return None
+    if node.get("generation_status") not in ("pending", "submitted", "polling"):
+        return None  # 不在途,无可取消
+    node["generation_status"] = "cancelled"
+    node["asset_status"] = "idle"
+    node["generation_task_id"] = None
+    node["generation_lease_until"] = None
+    node["generation_next_retry_at"] = None
+    node["generation_error"] = None
+    _upsert_node(node)
+    return _load_node(node_id)
+
+
 __all__ = [
     # types
     "NodeType",

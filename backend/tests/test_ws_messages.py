@@ -621,7 +621,7 @@ class TestInboundModelsRegistry:
             "review_node", "execute_node", "update_node_status",
             "optimize_prompt", "regenerate_node", "list_node_versions",
             "restore_node_version", "regenerate_script_node", "seed_canvas",
-            "review_decision", "user_message",
+            "cancel_generation", "review_decision", "user_message",
         }
         assert set(INBOUND_MODELS) == expected, (
             f"INBOUND_MODELS keys drift: extra={set(INBOUND_MODELS) - expected}, "

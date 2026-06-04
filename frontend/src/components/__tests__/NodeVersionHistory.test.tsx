@@ -22,7 +22,7 @@ function makeActions(over: Partial<NodeActions> = {}): NodeActions {
   return {
     handleReview: vi.fn(), handleExecuteNode: vi.fn(), handleUpdateNodeStatus: vi.fn(),
     handleRegenerateNode: vi.fn(), handleListNodeVersions: vi.fn(), handleRestoreNodeVersion: vi.fn(),
-    handleRegenerateScriptNode: vi.fn(), handleOptimizePrompt: vi.fn(),
+    handleRegenerateScriptNode: vi.fn(), handleCancelGeneration: vi.fn(), handleOptimizePrompt: vi.fn(),
     handleCreateEdge: vi.fn(), handleDeleteEdge: vi.fn(), handleReorderEdge: vi.fn(), ...over,
   };
 }

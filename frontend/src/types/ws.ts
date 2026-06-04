@@ -197,6 +197,14 @@ export interface SeedCanvasMsg {
   analysis_id: string;
 }
 
+/** 逐镜取消(P2 ③)— 取消一个在途的媒体生成节点。后端置 cancelled(worker 回写被守卫拦下),
+ *  asset_status 回 idle,可重新生成。回 canvas_updated。 */
+export interface CancelGenerationMsg {
+  type: "cancel_generation";
+  thread_id: string;
+  node_id: string;
+}
+
 /** time-travel 回溯(P2 slice-2b)— 服务端 → 前端:某节点的版本快照列表(升序)。
  *  对应后端 NodeVersionsReturnedEvent;NodeVersionHistory 渲染历史 + 当前 vs 旧版对比。 */
 export interface NodeVersionsReturnedEvent {
@@ -254,6 +262,7 @@ export type WSCommand =
   | RestoreNodeVersionMsg
   | RegenerateScriptNodeMsg
   | SeedCanvasMsg
+  | CancelGenerationMsg
   | ReviewDecisionMsg
   | UserMessageMsg;
 

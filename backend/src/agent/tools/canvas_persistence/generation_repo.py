@@ -135,6 +135,11 @@ def update_generation_state(
     node = _load_node(node_id, user_id=user_id, thread_id=thread_id)
     if not node:
         return
+    # 取消守卫(逐镜取消,P2 ③):节点已被用户取消 → worker 对在途任务的回写一律跳过(取消
+    # 优先,防 in-flight 竞态:已 claim 的任务跑完会盖掉取消)。重新生成走 enqueue 直接置
+    # pending(不经此函数),故能正常重启;只有这条旧任务的回写被拦下。
+    if node.get("generation_status") == "cancelled":
+        return
     node["generation_status"] = status
     if task_id is not None:
         node["generation_task_id"] = task_id

@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict
 NodeType = Literal["script", "image", "video", "composite"]
 NodeStatus = Literal["reviewing", "confirmed"]
 AssetStatus = Literal["idle", "generating", "done", "failed", "timeout"]
-GenerationStatus = Literal["idle", "pending", "submitted", "polling", "done", "failed"]
+GenerationStatus = Literal["idle", "pending", "submitted", "polling", "done", "failed", "cancelled"]
 
 
 class CanvasNode(BaseModel):

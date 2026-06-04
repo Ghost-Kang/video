@@ -13,12 +13,15 @@ import pytest
 
 from agent.tools import canvas as canvas_tools
 from agent.tools.canvas import (
+    cancel_node_generation,
     regenerate_node,
     regenerate_script_node,
     restore_node_version,
     _descendants,
     _mark_descendants_stale,
 )
+from agent.tools.canvas_persistence.generation_repo import update_generation_state
+from agent.tools.canvas_persistence.nodes_repo import _update_node_result
 from agent.tools.canvas_persistence import db as canvas_db
 from agent.tools.canvas_persistence.versions_repo import list_versions
 from agent.transport.context import WSCtx
@@ -510,3 +513,79 @@ class TestSeedCanvas:
         frame = next(m for m in ctx.ws.sent if m["type"] == "canvas_updated")
         # 不重复 seed:仍只有原来那一个节点
         assert list(frame["canvas"]["nodes"].keys()) == ["existing"]
+
+
+# ---------- 逐镜取消(P2 ③ async subagents 可取消)----------
+
+
+class TestCancelGeneration:
+    def test_cancel_in_flight_sets_cancelled_and_idle(self):
+        _thread()
+        _mk("V", type="video", asset_status="generating")
+        n = canvas_tools._load_node("V")
+        n["generation_status"] = "polling"
+        n["generation_task_id"] = "task-1"
+        canvas_tools._upsert_node(n)
+
+        out = cancel_node_generation("V")
+        assert out is not None
+        assert out["generation_status"] == "cancelled"
+        assert out["asset_status"] == "idle"
+        assert out["generation_task_id"] is None
+
+    def test_cancel_only_in_flight(self):
+        _thread()
+        _mk("done", type="image", asset_status="done", result={"url": "x.png"})
+        n = canvas_tools._load_node("done")
+        n["generation_status"] = "done"
+        canvas_tools._upsert_node(n)
+        assert cancel_node_generation("done") is None   # 不在途
+        assert cancel_node_generation("missing") is None
+
+    def test_cancel_guard_blocks_worker_writeback(self):
+        # 取消后,worker 的在途回写(update_generation_state/_update_node_result)被守卫拦下,
+        # 不会把节点盖回 done + 写 url(防 in-flight 竞态)。
+        tid = _thread()
+        _mk("V", type="video", asset_status="generating")
+        n = canvas_tools._load_node("V")
+        n["generation_status"] = "polling"
+        canvas_tools._upsert_node(n)
+
+        cancel_node_generation("V")  # → cancelled
+        # 模拟 in-flight worker 跑完回写
+        update_generation_state("V", "done", user_id="default", thread_id=tid)
+        _update_node_result("V", {"url": "late.mp4"}, user_id="default", thread_id=tid)
+
+        n2 = canvas_tools._load_node("V")
+        assert n2["generation_status"] == "cancelled"  # 没被盖回 done
+        assert n2["asset_status"] == "idle"
+        assert n2["result"] is None                    # url 没被写进去
+
+    def test_regenerate_after_cancel_works(self):
+        # 取消后重新生成走 enqueue 直接置 pending,不受取消守卫影响(能正常重启)。
+        _thread()
+        _mk("V", type="video", asset_status="generating")
+        n = canvas_tools._load_node("V")
+        n["generation_status"] = "polling"
+        canvas_tools._upsert_node(n)
+        cancel_node_generation("V")
+        canvas_tools.enqueue_generation("V")
+        assert canvas_tools._load_node("V")["generation_status"] == "pending"
+
+
+class TestCancelGenerationHandler:
+    def test_handler_cancels_and_pushes_canvas(self):
+        tid = _thread()
+        _mk("V", type="video", asset_status="generating")
+        n = canvas_tools._load_node("V")
+        n["generation_status"] = "submitted"
+        canvas_tools._upsert_node(n)
+
+        from agent.transport.ws_handlers import handle_cancel_generation
+        from agent.transport.ws_messages import CancelGenerationMsg
+
+        ctx = WSCtx(user_id="default", ws=_FakeWS(), pool=None)
+        asyncio.run(handle_cancel_generation(ctx, CancelGenerationMsg(type="cancel_generation", thread_id=tid, node_id="V")))
+        frame = next(m for m in ctx.ws.sent if m["type"] == "canvas_updated")
+        assert frame["canvas"]["nodes"]["V"]["generation_status"] == "cancelled"
+        assert frame["canvas"]["nodes"]["V"]["asset_status"] == "idle"

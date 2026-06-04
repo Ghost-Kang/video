@@ -182,6 +182,15 @@ class SeedCanvasMsg(_Base):
     analysis_id: str = ""
 
 
+class CancelGenerationMsg(_Base):
+    """逐镜取消(P2 ③)— 取消一个在途的媒体生成节点。后端置 cancelled(worker 回写被取消
+    守卫拦下),asset_status 回 idle,用户可重新生成。回 canvas_updated。"""
+
+    type: Literal["cancel_generation"]
+    thread_id: str = Field(min_length=1)
+    node_id: str
+
+
 class ReviewDecisionMsg(_Base):
     """P2 审核闸门 — 用户对 `review_required` 的决策(approve/edit/reject)。
 
@@ -232,6 +241,7 @@ WSInbound = Annotated[
         RestoreNodeVersionMsg,
         RegenerateScriptNodeMsg,
         SeedCanvasMsg,
+        CancelGenerationMsg,
         ReviewDecisionMsg,
         UserMessageMsg,
     ],
@@ -496,6 +506,7 @@ INBOUND_MODELS: dict[str, type[_Base]] = {
     "restore_node_version": RestoreNodeVersionMsg,
     "regenerate_script_node": RegenerateScriptNodeMsg,
     "seed_canvas": SeedCanvasMsg,
+    "cancel_generation": CancelGenerationMsg,
     "review_decision": ReviewDecisionMsg,
     "user_message": UserMessageMsg,
 }

@@ -37,6 +37,7 @@ from agent.transport.ws_messages import (
     OptimizePromptMsg,
     RegenerateNodeMsg,
     RegenerateScriptNodeMsg,
+    CancelGenerationMsg,
     ReorderEdgeMsg,
     RestoreNodeVersionMsg,
     SeedCanvasMsg,
@@ -564,6 +565,19 @@ async def handle_seed_canvas(ctx: WSCtx, msg: SeedCanvasMsg) -> None:
     await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
 
 
+async def handle_cancel_generation(ctx: WSCtx, msg: CancelGenerationMsg) -> None:
+    """逐镜取消(P2 ③)— 取消一个在途的媒体生成。置 cancelled(worker 回写被取消守卫拦下)
+    + asset_status 回 idle,回推 canvas_updated。不在途/节点不存在 → 回推当前快照即可。"""
+
+    def _work() -> dict | None:
+        canvas_tools.set_thread_id(msg.thread_id)
+        canvas_tools.cancel_node_generation(msg.node_id)
+        return canvas_data(msg.thread_id)
+
+    snapshot = await asyncio.to_thread(_work)
+    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
+
+
 async def handle_update_node_status(ctx: WSCtx, msg: UpdateNodeStatusMsg) -> None:
     print(f"[状态] update_node_status node={msg.node_id} → {msg.node_status}")
 
@@ -660,6 +674,7 @@ HANDLERS: dict[str, tuple[type, HandlerFn]] = {
     "restore_node_version": (RestoreNodeVersionMsg, handle_restore_node_version),
     "regenerate_script_node": (RegenerateScriptNodeMsg, handle_regenerate_script_node),
     "seed_canvas": (SeedCanvasMsg, handle_seed_canvas),
+    "cancel_generation": (CancelGenerationMsg, handle_cancel_generation),
     "review_decision": (ReviewDecisionMsg, handle_review_decision),
     "user_message": (UserMessageMsg, handle_user_message),
 }
