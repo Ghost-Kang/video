@@ -27,6 +27,9 @@ const AdminCost = lazy(() =>
 const AdminHealth = lazy(() =>
   import("./pages/AdminHealth").then((mod) => ({ default: mod.AdminHealth })),
 );
+const AdminFunnel = lazy(() =>
+  import("./pages/AdminFunnel").then((mod) => ({ default: mod.AdminFunnel })),
+);
 
 function RouteFallback() {
   return <div className="min-h-screen bg-[var(--color-paper)] dark:bg-stone-950" />;
@@ -139,6 +142,7 @@ function AppRoutes() {
         <Route path="/admin/events" element={<AdminEvents />} />
         <Route path="/admin/cost" element={<AdminCost />} />
         <Route path="/admin/health" element={<AdminHealth />} />
+        <Route path="/admin/funnel" element={<AdminFunnel />} />
 
         {/* Authed routes (upstream 66758bd: WS auth + multi-user isolation) */}
         <Route

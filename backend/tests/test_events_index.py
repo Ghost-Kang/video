@@ -38,6 +38,37 @@ def test_frontend_emitted_events_accepted(
     assert set(names) <= got, f"missing from events table: {set(names) - got}"
 
 
+def test_funnel_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Beta 漏斗端点(item D):每阶段去重用户数 + 转化率。"""
+    db_path = _use_tmp_db(monkeypatch, tmp_path)
+    for u in ("u1", "u2", "u3"):  # 3 发起(emit 宽松 → 建表)
+        asyncio.run(emit("analysis_wait_started", user_id=u, run_id="r", payload={}))
+    db = sqlite3.connect(str(db_path))
+    db.executemany(
+        "INSERT INTO events (event_name, user_id, run_id, payload_json, created_at) VALUES (?,?,?,?,?)",
+        [
+            ("analysis_returned", "u1", "r", "{}", "2026-06-04T00:00:03+00:00"),
+            ("analysis_returned", "u2", "r", "{}", "2026-06-04T00:00:04+00:00"),
+            ("script_rewritten", "u1", "r", "{}", "2026-06-04T00:00:05+00:00"),
+            ("interview_logged", "u1", "r", '{"would_pay_39": true}', "2026-06-04T00:00:06+00:00"),
+        ],
+    )
+    db.commit()
+    db.close()
+    from agent.transport.http_router import handle_funnel
+
+    status, payload, _ = asyncio.run(handle_funnel({}, {}))
+    assert status == 200
+    users = {x["label"]: x["users"] for x in payload["stages"]}
+    assert users["发起分析"] == 3
+    assert users["分析完成"] == 2
+    assert users["改写"] == 1
+    assert users["草稿图"] == 0
+    assert users["付费意向"] == 1
+    conv = {x["label"]: x["step_conv"] for x in payload["stages"]}
+    assert conv["分析完成"] == round(2 / 3, 3)
+
+
 def _seed_events(db_path: Path, count: int = 1000) -> None:
     db = sqlite3.connect(str(db_path))
     rows = [
