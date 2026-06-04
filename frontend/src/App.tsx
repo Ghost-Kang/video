@@ -7,6 +7,7 @@ import { CanvasChatDock } from "./components/CanvasChatDock";
 import { Header } from "./components/Header";
 import { DarkModeToggle } from "./components/landing/DarkModeToggle";
 import { NodeDetail } from "./components/NodeDetail";
+import { AnchorSidebar } from "./components/anchors/AnchorSidebar";
 import { ReviewGate } from "./components/ReviewGate";
 import { NodeActionsContext } from "./lib/nodeActionsContext";
 import { Sidebar } from "./components/Sidebar";
@@ -288,6 +289,16 @@ export default function App({ userId, onLogout }: AppProps) {
     });
   }, [setSearchParams]);
   const proToggle = useMemo(() => isAdminUser(userId) ? toggleProView : undefined, [toggleProView, userId]);
+  // canvas 统筹 P0 桥 — 「在画布上做我的版本」:从分析顺势进画布。seed 起点节点 + 切到画布视图
+  // (?view=pro 任何用户可达;这是画布「解封」给普通用户的入口,D2 双轨:CardStack 仍默认)。
+  const onSeedCanvas = useCallback(() => {
+    sendCommand({ type: "seed_canvas", thread_id: tid, analysis_id: analysis?.analysis_id ?? "" });
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("view", "pro");
+      return next;
+    });
+  }, [sendCommand, tid, analysis, setSearchParams]);
   // W5D3 layout reform — chat from right rail → bottom dock.
   // 非 pro-view 用 ChatPanel(CardStack 拆解配套的 5 状态机);pro-view 用
   // CanvasChatDock(自由对话驱动 Director 在画布编排锚点级联)。两者都走底部
@@ -302,9 +313,11 @@ export default function App({ userId, onLogout }: AppProps) {
           {isProView ? (
             <NodeActionsContext.Provider value={actions}>
               <Canvas onPositionChange={(pos) => sendCommand({ ...pos, thread_id: tid })} onCreateEdge={actions.handleCreateEdge} onDeleteEdge={actions.handleDeleteEdge} />
+              {/* P1 锚点级联护城河:跨片角色/场景锚点复用侧栏(自取数据,画布创作时可见) */}
+              <AnchorSidebar />
               {selectedNodeId && <NodeDetail actions={actions} />}
             </NodeActionsContext.Provider>
-          ) : <CardStack onGenerateFirstFrame={onGenerateFirstFrame} onTriggerRewrite={onTriggerRewrite} onGenerateShotVideo={onGenerateShotVideo} onComposeFilm={onComposeFilm} pendingCase={pendingCase} thinking={thinking} />}
+          ) : <CardStack onGenerateFirstFrame={onGenerateFirstFrame} onTriggerRewrite={onTriggerRewrite} onGenerateShotVideo={onGenerateShotVideo} onComposeFilm={onComposeFilm} pendingCase={pendingCase} thinking={thinking} onSeedCanvas={onSeedCanvas} />}
         </div>
         {chatOpen ? (
           isProView ? (

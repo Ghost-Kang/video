@@ -58,6 +58,16 @@ def build_interrupt_on() -> dict | None:
     }
 
 
+# canvas 统筹 P2 ④ — 长会话上下文降本:**无需自建**。`create_deep_agent` 已**无条件**挂上
+# deepagents 自带的 summarization middleware(graph.py:698):它 profile-aware(doubao 不暴露
+# max_input_tokens → 自动回落绝对 token 阈值 trigger=('tokens',170000)/keep=('messages',6)),
+# 且**非破坏式**(不重写 messages,把被淘汰的历史 offload 到 /conversation_history/{thread}.md,
+# read_file 可取回)。之前自己再加一个 langchain SummarizationMiddleware = 重复 + 同名
+# (两个 .name 都叫 "SummarizationMiddleware")会让 create_agent 抛 AssertionError 崩掉整个
+# agent 池构造,且 langchain 那个是破坏式重写 messages、更差。故 ④ 由框架内置满足,不另加。
+# (要调阈值就走 deepagents 内置的配置路径,不要 stack 第二个。)
+
+
 def _make_backend() -> CompositeBackend:
     return CompositeBackend(
         default=StateBackend(),
@@ -70,11 +80,15 @@ def _make_backend() -> CompositeBackend:
     )
 
 
-def create_director_agent(checkpointer=None, interrupt_on: dict | None = "default"):
+def create_director_agent(
+    checkpointer=None,
+    interrupt_on: dict | None = "default",
+):
     """创建导演 agent，单 agent 承担全部创作角色。
 
     `interrupt_on`:None=不挂闸门;dict=显式闸门配置(测试用);默认哨兵 "default"
     =从 config 读(`build_interrupt_on()`),让生产走开关、测试可显式覆盖而不碰环境变量。
+    长会话上下文降本由 deepagents 内置 summarization middleware 提供(见上方注释),不另加。
     """
     if interrupt_on == "default":
         interrupt_on = build_interrupt_on()
@@ -89,6 +103,10 @@ def create_director_agent(checkpointer=None, interrupt_on: dict | None = "defaul
             create_canvas_node,
             update_canvas_node,
             delete_canvas_node,
+            # get_canvas_state — Director 自己也要能读画布(判定「画布创作模式 vs 卡片栈改写」,
+            # 见 director.md §0.6;此前只 canvas-manager 子 agent 有,Director 调不到 → 路由判定
+            # 无法执行)。读单节点也能拿 node_id/description 给 update_canvas_node 用。
+            get_canvas_state,
             cascade_analyze,
             cascade_rewrite,
             cascade_generate_first_frame,

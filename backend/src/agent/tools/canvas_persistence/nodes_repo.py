@@ -134,6 +134,9 @@ def _update_node_result(
     """Patch node.result dict. 节点不存在 silently no-op。"""
     node = _load_node(node_id, user_id=user_id, thread_id=thread_id)
     if node:
+        # 取消守卫(逐镜取消,P2 ③):取消后不写产物 url —— 防 in-flight 任务回写盖掉取消。
+        if node.get("generation_status") == "cancelled":
+            return
         existing = node.get("result") or {}
         if isinstance(existing, dict):
             existing.update(updates)

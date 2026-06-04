@@ -1,7 +1,7 @@
 export type NodeType = "script" | "image" | "video" | "composite";
 export type NodeStatus = "reviewing" | "confirmed";
 export type AssetStatus = "idle" | "generating" | "done" | "failed" | "timeout";
-export type GenerationStatus = "idle" | "pending" | "submitted" | "polling" | "done" | "failed";
+export type GenerationStatus = "idle" | "pending" | "submitted" | "polling" | "done" | "failed" | "cancelled";
 
 export interface CanvasNode {
   id: string;

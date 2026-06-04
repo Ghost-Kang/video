@@ -172,6 +172,25 @@ class RegenerateScriptNodeMsg(_Base):
     feedback: str = ""
 
 
+class SeedCanvasMsg(_Base):
+    """canvas 统筹 P0 桥 — 「在画布上做我的版本」:从爆点分析顺势进画布。后端在空画布上 seed
+    一个「我的策划书」起点节点(幂等:画布已有节点则不重复 seed),前端切到画布视图。
+    analysis_id 透传备查(当前 seed 不依赖它,后续可据它把分析素材也 seed 成节点)。"""
+
+    type: Literal["seed_canvas"]
+    thread_id: str = Field(min_length=1)
+    analysis_id: str = ""
+
+
+class CancelGenerationMsg(_Base):
+    """逐镜取消(P2 ③)— 取消一个在途的媒体生成节点。后端置 cancelled(worker 回写被取消
+    守卫拦下),asset_status 回 idle,用户可重新生成。回 canvas_updated。"""
+
+    type: Literal["cancel_generation"]
+    thread_id: str = Field(min_length=1)
+    node_id: str
+
+
 class ReviewDecisionMsg(_Base):
     """P2 审核闸门 — 用户对 `review_required` 的决策(approve/edit/reject)。
 
@@ -221,6 +240,8 @@ WSInbound = Annotated[
         ListNodeVersionsMsg,
         RestoreNodeVersionMsg,
         RegenerateScriptNodeMsg,
+        SeedCanvasMsg,
+        CancelGenerationMsg,
         ReviewDecisionMsg,
         UserMessageMsg,
     ],
@@ -484,6 +505,8 @@ INBOUND_MODELS: dict[str, type[_Base]] = {
     "list_node_versions": ListNodeVersionsMsg,
     "restore_node_version": RestoreNodeVersionMsg,
     "regenerate_script_node": RegenerateScriptNodeMsg,
+    "seed_canvas": SeedCanvasMsg,
+    "cancel_generation": CancelGenerationMsg,
     "review_decision": ReviewDecisionMsg,
     "user_message": UserMessageMsg,
 }

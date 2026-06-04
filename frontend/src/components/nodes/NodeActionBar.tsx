@@ -112,6 +112,18 @@ export function NodeActionBar({ node, selected }: { node: CanvasNode; selected?:
               {genLabel}
             </button>
           )}
+          {/* 逐镜取消(P2 ③):媒体生成在途时,把生成按钮位换成「✕ 取消」。 */}
+          {isMedia && asset === "generating" && (
+            <button
+              type="button"
+              style={S.btnCancel}
+              title="取消这条镜头的生成(可重新生成)"
+              onClick={() => actions.handleCancelGeneration(node.id)}
+              data-testid="cancel-generation"
+            >
+              ✕ 取消
+            </button>
+          )}
           {isScript && (
             <button
               type="button"
@@ -167,6 +179,16 @@ const S: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     color: "#fff",
     fontWeight: 600,
+  },
+  // 逐镜取消(P2 ③):中性灰描边,区别于生成/重生的主色。
+  btnCancel: {
+    fontSize: 11,
+    padding: "3px 9px",
+    borderRadius: 6,
+    border: "1px solid #d4d4d8",
+    background: "#fafafa",
+    cursor: "pointer",
+    color: "#71717a",
   },
   // 脚本重生反馈表单(2d)。
   form: {

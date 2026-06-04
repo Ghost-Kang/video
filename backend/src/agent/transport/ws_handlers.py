@@ -37,8 +37,10 @@ from agent.transport.ws_messages import (
     OptimizePromptMsg,
     RegenerateNodeMsg,
     RegenerateScriptNodeMsg,
+    CancelGenerationMsg,
     ReorderEdgeMsg,
     RestoreNodeVersionMsg,
+    SeedCanvasMsg,
     ReviewDecisionMsg,
     ReviewNodeMsg,
     UpdateNodeStatusMsg,
@@ -546,6 +548,36 @@ async def handle_regenerate_script_node(ctx: WSCtx, msg: RegenerateScriptNodeMsg
     asyncio.create_task(_run_agent_serialized(ctx, synth))
 
 
+async def handle_seed_canvas(ctx: WSCtx, msg: SeedCanvasMsg) -> None:
+    """canvas 统筹 P0 桥 — 「在画布上做我的版本」:在**空画布**上 seed 一个「我的策划书」起点
+    节点(reviewing,空内容),让用户从爆点分析顺势进画布开始创作。幂等:画布已有任何节点
+    (已 seed / 已开始级联)就不重复 seed,只回推当前快照。纯脚手架,不调模型、不触发 Director
+    —— 用户进画布后告诉导演改写方向,既有锚点级联(director.md §2-6)接手。"""
+
+    def _work() -> dict | None:
+        canvas_tools.set_thread_id(msg.thread_id)
+        existing = canvas_tools._load_all_nodes()
+        if not existing:  # 空画布才 seed,避免重复点击 / 已开始创作时叠加
+            canvas_tools.create_canvas_node("script", "✍️ 我的策划书", description="")
+        return canvas_data(msg.thread_id)
+
+    snapshot = await asyncio.to_thread(_work)
+    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
+
+
+async def handle_cancel_generation(ctx: WSCtx, msg: CancelGenerationMsg) -> None:
+    """逐镜取消(P2 ③)— 取消一个在途的媒体生成。置 cancelled(worker 回写被取消守卫拦下)
+    + asset_status 回 idle,回推 canvas_updated。不在途/节点不存在 → 回推当前快照即可。"""
+
+    def _work() -> dict | None:
+        canvas_tools.set_thread_id(msg.thread_id)
+        canvas_tools.cancel_node_generation(msg.node_id)
+        return canvas_data(msg.thread_id)
+
+    snapshot = await asyncio.to_thread(_work)
+    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
+
+
 async def handle_update_node_status(ctx: WSCtx, msg: UpdateNodeStatusMsg) -> None:
     print(f"[状态] update_node_status node={msg.node_id} → {msg.node_status}")
 
@@ -641,6 +673,8 @@ HANDLERS: dict[str, tuple[type, HandlerFn]] = {
     "list_node_versions": (ListNodeVersionsMsg, handle_list_node_versions),
     "restore_node_version": (RestoreNodeVersionMsg, handle_restore_node_version),
     "regenerate_script_node": (RegenerateScriptNodeMsg, handle_regenerate_script_node),
+    "seed_canvas": (SeedCanvasMsg, handle_seed_canvas),
+    "cancel_generation": (CancelGenerationMsg, handle_cancel_generation),
     "review_decision": (ReviewDecisionMsg, handle_review_decision),
     "user_message": (UserMessageMsg, handle_user_message),
 }

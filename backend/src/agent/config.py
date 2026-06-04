@@ -75,6 +75,9 @@ INTERRUPT_GATE_TOOLS = frozenset(
     if t.strip()
 )
 
+# canvas 统筹 P2 ④ — 长会话上下文降本:由 deepagents 内置 summarization middleware 提供
+# (无条件挂、profile-aware、非破坏式 offload),无需自建 flag/中间件。详见 main.py 注释。
+
 # -------- 视频生成 --------
 VIDEO_GEN_API_KEY = os.getenv("VIDEO_GEN_API_KEY")
 VIDEO_GEN_BASE_URL = os.getenv("VIDEO_GEN_BASE_URL")

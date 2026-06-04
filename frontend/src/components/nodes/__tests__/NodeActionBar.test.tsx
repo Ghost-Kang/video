@@ -51,6 +51,7 @@ function makeActions(over: Partial<NodeActions> = {}): NodeActions {
     handleListNodeVersions: vi.fn(),
     handleRestoreNodeVersion: vi.fn(),
     handleRegenerateScriptNode: vi.fn(),
+    handleCancelGeneration: vi.fn(),
     handleOptimizePrompt: vi.fn(),
     handleCreateEdge: vi.fn(),
     handleDeleteEdge: vi.fn(),
@@ -126,11 +127,13 @@ describe("NodeActionBar — regenerate vs generate routing", () => {
     expect(actions.handleRegenerateNode).not.toHaveBeenCalled();
   });
 
-  it("hides the generate/regenerate button while the asset is generating", () => {
+  it("shows ✕ 取消 (not the generate button) while the asset is generating, and clicking cancels (P2 ③)", () => {
     const actions = makeActions();
     renderBar(makeNode({ asset_status: "generating" }), actions);
     expect(screen.queryByText("↻ 重生")).toBeNull();
     expect(screen.queryByText("⚡ 生成")).toBeNull();
+    fireEvent.click(screen.getByTestId("cancel-generation"));
+    expect(actions.handleCancelGeneration).toHaveBeenCalledWith("n1");
   });
 
   it("does not offer regenerate on a reviewing (unconfirmed) node — only the confirm button", () => {

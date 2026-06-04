@@ -37,6 +37,13 @@ describe("useNodeActions — regenerate", () => {
     expect(send).toHaveBeenCalledWith({ type: "regenerate_script_node", thread_id: "t1", node_id: "s1", feedback: "更钩子" });
   });
 
+  it("handleCancelGeneration sends a cancel_generation command (P2 ③)", () => {
+    const send = vi.fn();
+    const { result } = renderHook(() => useNodeActions("t1", send, vi.fn()));
+    result.current.handleCancelGeneration("v3");
+    expect(send).toHaveBeenCalledWith({ type: "cancel_generation", thread_id: "t1", node_id: "v3" });
+  });
+
   it("handleRestoreNodeVersion sends a restore_node_version command (2c)", () => {
     const send = vi.fn();
     const { result } = renderHook(() => useNodeActions("t1", send, vi.fn()));
