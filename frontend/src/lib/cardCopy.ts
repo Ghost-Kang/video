@@ -118,6 +118,10 @@ export const COPY = {
 
   your_version_header: "你的版本",
   your_version_waiting: "正在帮你改成你自己的版本…",
+  // confidence 质量闸:自评偏低的改写不直接发,提示换源/重生(founder D6「拦截+提示」)。
+  rewrite_gate_title: "这条自动改写出来偏平,先没直接给你",
+  rewrite_gate_hint: "它的反差/解法/钩子不够有爆点(系统自评质量不稳)。换一条更有爆点的源,或重新生成一版试试。",
+  rewrite_gate_regen: "重新生成一版",
 
   transcript_header: "完整原片台词",
   transcript_expand: "展开",

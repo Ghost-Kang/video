@@ -10,7 +10,12 @@ import pytest
 
 from agent.cascade.analysis_service import request_shallow_analysis
 from agent.cascade.failures import FailureCode, HardFailure
-from agent.cascade.rewrite_service import RewriteResult, error_payload, request_rewrite
+from agent.cascade.rewrite_service import (
+    RewriteResult,
+    RewriteShot,
+    error_payload,
+    request_rewrite,
+)
 
 
 def _use_tmp_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
@@ -128,6 +133,70 @@ def test_revision_bump_invalidates_cache(monkeypatch: pytest.MonkeyPatch, tmp_pa
     again = asyncio.run(request_rewrite(analysis_id=analysis_id, niche="baomam_fushi", user_id="u1"))
     assert again.rewrite_id == after_bump.rewrite_id
     assert len(_events(db_path, "script_rewritten")) == 2  # second call cached again
+
+
+def _stub_rewrite_with_confidence(confidence: float):
+    """Replace _rewrite_for_niche with a stub returning a fixed confidence so the
+    confidence 质量闸 (D6 二轮) can be exercised deterministically."""
+
+    async def _fn(contract, niche, *, topic=None):  # noqa: ANN001
+        return RewriteResult(
+            rewrite_id="rw_stub",
+            analysis_id=contract.analysis_id,
+            niche=niche,
+            script_markdown="### 改写脚本\n1. 测试台词\n   画面：测试画面",
+            shots=[
+                RewriteShot(shot_index=1, dialogue="a", visual="x"),
+                RewriteShot(shot_index=2, dialogue="b", visual="y"),
+                RewriteShot(shot_index=3, dialogue="c", visual="z"),
+            ],
+            parser_warnings=[],
+            confidence=confidence,
+            cost_cny=0.1,
+            model="test",
+        )
+
+    return _fn
+
+
+def test_confidence_gate_low_flags_and_skips_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """D6 二轮 confidence 质量闸:自评 < 0.5 → quality_gated=True 且**不入缓存**,
+    使「重生」每次都是新尝试(否则 24h 缓存回灌同一条平稿)。"""
+    db_path = _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_REWRITE_MIN_CONFIDENCE", "0.5")
+    monkeypatch.setattr("agent.config.REWRITE_MIN_CONFIDENCE", 0.5)
+    monkeypatch.setattr(
+        "agent.cascade.rewrite_service._rewrite_for_niche",
+        _stub_rewrite_with_confidence(0.4),
+    )
+    analysis_id = asyncio.run(_analysis())
+
+    first = asyncio.run(request_rewrite(analysis_id=analysis_id, niche="generic", user_id="u1"))
+    assert first.quality_gated is True
+    # 低分稿不缓存 → 第二次仍重新生成(非幂等),两次都发 script_rewritten。
+    asyncio.run(request_rewrite(analysis_id=analysis_id, niche="generic", user_id="u1"))
+    assert len(_events(db_path, "script_rewritten")) == 2
+
+
+def test_confidence_gate_high_passes_and_caches(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """达标稿(≥ 0.5)→ quality_gated=False 且正常入缓存(幂等,只发一次事件)。"""
+    db_path = _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setattr("agent.config.REWRITE_MIN_CONFIDENCE", 0.5)
+    monkeypatch.setattr(
+        "agent.cascade.rewrite_service._rewrite_for_niche",
+        _stub_rewrite_with_confidence(0.7),
+    )
+    analysis_id = asyncio.run(_analysis())
+
+    first = asyncio.run(request_rewrite(analysis_id=analysis_id, niche="generic", user_id="u1"))
+    assert first.quality_gated is False
+    second = asyncio.run(request_rewrite(analysis_id=analysis_id, niche="generic", user_id="u1"))
+    assert second.rewrite_id == first.rewrite_id  # cache hit
+    assert len(_events(db_path, "script_rewritten")) == 1
 
 
 def test_multi_user_isolation(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

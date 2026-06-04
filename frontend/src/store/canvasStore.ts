@@ -28,6 +28,9 @@ interface CanvasStore {
   shots: Scene[];
   /** 改写后的镜头 — 跟 shots 共存,空时不渲染对应区域。 */
   rewriteShots: RewriteShot[];
+  /** confidence 质量闸(D6 二轮):当前改写自评偏低被拦 → 改写区不发「你的版本」,
+   *  改提示换源/重生。后端 quality_gated 经 rewrite_returned 帧带来。 */
+  rewriteQualityGated: boolean;
   /** 合成整片 URL(/media/<rewrite_id>/film.mp4),空时不渲染成片播放器。 */
   filmUrl: string;
   /** 合成在途/失败提示(整片级);空 = 无。 */
@@ -48,6 +51,7 @@ interface CanvasStore {
   setScript: (script: string) => void;
   setShots: (shots: Scene[]) => void;
   setRewriteShots: (shots: RewriteShot[]) => void;
+  setRewriteQualityGated: (gated: boolean) => void;
   updateShotFirstFrame: (scene_index: number, url: string) => void;
   updateRewriteShotFirstFrame: (shot_index: number, url: string) => void;
   setRewriteShotFirstFrameError: (shot_index: number, error: string | null) => void;
@@ -74,6 +78,7 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
   script: "",
   shots: [],
   rewriteShots: [],
+  rewriteQualityGated: false,
   filmUrl: "",
   filmError: "",
   failure: null,
@@ -126,6 +131,8 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
   setShots: (shots) => set({ shots }),
 
   setRewriteShots: (rewriteShots) => set({ rewriteShots }),
+
+  setRewriteQualityGated: (rewriteQualityGated) => set({ rewriteQualityGated }),
 
   updateShotFirstFrame: (scene_index, url) =>
     set((s) => ({
@@ -235,6 +242,7 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
       script: "",
       shots: [],
       rewriteShots: [],
+      rewriteQualityGated: false,
       filmUrl: "",
       filmError: "",
       failure: null,

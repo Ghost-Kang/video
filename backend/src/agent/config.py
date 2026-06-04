@@ -56,6 +56,16 @@ AUTO_SHOWCASE_MAX = int(os.getenv("AUTO_SHOWCASE_MAX", "10") or "10")
 # 自动发布案例至少需要几幕成功抽到 clip(无 clip 的卡退化成静态,落地页轮播体验差)。
 AUTO_SHOWCASE_MIN_CLIPS = int(os.getenv("AUTO_SHOWCASE_MIN_CLIPS", "3") or "3")
 
+# -------- 改写解封(rewrite unseal, phase2 D6 后)--------
+# 改写「你的版本」灰度开关 + 运行时 kill-switch。后端下发给 session_state →
+# 前端 resolveRewriteEnabled(cohortFlag)。默认 OFF(= 当前线上行为,改写区隐藏);
+# 设 CASCADE_REWRITE_ENABLED=1 对全 beta cohort 开,翻车可秒关、无需重构建前端。
+REWRITE_ENABLED = os.getenv("CASCADE_REWRITE_ENABLED", "0").strip().lower() not in ("0", "false", "no", "off", "")
+# confidence 质量闸:改写自评 confidence 低于此 → 不当「你的版本」直接发,前端拦截
+# 提示「换条更有爆点的源 / 手动调整」+ 重生(D6 二轮实测:平的避坑罗列模型诚实自评
+# ~0.4,达标稿 0.6+;0.5 正好卡住平稿、放过达标稿)。低分稿不入缓存,保证重生是新尝试。
+REWRITE_MIN_CONFIDENCE = float(os.getenv("CASCADE_REWRITE_MIN_CONFIDENCE", "0.5") or "0.5")
+
 # -------- 审核闸门(LangGraph interrupt,canvas 统筹 P2 slice-1)--------
 # 把「烧钱的生成工具」从 director.md 的口头约定(「只创建不执行 / 跑过头」)升级为
 # LangGraph 原生 interrupt() 审核闸门:Director **自主**调生成工具前 graph 真的暂停,

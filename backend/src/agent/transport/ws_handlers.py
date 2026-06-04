@@ -14,6 +14,7 @@ import json
 import time
 from typing import Any, Awaitable, Callable
 
+from agent import config  # 通过 module 访问(REWRITE_ENABLED kill-switch 运行时读)
 from agent import store  # 通过 module 访问,方便 test monkeypatch
 from agent.cascade import cost_guard  # B3 — enqueue-time generation cost guard
 from agent.cascade import events as cascade_events  # module 访问,test 可 patch emit
@@ -182,6 +183,8 @@ async def handle_get_session_state(ctx: WSCtx, msg: GetSessionStateMsg) -> None:
         canvas=canvas,
         run_status=run_status,
         failure=failure,
+        # 改写解封灰度 kill-switch:后端权威下发,前端 resolveRewriteEnabled(cohortFlag)。
+        rewrite_enabled=config.REWRITE_ENABLED,
     )
     # W5D4 — replay this thread's analysis/rewrite so a reloaded finished
     # session shows its cards instead of an empty panel. analysis_returned /

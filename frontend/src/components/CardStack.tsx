@@ -47,9 +47,16 @@ export function CardStack({ onTriggerRewrite, onGenerateFirstFrame, onGenerateSh
   // hook 数变化 → #310 崩溃被错误边界吞成空白页)。
   const script = useCanvasStore((s) => s.script);
   const rewriteShots = useCanvasStore((s) => s.rewriteShots);
-  // 改写解封灰度门(VITE_REWRITE_ENABLED / 将来按 cohort)。关时下方改写区完全不渲染,
-  // 行为 = 解封前(只展示分析)。
-  const REWRITE_ENABLED = useMemo(() => resolveRewriteEnabled(), []);
+  // confidence 质量闸:当前改写自评偏低被拦 → 不发「你的版本」,改提示换源/重生。
+  const rewriteQualityGated = useCanvasStore((s) => s.rewriteQualityGated);
+  // 改写解封灰度门:后端 session_state.rewrite_enabled(config.REWRITE_ENABLED kill-switch)
+  // 经 wsStore 下发,传入 resolveRewriteEnabled(cohortFlag) 按全 beta cohort 灰度,翻车可
+  // 秒关。undefined(旧后端)时下探 VITE flag。关时下方改写区完全不渲染(行为 = 解封前)。
+  const rewriteCohortFlag = useWSStore((s) => s.rewriteEnabled);
+  const REWRITE_ENABLED = useMemo(
+    () => resolveRewriteEnabled(rewriteCohortFlag),
+    [rewriteCohortFlag],
+  );
   const { ref: headerRef, inView: headerInView } = useInView<HTMLHeadingElement>();
 
   if (!analysis) {
@@ -158,7 +165,35 @@ export function CardStack({ onTriggerRewrite, onGenerateFirstFrame, onGenerateSh
           </div>
         )}
 
-        {REWRITE_ENABLED && hasRewrite && (
+        {/* confidence 质量闸:自评偏低的「对但平」稿不当你的版本直接发,改提示换源/重生
+            (founder D6 选择「拦截+提示」;低分稿后端不入缓存,重生即新尝试)。 */}
+        {REWRITE_ENABLED && hasRewrite && rewriteQualityGated && (
+          <section
+            className="rounded-2xl border border-amber-300/60 dark:border-amber-700/50 bg-amber-50/60 dark:bg-amber-950/20 px-4 py-5"
+            role="status"
+            aria-live="polite"
+            data-testid="rewrite-quality-gate"
+          >
+            <p className="text-[15px] font-medium text-stone-800 dark:text-stone-100 mb-1">
+              {COPY.rewrite_gate_title}
+            </p>
+            <p className="text-sm text-stone-600 dark:text-stone-300 mb-3">
+              {COPY.rewrite_gate_hint}
+            </p>
+            {onTriggerRewrite && (
+              <button
+                type="button"
+                onClick={() => onTriggerRewrite()}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#7c2d12] dark:bg-[#ea580c] text-white px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
+                data-testid="rewrite-gate-regen"
+              >
+                {COPY.rewrite_gate_regen}
+              </button>
+            )}
+          </section>
+        )}
+
+        {REWRITE_ENABLED && hasRewrite && !rewriteQualityGated && (
           <section className="space-y-3">
             <h2 className="font-serif-cn text-lg text-stone-900 dark:text-stone-50 px-1 pt-2">
               {COPY.your_version_header}
@@ -175,7 +210,7 @@ export function CardStack({ onTriggerRewrite, onGenerateFirstFrame, onGenerateSh
         )}
 
         {/* 合成整片:任一镜出了视频后出现「合成整片」;成片用 <video> 播放器展示。 */}
-        {REWRITE_ENABLED && hasRewrite && onComposeFilm && (hasAnyShotVideo || filmUrl) && (
+        {REWRITE_ENABLED && hasRewrite && !rewriteQualityGated && onComposeFilm && (hasAnyShotVideo || filmUrl) && (
           <section className="space-y-3">
             <h2 className="font-serif-cn text-lg text-stone-900 dark:text-stone-50 px-1 pt-2">
               {COPY.film_header}
@@ -213,7 +248,7 @@ export function CardStack({ onTriggerRewrite, onGenerateFirstFrame, onGenerateSh
           </section>
         )}
 
-        {REWRITE_ENABLED && hasRewrite && (
+        {REWRITE_ENABLED && hasRewrite && !rewriteQualityGated && (
           <PublishPackCard script={script} analysis={analysis} />
         )}
       </div>

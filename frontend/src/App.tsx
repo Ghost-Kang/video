@@ -197,9 +197,14 @@ export default function App({ userId, onLogout }: AppProps) {
   // D2 灰度铺路(phase2_kickoff_synthesis_2026-05-31 §3):REWRITE_ENABLED 不再是
   // 源码硬常量,改成运行时可控(后端 cohort flag > VITE_REWRITE_ENABLED > false)。
   // 本轮**保持关闭**:无 cohort flag 下发、不设 env → 恒为 false,行为不变。
-  // TODO: 后端在握手/session_state 下发 per-cohort rewrite_enabled 后,把它取出
-  // 传入 resolveRewriteEnabled(cohortFlag) 即可切到按 cohort 灰度。
-  const REWRITE_ENABLED = useMemo(() => resolveRewriteEnabled(), []);
+  // D6 解封:后端 session_state.rewrite_enabled(config.REWRITE_ENABLED kill-switch)
+  // 经 wsStore 下发,传入 resolveRewriteEnabled(cohortFlag) → 按全 beta cohort 灰度,
+  // 翻车可秒关、无需重构建前端。undefined(旧后端)时下探 VITE flag,行为不变。
+  const rewriteCohortFlag = useWSStore((s) => s.rewriteEnabled);
+  const REWRITE_ENABLED = useMemo(
+    () => resolveRewriteEnabled(rewriteCohortFlag),
+    [rewriteCohortFlag],
+  );
   useEffect(() => {
     if (!REWRITE_ENABLED) return;
     if (!analysis || loading) return;

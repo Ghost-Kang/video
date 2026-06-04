@@ -10,6 +10,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from agent import config
 from agent.cascade.contract import CascadeAnalysisContract
 from agent.cascade.cost_cap import predict_rewrite_cost
 from agent.cascade.event_names import EventName
@@ -49,6 +50,9 @@ class RewriteResult(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0)
     cost_cny: float = Field(..., ge=0.0)
     model: str
+    # confidence 质量闸:True = 自评 confidence < REWRITE_MIN_CONFIDENCE,前端拦截不当
+    # 「你的版本」直接发,提示换源/重生(D6 二轮)。低分稿不入缓存,重生即新尝试。
+    quality_gated: bool = False
     # Founder's H1-H8 taxonomy preserved from source. Empty when the source
     # is unannotated (legacy synthetic_v1 fixture or auto-derived analysis).
     hook_pattern_id: str = ""
@@ -86,15 +90,20 @@ async def request_rewrite(
         return RewriteResult.model_validate_json(cached)
 
     result = await _rewrite_for_niche(contract, niche, topic=topic)
-    await save_rewrite(
-        result.rewrite_id,
-        analysis_id=analysis_id,
-        niche=niche,
-        user_id=user_id,
-        run_id=run_id,
-        result_json=result.model_dump_json(),
-        created_at=utc_now_rfc3339(),
-    )
+    # confidence 质量闸(D6 二轮):自评偏低的「对但平」稿不当合格版本入缓存——否则
+    # 24h 缓存会把同一条平稿回灌,用户点「重生」拿到的还是它。标 quality_gated 让前端
+    # 拦截提示换源/重生;不缓存 → 重生触发一次新的改写尝试(用户主动点,不擅自花钱)。
+    result.quality_gated = result.confidence < config.REWRITE_MIN_CONFIDENCE
+    if not result.quality_gated:
+        await save_rewrite(
+            result.rewrite_id,
+            analysis_id=analysis_id,
+            niche=niche,
+            user_id=user_id,
+            run_id=run_id,
+            result_json=result.model_dump_json(),
+            created_at=utc_now_rfc3339(),
+        )
     await emit(
         EventName.SCRIPT_REWRITTEN,
         user_id=user_id,
@@ -108,6 +117,7 @@ async def request_rewrite(
             "shot_count": len(result.shots),
             "script_char_len": len(result.script_markdown),
             "confidence": result.confidence,
+            "quality_gated": result.quality_gated,
             "cost_cny": result.cost_cny,
             "model": result.model,
             "had_anchor_reference": False,

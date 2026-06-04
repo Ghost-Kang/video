@@ -139,6 +139,9 @@ interface WSStore {
   // mid-run redirect/session-switch survivable: the running thread's frames are
   // kept, not lost, even before P0-A guarantees they keep arriving server-side.
   pendingByThread: Record<string, WSEvent[]>;
+  // 改写解封灰度 kill-switch:后端 session_state.rewrite_enabled 权威下发
+  // (undefined = 旧后端未下发 → resolveRewriteEnabled 下探 VITE flag)。
+  rewriteEnabled?: boolean;
   setCurrentThreadId: (threadId: string) => void;
   setLoading: (loading: boolean) => void;
   resetThinking: () => void;
@@ -160,6 +163,7 @@ export const useWSStore = create<WSStore>((set, get) => ({
   progressEta: null,
   progressDetail: "",
   pendingByThread: {},
+  rewriteEnabled: undefined,
 
   setCurrentThreadId: (threadId) => {
     set({ currentThreadId: threadId });
@@ -287,6 +291,8 @@ export const useWSStore = create<WSStore>((set, get) => ({
       case "processing":
         break;
       case "session_state": {
+        // 改写解封灰度 kill-switch:后端权威下发(undefined = 旧后端,保留前端下探)。
+        if (event.rewrite_enabled !== undefined) set({ rewriteEnabled: event.rewrite_enabled });
         canvas.setMessages(event.messages);
         if (event.canvas) queueMicrotask(() => canvas.setCanvas(event.canvas!));
         // W5D4 — resume terminal run state on reconnect. Without this, a run
@@ -377,9 +383,12 @@ export const useWSStore = create<WSStore>((set, get) => ({
           progressDetail: "",
         });
         queueMicrotask(() => {
-          const { setScript, setRewriteShots } = useCanvasStore.getState();
+          const { setScript, setRewriteShots, setRewriteQualityGated } =
+            useCanvasStore.getState();
           setScript(event.rewrite.script_markdown);
           setRewriteShots(mapRewriteShotsToScenes(event.rewrite.shots));
+          // confidence 质量闸:低分稿标记,CardStack 改写区据此拦截提示换源/重生。
+          setRewriteQualityGated(Boolean(event.rewrite.quality_gated));
         });
         break;
       case "shot_first_frame_returned":
