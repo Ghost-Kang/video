@@ -63,20 +63,54 @@ export function PublishPackCard({ script, analysis }: Props) {
     }
   };
 
+  // 分字段复制(抖音/小红书发布表单是分字段的:标题 / 正文 / 话题各一格)——
+  // 整段复制会把所有东西塞进一格,创作者还得手动拆。给每段单独的复制按钮。
+  const copyField = async (text: string, ok: string) => {
+    if (!text.trim()) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setToast(ok);
+    } catch {
+      setToast("复制没成功，请再试一次");
+    }
+    window.setTimeout(() => setToast(null), 3000);
+  };
+  const tagLine = tags.map((t) => `#${t}`).join(" ");
+
   return (
     <section className={CARD_CLASS} data-testid="publish-pack-card">
       <h2 className="text-lg font-medium text-stone-900 mb-4">
         {COPY.publish_header}
       </h2>
 
-      <p className="text-sm text-stone-500 mb-2">{COPY.suggested_titles}</p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm text-stone-500">{COPY.suggested_titles}</p>
+        <button
+          type="button"
+          onClick={() => copyField(titles[0] ?? "", "标题已复制")}
+          className="text-xs text-stone-400 hover:text-orange-600 transition-colors"
+          data-testid="copy-title"
+        >
+          复制标题
+        </button>
+      </div>
       <ol className="list-decimal list-inside space-y-1 mb-5 text-base text-stone-700">
         {titles.map((t) => (
           <li key={t}>{t}</li>
         ))}
       </ol>
 
-      <p className="text-sm text-stone-500 mb-2">{COPY.tags_label}</p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm text-stone-500">{COPY.tags_label}</p>
+        <button
+          type="button"
+          onClick={() => copyField(tagLine, "话题标签已复制")}
+          className="text-xs text-stone-400 hover:text-orange-600 transition-colors"
+          data-testid="copy-tags"
+        >
+          复制话题
+        </button>
+      </div>
       <div className="flex flex-wrap gap-2 mb-6">
         {tags.map((tag) => (
           <span
@@ -88,10 +122,20 @@ export function PublishPackCard({ script, analysis }: Props) {
         ))}
       </div>
 
-      <button type="button" className={`${BTN_PRIMARY} w-full flex items-center justify-center gap-2`} onClick={handleCopy}>
-        <Copy className="h-4 w-4" aria-hidden />
-        {COPY.copy_button}
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => copyField(script.trim(), "脚本已复制")}
+          className="shrink-0 rounded-lg border border-stone-200 bg-white/70 hover:bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors"
+          data-testid="copy-script"
+        >
+          复制脚本
+        </button>
+        <button type="button" className={`${BTN_PRIMARY} flex-1 flex items-center justify-center gap-2`} onClick={handleCopy} data-testid="copy-all">
+          <Copy className="h-4 w-4" aria-hidden />
+          {COPY.copy_button}
+        </button>
+      </div>
 
       {toast && (
         <p className="mt-3 text-sm text-orange-600 text-center" role="status">
