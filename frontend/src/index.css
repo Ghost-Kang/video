@@ -680,3 +680,24 @@ html.dark .cascade-rf-controls .react-flow__controls-button svg {
 html.dark .cascade-rf-controls .react-flow__controls-button:hover {
   background: rgba(234, 88, 12, 0.14);
 }
+
+/* ── React Flow 小地图暖色非阻挡版(P2 画布 polish)──
+   颜色全走 xyflow 的 CSS 变量,亮/暗模式都不会回到「白底挡操作」的老问题。 */
+.cascade-rf-minimap {
+  --xy-minimap-background-color: rgba(250, 248, 243, 0.72);
+  --xy-minimap-mask-background-color: rgba(124, 45, 18, 0.10);
+  --xy-minimap-mask-stroke-color: rgba(124, 45, 18, 0.30);
+  --xy-minimap-mask-stroke-width: 2;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(124, 45, 18, 0.16);
+  box-shadow: 0 8px 26px -12px rgba(124, 45, 18, 0.32);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+html.dark .cascade-rf-minimap {
+  --xy-minimap-background-color: rgba(28, 25, 23, 0.78);
+  --xy-minimap-mask-background-color: rgba(234, 88, 12, 0.12);
+  --xy-minimap-mask-stroke-color: rgba(234, 88, 12, 0.28);
+  border-color: rgba(234, 88, 12, 0.22);
+}
