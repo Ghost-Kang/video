@@ -20,7 +20,10 @@ from agent.tools.canvas import (
     _descendants,
     _mark_descendants_stale,
 )
-from agent.tools.canvas_persistence.generation_repo import update_generation_state
+from agent.tools.canvas_persistence.generation_repo import (
+    schedule_generation_retry,
+    update_generation_state,
+)
 from agent.tools.canvas_persistence.nodes_repo import _update_node_result
 from agent.tools.canvas_persistence import db as canvas_db
 from agent.tools.canvas_persistence.versions_repo import list_versions
@@ -63,6 +66,27 @@ def _mk(nid, *, type="image", asset_status="idle", result=None, needs_regen=Fals
 
 def _edge(s, t):
     canvas_tools._upsert_edge({"id": f"{s}-{t}", "source": s, "target": t})
+
+
+class TestRetryTerminalGuard:
+    """#9(bug 审计 2026-06-04):schedule_generation_retry 终态守卫扩到 done/failed。"""
+
+    def test_retry_skips_done_node(self):
+        _thread()
+        _mk("X", asset_status="done", result={"url": "ok.png"})
+        update_generation_state("X", "done")
+        # 迟到的失败回调不能把已 done 的节点拉回 pending
+        assert schedule_generation_retry("X", "stale error") is False
+        n = canvas_tools._load_node("X")
+        assert n["generation_status"] == "done"
+        assert n["asset_status"] == "done"
+
+    def test_retry_still_works_for_in_flight(self):
+        _thread()
+        _mk("Y", asset_status="generating")
+        update_generation_state("Y", "polling")  # 在途
+        assert schedule_generation_retry("Y", "transient") is True  # 正常重试不受影响
+        assert canvas_tools._load_node("Y")["generation_status"] == "pending"
 
 
 # ---------- descendants traversal ----------
