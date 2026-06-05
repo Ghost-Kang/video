@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cascade · 图文上手手册（看图照着做）</title>
+<style>
+  :root{
+    --paper:#faf8f3; --ink:#1c1917; --clay:#7c2d12; --rust:#9a3412;
+    --orange:#ea580c; --amber:#f59e0b; --sand:#d4a574; --green:#15803d;
+    --line:rgba(124,45,18,0.14); --muted:#78716c;
+    --serif:"Source Han Serif SC","Noto Serif SC","Songti SC","STSong",serif;
+    --sans:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#e9e3d8;font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .page{
+    width:1040px;margin:24px auto;background:var(--paper);
+    border-radius:24px;overflow:hidden;position:relative;
+    box-shadow:0 36px 90px -36px rgba(124,45,18,0.4);
+  }
+  /* ── warm aurora header ── */
+  .hero{
+    position:relative;padding:42px 52px 36px;overflow:hidden;
+    background:
+      radial-gradient(120% 150% at 0% 0%, rgba(234,88,12,0.16) 0%, rgba(234,88,12,0) 55%),
+      radial-gradient(120% 150% at 100% 0%, rgba(124,45,18,0.13) 0%, rgba(124,45,18,0) 55%),
+      linear-gradient(180deg,#fffdf9 0%, var(--paper) 100%);
+    border-bottom:1px solid var(--line);
+  }
+  .badge{
+    position:absolute;top:38px;right:48px;font-size:11.5px;font-weight:700;letter-spacing:0.08em;
+    color:var(--clay);background:rgba(255,255,255,0.7);border:1px solid var(--line);
+    padding:6px 13px;border-radius:999px;backdrop-filter:blur(6px)
+  }
+  .brandrow{display:flex;align-items:baseline;gap:15px}
+  .wordmark{font-family:var(--serif);font-size:38px;font-weight:600;color:var(--clay);letter-spacing:-0.02em}
+  .wordmark .dot{color:var(--orange)}
+  .tagline{font-size:14px;color:var(--rust);font-weight:600;letter-spacing:0.04em}
+  .htitle{font-family:var(--serif);font-size:25px;font-weight:600;color:var(--ink);margin-top:18px;letter-spacing:-0.01em}
+  .htitle b{color:var(--clay)}
+  .oneliner{margin-top:11px;font-size:14.5px;line-height:1.75;color:#44403c;max-width:820px}
+  .oneliner b{color:var(--clay)}
+  .legend{margin-top:16px;display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:#57534e}
+  .legend span{display:flex;align-items:center;gap:7px}
+  .legend .ring{width:15px;height:15px;border-radius:5px;border:2.5px solid var(--orange);box-shadow:0 0 0 3px rgba(234,88,12,0.16)}
+  .legend .pin{width:18px;height:18px;border-radius:999px;background:var(--clay);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+  /* ── body / steps ── */
+  .body{padding:14px 52px 30px}
+  .step{display:grid;grid-template-columns:64px 1fr;gap:20px;padding:26px 0;border-bottom:1px solid var(--line)}
+  .step:last-of-type{border-bottom:none}
+  .rail{display:flex;flex-direction:column;align-items:center;position:relative}
+  .rail .bignum{
+    width:50px;height:50px;border-radius:999px;flex-shrink:0;z-index:2;
+    background:linear-gradient(160deg,var(--rust),var(--clay));color:#fff;
+    font-family:var(--serif);font-size:22px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 10px 22px -10px rgba(124,45,18,0.7)
+  }
+  .rail .line{width:2px;flex:1;background:var(--line);margin-top:6px}
+  .step:last-of-type .rail .line{display:none}
+
+  .h3{font-family:var(--serif);font-size:21px;font-weight:600;color:var(--clay);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .h3 .where{font-family:var(--sans);font-size:12px;font-weight:600;color:var(--rust);background:rgba(124,45,18,0.08);border:1px solid var(--line);padding:3px 10px;border-radius:999px}
+  .lede{margin-top:7px;font-size:13.5px;line-height:1.7;color:#44403c}
+  .lede b{color:var(--rust)}
+
+  /* ── screenshot frame (faux app window) ── */
+  .frame{
+    margin-top:15px;border-radius:14px;overflow:hidden;border:1px solid var(--line);
+    background:#fff;box-shadow:0 20px 44px -26px rgba(124,45,18,0.5)
+  }
+  .chrome{
+    height:34px;display:flex;align-items:center;gap:7px;padding:0 14px;
+    background:linear-gradient(180deg,#fbf7f0,#f3ece1);border-bottom:1px solid var(--line)
+  }
+  .chrome .d{width:11px;height:11px;border-radius:999px}
+  .chrome .d1{background:#e0795f}.chrome .d2{background:#e9b15c}.chrome .d3{background:#9ec08a}
+  .chrome .url{
+    margin-left:10px;font-size:11.5px;color:var(--muted);background:#fff;border:1px solid var(--line);
+    border-radius:999px;padding:3px 14px;letter-spacing:0.02em
+  }
+  .shot{position:relative;line-height:0}
+  .shot img{width:100%;display:block}
+
+  /* annotation hot-rings + numbered pins on the screenshot */
+  .hot{position:absolute;border:2.5px solid var(--orange);border-radius:10px;
+    box-shadow:0 0 0 4px rgba(234,88,12,0.14),0 6px 18px -4px rgba(234,88,12,0.5);
+    background:rgba(234,88,12,0.05)}
+  .hot.soft{border-style:dashed;border-color:var(--clay);box-shadow:0 0 0 3px rgba(124,45,18,0.08)}
+  .pin{position:absolute;width:26px;height:26px;border-radius:999px;background:var(--clay);color:#fff;
+    font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 6px 14px -4px rgba(124,45,18,0.8);border:2px solid #fff;z-index:3}
+
+  /* caption strip under the shot */
+  .cap{margin-top:13px;display:flex;flex-direction:column;gap:8px}
+  .do{display:flex;gap:11px;align-items:flex-start;font-size:13.5px;line-height:1.6;color:#292524}
+  .do .n{flex-shrink:0;width:22px;height:22px;border-radius:999px;background:var(--clay);color:#fff;
+    font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .do b{color:var(--clay)}
+  .note{margin-top:4px;font-size:12.5px;line-height:1.65;color:var(--muted);
+    background:rgba(124,45,18,0.045);border-left:3px solid var(--sand);border-radius:0 8px 8px 0;padding:9px 13px}
+  .note b{color:var(--rust)}
+
+  /* illustrated (mock) panel for the publish step */
+  .mock{margin-top:15px;border:1px dashed var(--clay);border-radius:14px;background:rgba(255,255,255,0.6);
+    padding:18px 20px;position:relative}
+  .mock .ml{position:absolute;top:-10px;left:16px;font-size:11px;font-weight:700;color:var(--clay);
+    background:var(--paper);padding:1px 10px;border-radius:999px;border:1px solid var(--line)}
+  .mock .mt{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--ink);margin-bottom:12px}
+  .pkg{display:grid;grid-template-columns:1fr 1fr;gap:9px 14px;font-size:12.5px;color:#44403c}
+  .pkg .row{display:flex;align-items:center;gap:9px}
+  .pkg .k{color:var(--muted);min-width:48px}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .b{font-size:12px;font-weight:600;padding:6px 13px;border-radius:9px;border:1px solid var(--line);color:var(--clay);background:rgba(124,45,18,0.06)}
+  .b.go{color:#fff;background:linear-gradient(160deg,var(--rust),var(--clay));border:none;box-shadow:0 8px 18px -8px rgba(124,45,18,0.7)}
+
+  /* status-chip key block */
+  .keybox{margin:8px 52px 0;background:rgba(255,255,255,0.6);border:1px solid var(--line);border-radius:16px;padding:20px 24px}
+  .keybox h4{font-family:var(--serif);font-size:17px;color:var(--clay);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:9px}
+  .keybox h4 .pip{width:8px;height:8px;border-radius:2px;background:var(--orange);transform:rotate(45deg)}
+  .keybox .sub{font-size:12.5px;color:var(--muted);margin-bottom:14px}
+  .chips{display:flex;flex-wrap:wrap;gap:9px}
+  .chip{font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid transparent;display:flex;align-items:center;gap:6px}
+  .c-amber{color:#b45309;background:rgba(180,83,9,0.10)}
+  .c-green{color:var(--green);background:rgba(21,128,61,0.10)}
+  .c-red{color:#b91c1c;background:rgba(185,28,28,0.09)}
+  .chip .cd{font-size:11px;color:var(--muted);font-weight:500}
+
+  .foot{margin:26px 52px 0;padding-top:18px;border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted)}
+  .foot .warm{color:var(--rust);font-weight:600}
+
+  @media print{
+    html,body{background:#fff}
+    .page{margin:0;box-shadow:none;border-radius:0;width:100%}
+    .step{break-inside:avoid}
+    @page{size:A4;margin:8mm}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══ HEADER ═══ -->
+  <div class="hero">
+    <div class="badge">图文上手 · v1</div>
+    <div class="brandrow">
+      <div class="wordmark">Cascade<span class="dot">.</span></div>
+      <div class="tagline">拆爆款 · 改成你的 · 一键出片</div>
+    </div>
+    <div class="htitle">看图照着做：<b>从一条爆款，到你自己的短片</b></div>
+    <p class="oneliner">
+      这份手册<b>每一步都配真实截图</b>，照着图上圈出来的地方点就行。你不用懂剪辑、不用懂脚本——
+      只要会刷抖音、会复制链接、会用大白话说一句「我想做支这样的视频」，剩下的交给画布里的 AI「导演」。
+    </p>
+    <div class="legend">
+      <span><i class="ring"></i> 橙色圈 = 这一步要点 / 要看的地方</span>
+      <span><i class="pin">1</i> 编号 = 对应下方说明里的操作顺序</span>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- ① 进门 -->
+    <section class="step">
+      <div class="rail"><div class="bignum">1</div><div class="line"></div></div>
+      <div>
+        <div class="h3">进门 · 填邀请码 <span class="where">第一个页面</span></div>
+        <p class="lede">第一次打开 Cascade，会先让你填<b>邀请码</b>（产品方发给你的「门票」）。</p>
+        <div class="frame">
+          <div class="chrome"><i class="d d1"></i><i class="d d2"></i><i class="d d3"></i><span class="url">cascade · 内测</span></div>
+          <div class="shot">
+            <img src="01-invite.png" alt="邀请码页">
+            <div class="hot" style="left:35.5%;top:47.9%;width:28.5%;height:6.6%"><span class="pin" style="left:-13px;top:-13px">1</span></div>
+            <div class="hot" style="left:35.5%;top:54.9%;width:28.5%;height:6.8%"><span class="pin" style="left:-13px;top:-13px">2</span></div>
+          </div>
+        </div>
+        <div class="cap">
+          <div class="do"><span class="n">1</span><span>在输入框里<b>粘上邀请码</b>。</span></div>
+          <div class="do"><span class="n">2</span><span>点<b>「进去看看」</b>。</span></div>
+        </div>
+        <div class="note">码<b>填错或带了多余空格</b>会被拦在这一步、进不去——这很正常，核对一下重填即可。</div>
+      </div>
+    </section>
+
+    <!-- ② 粘爆款 -->
+    <section class="step">
+      <div class="rail"><div class="bignum">2</div><div class="line"></div></div>
+      <div>
+        <div class="h3">粘一条想模仿的爆款 <span class="where">落地页</span></div>
+        <p class="lede">进来后，在落地页<b>粘一条抖音链接</b>，让 Cascade 把它拆开。懒得找链接？直接点下面轮播的<b>案例卡</b>也行。</p>
+        <div class="frame">
+          <div class="chrome"><i class="d d1"></i><i class="d d2"></i><i class="d d3"></i><span class="url">cascade · 落地页</span></div>
+          <div class="shot">
+            <img src="02-landing.png" alt="落地页 粘链接">
+            <div class="hot" style="left:32.8%;top:64.4%;width:28.5%;height:8.6%"><span class="pin" style="left:-13px;top:-13px">1</span></div>
+            <div class="hot" style="left:60.9%;top:64.6%;width:8.6%;height:8%"><span class="pin" style="right:-13px;top:-13px">2</span></div>
+          </div>
+        </div>
+        <div class="cap">
+          <div class="do"><span class="n">1</span><span>把抖音的<b>分享文案、App 链接或网址</b>整段粘进输入框（短链会自动展开，不用手动处理）。</span></div>
+          <div class="do"><span class="n">2</span><span>点右边的<b>「拆解」</b>。</span></div>
+        </div>
+        <div class="note">最适合拆的是<b>时长 15–90 秒</b>的视频。太短（&lt;5秒）或太长（&gt;3分钟）拆不动。</div>
+      </div>
+    </section>
+
+    <!-- ③ 等拆解 -->
+    <section class="step">
+      <div class="rail"><div class="bignum">3</div><div class="line"></div></div>
+      <div>
+        <div class="h3">等它拆解（约 1 分钟） <span class="where">分析中</span></div>
+        <p class="lede">点完之后进入「分析中」。画面会播你刚选那条视频的封面、逐幕扫描、配进度点，还会把已经拆出来的<b>「钩子」</b>先给你看。</p>
+        <div class="frame">
+          <div class="chrome"><i class="d d1"></i><i class="d d2"></i><i class="d d3"></i><span class="url">cascade · 分析中</span></div>
+          <div class="shot">
+            <img src="03-analyzing.png" alt="分析中">
+            <div class="hot soft" style="left:38%;top:62%;width:36%;height:24%"><span class="pin" style="left:-13px;top:-13px">i</span></div>
+          </div>
+        </div>
+        <div class="cap">
+          <div class="do"><span class="n">i</span><span><b>什么都不用点，等就好。</b>真实进度会在这一块实时显示，多数情况 1 分钟内出结果。</span></div>
+        </div>
+        <div class="note">如果你的系统开了<b>「减少动画」</b>，扫描线会自动关掉、只留静态封面——这是照顾对动画敏感的人，不是出 bug。</div>
+      </div>
+    </section>
+
+    <!-- ④ 看懂 + 做我的版本 -->
+    <section class="step">
+      <div class="rail"><div class="bignum">4</div><div class="line"></div></div>
+      <div>
+        <div class="h3">看懂它为什么火 → 做我的版本 <span class="where">爆点分析</span></div>
+        <p class="lede">拆完你会看到<b>「爆点分析」</b>卡：主题、为什么火，以及钩子／痛点／情绪／人群四个维度。往下滑还有逐幕的「视频分析」。看明白套路后，就开始做你自己的。</p>
+        <div class="frame">
+          <div class="chrome"><i class="d d1"></i><i class="d d2"></i><i class="d d3"></i><span class="url">cascade · 爆点分析</span></div>
+          <div class="shot">
+            <img src="04-analysis.png" alt="爆点分析结果">
+            <div class="hot" style="left:33%;top:16.7%;width:49%;height:10.5%"><span class="pin" style="left:-13px;top:-13px">1</span></div>
+            <div class="hot soft" style="left:31%;top:28%;width:62%;height:42%"><span class="pin" style="left:-13px;top:-13px">i</span></div>
+          </div>
+        </div>
+        <div class="cap">
+          <div class="do"><span class="n">i</span><span>先<b>看懂</b>这条为什么火（橙色虚线框这张「爆点分析」卡）。想看逐字稿，点卡片右上角的<b>「原视频脚本」</b>。</span></div>
+          <div class="do"><span class="n">1</span><span>点最上面那个深棕色大按钮<b>「在画布上做我的版本」</b>——它会把这条的主题／为什么火／可复制套路一起带进画布。</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ⑤ 叫导演 + 说创意 -->
+    <section class="step">
+      <div class="rail"><div class="bignum">5</div><div class="line"></div></div>
+      <div>
+        <div class="h3">叫出导演 · 用大白话说创意 <span class="where">创作画布</span></div>
+        <p class="lede">进来是一张白板。顶部那条<b>「创作流程」六步进度条</b>会告诉你走到哪了（策划书→角色→场景→分镜→视频→合成）。现在把你想做什么告诉导演。</p>
+        <div class="frame">
+          <div class="chrome"><i class="d d1"></i><i class="d d2"></i><i class="d d3"></i><span class="url">cascade · 画布 ?view=pro</span></div>
+          <div class="shot">
+            <img src="05-canvas-empty.png" alt="空画布引导">
+            <div class="hot soft" style="left:25.5%;top:1.4%;width:43.5%;height:4.2%"><span class="pin" style="left:-13px;top:-11px">i</span></div>
+            <div class="hot" style="left:42%;top:42%;width:14.5%;height:7%"><span class="pin" style="left:-13px;top:-13px">1</span></div>
+            <div class="hot" style="left:1.5%;top:83.9%;width:92%;height:9.2%"><span class="pin" style="left:-13px;top:-13px">2</span></div>
+          </div>
+        </div>
+        <div class="cap">
+          <div class="do"><span class="n">i</span><span>顶部是<b>六步进度条</b>：✓绿=做完、●陶土=正在做、○灰=没开始，一眼知道进度。</span></div>
+          <div class="do"><span class="n">1</span><span>点中间的<b>「告诉导演你想做什么」</b>叫出对话窗。</span></div>
+          <div class="do"><span class="n">2</span><span>在底部输入框用大白话写创意，比如<b>「做一支 30 秒的宝宝辅食教程，主角是一位妈妈，温馨厨房风」</b>，点「发送」。</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ⑥ 导演搭节点 + 逐个确认 -->
+    <section class="step">
+      <div class="rail"><div class="bignum">6</div><div class="line"></div></div>
+      <div>
+        <div class="h3">导演替你搭好 · 你逐个确认 <span class="where">画布节点</span></div>
+        <p class="lede">导演会在画布上一步步搭出<b>节点</b>并用箭头连起来：策划书 → 角色 → 场景 → 分镜 → 视频 → 合成。你的任务是<b>「看一眼 → 满意就确认」</b>。</p>
+        <div class="frame">
+          <div class="chrome"><i class="d d1"></i><i class="d d2"></i><i class="d d3"></i><span class="url">cascade · 画布</span></div>
+          <div class="shot">
+            <img src="06-canvas-seeded.png" alt="画布已播种 策划书节点">
+            <div class="hot" style="left:54.7%;top:50.3%;width:26.6%;height:14.5%"><span class="pin" style="right:-13px;top:-13px">1</span></div>
+          </div>
+        </div>
+        <div class="cap">
+          <div class="do"><span class="n">1</span><span><b>选中</b>一个节点，它上方会浮出一条操作条。看节点左下角的<b>状态徽章</b>（如「● 待确认」）——满意就点操作条上的<b>「✓ 确认」</b>，这会解锁下一步。想改就点<b>「↻ 重生」</b>。</span></div>
+        </div>
+        <div class="note">先确认<b>策划书</b>（创作第一步），它通过后导演才会往下搭角色、场景、分镜。</div>
+      </div>
+    </section>
+
+    <!-- ⑦ 详情面板 改 Prompt + 生成 -->
+    <section class="step">
+      <div class="rail"><div class="bignum">7</div><div class="line"></div></div>
+      <div>
+        <div class="h3">改细节 · 点生成 <span class="where">右侧详情面板</span></div>
+        <p class="lede">选中任一节点，<b>右侧会弹出详情面板</b>。图片/视频节点可以在这里改 Prompt（生成指令）、设参数，然后点生成；这里也能切「审核中／已确认」、翻版本历史。</p>
+        <div class="frame">
+          <div class="chrome"><i class="d d1"></i><i class="d d2"></i><i class="d d3"></i><span class="url">cascade · 节点详情</span></div>
+          <div class="shot">
+            <img src="07-nodedetail.png" alt="节点详情面板">
+            <div class="hot" style="left:73.5%;top:5.5%;width:25.5%;height:89%"><span class="pin" style="left:-13px;top:-13px">1</span></div>
+          </div>
+        </div>
+        <div class="cap">
+          <div class="do"><span class="n">1</span><span>在右侧面板里：<b>图片节点</b>改 Prompt（如「妈妈在明亮厨房给宝宝做辅食，温馨」）后点<b>「⚡ 生成」</b>；<b>视频节点</b>设时长/分辨率/配音后生成；最后在<b>合成节点</b>点<b>「🎬 合成」</b>拼成整片。</span></div>
+        </div>
+        <div class="note"><b>生成是异步的</b>：点完先变「生成中」，图片通常较快、视频要几分钟，等不及可点「✕ 取消」。改 Prompt 没把握？点框下的<b>「润色」</b>让系统帮你优化。</div>
+      </div>
+    </section>
+
+    <!-- ⑧ 发布（示意） -->
+    <section class="step">
+      <div class="rail"><div class="bignum">8</div><div class="line"></div></div>
+      <div>
+        <div class="h3">复制发布包 · 去抖音发 <span class="where">成片后</span></div>
+        <p class="lede">整片合成后，会出现一张<b>「准备发出去」</b>卡片。一键把标题、话题、脚本、镜头图、成片打成一包复制，直接去抖音粘贴就能发。</p>
+        <div class="mock">
+          <span class="ml">界面示意</span>
+          <div class="mt">🚀 准备发出去</div>
+          <div class="pkg">
+            <div class="row"><span class="k">标题</span><span>这条厨房小技巧，30 秒学会…</span></div>
+            <div class="row"><span class="k">话题</span><span>#生活技巧 #厨房好物 #实用</span></div>
+            <div class="row"><span class="k">脚本</span><span>改好的逐幕口播 + 画面…</span></div>
+            <div class="row"><span class="k">成片</span><span>合成后的完整短视频链接</span></div>
+          </div>
+          <div class="btns">
+            <span class="b">复制标题</span><span class="b">复制话题</span><span class="b">复制脚本</span>
+            <span class="b go">一键复制，去发 →</span>
+          </div>
+        </div>
+        <div class="cap">
+          <div class="do"><span class="n">1</span><span>点<b>「一键复制，去发」</b>，把<b>完整发布包</b>一次性复制到剪贴板，去抖音粘贴发布。每次复制后顶部会弹个提示，3 秒后消失。</span></div>
+        </div>
+        <div class="note">草稿图/成片还没做完时，发布包里会显示<b>「(生成后自动填入)」</b>占位；等它们完成会自动补上，到时再复制就是完整的了。</div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ═══ 状态芯片速查 ═══ -->
+  <div class="keybox">
+    <h4><span class="pip"></span>节点上的「状态芯片」——一眼看懂它在干嘛</h4>
+    <div class="sub">每个节点左下角有个彩色小徽章，颜色就是信号灯：</div>
+    <div class="chips">
+      <span class="chip c-amber">● 待确认 <span class="cd">内容好了，等你审核</span></span>
+      <span class="chip c-amber">生成中 <span class="cd">AI 正在处理</span></span>
+      <span class="chip c-green">✓ 已确认 <span class="cd">你通过了</span></span>
+      <span class="chip c-green">已生成 <span class="cd">做好了</span></span>
+      <span class="chip c-amber">⚠ 待重生 <span class="cd">上游改了，过时要重做</span></span>
+      <span class="chip c-red">✕ 失败重试 <span class="cd">出错了，可重来</span></span>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>Cascade 内测 · 图文上手手册 · 截图取自真实产品（2026-06-04）· 想知道每个按钮的细节，看配套《用户手册》</span>
+    <span class="warm">慢慢来，每步都有导演陪你，做错也能回头改 ✦</span>
+  </div>
+
+</div>
+</body>
+</html>
