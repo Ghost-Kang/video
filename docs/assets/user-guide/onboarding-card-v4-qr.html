@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cascade · 一页纸上手卡 v4</title>
+<style>
+  :root{
+    /* ===== sky world ===== */
+    --sky-top:#1f6fd6;       /* deep azure top */
+    --sky-mid:#3f93e8;       /* mid blue */
+    --sky-low:#86c2f2;       /* lower light blue */
+    --sky-haze:#d9edfb;      /* near-horizon white-blue */
+    /* ===== gold accent ===== */
+    --gold:#e8b04b;          /* warm gold (brand point) */
+    --gold-lite:#f6d488;
+    --gold-deep:#c98a2b;
+    /* ===== text on glass ===== */
+    --ink:#16344f;           /* primary ink (deep blue-gray) */
+    --ink2:#234a6b;          /* secondary */
+    --ink3:#456c8c;          /* tertiary */
+    --faint:#6b8bab;         /* faint label */
+    --white:#ffffff;
+    /* ===== semantic on glass ===== */
+    --s-green:#0f9d6b;       /* green = confirmed/done */
+    --s-amber:#d9981f;       /* amber/yellow = your move / in progress */
+    --s-orange:#e07b39;      /* orange = needs regen */
+    --s-red:#d6455b;         /* red = fail/retry */
+    /* ===== glass hairlines ===== */
+    --glass-edge:rgba(255,255,255,0.62);
+    --glass-edge2:rgba(255,255,255,0.30);
+    --serif:"Source Han Serif SC","Noto Serif SC","Songti SC","STSong",serif;
+    --sans:-apple-system,"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei",system-ui,sans-serif;
+    --r:26px;
+    --r2:20px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{
+    background:#0d3a6b;font-family:var(--sans);color:var(--ink);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+    font-feature-settings:"ss01","cv11";letter-spacing:-0.006em
+  }
+
+  /* ============ PAGE = the sky ============ */
+  .page{
+    width:880px;margin:26px auto;position:relative;overflow:hidden;
+    border-radius:34px;
+    background:
+      linear-gradient(178deg,
+        var(--sky-top) 0%,
+        #2c80df 22%,
+        var(--sky-mid) 46%,
+        var(--sky-low) 74%,
+        var(--sky-haze) 100%);
+    box-shadow:0 50px 130px -40px rgba(8,40,80,0.7);
+  }
+  /* sunlight bloom top-right (where "直上青云" light comes from) */
+  .page::after{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+    background:
+      radial-gradient(60% 40% at 86% -6%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 55%),
+      radial-gradient(70% 50% at 50% 112%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 60%);
+    mix-blend-mode:screen;opacity:.9;
+  }
+  /* SVG turbulence cloud layers sit between sky and content */
+  .clouds{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .clouds svg{position:absolute}
+  .cloud-band{position:absolute;left:-14%;width:128%;height:380px}
+  .cb1{top:30px;opacity:1;transform:rotate(-8deg)}
+  .cb2{top:410px;opacity:.78;transform:rotate(6deg)}
+  .cb3{top:860px;opacity:.9;transform:rotate(-5deg)}
+  .cb4{top:1270px;opacity:.82;transform:rotate(7deg)}
+  /* soft puffy radial clouds — sweeping S-shaped volume, like the reference */
+  .puff{position:absolute;border-radius:50%;background:radial-gradient(closest-side, rgba(255,255,255,0.98), rgba(255,255,255,0) 70%);filter:blur(3px)}
+  .p1{top:96px;left:-90px;width:520px;height:250px;opacity:.95}
+  .p2{top:60px;right:-70px;width:460px;height:240px;opacity:.9}
+  .p3{top:520px;left:34%;width:560px;height:280px;opacity:.62}
+  .p4{top:1140px;left:-70px;width:540px;height:270px;opacity:.85}
+  .p5{top:1480px;right:-50px;width:500px;height:260px;opacity:.7}
+  /* extra small bright puffs to fill the S-sweep */
+  .p6{top:220px;right:18%;width:300px;height:160px;opacity:.7}
+  .p7{top:760px;left:-30px;width:360px;height:190px;opacity:.55}
+  .p8{top:1340px;right:24%;width:330px;height:170px;opacity:.6}
+
+  .content{position:relative;z-index:2}
+
+  /* ============ glass primitive ============ */
+  .glass{
+    position:relative;
+    background:linear-gradient(180deg, rgba(255,255,255,0.46), rgba(255,255,255,0.24));
+    -webkit-backdrop-filter:blur(22px) saturate(150%);
+            backdrop-filter:blur(22px) saturate(150%);
+    border:1px solid var(--glass-edge2);
+    border-radius:var(--r2);
+    box-shadow:
+      0 22px 46px -26px rgba(13,58,107,0.55),
+      0 2px 0 rgba(255,255,255,0.25) inset,
+      0 0 0 0.5px rgba(255,255,255,0.4) inset;
+  }
+  /* glass top-edge highlight (light catching the upper rim) */
+  .glass::before{
+    content:"";position:absolute;left:14px;right:14px;top:0;height:1.4px;border-radius:2px;
+    background:linear-gradient(90deg, transparent, var(--glass-edge) 22%, rgba(255,255,255,0.9) 50%, var(--glass-edge) 78%, transparent);
+    z-index:3;pointer-events:none;
+  }
+
+  /* ============ HERO ============ */
+  .hero{padding:48px 50px 28px;position:relative;z-index:2}
+  .toprow{display:flex;justify-content:space-between;align-items:flex-start}
+  .wordmark{
+    font-family:var(--sans);font-size:62px;font-weight:900;line-height:.92;letter-spacing:-0.03em;
+    background:linear-gradient(176deg,#fdeec9 0%, var(--gold-lite) 42%, var(--gold) 72%, var(--gold-deep) 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 3px 10px rgba(20,52,79,0.30)) drop-shadow(0 0 1px rgba(255,255,255,0.6));
+  }
+  .tagline{
+    margin-top:13px;font-size:16px;font-weight:800;letter-spacing:0.02em;color:var(--white);
+    text-shadow:0 2px 10px rgba(15,52,90,0.45);
+  }
+  .tagline i{font-style:normal;color:var(--gold-lite);margin:0 9px;font-weight:900;text-shadow:0 2px 8px rgba(15,52,90,0.5)}
+  .pill{
+    font-size:11px;font-weight:800;letter-spacing:0.14em;color:var(--ink2);white-space:nowrap;
+    background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.34));
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+    border:1px solid var(--glass-edge2);
+    padding:8px 15px;border-radius:999px;
+    box-shadow:0 6px 16px -10px rgba(13,58,107,0.5), 0 1px 0 rgba(255,255,255,0.5) inset;
+  }
+  /* big heavy headline — echoes "旗舰性能 直上青云" : huge, bold, lots of contrast */
+  .headline{
+    margin-top:30px;font-family:var(--sans);font-weight:900;font-size:60px;line-height:1.04;
+    letter-spacing:-0.035em;color:var(--white);
+    text-shadow:0 4px 24px rgba(15,52,90,0.5), 0 1px 2px rgba(15,52,90,0.45), 0 0 1px rgba(15,52,90,0.5);
+  }
+  .headline .au{
+    background:linear-gradient(176deg,#fdeec9 0%, var(--gold-lite) 46%, var(--gold) 96%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 3px 12px rgba(20,52,79,0.32));
+  }
+  .headline .big{font-size:72px;letter-spacing:-0.045em}
+  .oneliner{
+    margin-top:26px;font-size:23px;line-height:1.45;color:var(--white);font-weight:800;max-width:740px;
+    text-shadow:0 2px 14px rgba(15,52,90,0.45);
+  }
+  .oneliner b{color:var(--gold-lite);font-weight:900;font-size:25px;
+    text-shadow:0 2px 10px rgba(15,52,90,0.5)}
+  .youknow{margin-top:24px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:13px;font-weight:700}
+  .youknow .lead{color:var(--white);text-shadow:0 1px 8px rgba(15,52,90,0.4);font-weight:900;font-size:14px}
+  .youknow span.k{
+    background:linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.32));
+    -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+    border:1px solid var(--glass-edge2);color:var(--ink2);
+    padding:6px 14px;border-radius:999px;box-shadow:0 1px 0 rgba(255,255,255,0.5) inset;font-weight:800
+  }
+
+  /* ============ BODY ============ */
+  .body{padding:6px 50px 16px;position:relative;z-index:2}
+  .seclabel{display:flex;align-items:center;gap:13px;margin:32px 0 16px}
+  .seclabel .pip{
+    width:11px;height:11px;border-radius:3px;transform:rotate(45deg);flex-shrink:0;
+    background:linear-gradient(135deg,var(--gold-lite),var(--gold-deep));
+    box-shadow:0 2px 8px rgba(201,138,43,0.5)
+  }
+  .seclabel .k{font-family:var(--sans);font-size:25px;font-weight:900;color:var(--white);text-shadow:0 2px 14px rgba(15,52,90,0.5);letter-spacing:-0.02em}
+  .seclabel .meta{
+    font-size:12px;font-weight:900;color:var(--ink2);letter-spacing:0.06em;
+    background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.36));
+    -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+    border:1px solid var(--glass-edge2);padding:5px 13px;border-radius:999px;
+    box-shadow:0 1px 0 rgba(255,255,255,0.5) inset
+  }
+  .seclabel .ln{flex:1;height:1px;background:linear-gradient(90deg,rgba(255,255,255,0.55),transparent)}
+
+  /* ===== 3 steps ===== */
+  .steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+  .step{padding:24px 20px 22px;overflow:hidden}
+  .step .bignum{
+    font-family:var(--serif);font-weight:700;font-size:124px;line-height:.72;
+    color:transparent;-webkit-text-stroke:2px rgba(232,176,75,0.55);
+    position:absolute;top:-12px;right:6px;z-index:0;letter-spacing:-0.05em;opacity:.95;
+  }
+  .step .tag{
+    position:relative;z-index:2;display:inline-flex;align-items:center;gap:6px;
+    font-size:11.5px;font-weight:800;color:#3a2906;letter-spacing:0.01em;margin-bottom:14px;
+    padding:6px 13px 6px 11px;border-radius:999px;
+    background:linear-gradient(135deg,var(--gold-lite),var(--gold));
+    box-shadow:0 6px 14px -6px rgba(201,138,43,0.6), 0 1px 0 rgba(255,255,255,0.5) inset
+  }
+  .step .tag .e{font-size:13px}
+  .step .st{position:relative;z-index:2;font-size:23px;font-weight:900;color:var(--ink);margin-bottom:9px;letter-spacing:-0.025em;line-height:1.1}
+  .step .sd{position:relative;z-index:2;font-size:13px;line-height:1.66;color:var(--ink2);font-weight:600}
+  .step .sd b{color:var(--gold-deep);font-weight:900;white-space:nowrap}
+  .step.arrow::after{
+    content:"›";position:absolute;right:-23px;top:50%;z-index:6;transform:translateY(-56%);
+    font-size:32px;font-weight:900;color:var(--white);line-height:1;
+    text-shadow:0 2px 10px rgba(15,52,90,0.5)
+  }
+
+  /* ===== 6-step glass capsule rail ===== */
+  .railwrap{padding:26px 28px 22px;position:relative;overflow:hidden}
+  .rail{display:flex;align-items:flex-start;justify-content:space-between;position:relative}
+  .rstep{display:flex;flex-direction:column;align-items:center;gap:11px;flex:1;position:relative;z-index:2}
+  .rstep .conn{
+    position:absolute;top:22px;left:calc(50% + 25px);width:calc(100% - 50px);height:3px;border-radius:3px;z-index:1;
+    background:linear-gradient(90deg, rgba(232,176,75,0.85), rgba(255,255,255,0.85));
+    box-shadow:0 1px 6px rgba(232,176,75,0.4)
+  }
+  .rstep:last-child .conn{display:none}
+  .rstep .rc{
+    width:46px;height:46px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--serif);font-size:18px;font-weight:700;color:var(--white);position:relative;z-index:2;
+    transform:rotate(-45deg);
+    background:linear-gradient(135deg, rgba(46,128,223,0.92), rgba(31,111,214,0.92));
+    border:1px solid rgba(255,255,255,0.55);
+    box-shadow:0 8px 18px -8px rgba(13,58,107,0.7), 0 1px 0 rgba(255,255,255,0.5) inset
+  }
+  .rstep .rc.gold{
+    background:linear-gradient(135deg, var(--gold-lite), var(--gold-deep));
+    box-shadow:0 8px 18px -8px rgba(201,138,43,0.7), 0 1px 0 rgba(255,255,255,0.55) inset
+  }
+  .rstep .rc span{transform:rotate(45deg)}
+  .rstep .rl{font-size:16px;font-weight:900;color:var(--ink);letter-spacing:-0.02em}
+  .rstep .rsub{font-size:10.5px;color:var(--ink3);text-align:center;line-height:1.44;font-weight:700}
+  .legend{
+    margin-top:20px;padding-top:16px;border-top:1px dashed rgba(70,108,140,0.3);
+    display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:12px;color:var(--ink2);font-weight:700
+  }
+  .legend .lead{color:var(--ink);font-weight:900}
+  .legend i{font-style:normal;display:inline-flex;align-items:center;gap:7px}
+  .legend .dt{width:11px;height:11px;border-radius:4px}
+
+  /* ===== status : traffic-light groups ===== */
+  .lights{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px}
+  .light{
+    padding:18px 16px 16px;border-radius:18px;position:relative;overflow:hidden;
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    box-shadow:0 1px 0 rgba(255,255,255,0.45) inset, 0 14px 30px -22px rgba(13,58,107,0.6)
+  }
+  .light .dot{width:16px;height:16px;border-radius:50%;margin-bottom:11px;
+    box-shadow:0 0 0 4px rgba(255,255,255,0.35), 0 4px 10px -2px rgba(15,52,90,0.4)}
+  .light .big{font-size:26px;font-weight:900;line-height:1;letter-spacing:-0.02em;margin-bottom:3px}
+  .light .mean{font-size:13.5px;font-weight:800;margin-bottom:13px;letter-spacing:-0.01em}
+  .light .nm{display:flex;flex-wrap:wrap;gap:6px}
+  .light .nm span{
+    font-size:12px;font-weight:900;padding:4px 10px;border-radius:9px;letter-spacing:-0.01em;
+    background:rgba(255,255,255,0.5);box-shadow:0 1px 0 rgba(255,255,255,0.6) inset
+  }
+  .l-green{background:linear-gradient(180deg,rgba(15,157,107,0.18),rgba(15,157,107,0.07));border:1px solid rgba(15,157,107,0.42)}
+  .l-green .dot{background:var(--s-green)}
+  .l-green .big,.l-green .mean,.l-green .nm span{color:#0a7a52}
+  .l-amber{background:linear-gradient(180deg,rgba(217,152,31,0.2),rgba(217,152,31,0.08));border:1px solid rgba(217,152,31,0.48)}
+  .l-amber .dot{background:var(--s-amber)}
+  .l-amber .big,.l-amber .mean,.l-amber .nm span{color:#a8740d}
+  .l-orange{background:linear-gradient(180deg,rgba(224,123,57,0.2),rgba(224,123,57,0.08));border:1px solid rgba(224,123,57,0.48)}
+  .l-orange .dot{background:var(--s-orange)}
+  .l-orange .big,.l-orange .mean,.l-orange .nm span{color:#bf5e1f}
+  .l-red{background:linear-gradient(180deg,rgba(214,69,91,0.18),rgba(214,69,91,0.07));border:1px solid rgba(214,69,91,0.46)}
+  .l-red .dot{background:var(--s-red)}
+  .l-red .big,.l-red .mean,.l-red .nm span{color:#c23149}
+
+  /* ===== remember : big keyword anchors ===== */
+  .remember{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .mem{display:flex;gap:14px;align-items:center;padding:18px 18px;overflow:hidden}
+  .mem .mi{
+    flex-shrink:0;width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+    font-size:24px;background:linear-gradient(180deg, rgba(255,255,255,0.62), rgba(255,255,255,0.3));
+    border:1px solid var(--glass-edge2);box-shadow:0 1px 0 rgba(255,255,255,0.55) inset
+  }
+  .mem .mc{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .mem .mk{font-size:21px;font-weight:900;color:var(--ink);letter-spacing:-0.03em;line-height:1}
+  .mem .md{font-size:12.5px;line-height:1.45;color:var(--ink2);font-weight:600}
+  .mem .md b{color:var(--gold-deep);font-weight:900;white-space:nowrap}
+
+  /* ===== access bar ===== */
+  .access{
+    margin:26px 0 0;padding:18px 50px;min-height:128px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.40), rgba(255,255,255,0.22));
+    -webkit-backdrop-filter:blur(20px) saturate(140%);backdrop-filter:blur(20px) saturate(140%);
+    border-top:1px solid var(--glass-edge2);
+    display:flex;align-items:center;justify-content:space-between;gap:26px;position:relative;z-index:2
+  }
+  .access .ax-text{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .access .ax-lead{font-size:13.5px;font-weight:800;color:var(--ink2)}
+  .access .ax-url{font-size:24px;font-weight:900;letter-spacing:0.005em;line-height:1.06;color:var(--gold-deep);
+    text-shadow:0 1px 0 rgba(255,255,255,0.7)}
+  .access .ax-code{font-size:13.5px;font-weight:700;color:var(--ink2)}
+  .access .ax-code b{color:var(--gold-deep);font-weight:900}
+  .access .ax-qr{display:flex;flex-direction:column;align-items:center;gap:7px;flex-shrink:0}
+  .access .ax-qrbox{
+    width:110px;height:110px;background:#fff;border-radius:16px;padding:11px;
+    box-shadow:0 14px 30px -12px rgba(13,58,107,0.55), 0 2px 0 rgba(255,255,255,0.6) inset, 0 0 0 1px rgba(255,255,255,0.5);
+    display:flex;align-items:center;justify-content:center
+  }
+  .access .ax-qrbox svg{width:100%;height:100%;display:block;shape-rendering:crispEdges}
+  .access .ax-qrcap{font-size:11.5px;font-weight:800;color:var(--ink2);letter-spacing:0.02em}
+  /* ===== footer ===== */
+  .foot{
+    margin:0;padding:22px 50px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.32), rgba(255,255,255,0.16));
+    -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+    border-top:1px solid var(--glass-edge2);
+    display:flex;justify-content:space-between;align-items:center;gap:16px;position:relative;z-index:2
+  }
+  .foot::before{
+    content:"";position:absolute;left:50px;right:50px;top:0;height:1.4px;
+    background:linear-gradient(90deg, transparent, var(--glass-edge) 22%, rgba(255,255,255,0.9) 50%, var(--glass-edge) 78%, transparent);
+  }
+  .foot .warm{font-family:var(--serif);font-size:16px;color:var(--ink);font-weight:700}
+  .foot .warm .au{color:var(--gold-deep);font-weight:800}
+  .foot .ref{font-size:11px;color:var(--ink3);font-weight:600;text-align:right;line-height:1.55}
+  .foot .ref b{color:var(--ink)}
+
+  @media print{
+    html,body{background:#0d3a6b}
+    .page{margin:0;box-shadow:none;border-radius:0;width:100%}
+    @page{size:A4;margin:8mm}
+  }
+</style>
+</head>
+<body>
+
+<!-- SVG turbulence cloud generator (rendered to the cloud bands via filter) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="cloudFilter" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.026" numOctaves="5" seed="7" stitchTiles="stitch" result="noise"/>
+      <feColorMatrix in="noise" type="matrix"
+        values="0 0 0 0 1
+                0 0 0 0 1
+                0 0 0 0 1
+                0 0 0 1.9 -0.48" result="white"/>
+      <feGaussianBlur in="white" stdDeviation="7" result="soft"/>
+      <feComponentTransfer in="soft">
+        <feFuncA type="gamma" amplitude="1.15" exponent="1.25" offset="0"/>
+      </feComponentTransfer>
+    </filter>
+    <filter id="cloudFilter2" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.016 0.03" numOctaves="4" seed="23" stitchTiles="stitch" result="noise"/>
+      <feColorMatrix in="noise" type="matrix"
+        values="0 0 0 0 1
+                0 0 0 0 1
+                0 0 0 0 1
+                0 0 0 1.75 -0.55" result="white"/>
+      <feGaussianBlur in="white" stdDeviation="9"/>
+    </filter>
+  </defs>
+</svg>
+
+<div class="page">
+
+  <!-- sky clouds layer -->
+  <div class="clouds">
+    <div class="puff p1"></div>
+    <div class="puff p2"></div>
+    <div class="puff p6"></div>
+    <div class="cloud-band cb1"><svg width="100%" height="100%"><rect width="100%" height="100%" filter="url(#cloudFilter)"/></svg></div>
+    <div class="cloud-band cb2"><svg width="100%" height="100%"><rect width="100%" height="100%" filter="url(#cloudFilter2)"/></svg></div>
+    <div class="puff p3"></div>
+    <div class="puff p7"></div>
+    <div class="cloud-band cb3"><svg width="100%" height="100%"><rect width="100%" height="100%" filter="url(#cloudFilter)"/></svg></div>
+    <div class="puff p4"></div>
+    <div class="puff p8"></div>
+    <div class="cloud-band cb4"><svg width="100%" height="100%"><rect width="100%" height="100%" filter="url(#cloudFilter2)"/></svg></div>
+    <div class="puff p5"></div>
+  </div>
+
+  <div class="content">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="toprow">
+      <div class="brand">
+        <div class="wordmark">Cascade</div>
+        <div class="tagline">拆爆款<i>·</i>改成你的<i>·</i>一键出片</div>
+      </div>
+      <div class="pill">内测上手卡 · v4</div>
+    </div>
+    <div class="headline">拆开爆款，<span class="au">改成你的</span>，<br><span class="au big">一键直上出片青云</span>。</div>
+    <p class="oneliner">
+      一条<b>爆款</b>，<b>一句话</b>，导演陪你做成<b>你的短片</b>。
+    </p>
+    <div class="youknow">
+      <span class="lead">你只要会：</span>
+      <span class="k">刷抖音</span><span class="k">复制链接</span><span class="k">说一句「我想做支这样的视频」</span>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- 3 步出片 -->
+    <div class="seclabel">
+      <span class="pip"></span><span class="k">最短路径</span><span class="meta">3 步出片</span><span class="ln"></span>
+    </div>
+    <div class="steps">
+      <div class="step glass arrow">
+        <div class="bignum">1</div>
+        <div class="tag"><span class="e">🔗</span>拆一条爆款</div>
+        <div class="st">粘链接<br>拆解</div>
+        <div class="sd">粘抖音链接或点案例，点<b>「拆解」</b>，约 1 分钟出爆点分析。</div>
+      </div>
+      <div class="step glass arrow">
+        <div class="bignum">2</div>
+        <div class="tag"><span class="e">🎬</span>做我的版本</div>
+        <div class="st">告诉<br>导演</div>
+        <div class="sd">点<b>「在画布上做我的版本」</b>，大白话告诉导演你想做什么。</div>
+      </div>
+      <div class="step glass">
+        <div class="bignum">3</div>
+        <div class="tag"><span class="e">📋</span>确认 · 生成 · 发</div>
+        <div class="st">逐节点<br>出片</div>
+        <div class="sd">逐节点<b>「✓ 确认」「⚡ 生成」「🎬 合成」</b>，成片后<b>「一键复制，去发」</b>。</div>
+      </div>
+    </div>
+
+    <!-- 6 步创作流 -->
+    <div class="seclabel">
+      <span class="pip"></span><span class="k">导演帮你搭的创作流</span><span class="meta">6 步</span><span class="ln"></span>
+    </div>
+    <div class="railwrap glass">
+      <div class="rail">
+        <div class="rstep"><div class="conn"></div><div class="rc"><span>1</span></div><div class="rl">策划书</div><div class="rsub">为什么火<br>+ 改成你的</div></div>
+        <div class="rstep"><div class="conn"></div><div class="rc"><span>2</span></div><div class="rl">角色</div><div class="rsub">定主角形象</div></div>
+        <div class="rstep"><div class="conn"></div><div class="rc"><span>3</span></div><div class="rl">场景</div><div class="rsub">定拍摄场景</div></div>
+        <div class="rstep"><div class="conn"></div><div class="rc"><span>4</span></div><div class="rl">分镜</div><div class="rsub">每镜的画面</div></div>
+        <div class="rstep"><div class="conn"></div><div class="rc gold"><span>5</span></div><div class="rl">视频</div><div class="rsub">逐镜出短片</div></div>
+        <div class="rstep"><div class="rc gold"><span>6</span></div><div class="rl">合成</div><div class="rsub">拼成整片</div></div>
+      </div>
+      <div class="legend">
+        <span class="lead">画布顶部这条进度条 →</span>
+        <i><span class="dt" style="background:#0f9d6b"></span><b style="color:#0f9d6b">✓ 绿＝做完</b></i>
+        <i><span class="dt" style="background:#e8b04b"></span><b style="color:#b9802a">● 暖金＝正在做</b></i>
+        <i><span class="dt" style="background:#9fb6cc"></span>○ 灰＝没开始</i>
+      </div>
+    </div>
+
+    <!-- 看懂状态 -->
+    <div class="seclabel">
+      <span class="pip"></span><span class="k">看懂状态</span><span class="meta">看颜色就行</span><span class="ln"></span>
+    </div>
+    <div class="lights">
+      <div class="light l-green">
+        <div class="dot"></div>
+        <div class="big">妥了</div>
+        <div class="mean">这步过了，往下走</div>
+        <div class="nm"><span>已确认</span><span>已生成</span></div>
+      </div>
+      <div class="light l-amber">
+        <div class="dot"></div>
+        <div class="big">该你了</div>
+        <div class="mean">去确认，或正在做</div>
+        <div class="nm"><span>待确认</span><span>生成中</span></div>
+      </div>
+      <div class="light l-orange">
+        <div class="dot"></div>
+        <div class="big">要重做</div>
+        <div class="mean">上游改了，重生一下</div>
+        <div class="nm"><span>待重生</span></div>
+      </div>
+      <div class="light l-red">
+        <div class="dot"></div>
+        <div class="big">出岔了</div>
+        <div class="mean">点一下，重试就行</div>
+        <div class="nm"><span>失败重试</span></div>
+      </div>
+    </div>
+
+    <!-- 记住这几点 -->
+    <div class="seclabel">
+      <span class="pip"></span><span class="k">记住这几点</span><span class="meta">就够用</span><span class="ln"></span>
+    </div>
+    <div class="remember">
+      <div class="mem glass">
+        <span class="mi">🛡️</span>
+        <div class="mc">
+          <div class="mk">审核闸门</div>
+          <div class="md">批量生成前先问你，<b>确认生成</b> 放行 / <b>先不生成</b> 拦。</div>
+        </div>
+      </div>
+      <div class="mem glass">
+        <span class="mi">↩️</span>
+        <div class="mc">
+          <div class="mk">随时回头改</div>
+          <div class="md">任意节点 <b>↻ 重生</b>，旧版能 <b>↩ 回滚到此版</b>，不丢。</div>
+        </div>
+      </div>
+      <div class="mem glass">
+        <span class="mi">⏳</span>
+        <div class="mc">
+          <div class="mk">异步生成</div>
+          <div class="md">图片快、视频几分钟；等不及点 <b>✕ 取消</b>。</div>
+        </div>
+      </div>
+      <div class="mem glass">
+        <span class="mi">♻️</span>
+        <div class="mc">
+          <div class="mk">素材复用</div>
+          <div class="md">右侧「你之前用过的」角色 / 场景，点一下直接用。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="access">
+    <div class="ax-text">
+      <span class="ax-lead">🔗 扫码 / 点开，立即体验</span>
+      <span class="ax-url">https://cascade.herwin.top</span>
+      <span class="ax-code">邀请码 <b>cascade</b></span>
+    </div>
+    <div class="ax-qr">
+      <div class="ax-qrbox">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29" shape-rendering="crispEdges"><path stroke="#15171a" d="M2 2.5h7m3 0h2m4 0h1m1 0h7M2 3.5h1m5 0h1m2 0h1m1 0h1m2 0h2m2 0h1m5 0h1M2 4.5h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h2m2 0h1m1 0h3m1 0h1M2 5.5h1m1 0h3m1 0h1m1 0h3m2 0h2m3 0h1m1 0h3m1 0h1M2 6.5h1m1 0h3m1 0h1m1 0h4m2 0h1m1 0h1m1 0h1m1 0h3m1 0h1M2 7.5h1m5 0h1m1 0h4m1 0h1m1 0h1m2 0h1m5 0h1M2 8.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M10 9.5h4m4 0h1M2 10.5h1m1 0h5m2 0h1m1 0h1m1 0h2m3 0h5M5 11.5h1m1 0h1m2 0h1m5 0h1m4 0h1m3 0h1M3 12.5h1m2 0h4m2 0h7m1 0h4m1 0h2M4 13.5h2m4 0h1m5 0h5m5 0h1M2 14.5h2m4 0h5m1 0h4m1 0h2m1 0h1m1 0h3M2 15.5h4m1 0h1m1 0h2m1 0h1m1 0h2m2 0h2m1 0h1m1 0h1m1 0h1M2 16.5h1m3 0h1m1 0h1m5 0h1m2 0h1m2 0h4m1 0h2M2 17.5h1m1 0h2m8 0h1m1 0h4m1 0h2m3 0h1M2 18.5h1m1 0h1m2 0h2m1 0h1m1 0h1m2 0h8m1 0h1M10 19.5h1m2 0h1m1 0h1m1 0h2m3 0h2M2 20.5h7m6 0h2m1 0h1m1 0h1m1 0h1m1 0h3M2 21.5h1m5 0h1m1 0h4m4 0h1m3 0h2M2 22.5h1m1 0h3m1 0h1m1 0h2m1 0h3m1 0h6m1 0h1M2 23.5h1m1 0h3m1 0h1m1 0h1m1 0h2m1 0h1m3 0h2m1 0h5M2 24.5h1m1 0h3m1 0h1m1 0h2m2 0h4m5 0h2m1 0h1M2 25.5h1m5 0h1m3 0h1m4 0h2m1 0h4m2 0h1M2 26.5h7m1 0h1m1 0h1m2 0h2m2 0h1m1 0h6"/></svg>
+      </div>
+      <span class="ax-qrcap">扫码直达</span>
+    </div>
+  </div>
+  <div class="foot">
+    <span class="warm">慢慢来，每步都有导演陪你，做错也能回头改 <span class="au">✦</span></span>
+    <span class="ref">Cascade 内测 · 一页纸上手卡<br>配套 <b>《用户手册》</b> 详读每个按钮</span>
+  </div>
+
+  </div><!-- /content -->
+</div>
+</body>
+</html>

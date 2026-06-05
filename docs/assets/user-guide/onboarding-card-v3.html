@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cascade · 一页纸上手卡 v3</title>
+<style>
+  :root{
+    /* warm-dark base */
+    --bg0:#160f0b;        /* page outer */
+    --espresso:#1a1310;   /* deepest card */
+    --coffee:#241a15;     /* card base */
+    --coffee2:#2a1d16;    /* card lighter */
+    --mocha:#33231a;      /* raised */
+    /* warm text */
+    --cream:#f5ede4;      /* primary text (warm white) */
+    --sand:#e7d9c8;       /* secondary */
+    --taupe:#c9b6a3;      /* tertiary */
+    --faint:#9a8674;      /* faint label */
+    /* brand glow */
+    --orange:#ea580c;
+    --orange-lite:#fb7c3a;
+    --amber:#f59e0b;
+    --gold:#fbbf24;
+    --clay:#9a3412;
+    /* semantic on dark */
+    --g-green:#34d399;
+    --g-red:#fb7185;
+    /* hairlines */
+    --line:rgba(245,158,11,0.14);
+    --line2:rgba(245,158,11,0.08);
+    --serif:"Source Han Serif SC","Noto Serif SC","Songti SC","STSong",serif;
+    --sans:-apple-system,"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei",system-ui,sans-serif;
+    --r:18px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{
+    background:#0c0907;font-family:var(--sans);color:var(--cream);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+    font-feature-settings:"ss01","cv11";letter-spacing:-0.006em
+  }
+  .page{
+    width:880px;margin:26px auto;position:relative;overflow:hidden;
+    border-radius:28px;
+    background:
+      radial-gradient(120% 80% at 88% -8%, rgba(245,158,11,0.16) 0%, rgba(245,158,11,0) 42%),
+      radial-gradient(90% 70% at 6% 4%, rgba(234,88,12,0.14) 0%, rgba(234,88,12,0) 40%),
+      radial-gradient(130% 90% at 50% 118%, rgba(154,52,18,0.22) 0%, rgba(154,52,18,0) 52%),
+      linear-gradient(165deg,#1c1410 0%, var(--bg0) 55%, #120c09 100%);
+    border:1px solid rgba(245,158,11,0.16);
+    box-shadow:0 50px 120px -40px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,0,0,0.4) inset;
+  }
+  /* faint warm tech grid */
+  .page::before{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.5;
+    background-image:
+      linear-gradient(rgba(245,158,11,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245,158,11,0.035) 1px, transparent 1px);
+    background-size:34px 34px;
+    -webkit-mask-image:radial-gradient(120% 90% at 50% 0%, #000 30%, transparent 78%);
+            mask-image:radial-gradient(120% 90% at 50% 0%, #000 30%, transparent 78%);
+  }
+  .page > *{position:relative;z-index:1}
+
+  /* ============ HERO ============ */
+  .hero{padding:38px 46px 30px;position:relative}
+  /* glowing top hairline */
+  .hero::before{
+    content:"";position:absolute;top:0;left:46px;right:46px;height:2px;border-radius:2px;
+    background:linear-gradient(90deg, transparent, var(--orange) 18%, var(--amber) 52%, var(--gold) 78%, transparent);
+    box-shadow:0 0 18px rgba(245,158,11,0.55);opacity:.9
+  }
+  .toprow{display:flex;justify-content:space-between;align-items:flex-start}
+  .wordmark{
+    font-family:var(--serif);font-size:46px;font-weight:700;line-height:1;letter-spacing:-0.02em;
+    background:linear-gradient(180deg,#fff4e6 0%, #f7d9a8 55%, #f0b86a 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 22px rgba(245,158,11,0.45))
+  }
+  .wordmark .dot{
+    background:linear-gradient(180deg,#fbbf24,#ea580c);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 14px rgba(234,88,12,0.7))
+  }
+  .tagline{margin-top:12px;font-size:14px;font-weight:700;letter-spacing:0.04em;color:var(--gold)}
+  .tagline i{font-style:normal;color:var(--faint);margin:0 8px;font-weight:400}
+  .pill{
+    font-size:11px;font-weight:800;letter-spacing:0.14em;color:var(--gold);white-space:nowrap;
+    background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.34);
+    padding:7px 14px;border-radius:999px;
+    box-shadow:0 0 16px rgba(245,158,11,0.18) inset
+  }
+  .oneliner{margin-top:20px;font-size:14.5px;line-height:1.78;color:var(--sand);max-width:740px;font-weight:500}
+  .oneliner b{color:#fff6ea;font-weight:800;text-shadow:0 0 14px rgba(245,158,11,0.45)}
+  .youknow{margin-top:16px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:var(--taupe);font-weight:600}
+  .youknow .lead{color:var(--faint)}
+  .youknow span{
+    background:rgba(245,158,11,0.07);border:1px solid var(--line);
+    padding:5px 12px;border-radius:999px;color:var(--sand)
+  }
+
+  /* ============ BODY ============ */
+  .body{padding:6px 46px 14px}
+  .seclabel{display:flex;align-items:center;gap:11px;margin:26px 0 16px}
+  .seclabel .pip{
+    width:9px;height:9px;border-radius:2px;transform:rotate(45deg);flex-shrink:0;
+    background:linear-gradient(135deg,#fbbf24,#ea580c);
+    box-shadow:0 0 12px rgba(245,158,11,0.7)
+  }
+  .seclabel .k{font-family:var(--serif);font-size:19px;font-weight:700;color:var(--cream)}
+  .seclabel .meta{
+    font-size:11px;font-weight:800;color:var(--gold);letter-spacing:0.04em;
+    background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.28);
+    padding:3px 11px;border-radius:999px
+  }
+  .seclabel .ln{flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+
+  /* glass card base */
+  .glass{
+    background:linear-gradient(180deg, rgba(255,233,205,0.045), rgba(255,233,205,0.012));
+    border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:0 18px 40px -28px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.04) inset;
+  }
+
+  /* 3 steps */
+  .steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  .step{position:relative;padding:20px 18px 19px 20px;overflow:hidden}
+  /* left glow accent bar — ties step cards to the brand rail */
+  .step::before{
+    content:"";position:absolute;left:0;top:16px;bottom:16px;width:3px;border-radius:3px;z-index:2;
+    background:linear-gradient(180deg,#fbbf24,#ea580c);
+    box-shadow:0 0 12px rgba(245,158,11,0.5)
+  }
+  .step .bignum{
+    font-family:var(--serif);font-weight:700;font-size:92px;line-height:.78;
+    color:transparent;-webkit-text-stroke:1.3px rgba(245,158,11,0.26);
+    position:absolute;top:-8px;right:6px;z-index:0;letter-spacing:-0.05em;
+  }
+  .step .tag{
+    position:relative;z-index:1;display:inline-flex;align-items:center;gap:6px;
+    font-size:11px;font-weight:800;color:#1a1310;letter-spacing:0.02em;margin-bottom:13px;
+    padding:5px 12px 5px 10px;border-radius:999px;
+    background:linear-gradient(135deg,#fbbf24,#f59e0b);
+    box-shadow:0 0 18px rgba(245,158,11,0.35)
+  }
+  .step .tag .e{font-size:13px}
+  .step .st{position:relative;z-index:1;font-size:16px;font-weight:800;color:var(--cream);margin-bottom:7px;letter-spacing:-0.01em}
+  .step .sd{position:relative;z-index:1;font-size:12.5px;line-height:1.66;color:var(--sand)}
+  .step .sd b{color:var(--gold);font-weight:800;white-space:nowrap}
+  .step.arrow::after{
+    content:"›";position:absolute;right:-21px;top:50%;z-index:6;transform:translateY(-54%);
+    font-size:28px;font-weight:900;color:var(--amber);line-height:1;
+    text-shadow:0 0 12px rgba(245,158,11,0.6)
+  }
+
+  /* 6-step glow rail */
+  .railwrap{padding:24px 26px 20px;position:relative;overflow:hidden}
+  .rail{display:flex;align-items:flex-start;justify-content:space-between;position:relative}
+  .rstep{display:flex;flex-direction:column;align-items:center;gap:10px;flex:1;position:relative;z-index:2}
+  .rstep .conn{
+    position:absolute;top:21px;left:calc(50% + 24px);width:calc(100% - 48px);height:2.5px;border-radius:3px;z-index:1;
+    box-shadow:0 0 10px rgba(245,158,11,0.35)
+  }
+  .rstep:last-child .conn{display:none}
+  .rstep .rc{
+    width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--serif);font-size:17px;font-weight:700;color:#fff7ec;position:relative;z-index:2;
+    transform:rotate(-45deg);
+    border:1px solid rgba(255,255,255,0.16);
+  }
+  .rstep .rc span{transform:rotate(45deg)}
+  .rstep .rl{font-size:13.5px;font-weight:800;color:var(--cream);letter-spacing:-0.01em}
+  .rstep .rsub{font-size:10.5px;color:var(--taupe);text-align:center;line-height:1.42;font-weight:600}
+  .legend{
+    margin-top:18px;padding-top:15px;border-top:1px dashed var(--line2);
+    display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:11.5px;color:var(--sand);font-weight:600
+  }
+  .legend .lead{color:var(--gold);font-weight:800}
+  .legend i{font-style:normal;display:inline-flex;align-items:center;gap:7px}
+  .legend .dt{width:11px;height:11px;border-radius:4px}
+
+  /* split: chips + tips */
+  .split{display:grid;grid-template-columns:0.94fr 1.06fr;gap:18px;align-items:stretch}
+  .panel{padding:20px 20px 18px}
+  .panel .pt{font-family:var(--serif);font-size:15.5px;font-weight:700;color:var(--cream);margin-bottom:3px}
+  .panel .ps{font-size:11px;color:var(--faint);margin-bottom:15px;font-weight:600}
+  .chips{display:flex;flex-wrap:wrap;gap:9px}
+  .chip{
+    font-size:12px;font-weight:800;padding:7px 13px;border-radius:11px;
+    display:inline-flex;align-items:center;gap:5px;letter-spacing:-0.005em
+  }
+  .c-amber{color:var(--gold);background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.34);box-shadow:0 0 14px rgba(245,158,11,0.14)}
+  .c-green{color:var(--g-green);background:rgba(52,211,153,0.10);border:1px solid rgba(52,211,153,0.30)}
+  .c-red{color:var(--g-red);background:rgba(251,113,133,0.10);border:1px solid rgba(251,113,133,0.30)}
+  .chipnote{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line2);display:flex;flex-direction:column;gap:9px}
+  .chipnote .row{display:flex;gap:9px;align-items:baseline;font-size:11.5px;line-height:1.5;color:var(--sand);font-weight:600}
+  .chipnote .row .sw{flex-shrink:0;font-weight:800}
+  .chipnote .row .sw.a{color:var(--gold)}
+  .chipnote .row .sw.g{color:var(--g-green)}
+  .chipnote .row .sw.r{color:var(--g-red)}
+
+  .tips{display:flex;flex-direction:column;gap:14px}
+  .tip{display:flex;gap:12px;align-items:flex-start}
+  .tip .ti{
+    flex-shrink:0;width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+    font-size:16px;background:rgba(245,158,11,0.10);border:1px solid var(--line)
+  }
+  .tip .tt{font-size:12px;line-height:1.62;color:var(--sand);padding-top:1px}
+  .tip .tt b{color:var(--gold);font-weight:800}
+
+  /* access bar */
+  .access{
+    margin:22px 0 0;padding:15px 46px;
+    background:linear-gradient(180deg, rgba(245,158,11,0.08), rgba(0,0,0,0.16));
+    border-top:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap
+  }
+  .access .ax-lead{font-size:12.5px;font-weight:800;color:var(--amber)}
+  .access .ax-url{font-size:18px;font-weight:900;letter-spacing:0.01em;color:var(--gold);
+    text-shadow:0 0 16px rgba(251,191,36,0.45)}
+  .access .ax-code{font-size:12.5px;font-weight:700;color:var(--sand)}
+  .access .ax-code b{color:var(--gold);font-weight:900}
+  /* footer */
+  .foot{
+    margin:0;padding:20px 46px;
+    background:linear-gradient(180deg, rgba(245,158,11,0.05), rgba(0,0,0,0.18));
+    border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;gap:16px
+  }
+  .foot .warm{font-family:var(--serif);font-size:14.5px;color:var(--gold);font-weight:700;text-shadow:0 0 16px rgba(245,158,11,0.3)}
+  .foot .ref{font-size:11px;color:var(--taupe);font-weight:600;text-align:right;line-height:1.55}
+  .foot .ref b{color:var(--cream)}
+
+  @media print{
+    html,body{background:#0c0907}
+    .page{margin:0;box-shadow:none;border-radius:0;width:100%;border:none}
+    @page{size:A4;margin:8mm}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="toprow">
+      <div class="brand">
+        <div class="wordmark">Cascade<span class="dot">.</span></div>
+        <div class="tagline">拆爆款<i>·</i>改成你的<i>·</i>一键出片</div>
+      </div>
+      <div class="pill">内测上手卡 · v3</div>
+    </div>
+    <p class="oneliner">
+      把一条<b>爆款短视频拆开</b> → 看懂为什么火 → <b>改成你自己的版本</b> → <b>一键生成你的短片</b>，
+      全程有 AI「导演」陪你做。
+    </p>
+    <div class="youknow">
+      <span class="lead">你只要会：</span>
+      <span>刷抖音</span><span>复制链接</span><span>说一句「我想做支这样的视频」</span>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- 3 步出片 -->
+    <div class="seclabel">
+      <span class="pip"></span><span class="k">最短路径</span><span class="meta">3 步出片</span><span class="ln"></span>
+    </div>
+    <div class="steps">
+      <div class="step glass arrow">
+        <div class="bignum">1</div>
+        <div class="tag"><span class="e">🔗</span>拆一条爆款</div>
+        <div class="st">粘链接 → 拆解</div>
+        <div class="sd">粘抖音链接、或点落地页案例，点<b>「拆解」</b>，约 1 分钟出「爆点分析」。</div>
+      </div>
+      <div class="step glass arrow">
+        <div class="bignum">2</div>
+        <div class="tag"><span class="e">🎬</span>做我的版本</div>
+        <div class="st">告诉导演</div>
+        <div class="sd">点<b>「在画布上做我的版本」</b>，再点<b>「告诉导演你想做什么」</b>，大白话说创意。</div>
+      </div>
+      <div class="step glass">
+        <div class="bignum">3</div>
+        <div class="tag"><span class="e">📋</span>确认 · 生成 · 发</div>
+        <div class="st">逐节点出片</div>
+        <div class="sd">逐节点<b>「✓ 确认」「⚡ 生成」「🎬 合成」</b>，成片后<b>「一键复制，去发」</b>。</div>
+      </div>
+    </div>
+
+    <!-- 6 步创作流 -->
+    <div class="seclabel">
+      <span class="pip"></span><span class="k">导演帮你搭的创作流</span><span class="meta">6 步</span><span class="ln"></span>
+    </div>
+    <div class="railwrap glass">
+      <div class="rail">
+        <div class="rstep"><div class="conn" style="background:linear-gradient(90deg,#9a3412,#c2410c)"></div><div class="rc" style="background:linear-gradient(135deg,#7c2d12,#9a3412);box-shadow:0 0 18px rgba(154,52,18,0.5)"><span>1</span></div><div class="rl">策划书</div><div class="rsub">为什么火<br>+ 改成你的</div></div>
+        <div class="rstep"><div class="conn" style="background:linear-gradient(90deg,#c2410c,#ea580c)"></div><div class="rc" style="background:linear-gradient(135deg,#9a3412,#c2410c);box-shadow:0 0 18px rgba(194,65,12,0.5)"><span>2</span></div><div class="rl">角色</div><div class="rsub">定主角形象</div></div>
+        <div class="rstep"><div class="conn" style="background:linear-gradient(90deg,#ea580c,#f97316)"></div><div class="rc" style="background:linear-gradient(135deg,#c2410c,#ea580c);box-shadow:0 0 20px rgba(234,88,12,0.55)"><span>3</span></div><div class="rl">场景</div><div class="rsub">定拍摄场景</div></div>
+        <div class="rstep"><div class="conn" style="background:linear-gradient(90deg,#f97316,#f59e0b)"></div><div class="rc" style="background:linear-gradient(135deg,#ea580c,#f59e0b);box-shadow:0 0 20px rgba(245,131,11,0.55)"><span>4</span></div><div class="rl">分镜</div><div class="rsub">每镜的画面</div></div>
+        <div class="rstep"><div class="conn" style="background:linear-gradient(90deg,#f59e0b,#fbbf24)"></div><div class="rc" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);box-shadow:0 0 22px rgba(251,191,36,0.55)"><span>5</span></div><div class="rl">视频</div><div class="rsub">逐镜出短片</div></div>
+        <div class="rstep"><div class="rc" style="background:linear-gradient(135deg,#fbbf24,#fcd34d);box-shadow:0 0 22px rgba(252,211,77,0.55)"><span>6</span></div><div class="rl">合成</div><div class="rsub">拼成整片</div></div>
+      </div>
+      <div class="legend">
+        <span class="lead">画布顶部这条进度条 →</span>
+        <i><span class="dt" style="background:#34d399"></span><b style="color:#34d399">✓ 绿＝做完</b></i>
+        <i><span class="dt" style="background:#ea580c"></span><b style="color:#fb7c3a">● 陶土／暖色＝正在做</b></i>
+        <i><span class="dt" style="background:#6b5d50"></span>○ 灰＝没开始</i>
+      </div>
+    </div>
+
+    <!-- chips + tips -->
+    <div class="seclabel">
+      <span class="pip"></span><span class="k">看懂状态 · 记住这几点</span><span class="ln"></span>
+    </div>
+    <div class="split">
+      <div class="panel glass">
+        <div class="pt">节点状态芯片</div>
+        <div class="ps">一眼看懂每个节点走到哪</div>
+        <div class="chips">
+          <span class="chip c-amber">● 待确认</span>
+          <span class="chip c-amber">生成中</span>
+          <span class="chip c-green">✓ 已确认</span>
+          <span class="chip c-green">已生成</span>
+          <span class="chip c-red">✕ 失败重试</span>
+          <span class="chip c-amber">⚠ 待重生</span>
+        </div>
+        <div class="chipnote">
+          <div class="row"><span class="sw a">琥珀＝</span><span>该你出手：去「✓ 确认」或「⚡ 生成」</span></div>
+          <div class="row"><span class="sw g">绿色＝</span><span>这一步妥了，可以往下走</span></div>
+          <div class="row"><span class="sw r">红色＝</span><span>出岔子了，点一下重试就行</span></div>
+        </div>
+      </div>
+      <div class="panel glass">
+        <div class="tips">
+          <div class="tip"><span class="ti">🛡️</span><span class="tt"><b>审核闸门</b>：导演自动批量生成会弹卡问你，「确认生成」放行 /「先不生成」拦住；自己点生成则直接执行。</span></div>
+          <div class="tip"><span class="ti">↩️</span><span class="tt"><b>随时回头改</b>：任意节点「↻ 重生」，下游自动标「待重生」；版本历史能对比、能「回滚到此版」，旧版不丢。</span></div>
+          <div class="tip"><span class="ti">⏳</span><span class="tt"><b>生成是异步的</b>：点完先变「生成中」，图片快、视频几分钟；等不及点「✕ 取消」。</span></div>
+          <div class="tip"><span class="ti">♻️</span><span class="tt"><b>素材能复用</b>：右侧「你之前用过的」里的角色/场景点一下直接复用。</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="access">
+    <span class="ax-lead">🔗 立即体验</span>
+    <span class="ax-url">https://cascade.herwin.top</span>
+    <span class="ax-code">邀请码 <b>cascade</b></span>
+  </div>
+  <div class="foot">
+    <span class="warm">慢慢来，每步都有导演陪你，做错也能回头改 <span style="color:#fbbf24;text-shadow:0 0 12px rgba(251,191,36,0.8)">✦</span></span>
+    <span class="ref">Cascade 内测 · 一页纸上手卡<br>配套 <b>《用户手册》</b> 详读每个按钮</span>
+  </div>
+</div>
+</body>
+</html>
