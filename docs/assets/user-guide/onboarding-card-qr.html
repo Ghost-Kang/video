@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cascade · 一页纸上手卡</title>
+<style>
+  :root{
+    --paper:#faf8f3; --ink:#1c1917; --clay:#7c2d12; --rust:#9a3412;
+    --orange:#ea580c; --amber:#f59e0b; --sand:#d4a574; --green:#15803d;
+    --line:rgba(124,45,18,0.14); --muted:#78716c;
+    --serif:"Source Han Serif SC","Noto Serif SC","Songti SC","STSong",serif;
+    --sans:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#e9e3d8;font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .page{
+    width:820px;margin:24px auto;background:var(--paper);
+    border-radius:22px;overflow:hidden;position:relative;
+    box-shadow:0 30px 80px -30px rgba(124,45,18,0.35);
+  }
+  /* warm aurora header */
+  .hero{
+    position:relative;padding:34px 44px 28px;overflow:hidden;
+    background:
+      radial-gradient(120% 140% at 0% 0%, rgba(234,88,12,0.14) 0%, rgba(234,88,12,0) 55%),
+      radial-gradient(120% 140% at 100% 0%, rgba(124,45,18,0.12) 0%, rgba(124,45,18,0) 55%),
+      linear-gradient(180deg,#fffdf9 0%, var(--paper) 100%);
+    border-bottom:1px solid var(--line);
+  }
+  .brandrow{display:flex;align-items:baseline;gap:14px}
+  .wordmark{font-family:var(--serif);font-size:34px;font-weight:600;color:var(--clay);letter-spacing:-0.02em}
+  .wordmark .dot{color:var(--orange)}
+  .tagline{font-size:13px;color:var(--rust);font-weight:600;letter-spacing:0.04em}
+  .oneliner{margin-top:12px;font-size:14.5px;line-height:1.7;color:#44403c;max-width:660px}
+  .oneliner b{color:var(--clay)}
+  .badge{
+    position:absolute;top:30px;right:40px;font-size:11px;font-weight:700;letter-spacing:0.08em;
+    color:var(--clay);background:rgba(255,255,255,0.7);border:1px solid var(--line);
+    padding:6px 12px;border-radius:999px;backdrop-filter:blur(6px)
+  }
+  .body{padding:26px 44px 30px}
+  .h{font-family:var(--serif);font-size:18px;color:var(--clay);font-weight:600;margin:0 0 14px;display:flex;align-items:center;gap:9px}
+  .h .pip{width:8px;height:8px;border-radius:2px;background:var(--orange);transform:rotate(45deg)}
+  /* 3-step happy path */
+  .steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  .step{
+    position:relative;background:rgba(255,255,255,0.72);border:1px solid var(--line);border-radius:16px;
+    padding:16px 16px 18px;box-shadow:0 8px 24px -16px rgba(124,45,18,0.4)
+  }
+  .step .num{
+    font-family:var(--serif);font-size:13px;font-weight:700;color:#fff;background:var(--clay);
+    width:24px;height:24px;border-radius:999px;display:flex;align-items:center;justify-content:center;margin-bottom:10px
+  }
+  .step .icon{font-size:20px;margin-bottom:6px}
+  .step .st{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:5px}
+  .step .sd{font-size:12px;line-height:1.6;color:var(--muted)}
+  .step .sd b{color:var(--rust)}
+  .step.arrow::after{content:"→";position:absolute;right:-12px;top:50%;transform:translateY(-50%);color:rgba(124,45,18,0.4);font-size:16px;z-index:2}
+  /* 6-step rail */
+  .rail{display:flex;align-items:center;justify-content:space-between;margin-top:6px;padding:4px 2px}
+  .rstep{display:flex;flex-direction:column;align-items:center;gap:7px;flex:1;position:relative}
+  .rstep .rc{
+    width:34px;height:34px;border-radius:999px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--serif);font-size:14px;font-weight:700;color:#fff;z-index:2
+  }
+  .rstep .rl{font-size:12px;font-weight:600;color:var(--clay)}
+  .rstep .rsub{font-size:10.5px;color:var(--muted);text-align:center;line-height:1.4}
+  .rail .rline{position:absolute;top:17px;left:50%;width:100%;height:2px;background:var(--line);z-index:1}
+  .rstep:last-child .rline{display:none}
+  /* tips */
+  .tips{display:grid;grid-template-columns:1fr 1fr;gap:12px 22px;margin-top:4px}
+  .tip{display:flex;gap:10px;align-items:flex-start}
+  .tip .ti{font-size:15px;line-height:1.2;flex-shrink:0;margin-top:1px}
+  .tip .tt{font-size:12.5px;line-height:1.6;color:#44403c}
+  .tip .tt b{color:var(--clay)}
+  .sec{margin-top:24px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:2px}
+  .chip{font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;border:1px solid transparent}
+  .c-clay{color:var(--clay);background:rgba(124,45,18,0.08)}
+  .c-amber{color:#b45309;background:rgba(180,83,9,0.10)}
+  .c-green{color:var(--green);background:rgba(21,128,61,0.10)}
+  .c-red{color:#b91c1c;background:rgba(185,28,28,0.09)}
+  .access{
+    margin-top:24px;padding:16px 22px;border-radius:14px;min-height:118px;
+    background:linear-gradient(180deg, rgba(234,88,12,0.08), rgba(124,45,18,0.05));
+    border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;gap:22px
+  }
+  .access .ax-text{display:flex;flex-direction:column;gap:7px;min-width:0}
+  .access .ax-lead{font-size:13px;font-weight:700;color:var(--clay)}
+  .access .ax-url{font-size:21px;font-weight:800;color:var(--orange);letter-spacing:0.005em;line-height:1.1}
+  .access .ax-code{font-size:13px;font-weight:600;color:#57534e}
+  .access .ax-code b{color:var(--clay);font-weight:800}
+  .access .ax-qr{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0}
+  .access .ax-qrbox{
+    width:104px;height:104px;background:#fff;border-radius:13px;padding:10px;
+    box-shadow:0 6px 18px -8px rgba(124,45,18,0.4), 0 0 0 1px var(--line);
+    display:flex;align-items:center;justify-content:center
+  }
+  .access .ax-qrbox svg{width:100%;height:100%;display:block;shape-rendering:crispEdges}
+  .access .ax-qrcap{font-size:11px;font-weight:700;color:var(--clay);letter-spacing:0.02em}
+  .foot{
+    margin-top:18px;padding-top:16px;border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted)
+  }
+  .foot .warm{color:var(--rust);font-weight:600}
+  @media print{
+    html,body{background:#fff}
+    .page{margin:0;box-shadow:none;border-radius:0;width:100%}
+    @page{size:A4;margin:10mm}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="hero">
+    <div class="badge">内测上手卡 · v1</div>
+    <div class="brandrow">
+      <div class="wordmark">Cascade<span class="dot">.</span></div>
+      <div class="tagline">拆爆款 · 改成你的 · 一键出片</div>
+    </div>
+    <p class="oneliner">
+      把一条<b>爆款短视频拆开</b>，看懂它为什么火，<b>改成你自己的版本</b>，再<b>一键生成你的短片</b>——
+      全程有一个 AI「导演」陪你做。你只要会刷抖音、会复制链接、会说一句「我想做支这样的视频」。
+    </p>
+  </div>
+
+  <div class="body">
+    <!-- 3 步出片 -->
+    <h2 class="h"><span class="pip"></span>最短路径 · 3 步出片</h2>
+    <div class="steps">
+      <div class="step arrow">
+        <div class="num">1</div><div class="icon">🔗</div>
+        <div class="st">拆一条爆款</div>
+        <div class="sd">粘抖音链接、或点落地页案例 → 点<b>「拆解」</b>，约 1 分钟出「爆点分析」。</div>
+      </div>
+      <div class="step arrow">
+        <div class="num">2</div><div class="icon">🎬</div>
+        <div class="st">做我的版本</div>
+        <div class="sd">点<b>「在画布上做我的版本」</b>，再点<b>「告诉导演你想做什么」</b>，用大白话说创意。</div>
+      </div>
+      <div class="step">
+        <div class="num">3</div><div class="icon">📋</div>
+        <div class="st">确认 · 生成 · 发</div>
+        <div class="sd">逐节点<b>「✓ 确认」「⚡ 生成」「🎬 合成」</b>，成片后<b>「一键复制，去发」</b>。</div>
+      </div>
+    </div>
+
+    <!-- 6 步创作流 -->
+    <h2 class="h" style="margin-top:26px"><span class="pip"></span>导演帮你搭的 6 步创作流</h2>
+    <div class="rail">
+      <div class="rstep"><span class="rline"></span><span class="rc" style="background:var(--clay)">1</span><span class="rl">策划书</span><span class="rsub">为什么火<br>+改成你的</span></div>
+      <div class="rstep"><span class="rline"></span><span class="rc" style="background:var(--orange)">2</span><span class="rl">角色</span><span class="rsub">定主角形象</span></div>
+      <div class="rstep"><span class="rline"></span><span class="rc" style="background:var(--orange)">3</span><span class="rl">场景</span><span class="rsub">定拍摄场景</span></div>
+      <div class="rstep"><span class="rline"></span><span class="rc" style="background:var(--orange)">4</span><span class="rl">分镜</span><span class="rsub">每镜的画面</span></div>
+      <div class="rstep"><span class="rline"></span><span class="rc" style="background:var(--amber)">5</span><span class="rl">视频</span><span class="rsub">逐镜出短片</span></div>
+      <div class="rstep"><span class="rc" style="background:var(--sand)">6</span><span class="rl">合成</span><span class="rsub">拼成整片</span></div>
+    </div>
+    <p style="font-size:11.5px;color:var(--muted);margin-top:12px;line-height:1.6">
+      画布顶部有这条进度条，<b style="color:var(--green)">✓ 绿=做完</b>、<b style="color:var(--clay)">● 陶土=正在做</b>、○ 灰=还没开始，一眼知道走到哪。
+    </p>
+
+    <!-- 看懂状态芯片 -->
+    <div class="sec">
+      <h2 class="h"><span class="pip"></span>节点上的状态芯片(一眼看懂)</h2>
+      <div class="chips">
+        <span class="chip c-amber">● 待确认</span>
+        <span class="chip c-amber">生成中</span>
+        <span class="chip c-green">✓ 已确认</span>
+        <span class="chip c-green">已生成</span>
+        <span class="chip c-red">✕ 失败重试</span>
+        <span class="chip c-amber">⚠ 待重生</span>
+      </div>
+    </div>
+
+    <!-- 记住这几点 -->
+    <div class="sec">
+      <h2 class="h"><span class="pip"></span>记住这几点</h2>
+      <div class="tips">
+        <div class="tip"><span class="ti">🛡️</span><span class="tt"><b>审核闸门</b>：导演要自动批量生成时会弹卡问你，点「确认生成」放行或「先不生成」拦住——你自己点生成则直接执行。</span></div>
+        <div class="tip"><span class="ti">↩️</span><span class="tt"><b>随时回头改</b>：任意节点点「↻ 重生」可重做，下游自动标「待重生」；版本历史里能对比、能「回滚到此版」，旧版不会丢。</span></div>
+        <div class="tip"><span class="ti">⏳</span><span class="tt"><b>生成是异步的</b>：点完先变「生成中」，图片快、视频要几分钟；等不及可点「✕ 取消」。</span></div>
+        <div class="tip"><span class="ti">♻️</span><span class="tt"><b>素材能复用</b>：右侧「你之前用过的」里有你的角色/场景，点一下直接复用，省得重做。</span></div>
+      </div>
+    </div>
+
+    <div class="access">
+      <div class="ax-text">
+        <span class="ax-lead">🔗 扫码 / 点开，立即体验</span>
+        <span class="ax-url">https://cascade.herwin.top</span>
+        <span class="ax-code">邀请码 <b>cascade</b></span>
+      </div>
+      <div class="ax-qr">
+        <div class="ax-qrbox">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29" shape-rendering="crispEdges"><path stroke="#15171a" d="M2 2.5h7m3 0h2m4 0h1m1 0h7M2 3.5h1m5 0h1m2 0h1m1 0h1m2 0h2m2 0h1m5 0h1M2 4.5h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h2m2 0h1m1 0h3m1 0h1M2 5.5h1m1 0h3m1 0h1m1 0h3m2 0h2m3 0h1m1 0h3m1 0h1M2 6.5h1m1 0h3m1 0h1m1 0h4m2 0h1m1 0h1m1 0h1m1 0h3m1 0h1M2 7.5h1m5 0h1m1 0h4m1 0h1m1 0h1m2 0h1m5 0h1M2 8.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M10 9.5h4m4 0h1M2 10.5h1m1 0h5m2 0h1m1 0h1m1 0h2m3 0h5M5 11.5h1m1 0h1m2 0h1m5 0h1m4 0h1m3 0h1M3 12.5h1m2 0h4m2 0h7m1 0h4m1 0h2M4 13.5h2m4 0h1m5 0h5m5 0h1M2 14.5h2m4 0h5m1 0h4m1 0h2m1 0h1m1 0h3M2 15.5h4m1 0h1m1 0h2m1 0h1m1 0h2m2 0h2m1 0h1m1 0h1m1 0h1M2 16.5h1m3 0h1m1 0h1m5 0h1m2 0h1m2 0h4m1 0h2M2 17.5h1m1 0h2m8 0h1m1 0h4m1 0h2m3 0h1M2 18.5h1m1 0h1m2 0h2m1 0h1m1 0h1m2 0h8m1 0h1M10 19.5h1m2 0h1m1 0h1m1 0h2m3 0h2M2 20.5h7m6 0h2m1 0h1m1 0h1m1 0h1m1 0h3M2 21.5h1m5 0h1m1 0h4m4 0h1m3 0h2M2 22.5h1m1 0h3m1 0h1m1 0h2m1 0h3m1 0h6m1 0h1M2 23.5h1m1 0h3m1 0h1m1 0h1m1 0h2m1 0h1m3 0h2m1 0h5M2 24.5h1m1 0h3m1 0h1m1 0h2m2 0h4m5 0h2m1 0h1M2 25.5h1m5 0h1m3 0h1m4 0h2m1 0h4m2 0h1M2 26.5h7m1 0h1m1 0h1m2 0h2m2 0h1m1 0h6"/></svg>
+        </div>
+        <span class="ax-qrcap">扫码直达</span>
+      </div>
+    </div>
+    <div class="foot">
+      <span>Cascade 内测 · 一页纸上手卡 · 配套《用户手册》详读每个按钮</span>
+      <span class="warm">慢慢来，每步都有导演陪你，做错也能回头改 ✦</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

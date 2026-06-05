@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cascade · 一页纸上手卡 v2</title>
+<style>
+  :root{
+    /* ===== fresh light paper ===== */
+    --paper:#fdfaf4;        /* warm cream page */
+    --paper2:#fff9f2;       /* lighter peach-cream card */
+    --paper3:#fffdf9;       /* near-white inner */
+    --wash:#f4ede0;         /* body backdrop */
+    /* ===== coral / peach primary ===== */
+    --coral:#fb7a59;        /* peach coral (brand point) */
+    --coral-lite:#ffa886;
+    --coral-deep:#ef5d3a;
+    --tang:#f97316;         /* vivid tangerine (used sparingly) */
+    --tang-deep:#e2630c;
+    /* ===== fresh mint accent — keeps it from going all-orange ===== */
+    --mint:#5ec4a0;         /* sage mint */
+    --mint-lite:#9fe0c8;
+    --mint-deep:#2f9d7b;
+    /* ===== ink on cream ===== */
+    --ink:#2a2420;          /* primary ink (warm near-black) */
+    --ink2:#5a4f47;         /* secondary */
+    --ink3:#8a7d72;         /* tertiary */
+    --faint:#a89c8f;        /* faint label */
+    --white:#ffffff;
+    /* ===== semantic (fresh pastels) ===== */
+    --s-green:#2f9d7b;      /* mint green = confirmed/done */
+    --s-amber:#e0a32a;      /* sunny amber = your move / in progress */
+    --s-orange:#f0813c;     /* soft orange = needs regen */
+    --s-red:#ed6a6a;        /* coral red = fail/retry */
+    /* ===== hairlines ===== */
+    --line:rgba(239,93,58,0.14);
+    --line2:rgba(42,36,32,0.08);
+    --serif:"Source Han Serif SC","Noto Serif SC","Songti SC","STSong",serif;
+    --sans:-apple-system,"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei",system-ui,sans-serif;
+    --r:26px;
+    --r2:20px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{
+    background:var(--wash);font-family:var(--sans);color:var(--ink);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+    font-feature-settings:"ss01","cv11";letter-spacing:-0.006em
+  }
+
+  /* ============ PAGE = bright cream sheet ============ */
+  .page{
+    width:880px;margin:26px auto;position:relative;overflow:hidden;
+    border-radius:34px;background:var(--paper);
+    box-shadow:0 44px 110px -42px rgba(239,93,58,0.34), 0 6px 18px -10px rgba(42,36,32,0.10);
+  }
+  /* soft sunrise glow top-right + a fresh mint wash bottom-left — light & airy */
+  .page::after{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+    background:
+      radial-gradient(58% 40% at 90% -8%, rgba(255,168,134,0.34) 0%, rgba(255,168,134,0) 56%),
+      radial-gradient(54% 42% at 4% 104%, rgba(94,196,160,0.20) 0%, rgba(94,196,160,0) 60%),
+      radial-gradient(40% 30% at 16% 30%, rgba(255,221,196,0.30) 0%, rgba(255,221,196,0) 60%);
+  }
+  /* faint paper grain */
+  .page::before{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:30;
+    background-image:radial-gradient(rgba(239,93,58,0.02) 1px, transparent 1px);
+    background-size:3px 3px;opacity:.5;
+  }
+  .content{position:relative;z-index:2}
+
+  /* ============ HERO ============ */
+  .hero{padding:46px 50px 28px;position:relative;z-index:2}
+  .toprow{display:flex;justify-content:space-between;align-items:flex-start}
+  .wordmark{
+    font-family:var(--sans);font-size:62px;font-weight:900;line-height:.92;letter-spacing:-0.03em;
+    background:linear-gradient(174deg,#ffb89a 0%, var(--coral) 44%, var(--coral-deep) 78%, var(--tang-deep) 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 3px 9px rgba(239,93,58,0.18));
+  }
+  .tagline{
+    margin-top:13px;font-size:16px;font-weight:800;letter-spacing:0.02em;color:var(--ink2);
+  }
+  .tagline i{font-style:normal;color:var(--mint-deep);margin:0 9px;font-weight:900}
+  .pill{
+    font-size:11px;font-weight:800;letter-spacing:0.14em;color:var(--coral-deep);white-space:nowrap;
+    background:linear-gradient(180deg, #ffffff, #fff3ea);
+    border:1px solid rgba(239,93,58,0.22);
+    padding:8px 15px;border-radius:999px;
+    box-shadow:0 6px 16px -10px rgba(239,93,58,0.4), 0 1px 0 rgba(255,255,255,0.9) inset;
+  }
+  /* big heavy headline — huge, bold, lots of contrast (bright & lively) */
+  .headline{
+    margin-top:30px;font-family:var(--sans);font-weight:900;font-size:60px;line-height:1.04;
+    letter-spacing:-0.035em;color:var(--ink);
+  }
+  .headline .au{
+    background:linear-gradient(172deg,#ff9d77 0%, var(--coral) 46%, var(--coral-deep) 96%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 2px 8px rgba(239,93,58,0.16));
+  }
+  .headline .mn{
+    background:linear-gradient(172deg,#7fd6b6 0%, var(--mint) 50%, var(--mint-deep) 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .headline .big{font-size:72px;letter-spacing:-0.045em}
+  .oneliner{
+    margin-top:26px;font-size:23px;line-height:1.45;color:var(--ink);font-weight:800;max-width:740px;
+  }
+  .oneliner b{color:var(--coral-deep);font-weight:900;font-size:25px}
+  .youknow{margin-top:24px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:13px;font-weight:700}
+  .youknow .lead{color:var(--ink);font-weight:900;font-size:14px}
+  .youknow span.k{
+    background:linear-gradient(180deg, #ffffff, #fff5ee);
+    border:1px solid rgba(239,93,58,0.18);color:var(--ink2);
+    padding:6px 14px;border-radius:999px;box-shadow:0 1px 0 rgba(255,255,255,0.9) inset, 0 4px 10px -8px rgba(239,93,58,0.4);font-weight:800
+  }
+
+  /* ============ BODY ============ */
+  .body{padding:6px 50px 16px;position:relative;z-index:2}
+  .seclabel{display:flex;align-items:center;gap:13px;margin:32px 0 16px}
+  .seclabel .pip{
+    width:11px;height:11px;border-radius:3px;transform:rotate(45deg);flex-shrink:0;
+    background:linear-gradient(135deg,var(--coral-lite),var(--coral-deep));
+    box-shadow:0 2px 8px rgba(239,93,58,0.4)
+  }
+  .seclabel .k{font-family:var(--sans);font-size:25px;font-weight:900;color:var(--ink);letter-spacing:-0.02em}
+  .seclabel .meta{
+    font-size:12px;font-weight:900;color:var(--coral-deep);letter-spacing:0.06em;
+    background:linear-gradient(180deg,#fff,#fff1ea);
+    border:1px solid rgba(239,93,58,0.2);padding:5px 13px;border-radius:999px;
+    box-shadow:0 1px 0 rgba(255,255,255,0.9) inset
+  }
+  .seclabel .ln{flex:1;height:1px;background:linear-gradient(90deg,rgba(239,93,58,0.22),transparent)}
+
+  /* ===== card primitive (light, soft) ===== */
+  .card{
+    background:linear-gradient(180deg, var(--paper3), var(--paper2));
+    border:1px solid var(--line);border-radius:var(--r2);position:relative;
+    box-shadow:0 18px 38px -28px rgba(239,93,58,0.4), 0 1px 0 rgba(255,255,255,0.85) inset;
+  }
+
+  /* ===== 3 steps ===== */
+  .steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+  .step{padding:24px 20px 22px;overflow:hidden}
+  .step .bignum{
+    font-family:var(--serif);font-weight:700;font-size:124px;line-height:.72;
+    color:transparent;-webkit-text-stroke:2px rgba(251,122,89,0.30);
+    position:absolute;top:-12px;right:6px;z-index:0;letter-spacing:-0.05em;
+  }
+  .step.s2 .bignum{-webkit-text-stroke-color:rgba(94,196,160,0.34)}
+  .step.s3 .bignum{-webkit-text-stroke-color:rgba(249,115,22,0.28)}
+  .step .tag{
+    position:relative;z-index:2;display:inline-flex;align-items:center;gap:6px;
+    font-size:11.5px;font-weight:800;color:#fff;letter-spacing:0.01em;margin-bottom:14px;
+    padding:6px 13px 6px 11px;border-radius:999px;
+    background:linear-gradient(135deg,var(--coral),var(--coral-deep));
+    box-shadow:0 6px 14px -6px rgba(239,93,58,0.55), 0 1px 0 rgba(255,255,255,0.4) inset
+  }
+  .step.s2 .tag{background:linear-gradient(135deg,var(--mint),var(--mint-deep));box-shadow:0 6px 14px -6px rgba(47,157,123,0.5), 0 1px 0 rgba(255,255,255,0.4) inset}
+  .step.s3 .tag{background:linear-gradient(135deg,var(--tang),var(--tang-deep));box-shadow:0 6px 14px -6px rgba(226,99,12,0.5), 0 1px 0 rgba(255,255,255,0.4) inset}
+  .step .tag .e{font-size:13px}
+  .step .st{position:relative;z-index:2;font-size:23px;font-weight:900;color:var(--ink);margin-bottom:9px;letter-spacing:-0.025em;line-height:1.1}
+  .step .sd{position:relative;z-index:2;font-size:13px;line-height:1.66;color:var(--ink2);font-weight:600}
+  .step .sd b{color:var(--coral-deep);font-weight:900;white-space:nowrap}
+  .step.s2 .sd b{color:var(--mint-deep)}
+  .step.arrow::after{
+    content:"›";position:absolute;right:-23px;top:50%;z-index:6;transform:translateY(-56%);
+    font-size:32px;font-weight:900;color:var(--coral);line-height:1;
+    text-shadow:0 2px 8px rgba(239,93,58,0.3)
+  }
+
+  /* ===== 6-step rail ===== */
+  .railwrap{padding:26px 28px 22px;position:relative;overflow:hidden}
+  .rail{display:flex;align-items:flex-start;justify-content:space-between;position:relative}
+  .rstep{display:flex;flex-direction:column;align-items:center;gap:11px;flex:1;position:relative;z-index:2}
+  .rstep .conn{
+    position:absolute;top:22px;left:calc(50% + 25px);width:calc(100% - 50px);height:3px;border-radius:3px;z-index:1;
+  }
+  .rstep:last-child .conn{display:none}
+  .rstep .rc{
+    width:46px;height:46px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--serif);font-size:18px;font-weight:700;color:var(--white);position:relative;z-index:2;
+    transform:rotate(-45deg);
+    border:1px solid rgba(255,255,255,0.7);
+    box-shadow:0 8px 18px -8px rgba(239,93,58,0.5), 0 1px 0 rgba(255,255,255,0.5) inset
+  }
+  .rstep .rc span{transform:rotate(45deg)}
+  .rstep .rl{font-size:16px;font-weight:900;color:var(--ink);letter-spacing:-0.02em}
+  .rstep .rsub{font-size:10.5px;color:var(--ink3);text-align:center;line-height:1.44;font-weight:700}
+  .legend{
+    margin-top:20px;padding-top:16px;border-top:1px dashed rgba(239,93,58,0.22);
+    display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:12px;color:var(--ink2);font-weight:700
+  }
+  .legend .lead{color:var(--ink);font-weight:900}
+  .legend i{font-style:normal;display:inline-flex;align-items:center;gap:7px}
+  .legend .dt{width:11px;height:11px;border-radius:4px}
+
+  /* ===== status : traffic-light groups (fresh pastels) ===== */
+  .lights{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px}
+  .light{
+    padding:18px 16px 16px;border-radius:18px;position:relative;overflow:hidden;
+    box-shadow:0 1px 0 rgba(255,255,255,0.7) inset, 0 14px 30px -24px rgba(42,36,32,0.4)
+  }
+  .light .dot{width:16px;height:16px;border-radius:50%;margin-bottom:11px;
+    box-shadow:0 0 0 4px rgba(255,255,255,0.6), 0 4px 10px -2px rgba(42,36,32,0.2)}
+  .light .big{font-size:26px;font-weight:900;line-height:1;letter-spacing:-0.02em;margin-bottom:3px}
+  .light .mean{font-size:13.5px;font-weight:800;margin-bottom:13px;letter-spacing:-0.01em}
+  .light .nm{display:flex;flex-wrap:wrap;gap:6px}
+  .light .nm span{
+    font-size:12px;font-weight:900;padding:4px 10px;border-radius:9px;letter-spacing:-0.01em;
+    background:rgba(255,255,255,0.78);box-shadow:0 1px 0 rgba(255,255,255,0.9) inset
+  }
+  .l-green{background:linear-gradient(180deg,rgba(47,157,123,0.16),rgba(47,157,123,0.05));border:1px solid rgba(47,157,123,0.4)}
+  .l-green .dot{background:var(--s-green)}
+  .l-green .big,.l-green .mean,.l-green .nm span{color:#1f7d60}
+  .l-amber{background:linear-gradient(180deg,rgba(224,163,42,0.18),rgba(224,163,42,0.06));border:1px solid rgba(224,163,42,0.46)}
+  .l-amber .dot{background:var(--s-amber)}
+  .l-amber .big,.l-amber .mean,.l-amber .nm span{color:#a8780f}
+  .l-orange{background:linear-gradient(180deg,rgba(240,129,60,0.18),rgba(240,129,60,0.06));border:1px solid rgba(240,129,60,0.46)}
+  .l-orange .dot{background:var(--s-orange)}
+  .l-orange .big,.l-orange .mean,.l-orange .nm span{color:#cd5f1e}
+  .l-red{background:linear-gradient(180deg,rgba(237,106,106,0.16),rgba(237,106,106,0.05));border:1px solid rgba(237,106,106,0.44)}
+  .l-red .dot{background:var(--s-red)}
+  .l-red .big,.l-red .mean,.l-red .nm span{color:#d24b4b}
+
+  /* ===== remember : big keyword anchors ===== */
+  .remember{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .mem{display:flex;gap:14px;align-items:center;padding:18px 18px;overflow:hidden}
+  .mem .mi{
+    flex-shrink:0;width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+    font-size:24px;background:linear-gradient(160deg,#fff3ea,#ffe7d8);
+    border:1px solid rgba(239,93,58,0.18);box-shadow:0 1px 0 rgba(255,255,255,0.9) inset
+  }
+  .mem.g .mi{background:linear-gradient(160deg,#e6f7f0,#d3efe3);border-color:rgba(47,157,123,0.22)}
+  .mem .mc{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .mem .mk{font-size:21px;font-weight:900;color:var(--ink);letter-spacing:-0.03em;line-height:1}
+  .mem .md{font-size:12.5px;line-height:1.45;color:var(--ink2);font-weight:600}
+  .mem .md b{color:var(--coral-deep);font-weight:900;white-space:nowrap}
+  .mem.g .md b{color:var(--mint-deep)}
+
+  /* ===== access bar ===== */
+  .access{
+    margin:24px 0 0;padding:15px 50px;
+    background:linear-gradient(180deg, rgba(94,196,160,0.10), rgba(251,122,89,0.08));
+    border-top:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;position:relative;z-index:2
+  }
+  .access .ax-lead{font-size:12.5px;font-weight:800;color:var(--coral-deep)}
+  .access .ax-url{font-size:18px;font-weight:900;letter-spacing:0.01em;
+    background:linear-gradient(92deg,var(--coral-deep),var(--mint-deep));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .access .ax-code{font-size:12.5px;font-weight:700;color:var(--ink2)}
+  .access .ax-code b{color:var(--coral-deep);font-weight:900}
+  /* ===== footer ===== */
+  .foot{
+    margin:0;padding:22px 50px;
+    background:linear-gradient(180deg,#fff7f0,#fdeee2);
+    border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;gap:16px;position:relative;z-index:2
+  }
+  .foot .warm{font-family:var(--serif);font-size:16px;color:var(--ink);font-weight:700}
+  .foot .warm .au{color:var(--coral-deep);font-weight:800}
+  .foot .ref{font-size:11px;color:var(--ink3);font-weight:600;text-align:right;line-height:1.55}
+  .foot .ref b{color:var(--ink)}
+
+  @media print{
+    html,body{background:var(--wash)}
+    .page{margin:0;box-shadow:none;border-radius:0;width:100%}
+    @page{size:A4;margin:8mm}
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="content">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="toprow">
+      <div class="brand">
+        <div class="wordmark">Cascade</div>
+        <div class="tagline">拆爆款<i>·</i>改成你的<i>·</i>一键出片</div>
+      </div>
+      <div class="pill">内测上手卡 · v2</div>
+    </div>
+    <div class="headline">拆开爆款，<span class="au">改成你的</span>，<br><span class="mn big">一键出片</span>。</div>
+    <p class="oneliner">
+      一条<b>爆款</b>，<b>一句话</b>，导演陪你做成<b>你的短片</b>。
+    </p>
+    <div class="youknow">
+      <span class="lead">你只要会：</span>
+      <span class="k">刷抖音</span><span class="k">复制链接</span><span class="k">说一句「我想做支这样的视频」</span>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- 3 步出片 -->
+    <div class="seclabel">
+      <span class="pip"></span><span class="k">最短路径</span><span class="meta">3 步出片</span><span class="ln"></span>
+    </div>
+    <div class="steps">
+      <div class="step card arrow">
+        <div class="bignum">1</div>
+        <div class="tag"><span class="e">🔗</span>拆一条爆款</div>
+        <div class="st">粘链接<br>拆解</div>
+        <div class="sd">粘抖音链接或点案例，点<b>「拆解」</b>，约 1 分钟出爆点分析。</div>
+      </div>
+      <div class="step card s2 arrow">
+        <div class="bignum">2</div>
+        <div class="tag"><span class="e">🎬</span>做我的版本</div>
+        <div class="st">告诉<br>导演</div>
+        <div class="sd">点<b>「在画布上做我的版本」</b>，大白话告诉导演你想做什么。</div>
+      </div>
+      <div class="step card s3">
+        <div class="bignum">3</div>
+        <div class="tag"><span class="e">📋</span>确认 · 生成 · 发</div>
+        <div class="st">逐节点<br>出片</div>
+        <div class="sd">逐节点<b>「✓ 确认」「⚡ 生成」「🎬 合成」</b>，成片后<b>「一键复制，去发」</b>。</div>
+      </div>
+    </div>
+
+    <!-- 6 步创作流 -->
+    <div class="seclabel">
+      <span class="pip"></span><span class="k">导演帮你搭的创作流</span><span class="meta">6 步</span><span class="ln"></span>
+    </div>
+    <div class="railwrap card">
+      <div class="rail">
+        <div class="rstep"><div class="conn" style="background:linear-gradient(90deg,#fb7a59,#fda07f)"></div><div class="rc" style="background:linear-gradient(135deg,#fb7a59,#ef5d3a)"><span>1</span></div><div class="rl">策划书</div><div class="rsub">为什么火<br>+ 改成你的</div></div>
+        <div class="rstep"><div class="conn" style="background:linear-gradient(90deg,#fda07f,#f99060)"></div><div class="rc" style="background:linear-gradient(135deg,#fda07f,#f97316)"><span>2</span></div><div class="rl">角色</div><div class="rsub">定主角形象</div></div>
+        <div class="rstep"><div class="conn" style="background:linear-gradient(90deg,#f99060,#f8b061)"></div><div class="rc" style="background:linear-gradient(135deg,#f97316,#f8b04b)"><span>3</span></div><div class="rl">场景</div><div class="rsub">定拍摄场景</div></div>
+        <div class="rstep"><div class="conn" style="background:linear-gradient(90deg,#f8b061,#a9d9a4)"></div><div class="rc" style="background:linear-gradient(135deg,#8fd3b2,#5ec4a0)"><span>4</span></div><div class="rl">分镜</div><div class="rsub">每镜的画面</div></div>
+        <div class="rstep"><div class="conn" style="background:linear-gradient(90deg,#7fcfb0,#5ec4a0)"></div><div class="rc" style="background:linear-gradient(135deg,#5ec4a0,#2f9d7b)"><span>5</span></div><div class="rl">视频</div><div class="rsub">逐镜出短片</div></div>
+        <div class="rstep"><div class="rc" style="background:linear-gradient(135deg,#3aab87,#2f9d7b)"><span>6</span></div><div class="rl">合成</div><div class="rsub">拼成整片</div></div>
+      </div>
+      <div class="legend">
+        <span class="lead">画布顶部这条进度条 →</span>
+        <i><span class="dt" style="background:#2f9d7b"></span><b style="color:#2f9d7b">✓ 绿＝做完</b></i>
+        <i><span class="dt" style="background:#fb7a59"></span><b style="color:#ef5d3a">● 珊瑚＝正在做</b></i>
+        <i><span class="dt" style="background:#d8d0c5"></span>○ 灰＝没开始</i>
+      </div>
+    </div>
+
+    <!-- 看懂状态 -->
+    <div class="seclabel">
+      <span class="pip"></span><span class="k">看懂状态</span><span class="meta">看颜色就行</span><span class="ln"></span>
+    </div>
+    <div class="lights">
+      <div class="light l-green">
+        <div class="dot"></div>
+        <div class="big">妥了</div>
+        <div class="mean">这步过了，往下走</div>
+        <div class="nm"><span>已确认</span><span>已生成</span></div>
+      </div>
+      <div class="light l-amber">
+        <div class="dot"></div>
+        <div class="big">该你了</div>
+        <div class="mean">去确认，或正在做</div>
+        <div class="nm"><span>待确认</span><span>生成中</span></div>
+      </div>
+      <div class="light l-orange">
+        <div class="dot"></div>
+        <div class="big">要重做</div>
+        <div class="mean">上游改了，重生一下</div>
+        <div class="nm"><span>待重生</span></div>
+      </div>
+      <div class="light l-red">
+        <div class="dot"></div>
+        <div class="big">出岔了</div>
+        <div class="mean">点一下，重试就行</div>
+        <div class="nm"><span>失败重试</span></div>
+      </div>
+    </div>
+
+    <!-- 记住这几点 -->
+    <div class="seclabel">
+      <span class="pip"></span><span class="k">记住这几点</span><span class="meta">就够用</span><span class="ln"></span>
+    </div>
+    <div class="remember">
+      <div class="mem card">
+        <span class="mi">🛡️</span>
+        <div class="mc">
+          <div class="mk">审核闸门</div>
+          <div class="md">批量生成前先问你，<b>确认生成</b> 放行 / <b>先不生成</b> 拦。</div>
+        </div>
+      </div>
+      <div class="mem card g">
+        <span class="mi">↩️</span>
+        <div class="mc">
+          <div class="mk">随时回头改</div>
+          <div class="md">任意节点 <b>↻ 重生</b>，旧版能 <b>↩ 回滚到此版</b>，不丢。</div>
+        </div>
+      </div>
+      <div class="mem card">
+        <span class="mi">⏳</span>
+        <div class="mc">
+          <div class="mk">异步生成</div>
+          <div class="md">图片快、视频几分钟；等不及点 <b>✕ 取消</b>。</div>
+        </div>
+      </div>
+      <div class="mem card g">
+        <span class="mi">♻️</span>
+        <div class="mc">
+          <div class="mk">素材复用</div>
+          <div class="md">右侧「你之前用过的」角色 / 场景，点一下直接用。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="access">
+    <span class="ax-lead">🔗 立即体验</span>
+    <span class="ax-url">https://cascade.herwin.top</span>
+    <span class="ax-code">邀请码 <b>cascade</b></span>
+  </div>
+  <div class="foot">
+    <span class="warm">慢慢来，每步都有导演陪你，做错也能回头改 <span class="au">✦</span></span>
+    <span class="ref">Cascade 内测 · 一页纸上手卡<br>配套 <b>《用户手册》</b> 详读每个按钮</span>
+  </div>
+
+  </div><!-- /content -->
+</div>
+</body>
+</html>
