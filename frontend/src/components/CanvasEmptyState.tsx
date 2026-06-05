@@ -18,7 +18,7 @@ export function CanvasEmptyState() {
         <div style={S.spark}>✦</div>
         <h2 style={S.title} className="font-serif-cn">这是你的创作画布</h2>
         <p style={S.sub}>
-          告诉导演你想做什么 —— 比如「做一支 30 秒博朋克短片,主角是男侦探」。
+          告诉导演你想做什么 —— 比如「做一支 30 秒赛博朋克短片,主角是男侦探」。
           导演会在画布上帮你一步步搭好:
         </p>
         <div style={S.flow}>
