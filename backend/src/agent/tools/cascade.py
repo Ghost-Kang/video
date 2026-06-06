@@ -401,7 +401,8 @@ async def _emit_generation_cost(
     """补 GENERATION_COST 事件(2026-06-04 审计 #1-7):生成工具此前只 emit
     SHOT_*_RETURNED(cost_cny),不 emit GENERATION_COST(cost_fen),于是 sum_generation_cost
     永远读到 0 → ¥30/天 user 级成本闸 + 成本看板都失效。补上后日级闸生效、成本可见。
-    best-effort(绝不破坏生成);run 级 cap 仍 no-op(run_id 与事件存储错配),不会全局卡死。"""
+    best-effort(绝不破坏生成)。2026-06-06:run_id 经 agent_runner 真注入(不再恒 None),
+    传真 run_id 进来后 per-run cap 也读得到这笔成本(根因 A/C 闭环)。"""
     try:
         await emit(
             EventName.GENERATION_COST,
@@ -458,7 +459,10 @@ async def cascade_generate_first_frame(rewrite_id: str, shot_index: int) -> dict
     ctx = get_run_ctx()
     user_id = ctx.get("user_id") or "anonymous"
     thread_id = ctx.get("thread_id") or ""
-    run_id = ctx.get("run_id")
+    # run_id from the run ctx (agent_runner mints f"{thread_id}#{run_seq}"). Normalize
+    # to "anonymous" once so the cost_guard query AND the GENERATION_COST emit use the
+    # SAME id — else _run_cost queries one bucket while the emit lands in another.
+    run_id = ctx.get("run_id") or "anonymous"
 
     # 1. Resolve rewrite + shot
     raw = await load_rewrite_by_id(rewrite_id)
@@ -498,7 +502,7 @@ async def cascade_generate_first_frame(rewrite_id: str, shot_index: int) -> dict
     # frame: that nukes the whole result page; NOT silent: else the card spins to
     # the 75s timeout). Director also surfaces the return value in chat.
     try:
-        await cost_guard(user_id=user_id, run_id=run_id or "anonymous", predicted_cost_cny=PREDICT_SHOT_IMAGE_CNY)
+        await cost_guard(user_id=user_id, run_id=run_id, predicted_cost_cny=PREDICT_SHOT_IMAGE_CNY)
     except HardFailure as exc:
         msg = exc.hint or "本轮额度不足，先把已生成的内容用起来"
         await _push_shot_error(rewrite_id, shot_index, msg)
@@ -616,9 +620,10 @@ async def _poll_shot_video(
     thread_id: str,
     rewrite_id: str,
     shot_index: int,
+    run_id: str = "anonymous",
 ) -> None:
     """后台轮询 Seedance 任务 → 成功下载落 /media 持久 → 持久化 + 推帧。失败推单镜 error。
-    脱离 agent turn 存活(asyncio.create_task);用捕获的 user_id/thread_id,不读 RUN_CTX。"""
+    脱离 agent turn 存活(asyncio.create_task);用捕获的 user_id/thread_id/run_id,不读 RUN_CTX。"""
     try:
         result = await provider.poll(task_id)
     except asyncio.CancelledError:
@@ -655,7 +660,7 @@ async def _poll_shot_video(
         await emit(
             EventName.SHOT_VIDEO_RETURNED,
             user_id=user_id,
-            run_id=None,
+            run_id=run_id,
             payload={
                 "rewrite_id": rewrite_id,
                 "shot_index": shot_index,
@@ -665,8 +670,9 @@ async def _poll_shot_video(
     except Exception:
         pass
     # GENERATION_COST(成本闸 + 看板;审计 #1-7)。video 是付费 leg,best-effort。
+    # run_id 来自 enqueue 时捕获 → per-run cap 与日级闸都读得到这笔成本。
     await _emit_generation_cost(
-        user_id=user_id, run_id=None, call_kind="shot_video",
+        user_id=user_id, run_id=run_id, call_kind="shot_video",
         cost_cny=_SHOT_VIDEO_SECONDS * PREDICT_VIDEO_SECOND_CNY, provider="video",
     )
 
@@ -697,7 +703,7 @@ async def cascade_generate_shot_video(rewrite_id: str, shot_index: int) -> dict:
     ctx = get_run_ctx()
     user_id = ctx.get("user_id") or "anonymous"
     thread_id = ctx.get("thread_id") or ""
-    run_id = ctx.get("run_id")
+    run_id = ctx.get("run_id") or "anonymous"  # see cascade_generate_first_frame note
 
     raw = await load_rewrite_by_id(rewrite_id)
     if raw is None:
@@ -732,7 +738,7 @@ async def cascade_generate_shot_video(rewrite_id: str, shot_index: int) -> dict:
     try:
         await cost_guard(
             user_id=user_id,
-            run_id=run_id or "anonymous",
+            run_id=run_id,
             predicted_cost_cny=_SHOT_VIDEO_SECONDS * PREDICT_VIDEO_SECOND_CNY,
         )
     except HardFailure as exc:
@@ -760,8 +766,9 @@ async def cascade_generate_shot_video(rewrite_id: str, shot_index: int) -> dict:
         return {"error": "S8_UPSTREAM_REFUSED", "message": submitted.get("error", "生视频提交失败")}
 
     task_id = submitted.get("task_id")
-    # 后台轮询 → 落盘 → 持久化 → 推帧。脱离本 turn 存活。
-    asyncio.create_task(_poll_shot_video(provider, task_id, user_id, thread_id, rewrite_id, shot_index))
+    # 后台轮询 → 落盘 → 持久化 → 推帧。脱离本 turn 存活 → run_id 在 enqueue 时捕获传入
+    # (后台读不到 RUN_CTX),让完成时 emit 的 GENERATION_COST 归属到本 turn(审计 #1-7 根因 C)。
+    asyncio.create_task(_poll_shot_video(provider, task_id, user_id, thread_id, rewrite_id, shot_index, run_id))
 
     return {
         "shot_index": shot_index,
@@ -782,7 +789,7 @@ async def _push_film(user_id: str, thread_id: str, rewrite_id: str, *, film_url:
     )
 
 
-async def _compose_film_bg(user_id: str, thread_id: str, rewrite_id: str, local_paths: list[str]) -> None:
+async def _compose_film_bg(user_id: str, thread_id: str, rewrite_id: str, local_paths: list[str], run_id: str = "anonymous") -> None:
     """后台:本地分镜片 ffmpeg 拼接 → 落 /media/<rid>/film.mp4 → 持久化 + 推帧。"""
     try:
         data = await compose_local_files(local_paths)
@@ -811,7 +818,7 @@ async def _compose_film_bg(user_id: str, thread_id: str, rewrite_id: str, local_
         pass
     await _push_film(user_id, thread_id, rewrite_id, film_url=film_url)
     try:
-        await emit(EventName.FILM_RETURNED, user_id=user_id, run_id=None, payload={"rewrite_id": rewrite_id})
+        await emit(EventName.FILM_RETURNED, user_id=user_id, run_id=run_id, payload={"rewrite_id": rewrite_id})
     except Exception:
         pass
 
@@ -837,6 +844,7 @@ async def cascade_compose_film(rewrite_id: str) -> dict:
     ctx = get_run_ctx()
     user_id = ctx.get("user_id") or "anonymous"
     thread_id = ctx.get("thread_id") or ""
+    run_id = ctx.get("run_id") or "anonymous"  # compose 免费,但带上让 FILM_RETURNED 可归属本 turn
 
     raw = await load_rewrite_by_id(rewrite_id)
     if raw is None:
@@ -862,7 +870,7 @@ async def cascade_compose_film(rewrite_id: str) -> dict:
     if not local_paths:
         return {"error": "NO_SHOT_VIDEOS", "message": "还没有镜头视频,先把镜头生成视频再合成整片"}
 
-    asyncio.create_task(_compose_film_bg(user_id, thread_id, rewrite_id, local_paths))
+    asyncio.create_task(_compose_film_bg(user_id, thread_id, rewrite_id, local_paths, run_id))
     return {"status": "composing", "shots": len(local_paths), "message": "在合成整片了,稍等几十秒自动出现"}
 
 
@@ -950,7 +958,7 @@ async def cascade_ask(analysis_id: str, question: str) -> dict:
     ctx = get_run_ctx()
     user_id = ctx.get("user_id") or "anonymous"
     thread_id = ctx.get("thread_id") or ""
-    run_id = ctx.get("run_id")
+    run_id = ctx.get("run_id") or "anonymous"  # see cascade_generate_first_frame note
 
     if not isinstance(analysis_id, str) or not analysis_id.strip():
         return {"error": "S5_INVALID_PAYLOAD", "message": "analysis_id 不能为空"}
@@ -968,7 +976,7 @@ async def cascade_ask(analysis_id: str, question: str) -> dict:
     try:
         await cost_guard(
             user_id=user_id,
-            run_id=run_id or "anonymous",
+            run_id=run_id,
             predicted_cost_cny=PREDICT_ASK_CNY,
         )
     except HardFailure as exc:
