@@ -192,6 +192,45 @@ def test_poll_success_downloads_persists_and_pushes(monkeypatch, tmp_path):
     assert ws.sent[0]["error"] is None
 
 
+def test_poll_propagates_run_id_to_generation_cost(monkeypatch, tmp_path):
+    """审计 #1-7 根因 C 回归:后台 poll 完成时 emit 的 GENERATION_COST(及 SHOT_VIDEO_RETURNED)
+    必须带 enqueue 时捕获的 run_id;此前写死 None → per-run cap 读不到 video 成本。"""
+    from agent.cascade.events import EventName
+
+    ws = FakeWS()
+    notify.register("u1", ws)
+    fake = _FakeSeedance(submit_result={}, poll_result={"video_url": "https://ark/v.mp4"})
+
+    async def _fake_download(url, dest):
+        with open(dest, "wb") as f:
+            f.write(b"v")
+
+    async def _fake_record(rid, idx, url):
+        return None
+
+    monkeypatch.setattr(cascade_tools, "_download", _fake_download)
+    monkeypatch.setattr(cascade_tools, "media_root", lambda: tmp_path)
+    monkeypatch.setattr(cascade_tools, "record_shot_video", _fake_record)
+
+    captured: list[dict] = []
+
+    async def _cap_emit(event_name, *, user_id, run_id, payload):
+        captured.append({"event": event_name, "run_id": run_id, "payload": payload})
+
+    monkeypatch.setattr(cascade_tools, "emit", _cap_emit)
+
+    asyncio.run(_poll_shot_video(fake, "task_123", "u1", "t1", "rw_vid", 2, "t1#7"))
+    notify.unregister("u1", ws)
+
+    gen = [c for c in captured if c["event"] is EventName.GENERATION_COST]
+    assert gen, "background poll must emit GENERATION_COST"
+    assert gen[0]["run_id"] == "t1#7"
+    assert gen[0]["payload"]["run_id"] == "t1#7"
+    assert gen[0]["payload"]["cost_fen"] > 0
+    svr = [c for c in captured if c["event"] is EventName.SHOT_VIDEO_RETURNED]
+    assert svr and svr[0]["run_id"] == "t1#7"
+
+
 def test_poll_failure_pushes_error(monkeypatch, tmp_path):
     ws = FakeWS()
     notify.register("u1", ws)

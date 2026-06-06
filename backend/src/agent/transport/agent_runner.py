@@ -323,11 +323,18 @@ async def run_agent(
     # see isolated RUN_CTX values without this reset. The reset is hygiene
     # (avoids holding the ws reference for one extra GC cycle), not concurrency
     # safety. We capture the token before try so it's in scope for finally.
+    # Per-run cost cap needs a real run_id. mark_running bumps + returns the
+    # run_seq (run_state.py); mint run_id = f"{thread_id}#{run_seq}" and store it
+    # on the run ctx so every tool descendant (cost_guard + GENERATION_COST emit)
+    # attributes spend to THIS turn. Until 2026-06-06 run_id was hardcoded None →
+    # _run_cost(None)≈0 → the ¥/run cap was a silent no-op (audit #1-7 根因 A).
+    # mark_running must run BEFORE set_run_ctx — the ctx dict is frozen at set time.
+    run_seq = await run_state.mark_running(user_id, thread_id)  # W5D4 P0-B — persisted lifecycle
     _run_ctx = {
         "user_id": user_id,
         "thread_id": thread_id,
         "ws": ws,
-        "run_id": None,
+        "run_id": f"{thread_id}#{run_seq}",
         "tool_failure": None,  # W5D4 B5 — a tool that catches HardFailure sets this
     }
     _ctx_token = set_run_ctx(_run_ctx)
@@ -335,7 +342,6 @@ async def run_agent(
     failed = False  # W5D3 CR-P1: explicit flag replaces magic-string sentinel.
     awaiting_review = False  # P2 — graph paused at an autonomous review gate.
     entry = None  # set after pool.get; guarded at the bottom for the todos emit.
-    await run_state.mark_running(user_id, thread_id)  # W5D4 P0-B — persisted lifecycle
     try:
         # agent 的 tool call 通过 ContextVar 读写正确的用户/会话数据
         canvas_tools.set_user_id(user_id)
@@ -457,11 +463,15 @@ async def resume_agent(
     STALE (its gate was already resolved and a different gate is now pending) — we
     drop it and re-push the current review rather than applying it to the wrong
     tool calls. Empty = legacy/no-binding → resume whatever's pending."""
+    # Real run_id for the per-run cost cap (see run_agent). A resume mints a fresh
+    # run_seq; for an interrupt-gated generation both the cost_guard check and the
+    # GENERATION_COST emit run inside THIS resumed frame, so they share this id.
+    run_seq = await run_state.mark_running(user_id, thread_id)  # back to running while resuming
     _run_ctx = {
         "user_id": user_id,
         "thread_id": thread_id,
         "ws": ws,
-        "run_id": None,
+        "run_id": f"{thread_id}#{run_seq}",
         "tool_failure": None,
     }
     _ctx_token = set_run_ctx(_run_ctx)
@@ -469,7 +479,6 @@ async def resume_agent(
     failed = False
     awaiting_review = False
     entry = None  # set after pool.get; guarded at the bottom for the todos emit.
-    await run_state.mark_running(user_id, thread_id)  # back to running while resuming
     try:
         canvas_tools.set_user_id(user_id)
         canvas_tools.set_thread_id(thread_id)

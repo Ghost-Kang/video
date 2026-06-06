@@ -12,10 +12,21 @@ e3e2739). Phase 1 typical short-video = 60s = 1 min input → ¥1.00
 storyline alone, plus ARK Chat viral overlay ~¥0.10 tokens, total ≈ ¥1.10.
 ¥1.20 PREDICT keeps a ~9% buffer for low-bitrate longer clips.
 
-CASCADE_RUN_CAP_CNY = ¥3.0 (env override) still accommodates a single
-analysis + rewrite + shot pass (¥1.20 + ¥1.00 + ¥1.50 = ¥3.70 ← exceeds
-¥3.0 cap; raise cap to ¥4.5 via env if first concierge first-run trips).
-Per-user-day cap ¥30 = ~25 full runs/day, ample for Phase 1.
+CASCADE_RUN_CAP_CNY default = ¥25.0 (env override). 2026-06-06: this is the
+RUNAWAY CIRCUIT BREAKER, not the primary throttle. Once agent_runner started
+minting a real per-turn run_id (audit #1-7 根因 A — run_id was hardcoded None,
+so the per-run sum was always ~0 and this cap never bit), a low ¥3 cap would
+START killing legitimate turns: a single full film turn is ~¥18-20 (5 images
+¥7.5 + 5×5s video ¥7.5 + analysis ¥1.2 + rewrite ¥1.0). ¥25 holds one legal
+full turn with buffer while still tripping a retry storm / accidental loop.
+The PRIMARY throttle is the per-user-day cap ¥30. Founder finalizes both via
+env once pricing tiers land (phase2_pricing_cost_analysis ❓7).
+
+NOTE (known residual): generation cost is charged at enqueue but RECORDED at
+completion (video records in the background poll). So a BURST of video enqueues
+inside one turn isn't tightly capped per-run — sum_generation_cost only sees
+costs recorded by prior completed work. The ¥30/day cap backstops it; tight
+within-turn capping would need provisional reservation (out of scope here).
 
 Per-user day is measured by UTC calendar day.
 """
@@ -70,7 +81,10 @@ def predict_generation_cost(kind: str, *, n_images: int = 0, video_seconds: floa
 
 
 def _run_cap() -> float:
-    return float(os.environ.get("CASCADE_RUN_CAP_CNY", "3.0"))
+    # Default ¥25 = runaway circuit breaker sized to hold one legal full film turn
+    # (~¥18-20). See module docstring — raised from ¥3 on 2026-06-06 when run_id
+    # became real (a ¥3 per-run cap would otherwise kill legit multi-shot turns).
+    return float(os.environ.get("CASCADE_RUN_CAP_CNY", "25.0"))
 
 
 def _user_day_cap() -> float:

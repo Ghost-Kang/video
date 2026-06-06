@@ -49,6 +49,7 @@ async def _cost(user_id: str, run_id: str, fen: int, created_at: str | None = No
 
 def test_below_80_percent_has_no_warning(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_RUN_CAP_CNY", "3.0")  # default raised to ¥25 — pin for the threshold
     asyncio.run(_cost("u1", "r1", 100))
     asyncio.run(cost_guard("u1", "r1", 0.5))
     assert asyncio.run(cost_status("u1", "r1"))["warn"] is False
@@ -56,6 +57,7 @@ def test_below_80_percent_has_no_warning(monkeypatch: pytest.MonkeyPatch, tmp_pa
 
 def test_at_80_percent_warns_without_block(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_RUN_CAP_CNY", "3.0")  # default raised to ¥25 — pin for the 80% threshold
     asyncio.run(_cost("u1", "r1", 240))
     asyncio.run(cost_guard("u1", "r1", 0.0))
     assert asyncio.run(cost_status("u1", "r1"))["warn"] is True
@@ -63,6 +65,7 @@ def test_at_80_percent_warns_without_block(monkeypatch: pytest.MonkeyPatch, tmp_
 
 def test_run_cap_blocks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_RUN_CAP_CNY", "3.0")  # default raised to ¥25 — pin to test the cap mechanism
     asyncio.run(_cost("u1", "r1", 260))
     with pytest.raises(HardFailure) as exc:
         asyncio.run(cost_guard("u1", "r1", 0.5))
@@ -130,6 +133,7 @@ def test_generation_enqueue_blocked_over_run_cap(monkeypatch: pytest.MonkeyPatch
     """An image gen (¥1.5) on top of a run already near the ¥3.0 cap is refused
     BEFORE enqueue → worker never spends. This is the裸奔 hole B3 closes."""
     _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_RUN_CAP_CNY", "3.0")  # default raised to ¥25 — pin for the ¥3 enqueue guard
     asyncio.run(_cost("u1", "r1", 200))  # ¥2.00 already this run
     predicted = predict_generation_cost("image", n_images=1)  # ¥1.50 → 3.50 > 3.0
     with pytest.raises(HardFailure) as exc:
@@ -139,6 +143,7 @@ def test_generation_enqueue_blocked_over_run_cap(monkeypatch: pytest.MonkeyPatch
 
 def test_generation_enqueue_allowed_within_cap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_RUN_CAP_CNY", "3.0")  # default raised to ¥25 — pin for the ¥3 within-cap case
     asyncio.run(_cost("u1", "r1", 100))  # ¥1.00 this run
     predicted = predict_generation_cost("image", n_images=1)  # ¥1.50 → 2.50 ≤ 3.0
     asyncio.run(cost_guard("u1", "r1", predicted))  # must not raise
@@ -161,3 +166,56 @@ def test_generation_cost_sums_match_status(monkeypatch: pytest.MonkeyPatch, tmp_
     total = sum(json.loads(row[0])["cost_fen"] for row in db.execute("SELECT payload_json FROM events"))
     db.close()
     assert total == 100
+
+
+# --- 2026-06-06: per-run cap revived (audit #1-7 根因 A/C) -------------------
+# Until now run_id was hardcoded None in the run ctx → _run_cost(None)≈0 → the
+# ¥/run cap was a silent no-op. agent_runner now mints f"{thread_id}#{run_seq}"
+# and the generation tools emit GENERATION_COST under that SAME id, so the
+# per-run sum finally bites. These guard both the fix and the "改错全挂" risk.
+
+
+def test_per_run_cap_bites_with_matching_run_id(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """emit 与 cost_guard 共用同一真 run_id → per-run 累积上限真正生效,且 run 间隔离。"""
+    _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_RUN_CAP_CNY", "3.0")
+    run = "t1#1"
+    asyncio.run(_cost("u1", run, 150))  # ¥1.5 this run
+    asyncio.run(_cost("u1", run, 150))  # ¥3.0 this run
+    # 同 run 再来一笔 → 超 ¥3 → 拦(此前 run_id=None 永远拦不住)
+    with pytest.raises(HardFailure) as exc:
+        asyncio.run(cost_guard("u1", run, 0.5))
+    assert exc.value.code == FailureCode.S8_UPSTREAM_REFUSED
+    # 不同 run(同用户)→ per-run 归零 → 放行(证明按 run 隔离,不是全局累加)
+    asyncio.run(cost_guard("u1", "t1#2", 0.5))
+
+
+def test_full_film_turn_not_killed_at_default_cap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """改错全挂守卫:run_id 生效后,默认 ¥25 cap 必须容纳一次合法满片 turn(~¥18-20),
+    否则 normal 多镜生成会被误杀。同样负载压到 ¥3 cap 下必须被拦(证明 cap 仍在工作)。"""
+    _use_tmp_db(monkeypatch, tmp_path)  # 默认 cap = 25
+    run = "t1#1"
+    asyncio.run(_cost("u1", run, 1800))  # ¥18 已花(满片)
+    asyncio.run(cost_guard("u1", run, 1.5))  # +¥1.5 = ¥19.5 < 25 → 不抛
+    monkeypatch.setenv("CASCADE_RUN_CAP_CNY", "3.0")  # 压低 → 同负载必拦
+    with pytest.raises(HardFailure):
+        asyncio.run(cost_guard("u1", run, 1.5))
+
+
+def test_emit_generation_cost_real_run_id_feeds_run_cap(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """cascade._emit_generation_cost 带真 run_id → sum_generation_cost(run_id=...) 命中 →
+    cost_status 的 run_cost 与 user_today_cost 同时反映该笔(根因 A/C 闭环验证)。"""
+    _use_tmp_db(monkeypatch, tmp_path)
+    from agent.tools.cascade import _emit_generation_cost
+
+    run = "t1#9"
+    asyncio.run(
+        _emit_generation_cost(
+            user_id="u1", run_id=run, call_kind="shot_image", cost_cny=1.5, provider="image"
+        )
+    )
+    st = asyncio.run(cost_status("u1", run))
+    assert st["run_cost_cny"] == 1.5  # per-run 读到了(此前恒 0)
+    assert st["user_today_cost_cny"] == 1.5  # 日级也读到了
