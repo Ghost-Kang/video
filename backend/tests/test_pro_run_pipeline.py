@@ -210,6 +210,44 @@ def test_domestic_cached_generate_skips_seedream(monkeypatch, tmp_path):
     assert [c["call_kind"] for c in costs] == ["canvas_video"]
 
 
+def test_domestic_node_backend_comfyui(monkeypatch, tmp_path):
+    frames, costs = _setup(monkeypatch, tmp_path)
+
+    class _FakeCU:
+        async def submit(self, graph, *, user_id, run_id):
+            return {"task_id": "cu1"}
+
+        async def poll(self, task_id):
+            return {"status": "completed", "outputs": ["https://cu/img.png"]}
+
+    monkeypatch.setattr("agent.workers.pro_run_pipeline.get_comfyui_provider", lambda name: _FakeCU())
+    monkeypatch.setattr(pipe.config, "COMFYUI_PROVIDER", "fixture")
+
+    def _seed_should_not_be_called():
+        raise AssertionError("ComfyUI 后端节点不应调 Seedream")
+
+    monkeypatch.setattr("agent.tools.generation.SeedreamProvider", _seed_should_not_be_called)
+
+    g = {
+        "version": 1,
+        "nodes": [
+            {"id": "p", "type": "Prompt", "params": {"text": "猫"}},
+            {"id": "g", "type": "Generate", "params": {"backend": "ComfyUI"}},
+            {"id": "pv", "type": "Preview", "params": {}},
+        ],
+        "edges": [
+            {"id": "1", "source": "p", "sourceHandle": "text", "target": "g", "targetHandle": "positive"},
+            {"id": "2", "source": "g", "sourceHandle": "image", "target": "pv", "targetHandle": "image"},
+        ],
+    }
+    run = _enqueue(graph=g, provider="domestic", cost=1.5)
+    asyncio.run(pipe.process_pro_run_task(run))
+    after = repo.get_pro_run("r1", user_id="u1", thread_id="t1")
+    assert after["status"] == "done"
+    assert after["result"] == ["https://cu/img.png"]  # 走了 ComfyUI provider
+    assert "canvas_comfyui" in [c["call_kind"] for c in costs]  # 记 comfyui 账(非 seedream)
+
+
 def test_domestic_compose_concats_videos(monkeypatch, tmp_path):
     frames, costs = _setup(monkeypatch, tmp_path)
     _patch_domestic(monkeypatch)

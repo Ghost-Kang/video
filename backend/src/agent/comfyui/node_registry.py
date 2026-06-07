@@ -172,6 +172,8 @@ NODE_TYPES: dict[str, NodeType] = {
         ),
         outputs=(Port("image", PortType.IMAGE),),
         params=(
+            # 节点级后端:境内=Seedream(默认,现在就能真出图);ComfyUI=走 ComfyUI(需 GPU 实例)。
+            ParamSpec("backend", "str", "境内", label="执行后端", choices=("境内", "ComfyUI")),
             ParamSpec("seed", "int", 0, label="随机种子", minimum=0),
             ParamSpec("steps", "int", DEFAULT_STEPS, label="步数", minimum=1, maximum=150),
             ParamSpec("cfg", "float", DEFAULT_CFG, label="CFG", minimum=0.0, maximum=30.0),
@@ -210,6 +212,8 @@ NODE_TYPES: dict[str, NodeType] = {
         inputs=(Port("image", PortType.IMAGE, required=True),),
         outputs=(Port("video", PortType.VIDEO),),
         params=(
+            # 节点级后端:境内=Seedance(默认);ComfyUI=走 SVD(需 GPU 实例)。
+            ParamSpec("backend", "str", "境内", label="执行后端", choices=("境内", "ComfyUI")),
             ParamSpec("duration", "int", 5, label="时长(秒)", minimum=1, maximum=10),
             ParamSpec("fps", "int", 8, label="帧率", minimum=1, maximum=30),
             ParamSpec("motion", "int", 127, label="运动强度", minimum=0, maximum=255),
