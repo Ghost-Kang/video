@@ -39,7 +39,7 @@ def captured_runner(monkeypatch):
     """
     calls: list[dict] = []
 
-    async def _capture(user_id, pool, thread_id, content, ws, *, selected_niche=None):
+    async def _capture(user_id, pool, thread_id, content, ws, *, selected_niche=None, agent_prefix=""):
         calls.append({
             "user_id": user_id,
             "thread_id": thread_id,

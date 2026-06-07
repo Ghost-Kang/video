@@ -72,12 +72,15 @@ def _get_thread_run_lock(thread_id: str) -> asyncio.Lock:
     return lock
 
 
-async def _run_agent_serialized(ctx: WSCtx, msg: UserMessageMsg) -> None:
+async def _run_agent_serialized(ctx: WSCtx, msg: UserMessageMsg, agent_prefix: str = "") -> None:
     """Run one Director turn at a time per thread.
 
     Users can double-send or reconnect/autosend quickly. Without this guard,
     two `run_agent` tasks for the same thread race over the same LangGraph
     checkpoint and can duplicate expensive upstream analysis calls.
+
+    `agent_prefix`(H5):系统注入的技术标记(如 `[canvas_autostart]`)只进 LLM turn,不入
+    chat 历史(run_agent 存干净 msg.content);默认空,普通 user_message 不受影响。
     """
     lock = _get_thread_run_lock(msg.thread_id)
     async with lock:
@@ -88,6 +91,7 @@ async def _run_agent_serialized(ctx: WSCtx, msg: UserMessageMsg) -> None:
             msg.content,
             ctx.ws,
             selected_niche=msg.selected_niche,
+            agent_prefix=agent_prefix,
         )
 
 
@@ -584,17 +588,38 @@ async def handle_regenerate_script_node(ctx: WSCtx, msg: RegenerateScriptNodeMsg
     asyncio.create_task(_run_agent_serialized(ctx, synth))
 
 
+# H5 自动开工的内部标记(只进 LLM turn,不入 chat 历史 —— 见 run_agent agent_prefix)。
+# director.md 见此标记 → 强制**画布创作模式**:读「📊 这条为什么火」当依据,把改写后的完整策划书
+# 写进「✍️ 我的策划书」;即便此刻只有空 seed 策划书(平时判卡片栈)也走画布级 §2-6,不调
+# cascade_rewrite。只写策划书 + 建锚点节点(reviewing),**不执行生成**(图/视频仍要用户点 execute)。
+_CANVAS_AUTOSTART_MARKER = "[canvas_autostart]"
+# 存进 chat 历史的干净文案(读起来就是用户进画布的意图,不带技术标记)。
+_CANVAS_AUTOSTART_CONTENT = (
+    "我已进入画布,基于左侧「📊 这条为什么火」的爆点分析,"
+    "在画布上帮我做我的版本——先把改写后的完整策划书写进「✍️ 我的策划书」节点。"
+)
+# analysis_summary 截断上限:防客户端发超大 summary 放大那一轮 autostart 输入 token / 滥用面
+# (审计 2026-06-06 MEDIUM #2)。够装「主题/为什么火/可复制套路」摘要,远超即截断。
+_MAX_SUMMARY_CHARS = 6000
+
+
 async def handle_seed_canvas(ctx: WSCtx, msg: SeedCanvasMsg) -> None:
     """canvas 统筹 P0 桥 — 「在画布上做我的版本」:在**空画布**上 seed 创作起点,让用户从爆点
     分析顺势进画布。带 analysis_summary 时先 seed「📊 这条为什么火」只读参考节点(confirmed,
     内容=分析摘要),再 seed「✍️ 我的策划书」创作锚(reviewing,空)并连一条边,用户进画布就
     看到「为什么火」的依据;不带摘要就只 seed 策划书节点。幂等:画布已有任何节点就不重复 seed。
-    纯脚手架,不调模型、不触发 Director —— 用户给改写方向后既有锚点级联(director.md §2-6)接手。"""
 
-    def _work() -> dict | None:
+    H5(flag `CANVAS_AUTOSTART_DIRECTOR`,默认 OFF):**首次** seed 且带分析摘要时,自动发一条
+    `[canvas_autostart]` 让 Director 立刻把策划书写进画布(进画布即见导演开工),消除冷启动空窗。
+    会花一轮 Director LLM(写策划书,不含图/视频生成),故 flag 控制、可秒关;OFF 时退回前端手动
+    CTA。幂等 seed 保证每张画布最多触发一次,cost_guard 兜底。"""
+
+    summary = (msg.analysis_summary or "").strip()[:_MAX_SUMMARY_CHARS]  # 截断防滥用(MEDIUM #2)
+
+    def _work() -> tuple[dict | None, bool]:
         canvas_tools.set_thread_id(msg.thread_id)
+        seeded = False
         if not canvas_tools._load_all_nodes():  # 空画布才 seed
-            summary = (msg.analysis_summary or "").strip()
             parent_ids = None
             if summary:
                 # 📊 爆点分析参考(confirmed,只读)—— 给用户看「为什么火」,也给 Director 当上下文。
@@ -603,10 +628,21 @@ async def handle_seed_canvas(ctx: WSCtx, msg: SeedCanvasMsg) -> None:
                 parent_ids = [ref["id"]]
             # ✍️ 我的策划书 = 创作锚(reviewing,空,Director 把改写写进这里)。
             canvas_tools.create_canvas_node("script", "✍️ 我的策划书", description="", parent_ids=parent_ids)
-        return canvas_data(msg.thread_id)
+            seeded = True
+        return canvas_data(msg.thread_id), seeded
 
-    snapshot = await asyncio.to_thread(_work)
+    snapshot, seeded = await asyncio.to_thread(_work)
     await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
+
+    # H5 — 进画布自动开工(默认 OFF)。只在「首次 seed + 有分析上下文」触发:幂等 seed 保证每张
+    # 画布最多一次(重连重发 seed_canvas 时画布已有节点 → 不 seed → 不重复触发),无分析时无可
+    # 自动开工的依据。与 user_message 同一条 per-thread serialized agent 路径,cost_guard 兜底。
+    if config.CANVAS_AUTOSTART_DIRECTOR and seeded and summary:
+        autostart = UserMessageMsg(
+            type="user_message", thread_id=msg.thread_id, content=_CANVAS_AUTOSTART_CONTENT
+        )
+        # marker 走 agent_prefix(只进 LLM turn,不入 chat 历史),干净文案存历史(MEDIUM #3)。
+        asyncio.create_task(_run_agent_serialized(ctx, autostart, agent_prefix=_CANVAS_AUTOSTART_MARKER))
 
 
 async def handle_cancel_generation(ctx: WSCtx, msg: CancelGenerationMsg) -> None:

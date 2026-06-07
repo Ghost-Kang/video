@@ -310,6 +310,7 @@ async def run_agent(
     user_content: str,
     ws,
     selected_niche: Optional[Niche] = None,
+    agent_prefix: str = "",
 ) -> None:
     """后台执行 agent。出错时推 analysis_failed + canvas_updated 而非 raw exception。
 
@@ -317,6 +318,10 @@ async def run_agent(
     最前面注入一行 `[selected_niche: <id>]` 标记,Director prompt 已经知道如何
     解析这个标记并跳过 "你想选哪个赛道?" 的追问。保留原文给画布消息历史,
     所以 store 里仍存原始 user_content,标记只进 agent stream。
+
+    `agent_prefix`(H5,审计 2026-06-06)同理:系统注入的技术标记(如 `[canvas_autostart]`)
+    只 prepend 到喂给 LLM 的 turn,**不入 chat 历史**(store 存干净 user_content),避免
+    用户在会话里看到莫名其妙的带标记合成消息。空串 = 无注入(默认,向后兼容)。
     """
     # W5D3 — defensive ContextVar cleanup. PEP 567 + asyncio.create_task each
     # snapshot the parent Context, so two concurrent run_agent tasks already
@@ -349,12 +354,12 @@ async def run_agent(
         await asyncio.to_thread(save_message, user_id, thread_id, "user", user_content)
         entry = await pool.get(user_id, thread_id)
 
-        # 注入 niche 标记 — 不污染存储,只在喂给 LLM 的 turn 加 prefix。
-        agent_input_content = (
-            f"[selected_niche: {selected_niche}]\n\n{user_content}"
-            if selected_niche
-            else user_content
-        )
+        # 注入标记 — 不污染存储,只在喂给 LLM 的 turn 加 prefix(niche + 系统标记如 canvas_autostart)。
+        agent_input_content = user_content
+        if selected_niche:
+            agent_input_content = f"[selected_niche: {selected_niche}]\n\n{agent_input_content}"
+        if agent_prefix:
+            agent_input_content = f"{agent_prefix}\n\n{agent_input_content}"
 
         # W5D4 — bound the whole streamed turn. If the upstream model stalls,
         # asyncio.timeout fires TimeoutError instead of hanging this task (and
