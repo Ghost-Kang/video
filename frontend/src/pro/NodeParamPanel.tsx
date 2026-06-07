@@ -1,13 +1,17 @@
+import { useState } from "react";
 import { useEditor, useValue } from "tldraw";
 import { PRO_NODE_SPECS } from "../types/pro";
 import { useProCanvasStore } from "../store/proCanvasStore";
-import { getProNode, updateProNode } from "./graphIO";
+import { useToastStore } from "../store/toastStore";
+import { getProNode, loadGraph, updateProNode } from "./graphIO";
+import { ProApiError, proErrorTitle, regenFromScript } from "./proExecution";
 import type { ProNodeShape } from "./nodes/NodeShape";
 
 /** 选中单个节点时,右侧参数编辑面板。改参数 → editor.updateShape(单一真相在 editor)。 */
-export function NodeParamPanel() {
+export function NodeParamPanel({ threadId }: { threadId: string }) {
   const editor = useEditor();
   const removeEdgesForNodes = useProCanvasStore((s) => s.removeEdgesForNodes);
+  const [regenBusy, setRegenBusy] = useState(false);
 
   const selected = useValue<ProNodeShape | null>(
     "pro-selected-node",
@@ -21,6 +25,22 @@ export function NodeParamPanel() {
 
   if (!selected) return null;
   const spec = PRO_NODE_SPECS[selected.props.nodeType];
+
+  // 脚本卡重生:用当前(可能已编辑的)脚本重拆分镜 → 替换画布。
+  const regenFromScriptCard = async () => {
+    const script = String(selected.props.params.script_markdown ?? "").trim();
+    if (!script || regenBusy) return;
+    if (!window.confirm("根据当前脚本重新生成分镜?会替换画布上现有的分镜/图/视频节点。")) return;
+    setRegenBusy(true);
+    try {
+      loadGraph(editor, await regenFromScript(script, threadId));
+    } catch (e) {
+      const err = e as ProApiError;
+      useToastStore.getState().push({ kind: "error", title: proErrorTitle(err.code), body: err.detail });
+    } finally {
+      setRegenBusy(false);
+    }
+  };
 
   const setParam = (name: string, value: string | number) => {
     updateProNode(editor, selected.id, { params: { ...selected.props.params, [name]: value } });
@@ -105,10 +125,22 @@ export function NodeParamPanel() {
         })}
       </div>
 
+      {selected.props.nodeType === "Script" && (
+        <button
+          type="button"
+          onClick={regenFromScriptCard}
+          disabled={regenBusy}
+          data-testid="pro-script-regen"
+          className="mt-4 w-full rounded-lg bg-[var(--color-clay)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--color-clay-soft)] disabled:opacity-50"
+        >
+          {regenBusy ? "重新生成分镜中…" : "🔄 重新生成分镜"}
+        </button>
+      )}
+
       <button
         type="button"
         onClick={remove}
-        className="mt-4 w-full rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
+        className="mt-3 w-full rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
       >
         删除此节点
       </button>

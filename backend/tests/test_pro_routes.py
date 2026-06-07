@@ -145,6 +145,28 @@ def test_seed_from_theme_missing_theme_400(monkeypatch):
     assert status == 400 and body["error"] == "theme_required"
 
 
+def test_regen_from_script_ok(monkeypatch):
+    monkeypatch.setattr(config, "PRO_CANVAS_ENABLED", True)
+
+    async def fake_regen(script, user_id):
+        return {"version": 1, "nodes": [], "edges": [], "meta": {"source": "script_regen"}}
+
+    async def ok(*a, **k):
+        return None
+
+    monkeypatch.setattr("agent.transport.http_router.build_seed_graph_from_script", fake_regen)
+    monkeypatch.setattr(http_router.cost_guard, "cost_guard", ok)
+    monkeypatch.setattr(http_router.cost_guard, "record_generation_cost", ok)
+    status, body, _ = asyncio.run(http_router.handle_pro_regen_from_script({}, {"script": "# 改后脚本", "thread_id": "t1"}))
+    assert status == 200 and body["graph"]["meta"]["source"] == "script_regen"
+
+
+def test_regen_from_script_missing_script_400(monkeypatch):
+    monkeypatch.setattr(config, "PRO_CANVAS_ENABLED", True)
+    status, body, _ = asyncio.run(http_router.handle_pro_regen_from_script({}, {}))
+    assert status == 400 and body["error"] == "script_required"
+
+
 # ── WS pro_run_submit ───────────────────────────────────────────────────────────
 
 

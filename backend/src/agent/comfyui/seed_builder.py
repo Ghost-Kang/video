@@ -165,6 +165,23 @@ async def build_seed_graph_from_theme(theme: str, user_id: str) -> dict[str, Any
     )
 
 
+async def build_seed_graph_from_script(script_markdown: str, user_id: str) -> dict[str, Any]:
+    """脚本卡重生:用户编辑后的脚本 → Doubao 重拆分镜 → 创作图(保留脚本文本)。"""
+    from agent.comfyui.script_gen import generate_shots_from_script
+
+    result = await generate_shots_from_script(script_markdown)  # 抛 ScriptGenError
+    shots = [{"shot_index": s["shot_index"], "text": s["visual"]} for s in result["shots"]]
+    char_anchors, scene_anchors = await _load_anchors(user_id)
+    return _build_graph_from_shots(
+        shots,
+        script_markdown=result.get("script_markdown", ""),
+        char_anchors=char_anchors,
+        scene_anchors=scene_anchors,
+        assets_by_shot={},
+        meta={"source": "script_regen"},
+    )
+
+
 # ── 分析路径 ─────────────────────────────────────────────────────────────────────
 
 

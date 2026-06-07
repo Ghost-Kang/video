@@ -6,7 +6,11 @@ import asyncio
 
 import pytest
 
-from agent.comfyui.script_gen import ScriptGenError, generate_script_from_theme
+from agent.comfyui.script_gen import (
+    ScriptGenError,
+    generate_script_from_theme,
+    generate_shots_from_script,
+)
 
 
 class _Res:
@@ -74,3 +78,27 @@ def test_shots_capped_at_12(monkeypatch):
     _patch_model(monkeypatch, _fake_model('{"script_markdown":"x","shots":[%s]}' % many))
     out = asyncio.run(generate_script_from_theme("主题"))
     assert len(out["shots"]) == 12
+
+
+# ── 脚本卡重生(script → shots) ─────────────────────────────────────────────────
+
+
+def test_shots_from_script_keeps_script(monkeypatch):
+    _patch_model(monkeypatch, _fake_model('{"shots":[{"visual":"开场","dialogue":"d"},{"visual":"结尾"}]}'))
+    out = asyncio.run(generate_shots_from_script("# 我的脚本正文"))
+    assert out["script_markdown"] == "# 我的脚本正文"  # 保留用户编辑的脚本
+    assert [s["shot_index"] for s in out["shots"]] == [1, 2]
+    assert out["shots"][0]["visual"] == "开场"
+
+
+def test_shots_from_script_empty_raises():
+    with pytest.raises(ScriptGenError) as ei:
+        asyncio.run(generate_shots_from_script("   "))
+    assert ei.value.code == "script_required"
+
+
+def test_shots_from_script_bad_output_raises(monkeypatch):
+    _patch_model(monkeypatch, _fake_model("garbage", "still garbage"))
+    with pytest.raises(ScriptGenError) as ei:
+        asyncio.run(generate_shots_from_script("# 脚本"))
+    assert ei.value.code == "bad_output"
