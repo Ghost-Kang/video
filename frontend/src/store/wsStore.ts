@@ -149,6 +149,8 @@ interface WSStore {
   // 改写解封灰度 kill-switch:后端 session_state.rewrite_enabled 权威下发
   // (undefined = 旧后端未下发 → resolveRewriteEnabled 下探 VITE flag)。
   rewriteEnabled?: boolean;
+  // Pro 画布灰度:后端 session_state.pro_canvas_enabled 权威下发(undefined/false = 隐藏入口)。
+  proCanvasEnabled?: boolean;
   setCurrentThreadId: (threadId: string) => void;
   setLoading: (loading: boolean) => void;
   resetThinking: () => void;
@@ -171,6 +173,7 @@ export const useWSStore = create<WSStore>((set, get) => ({
   progressDetail: "",
   pendingByThread: {},
   rewriteEnabled: undefined,
+  proCanvasEnabled: undefined,
 
   setCurrentThreadId: (threadId) => {
     set({ currentThreadId: threadId });
@@ -300,6 +303,8 @@ export const useWSStore = create<WSStore>((set, get) => ({
       case "session_state": {
         // 改写解封灰度 kill-switch:后端权威下发(undefined = 旧后端,保留前端下探)。
         if (event.rewrite_enabled !== undefined) set({ rewriteEnabled: event.rewrite_enabled });
+        // Pro 画布灰度:后端权威下发(undefined/false = 隐藏 Agent 模式 Pro 画布入口)。
+        if (event.pro_canvas_enabled !== undefined) set({ proCanvasEnabled: event.pro_canvas_enabled });
         canvas.setMessages(event.messages);
         if (event.canvas) queueMicrotask(() => canvas.setCanvas(event.canvas!));
         // W5D4 — resume terminal run state on reconnect. Without this, a run

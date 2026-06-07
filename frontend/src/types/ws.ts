@@ -114,6 +114,8 @@ export interface SessionStateEventTyped extends Omit<SessionStateEvent, "message
   // 改写解封灰度 kill-switch:后端 config.REWRITE_ENABLED 权威下发(undefined = 旧后端
   // 未下发 → resolveRewriteEnabled 下探 VITE flag)。前端据此渲染/隐藏改写区。
   rewrite_enabled?: boolean;
+  // Pro 画布灰度:后端 config.PRO_CANVAS_ENABLED 权威下发(undefined/false = 隐藏入口)。
+  pro_canvas_enabled?: boolean;
 }
 
 export interface CanvasUpdatedEventTyped extends Omit<CanvasUpdatedEvent, "canvas"> {

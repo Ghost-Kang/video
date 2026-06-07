@@ -196,6 +196,8 @@ async def handle_get_session_state(ctx: WSCtx, msg: GetSessionStateMsg) -> None:
         failure=failure,
         # 改写解封灰度 kill-switch:后端权威下发,前端 resolveRewriteEnabled(cohortFlag)。
         rewrite_enabled=config.REWRITE_ENABLED,
+        # Pro 画布灰度:flag OFF 时前端不显示 Agent 模式的 Pro 画布入口。
+        pro_canvas_enabled=config.PRO_CANVAS_ENABLED,
     )
     # W5D4 — replay this thread's analysis/rewrite so a reloaded finished
     # session shows its cards instead of an empty panel. analysis_returned /

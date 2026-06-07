@@ -1,4 +1,5 @@
 import { ProViewToggle } from "./ProViewToggle";
+import { ProCanvasEntry } from "../pro/ProCanvasEntry";
 
 interface Props {
   userId: string;
@@ -66,6 +67,8 @@ export function Header({
       </button>
 
       <span className="ml-auto" />
+
+      <ProCanvasEntry variant="toolbar" />
 
       {onToggleProView && (
         <ProViewToggle

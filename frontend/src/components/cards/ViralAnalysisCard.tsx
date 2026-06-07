@@ -5,6 +5,7 @@ import { COPY, scrubUiForbidden, stripHookCode } from "../../lib/cardCopy";
 import { CARD_GLASS } from "../../lib/cardStyles";
 import { useInView } from "../../hooks/useInView";
 import { ScriptDrawer } from "./ScriptDrawer";
+import { ProCanvasEntry } from "../../pro/ProCanvasEntry";
 
 interface Props {
   analysis: CascadeAnalysisContract;
@@ -48,17 +49,21 @@ export function ViralAnalysisCard({ analysis }: Props) {
         <h2 className="font-serif-cn text-lg font-medium tracking-[-0.01em] text-stone-900 dark:text-stone-50">
           {COPY.viral_header}
         </h2>
-        <button
-          type="button"
-          onClick={() => setScriptOpen(true)}
-          aria-haspopup="dialog"
-          aria-expanded={scriptOpen}
-          data-testid="script-entry"
-          className="group inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200/80 bg-white/50 px-3 py-1.5 text-[12px] font-medium text-stone-600 backdrop-blur transition-all hover:border-[#7c2d12]/40 hover:text-[#7c2d12] hover:shadow-[0_0_14px_-2px_rgba(234,88,12,0.4)] dark:border-stone-700 dark:bg-stone-900/40 dark:text-stone-300 dark:hover:text-[#ea580c]"
-        >
-          <ScrollText className="h-3.5 w-3.5 group-hover:anim-icon-breathe" />
-          {COPY.script_entry}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Pro 画布入口(灰度自门控):把这条分析「展开为计算图」种子图。 */}
+          <ProCanvasEntry variant="card" analysisId={analysis.analysis_id} />
+          <button
+            type="button"
+            onClick={() => setScriptOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={scriptOpen}
+            data-testid="script-entry"
+            className="group inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200/80 bg-white/50 px-3 py-1.5 text-[12px] font-medium text-stone-600 backdrop-blur transition-all hover:border-[#7c2d12]/40 hover:text-[#7c2d12] hover:shadow-[0_0_14px_-2px_rgba(234,88,12,0.4)] dark:border-stone-700 dark:bg-stone-900/40 dark:text-stone-300 dark:hover:text-[#ea580c]"
+          >
+            <ScrollText className="h-3.5 w-3.5 group-hover:anim-icon-breathe" />
+            {COPY.script_entry}
+          </button>
+        </div>
       </div>
 
       {clean(va.theme) && (
