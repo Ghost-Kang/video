@@ -28,7 +28,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     (sed -i "s|http://deb.debian.org|${DEBIAN_MIRROR}|g" /etc/apt/sources.list.d/debian.sources 2>/dev/null || true) && \
     (sed -i "s|http://deb.debian.org|${DEBIAN_MIRROR}|g" /etc/apt/sources.list 2>/dev/null || true) && \
     apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates ffmpeg
+      curl ca-certificates ffmpeg fonts-wqy-zenhei
 ADD https://astral.sh/uv/install.sh /uv-install.sh
 RUN sh /uv-install.sh && rm /uv-install.sh
 ENV PATH="/root/.local/bin:$PATH"
