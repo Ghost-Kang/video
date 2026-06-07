@@ -130,12 +130,22 @@ def _update_node_result(
     *,
     user_id: str | None = None,
     thread_id: str | None = None,
+    expected_task_id: str | None = None,
 ) -> None:
-    """Patch node.result dict. 节点不存在 silently no-op。"""
+    """Patch node.result dict. 节点不存在 silently no-op。
+
+    M10(审计 2026-06-06)fencing token:worker 回写产物时传它正在跑的 ``expected_task_id``;
+    若节点当前 ``generation_task_id`` 已变(restore/regenerate 在途清掉/换掉它 —— 二者跑在
+    ``asyncio.to_thread``,与事件循环上的 worker 回写跨线程非事务),说明这条 worker 已被作废,
+    其迟到的 url 回写必须跳过,否则会盖掉用户刚回滚/重生的产物。``None`` = 不 fencing
+    (composite 无 task_id / handler 直接调用,行为不变,向后兼容)。"""
     node = _load_node(node_id, user_id=user_id, thread_id=thread_id)
     if node:
         # 取消守卫(逐镜取消,P2 ③):取消后不写产物 url —— 防 in-flight 任务回写盖掉取消。
         if node.get("generation_status") == "cancelled":
+            return
+        # fencing:节点已被 restore/regenerate 重置(task_id 变更)→ 这条陈旧 worker 回写作废。
+        if expected_task_id is not None and node.get("generation_task_id") != expected_task_id:
             return
         existing = node.get("result") or {}
         if isinstance(existing, dict):

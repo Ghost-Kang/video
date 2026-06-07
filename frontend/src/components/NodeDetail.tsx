@@ -502,13 +502,13 @@ const S = {
     alignItems: "center",
     gap: 8,
     padding: "12px 16px",
-    borderBottom: "1px solid #e4e4e7",
+    borderBottom: "1px solid #ece4d8",
   },
 
   title: {
     fontWeight: 600,
     fontSize: 14,
-    color: "#18181b",
+    color: "#292524",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap" as const,
@@ -520,7 +520,7 @@ const S = {
     border: "none",
     cursor: "pointer",
     fontSize: 14,
-    color: "#a1a1aa",
+    color: "#a8a29e",
     padding: 4,
   },
 
@@ -544,8 +544,8 @@ const S = {
     borderRadius: 4,
     fontSize: 11,
     fontWeight: 500,
-    background: "#f4f4f5",
-    color: "#71717a",
+    background: "#f3ede3",
+    color: "#78716c",
   }),
 
   subtype: () => ({
@@ -553,13 +553,13 @@ const S = {
     borderRadius: 4,
     fontSize: 11,
     fontWeight: 500,
-    background: "#ede9fe",
-    color: "#7c3aed",
+    background: "#f0e6d8",
+    color: "#c2410c",
   }),
 
   statusToggle: {
     display: "flex",
-    border: "1px solid #d4d4d8",
+    border: "1px solid #ddd2c2",
     borderRadius: 4,
     overflow: "hidden",
   } as React.CSSProperties,
@@ -572,8 +572,8 @@ const S = {
     cursor: "pointer",
     outline: "none",
     background: v === current ? "#7c2d12" : "#fff",
-    color: v === current ? "#faf8f3" : "#52525b",
-    borderRight: v === "reviewing" ? "1px solid #d4d4d8" : "none",
+    color: v === current ? "#faf8f3" : "#78716c",
+    borderRight: v === "reviewing" ? "1px solid #ddd2c2" : "none",
   }),
 
   section: {
@@ -586,7 +586,7 @@ const S = {
   label: {
     fontSize: 11,
     fontWeight: 500,
-    color: "#a1a1aa",
+    color: "#a8a29e",
     textTransform: "uppercase" as const,
     letterSpacing: "0.05em",
   },
@@ -606,10 +606,10 @@ const S = {
 
   toggleOff: {
     padding: "3px 10px",
-    border: "1px solid #d4d4d8",
+    border: "1px solid #ddd2c2",
     borderRadius: 4,
-    background: "#f4f4f5",
-    color: "#a1a1aa",
+    background: "#f3ede3",
+    color: "#a8a29e",
     cursor: "pointer",
     fontSize: 11,
     fontWeight: 600,
@@ -620,20 +620,20 @@ const S = {
   providerSelect: {
     width: "100%",
     padding: "6px 8px",
-    border: "1px solid #e4e4e7",
+    border: "1px solid #ece4d8",
     borderRadius: 6,
     fontSize: 12,
     fontFamily: "inherit",
     outline: "none",
     background: "#fff",
-    color: "#18181b",
+    color: "#292524",
     cursor: "pointer",
   } as React.CSSProperties,
 
   promptInput: {
     width: "100%",
     padding: "8px",
-    border: "1px solid #e4e4e7",
+    border: "1px solid #ece4d8",
     borderRadius: 6,
     fontSize: 12,
     fontFamily: "inherit",
@@ -663,9 +663,9 @@ const S = {
   agentBtn: {
     flex: 1,
     padding: "6px 0",
-    background: "#f4f4f5",
-    color: "#52525b",
-    border: "1px solid #e4e4e7",
+    background: "#f3ede3",
+    color: "#78716c",
+    border: "1px solid #ece4d8",
     borderRadius: 6,
     cursor: "pointer",
     fontSize: 12,
@@ -677,15 +677,15 @@ const S = {
     flexDirection: "column",
     gap: 6,
     padding: 8,
-    background: "#f4f4f5",
+    background: "#f3ede3",
     borderRadius: 6,
-    border: "1px solid #d4d4d8",
+    border: "1px solid #ddd2c2",
   } as React.CSSProperties,
 
   polishInput: {
     width: "100%",
     padding: "6px 8px",
-    border: "1px solid #d4d4d8",
+    border: "1px solid #ddd2c2",
     borderRadius: 4,
     fontSize: 12,
     fontFamily: "inherit",
@@ -701,7 +701,7 @@ const S = {
 
   polishSubmit: {
     padding: "4px 12px",
-    background: "#18181b",
+    background: "#292524",
     color: "#fff",
     border: "none",
     borderRadius: 4,
@@ -712,8 +712,8 @@ const S = {
   polishCancel: {
     padding: "4px 12px",
     background: "transparent",
-    color: "#71717a",
-    border: "1px solid #d4d4d8",
+    color: "#78716c",
+    border: "1px solid #ddd2c2",
     borderRadius: 4,
     cursor: "pointer",
     fontSize: 11,
@@ -738,7 +738,7 @@ const S = {
     height: 60,
     objectFit: "cover" as const,
     borderRadius: 4,
-    border: "1px solid #e4e4e7",
+    border: "1px solid #ece4d8",
   },
 
   refArrow: {
@@ -782,7 +782,7 @@ const S = {
 
   refTitle: {
     fontSize: 10,
-    color: "#a1a1aa",
+    color: "#a8a29e",
     maxWidth: 80,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -794,8 +794,8 @@ const S = {
     maxHeight: 260,
     objectFit: "contain" as const,
     borderRadius: 6,
-    border: "1px solid #e4e4e7",
-    background: "#fafafa",
+    border: "1px solid #ece4d8",
+    background: "#faf8f3",
   },
 
   resultVideo: {
@@ -805,7 +805,7 @@ const S = {
 
   text: {
     fontSize: 13,
-    color: "#3f3f46",
+    color: "#44403c",
     lineHeight: 1.6,
     whiteSpace: "pre-wrap" as const,
     wordBreak: "break-word" as const,
@@ -813,14 +813,14 @@ const S = {
 
   muted: {
     fontSize: 12,
-    color: "#a1a1aa",
+    color: "#a8a29e",
   },
 
   reviewSection: {
     padding: 10,
-    background: "#f4f4f5",
+    background: "#f3ede3",
     borderRadius: 8,
-    border: "1px solid #d4d4d8",
+    border: "1px solid #ddd2c2",
     display: "flex",
     flexDirection: "column",
     gap: 8,
@@ -834,7 +834,7 @@ const S = {
   approveBtn: {
     flex: 1,
     padding: "6px 0",
-    background: "#18181b",
+    background: "#292524",
     color: "#fff",
     border: "none",
     borderRadius: 6,
@@ -847,8 +847,8 @@ const S = {
     flex: 1,
     padding: "6px 0",
     background: "#fff",
-    color: "#52525b",
-    border: "1px solid #d4d4d8",
+    color: "#78716c",
+    border: "1px solid #ddd2c2",
     borderRadius: 6,
     cursor: "pointer",
     fontSize: 13,
@@ -859,8 +859,8 @@ const S = {
     flex: 1,
     padding: "6px 0",
     background: "transparent",
-    color: "#71717a",
-    border: "1px solid #e4e4e7",
+    color: "#78716c",
+    border: "1px solid #ece4d8",
     borderRadius: 6,
     cursor: "pointer",
     fontSize: 13,
@@ -880,7 +880,7 @@ const S = {
 
   shot: {
     padding: "8px 0",
-    borderBottom: "1px solid #f4f4f5",
+    borderBottom: "1px solid #f3ede3",
     display: "flex",
     flexDirection: "column",
     gap: 2,
@@ -889,20 +889,20 @@ const S = {
   shotNo: {
     fontSize: 12,
     fontWeight: 600,
-    color: "#18181b",
+    color: "#292524",
   },
 
   // markdown
-  mdP: { fontSize: 13, color: "#3f3f46", lineHeight: 1.7, margin: "6px 0", whiteSpace: "pre-wrap" as const, wordBreak: "break-word" as const },
-  mdH: { fontSize: 14, fontWeight: 600, color: "#18181b", margin: "12px 0 4px" },
+  mdP: { fontSize: 13, color: "#44403c", lineHeight: 1.7, margin: "6px 0", whiteSpace: "pre-wrap" as const, wordBreak: "break-word" as const },
+  mdH: { fontSize: 14, fontWeight: 600, color: "#292524", margin: "12px 0 4px" },
   mdList: { margin: "4px 0", paddingLeft: 20 },
-  mdLi: { fontSize: 13, color: "#3f3f46", lineHeight: 1.6, margin: "2px 0" },
-  mdStrong: { fontWeight: 600, color: "#18181b" },
-  mdEm: { fontStyle: "italic", color: "#71717a" },
-  mdCode: { fontFamily: "monospace", fontSize: 12, background: "#f4f4f5", padding: "1px 4px", borderRadius: 3 },
-  mdQuote: { borderLeft: "2px solid #e4e4e7", paddingLeft: 10, margin: "6px 0", color: "#71717a" },
-  mdHr: { border: "none", borderTop: "1px solid #e4e4e7", margin: "12px 0" },
+  mdLi: { fontSize: 13, color: "#44403c", lineHeight: 1.6, margin: "2px 0" },
+  mdStrong: { fontWeight: 600, color: "#292524" },
+  mdEm: { fontStyle: "italic", color: "#78716c" },
+  mdCode: { fontFamily: "monospace", fontSize: 12, background: "#f3ede3", padding: "1px 4px", borderRadius: 3 },
+  mdQuote: { borderLeft: "2px solid #ece4d8", paddingLeft: 10, margin: "6px 0", color: "#78716c" },
+  mdHr: { border: "none", borderTop: "1px solid #ece4d8", margin: "12px 0" },
   mdTable: { width: "100%", borderCollapse: "collapse", margin: "6px 0", fontSize: 12 } as React.CSSProperties,
-  mdTh: { border: "1px solid #e4e4e7", padding: "4px 8px", background: "#f4f4f5", fontWeight: 600, textAlign: "left" as const },
-  mdTd: { border: "1px solid #e4e4e7", padding: "4px 8px", color: "#3f3f46" },
+  mdTh: { border: "1px solid #ece4d8", padding: "4px 8px", background: "#f3ede3", fontWeight: 600, textAlign: "left" as const },
+  mdTd: { border: "1px solid #ece4d8", padding: "4px 8px", color: "#44403c" },
 };

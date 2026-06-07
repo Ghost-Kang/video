@@ -357,3 +357,60 @@ def test_pending_reserved_sums_only_pending_media():
     claim_pending_tasks("image")
     reserved2 = canvas_tools.pending_generation_reserved_cny(thread_id=tid)
     assert reserved2 == pytest.approx(3.0)  # 只剩 pending 的视频
+
+
+# ── M10(审计 2026-06-06):_update_node_result fencing token 防陈旧 worker 回写 ──
+
+
+def test_update_node_result_fencing_blocks_stale_writeback():
+    """节点 task_id 变更后(restore 清掉),陈旧 worker 的产物回写被 fencing 跳过。"""
+    tid = _unique_thread()
+    canvas_tools.set_thread_id(tid)
+    n = create_canvas_node("image", "图", "p")
+    nid = n["id"]
+    # worker 在途:task_id=T1
+    node = canvas_tools._load_node(nid)
+    node["generation_task_id"] = "T1"
+    node["generation_status"] = "polling"
+    canvas_tools._upsert_node(node)
+    # 匹配 task_id → 正常写入
+    canvas_tools._update_node_result(nid, {"url": "good.png"}, expected_task_id="T1")
+    assert (canvas_tools._load_node(nid).get("result") or {}).get("url") == "good.png"
+    # restore settle:清 task_id + 换回旧产物
+    node = canvas_tools._load_node(nid)
+    node["generation_task_id"] = None
+    node["result"] = {"url": "restored.png"}
+    canvas_tools._upsert_node(node)
+    # 陈旧 worker 回写(expected=T1)→ fencing 跳过,不盖 restored.png
+    canvas_tools._update_node_result(nid, {"url": "stale.png"}, expected_task_id="T1")
+    assert (canvas_tools._load_node(nid).get("result") or {}).get("url") == "restored.png"
+
+
+def test_update_node_result_no_fence_when_expected_none():
+    """expected_task_id=None(composite / handler 直接调用)→ 不 fencing,照常写(向后兼容)。"""
+    tid = _unique_thread()
+    canvas_tools.set_thread_id(tid)
+    n = create_canvas_node("composite", "合成", "")
+    canvas_tools._update_node_result(n["id"], {"url": "film.mp4"})
+    assert (canvas_tools._load_node(n["id"]).get("result") or {}).get("url") == "film.mp4"
+
+
+def test_regenerate_clears_task_id_for_fencing():
+    """regenerate 清 task_id,使上一轮 worker 的回写 fence 出局。"""
+    from agent.tools.canvas import regenerate_node
+
+    tid = _unique_thread()
+    canvas_tools.set_thread_id(tid)
+    n = create_canvas_node("image", "图", "p")
+    nid = n["id"]
+    node = canvas_tools._load_node(nid)
+    node["generation_task_id"] = "OLD"
+    node["generation_status"] = "done"
+    node["result"] = {"url": "v1.png"}
+    canvas_tools._upsert_node(node)
+
+    regenerate_node(nid)  # done(非在途)→ 允许重生;清 task_id
+    assert canvas_tools._load_node(nid).get("generation_task_id") is None
+    # 旧 worker 迟到回写(expected=OLD)被 fencing 跳过
+    canvas_tools._update_node_result(nid, {"url": "stale.png"}, expected_task_id="OLD")
+    assert (canvas_tools._load_node(nid).get("result") or {}).get("url") != "stale.png"
