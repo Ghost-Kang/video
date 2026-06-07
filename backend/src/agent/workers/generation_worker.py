@@ -20,10 +20,12 @@ from typing import Awaitable, Callable
 
 from agent.config import IMAGE_GEN_PROVIDER
 from agent.tools import canvas as canvas_tools
+from agent.tools.canvas_persistence import pro_runs_repo
 from agent.tools.video_generation import get_video_provider
 from agent.transport.notify import notify_user
 from agent.workers.composite_pipeline import process_composite_task
 from agent.workers.image_pipeline import make_image_provider, process_image_task
+from agent.workers.pro_run_pipeline import process_pro_run_task, recover_pro_run_task
 from agent.workers.s3 import upload_bytes_to_s3
 from agent.workers.video_pipeline import process_video_task
 
@@ -31,13 +33,14 @@ from agent.workers.video_pipeline import process_video_task
 IMAGE_CONCURRENCY = 5
 VIDEO_CONCURRENCY = 2
 COMPOSITE_CONCURRENCY = 1
+PRO_RUN_CONCURRENCY = 2  # ComfyUI 整图;self-host 单卡时 ComfyUI 自身队列再串行化
 TICK_INTERVAL_SEC = 2
 
 _started = False
 
 
 def start_workers() -> None:
-    """启动 image / video / composite 三个独立 worker task。Idempotent。"""
+    """启动 image / video / composite / pro_run 四个独立 worker task。Idempotent。"""
     global _started
     if _started:
         return
@@ -45,6 +48,7 @@ def start_workers() -> None:
     asyncio.create_task(_image_worker())
     asyncio.create_task(_video_worker())
     asyncio.create_task(_composite_worker())
+    asyncio.create_task(_pro_run_worker())
 
 
 # 兼容旧名:server.py + tests monkeypatch 用的是 _start_worker
@@ -68,6 +72,52 @@ async def _video_worker() -> None:
 async def _composite_worker() -> None:
     sem = asyncio.Semaphore(COMPOSITE_CONCURRENCY)
     await _worker_loop("composite", "composite", sem, process_composite_task)
+
+
+# ---------- Pro 计算图 worker(pro_runs 表,独立于 canvas_nodes) ----------
+# 注:不能复用 _worker_loop —— 它硬编码 canvas_tools.claim_pending_tasks(canvas_nodes)。
+# pro_runs 是另一张表、另一套 id(run_id),故单独成 loop。
+
+
+async def _pro_run_worker() -> None:
+    sem = asyncio.Semaphore(PRO_RUN_CONCURRENCY)
+    print(f"[Worker:pro_run] 启动 (concurrency={PRO_RUN_CONCURRENCY})")
+    tick = 0
+    while True:
+        tick += 1
+        try:
+            runs = pro_runs_repo.claim_pending_pro_runs()
+            if runs:
+                print(f"[Worker:pro_run] tick={tick} 认领 {len(runs)}: {[r['run_id'][:12] for r in runs]}")
+                await asyncio.gather(
+                    *(_run_pro_with_sem(sem, r) for r in runs), return_exceptions=True
+                )
+            recovered = pro_runs_repo.recover_pro_runs()
+            if recovered:
+                print(f"[Worker:pro_run] tick={tick} 恢复 {len(recovered)} 个中断计算图")
+                for r in recovered:
+                    try:
+                        await recover_pro_run_task(r)
+                    except Exception as e:  # noqa: BLE001
+                        print(f"[Worker:pro_run] 恢复异常 run={r['run_id'][:16]}: {e}")
+        except Exception as e:  # noqa: BLE001
+            print(f"[Worker:pro_run] 调度异常: {e}")
+        await asyncio.sleep(TICK_INTERVAL_SEC)
+
+
+async def _run_pro_with_sem(sem: asyncio.Semaphore, run: dict) -> None:
+    """semaphore-bounded 单 run 执行。pipeline 自处理预期错误;这里兜底未预期异常 → 重试/失败。"""
+    async with sem:
+        rid = run.get("run_id", "?")
+        uid = run.get("user_id", "")
+        tid = run.get("thread_id", "")
+        try:
+            await process_pro_run_task(run)
+        except Exception as e:  # noqa: BLE001
+            print(f"[Worker:pro_run] 任务异常 run={rid[:16]} error={e}")
+            retried = pro_runs_repo.schedule_pro_run_retry(rid, str(e), user_id=uid, thread_id=tid)
+            if not retried:
+                pro_runs_repo.update_pro_run_state(rid, "failed", user_id=uid, thread_id=tid, error=str(e))
 
 
 # ---------- shared loop body ----------

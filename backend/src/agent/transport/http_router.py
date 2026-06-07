@@ -36,6 +36,8 @@ from agent.cascade.failures import HardFailure
 from agent.cascade.persistence.db import _connect
 from agent.cascade.rewrite_service import error_payload, request_rewrite
 from agent.cascade.storage import list_creators, list_events
+from agent.comfyui.compiler import CompileError, estimate_graph_cost
+from agent.comfyui.seed_builder import SeedBuildError, build_seed_graph
 
 
 # Slowloris guard for the hand-rolled HTTP server: cap how long we wait for a
@@ -593,6 +595,45 @@ async def handle_client_error(qs: dict, body: dict) -> tuple[int, dict, str]:
     return 200, {"ok": True}, "OK"
 
 
+# ---------- Pro 画布(ComfyUI 计算图)----------
+# 都走 COHORT 默认鉴权(需 X-Invite-Code)+ PRO_CANVAS_ENABLED 灰度。POST,身份从 body["user_id"]
+# 取(dispatcher 已用 INVITE_CODE_MAP 钉成 server-derived;mapped code 不可伪造)。均只读不花钱。
+
+
+async def handle_pro_estimate(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """估算整图成本(Run 前确认弹窗)。不花钱。body={graph}。"""
+    if not config.PRO_CANVAS_ENABLED:
+        return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
+    graph = body.get("graph")
+    if not isinstance(graph, dict):
+        return 400, {"error": "graph_required"}, "Bad Request"
+    try:
+        est = estimate_graph_cost(graph)
+    except CompileError as exc:
+        return 400, {"error": exc.code, "message": exc.message}, "Bad Request"
+    return 200, est, "OK"
+
+
+async def handle_pro_seed(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """分析 → 种子可执行图(plan §6)。不花钱。body={analysis_id, thread_id?}。"""
+    if not config.PRO_CANVAS_ENABLED:
+        return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
+    analysis_id = str(body.get("analysis_id") or qs.get("analysis_id", [""])[0] or "").strip()
+    thread_id = str(body.get("thread_id") or qs.get("thread_id", [""])[0] or "").strip() or None
+    # 鉴权 A (B8-3) — 同 handle_rewrite:per-user MAPPED 邀请码下 dispatcher 已把 body["user_id"]
+    # 钉成 server-derived(不可伪造);共享码下仍是 client 自报(全站既有的弱模式残留,见 synthesis §6.1,
+    # 迁移路径=每人一码)。seed 只读不花钱 → 这是数据隔离层面的同款残留,非本功能新增的洞。
+    user_id = str(body.get("user_id") or "default")
+    if not analysis_id:
+        return 400, {"error": "analysis_id_required"}, "Bad Request"
+    try:
+        graph = await build_seed_graph(analysis_id, user_id, thread_id=thread_id)
+    except SeedBuildError as exc:
+        status = 404 if exc.code == "analysis_not_found" else 400
+        return status, {"error": exc.code, "message": exc.message}, "Bad Request"
+    return 200, {"graph": graph}, "OK"
+
+
 # ---------- routing ----------
 
 
@@ -613,6 +654,8 @@ EXACT_ROUTES: dict[tuple[str, str], HandlerFn] = {
     ("GET", "/api/invite/verify"): handle_invite_verify,
     ("GET", "/api/showcase"): handle_showcase_get,
     ("POST", "/api/showcase/status"): handle_showcase_status_post,
+    ("POST", "/api/pro/estimate"): handle_pro_estimate,
+    ("POST", "/api/pro/seed"): handle_pro_seed,
 }
 
 # (method, prefix, suffix, param_name, handler) — 路径里的可变段会作为 path_param 传入。

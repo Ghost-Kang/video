@@ -62,6 +62,11 @@ PREDICT_DOUBAO_DIRECT_CNY = 0.50
 # buffer over current provider rates. Used by predict_generation_cost so the
 # enqueue-time guard caps long clips before the worker spends real money.
 PREDICT_VIDEO_SECOND_CNY = 0.30
+# Pro 画布 ComfyUI 图(plan §3/§5)— 每个 Generate 节点按一张图计价(¥1.5 上界)。
+# self-host 境内 GPU 边际近零,这是保守上界(高估对成本闸是安全的);RunningHub 境外按次真扣费。
+# **必须有此分支**:否则 predict_generation_cost('comfyui') 回落 0.0 → 整条 ComfyUI Run 计 ¥0、
+# 对 ¥25/run + ¥30/天 闸完全不可见(正是审计 #1-7 / C1 修过的那类漏记账)。
+PREDICT_COMFYUI_IMAGE_CNY = 1.5
 
 
 def predict_generation_cost(kind: str, *, n_images: int = 0, video_seconds: float = 0.0) -> float:
@@ -69,6 +74,7 @@ def predict_generation_cost(kind: str, *, n_images: int = 0, video_seconds: floa
 
     - image: ``n_images × PREDICT_SHOT_IMAGE_CNY``
     - video: ``video_seconds × PREDICT_VIDEO_SECOND_CNY``
+    - comfyui: ``n_images × PREDICT_COMFYUI_IMAGE_CNY`` (Pro 画布每个 Generate 节点一张图)
     - composite/script: 0 (no external paid provider call at enqueue)
 
     Used by the enqueue-time cost_guard so retry×N + restart-reenqueue can't burn
@@ -79,6 +85,8 @@ def predict_generation_cost(kind: str, *, n_images: int = 0, video_seconds: floa
         return max(0, n_images) * PREDICT_SHOT_IMAGE_CNY
     if kind == "video":
         return max(0.0, video_seconds) * PREDICT_VIDEO_SECOND_CNY
+    if kind == "comfyui":
+        return max(0, n_images) * PREDICT_COMFYUI_IMAGE_CNY
     return 0.0
 
 

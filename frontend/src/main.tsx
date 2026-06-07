@@ -12,6 +12,7 @@ import { ToastContainer } from "./components/feedback/ToastContainer";
 import { reportClientError, extractThreadId } from "./lib/errorReporter";
 
 const App = lazy(() => import("./App"));
+const ProCanvas = lazy(() => import("./pro/ProCanvas"));
 const AnchorAnalytics = lazy(() =>
   import("./pages/AnchorAnalytics").then((mod) => ({ default: mod.AnchorAnalytics })),
 );
@@ -152,6 +153,12 @@ function AppRoutes() {
         <Route
           path="/chat/:threadId"
           element={user ? <App userId={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+        />
+        {/* Pro 高级子画布(tldraw + ComfyUI 计算图)。flag PRO_CANVAS_ENABLED 默认 OFF 时
+            后端 estimate/seed/run 入口会回 pro_canvas_disabled,前端 toast 提示。 */}
+        <Route
+          path="/pro/:threadId"
+          element={user ? <ProCanvas userId={user} /> : <Navigate to="/login" replace />}
         />
 
         {/* Legacy redirect */}
