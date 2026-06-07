@@ -55,6 +55,7 @@ export function createNode(editor: Editor, t: ProNodeTypeKey, x: number, y: numb
     status: "idle",
     resultUrl: cached ? cachedUrl : null,
     label: opts.label ?? "",
+    needsRegen: false,
   };
   editor.createShape<ProNodeShape>({ id, type: "pronode", x, y, props });
   return id;
@@ -106,4 +107,64 @@ export function loadGraph(editor: Editor, graph: ProGraph): void {
   }));
   useProCanvasStore.getState().setEdges(edges);
   editor.zoomToFit({ animation: { duration: 200 } });
+}
+
+const _GENERATED = ["Generate", "Video", "Compose"];
+
+/** 单节点重生:目标节点 + 其当前上游链(生成型上游用上次产物 cached,静态上游读最新) + 合成 Preview。
+ *  读 live editor + store edges,所以上游改了/加了内容都吃进去(见与 founder 的语义确认)。 */
+export function buildRegenSubgraph(editor: Editor, targetId: string): ProGraph {
+  const shapes = pronodeShapes(editor);
+  const byId = new Map(shapes.map((s) => [String(s.id), s]));
+  const edges = useProCanvasStore.getState().edges;
+
+  // BFS 上游(沿当前连线)
+  const keep = new Set<string>([targetId]);
+  const q = [targetId];
+  while (q.length) {
+    const cur = q.shift() as string;
+    for (const e of edges) if (e.target === cur && !keep.has(e.source)) { keep.add(e.source); q.push(e.source); }
+  }
+
+  const nodes: ProNode[] = [];
+  for (const id of keep) {
+    const s = byId.get(id);
+    if (!s) continue;
+    const p = s.props;
+    if (id === targetId) {
+      nodes.push({ id, type: p.nodeType, params: p.params, cached: false, cached_url: null, label: p.label, x: s.x, y: s.y });
+    } else {
+      const out = p.resultUrl || p.cachedUrl;
+      const isGen = _GENERATED.includes(p.nodeType);
+      nodes.push({
+        id, type: p.nodeType, params: p.params,
+        cached: isGen ? !!out : p.cached,
+        cached_url: isGen ? out : p.cachedUrl,
+        label: p.label, x: s.x, y: s.y,
+      });
+    }
+  }
+
+  // 合成 Preview 接目标产出(让 run 有出口)
+  const targetType = byId.get(targetId)?.props.nodeType;
+  const outHandle = targetType === "Video" || targetType === "Compose" ? "video" : "image";
+  const previewId = `regen_preview_${targetId}`;
+  nodes.push({ id: previewId, type: "Preview", params: {}, x: 0, y: 0 });
+
+  const subEdges = edges.filter((e) => keep.has(e.source) && keep.has(e.target)).map((e) => ({ ...e }));
+  subEdges.push({ id: `regen_e_${targetId}`, source: targetId, sourceHandle: outHandle, target: previewId, targetHandle: "image" });
+
+  return { version: 1, nodes, edges: subEdges };
+}
+
+/** 重生目标的下游(沿出边)生成型节点 id —— 重生后给它们标脏「需重生」。 */
+export function downstreamGeneratedIds(targetId: string): string[] {
+  const edges = useProCanvasStore.getState().edges;
+  const out = new Set<string>();
+  const q = [targetId];
+  while (q.length) {
+    const cur = q.shift() as string;
+    for (const e of edges) if (e.source === cur && !out.has(e.target)) { out.add(e.target); q.push(e.target); }
+  }
+  return [...out];
 }

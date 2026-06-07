@@ -53,3 +53,7 @@ class EventName(StrEnum):
     # AnalysisProgress pin-escape 观测(进度条「钉住/逃逸」误报排查)。前端 emit,同样漏列。
     PIN_ESCAPE_SHOWN = "pin_escape_shown"
     PIN_ESCAPE_ACTION = "pin_escape_action"
+    # Pro 画布漏斗(灰度上量观测):种子/主题建图 → 运行 → 出片成功。均 server-side 可观测。
+    PRO_SEEDED = "pro_seeded"
+    PRO_RUN_SUBMITTED = "pro_run_submitted"
+    PRO_RUN_DONE = "pro_run_done"

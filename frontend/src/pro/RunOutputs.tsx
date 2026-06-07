@@ -1,10 +1,22 @@
 import { useProCanvasStore } from "../store/proCanvasStore";
+import { useToastStore } from "../store/toastStore";
+import { saveFilm } from "./proExecution";
 
-/** 运行产物 / 失败原因条(底部)。pro_run_node_done/done 累积 outputs;failed 显错误。 */
-export function RunOutputs() {
+/** 运行产物 / 失败原因条(底部)。pro_run_node_done/done 累积 outputs;failed 显错误。
+ *  视频产物可播放 + 下载 + 「存入我的成片」(成片发布出口 = 产品内库)。 */
+export function RunOutputs({ threadId }: { threadId: string }) {
   const run = useProCanvasStore((s) => s.run);
   const show = run.status === "done" || run.status === "failed" || run.outputs.length > 0;
   if (!show) return null;
+
+  const onSave = async (url: string) => {
+    try {
+      await saveFilm(url, threadId);
+      useToastStore.getState().push({ kind: "info", title: "已存入我的成片", ttlMs: 2000 });
+    } catch {
+      useToastStore.getState().push({ kind: "error", title: "保存失败" });
+    }
+  };
 
   return (
     <div
@@ -17,9 +29,7 @@ export function RunOutputs() {
         <p className="text-sm text-red-600">运行失败:{run.error || "未知错误"}</p>
       ) : (
         <div className="flex items-center gap-3 overflow-x-auto">
-          <span className="shrink-0 text-xs font-medium text-[var(--color-ink-soft)]">
-            产物 {run.outputs.length}
-          </span>
+          <span className="shrink-0 text-xs font-medium text-[var(--color-ink-soft)]">产物 {run.outputs.length}</span>
           {run.outputs.map((url, i) => {
             const isVid = /\.(mp4|webm|mov)(\?|$)/i.test(url);
             return (
@@ -41,15 +51,26 @@ export function RunOutputs() {
                     />
                   </a>
                 )}
-                <a
-                  href={url}
-                  download
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[10px] font-medium text-[var(--color-clay)] hover:underline"
-                >
-                  ⬇ 下载{isVid ? "成片" : ""}
-                </a>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={url}
+                    download
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] font-medium text-[var(--color-clay)] hover:underline"
+                  >
+                    ⬇ 下载{isVid ? "成片" : ""}
+                  </a>
+                  {isVid && (
+                    <button
+                      type="button"
+                      onClick={() => onSave(url)}
+                      className="text-[10px] font-medium text-[var(--color-clay)] hover:underline"
+                    >
+                      💾 存入我的成片
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}

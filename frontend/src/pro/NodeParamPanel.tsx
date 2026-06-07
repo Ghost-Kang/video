@@ -8,7 +8,7 @@ import { ProApiError, proErrorTitle, regenFromScript, seedFromTheme } from "./pr
 import type { ProNodeShape } from "./nodes/NodeShape";
 
 /** 选中单个节点时,右侧参数编辑面板。改参数 → editor.updateShape(单一真相在 editor)。 */
-export function NodeParamPanel({ threadId }: { threadId: string }) {
+export function NodeParamPanel({ threadId, onRegen }: { threadId: string; onRegen?: (nodeId: string) => void }) {
   const editor = useEditor();
   const removeEdgesForNodes = useProCanvasStore((s) => s.removeEdgesForNodes);
   const [regenBusy, setRegenBusy] = useState(false);
@@ -166,6 +166,17 @@ export function NodeParamPanel({ threadId }: { threadId: string }) {
             {regenBusy ? "重新生成中…" : "🔄 按脚本重拆分镜"}
           </button>
         </div>
+      )}
+
+      {(selected.props.nodeType === "Generate" || selected.props.nodeType === "Video") && onRegen && (
+        <button
+          type="button"
+          onClick={() => onRegen(String(selected.id))}
+          data-testid="pro-node-regen"
+          className="mt-4 w-full rounded-lg bg-[var(--color-clay)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--color-clay-soft)]"
+        >
+          🔄 重新生成{selected.props.needsRegen ? "(上游已变)" : ""}
+        </button>
       )}
 
       <button

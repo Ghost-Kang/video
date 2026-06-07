@@ -167,6 +167,30 @@ def test_regen_from_script_missing_script_400(monkeypatch):
     assert status == 400 and body["error"] == "script_required"
 
 
+def test_pro_funnel(monkeypatch):
+    counts = {"pro_seeded": 3, "pro_run_submitted": 2, "pro_run_done": 1}
+    cost_rows = [('{"call_kind":"canvas_image"}',), ('{"call_kind":"canvas_video"}',), ('{"call_kind":"canvas_comfyui"}',)]
+
+    class _FakeDB:
+        async def execute_fetchall(self, sql, params):
+            if "COUNT(DISTINCT" in sql:
+                return [(counts.get(params[0], 0),)]
+            return cost_rows
+
+        async def close(self):
+            return None
+
+    async def fake_connect():
+        return _FakeDB()
+
+    monkeypatch.setattr("agent.transport.http_router._connect", fake_connect)
+    status, body, _ = asyncio.run(http_router.handle_pro_funnel({}, {}))
+    assert status == 200
+    assert [s["users"] for s in body["stages"]] == [3, 2, 1]
+    assert body["stages"][2]["step_conv"] == 0.5  # 1/2
+    assert body["real_outputs"] == {"images": 2, "videos": 1}  # canvas_image + canvas_comfyui → images
+
+
 # ── WS pro_run_submit ───────────────────────────────────────────────────────────
 
 

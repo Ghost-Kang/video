@@ -180,6 +180,17 @@ def _db() -> sqlite3.Connection:
             PRIMARY KEY (user_id, template_id)
         )"""
     )
+    db.execute(
+        """CREATE TABLE IF NOT EXISTS pro_films (
+            user_id TEXT NOT NULL DEFAULT 'default',
+            film_id TEXT NOT NULL,
+            video_url TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT '',
+            thread_id TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, film_id)
+        )"""
+    )
 
     # ALTER migrations — run once per path per process (see _MIGRATED_PATHS).
     if path_key not in _MIGRATED_PATHS:

@@ -31,9 +31,11 @@ export interface ProRunState {
   outputs: string[];
   error: string | null;
   pct: number;
+  /** 非 null = 这是某节点的「单节点重生」run,帧只更新该节点(否则按类型整图更新)。 */
+  regenNode: string | null;
 }
 
-const IDLE_RUN: ProRunState = { runId: null, status: "idle", outputs: [], error: null, pct: 0 };
+const IDLE_RUN: ProRunState = { runId: null, status: "idle", outputs: [], error: null, pct: 0, regenNode: null };
 
 interface ProCanvasStore {
   edges: ProEdge[];

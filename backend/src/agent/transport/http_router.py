@@ -44,7 +44,7 @@ from agent.comfyui.seed_builder import (
     build_seed_graph_from_script,
     build_seed_graph_from_theme,
 )
-from agent.tools.canvas_persistence import pro_graphs_repo
+from agent.tools.canvas_persistence import pro_films_repo, pro_graphs_repo
 
 
 # Slowloris guard for the hand-rolled HTTP server: cap how long we wait for a
@@ -167,6 +167,46 @@ async def handle_funnel(qs: dict, body: dict) -> tuple[int, dict, str]:
         prev = stages[i - 1]["users"] if i > 0 else None
         s["step_conv"] = round(s["users"] / prev, 3) if prev else None
     return 200, {"stages": stages}, "OK"
+
+
+async def handle_pro_funnel(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """Pro 画布漏斗(admin-gated):建图(种子/主题)→ 运行 → 出片成功。每阶段去重 user_id + 转化率。
+    口径同 handle_funnel(近似漏斗,Beta 量足够)。另带 generation_cost(canvas_*)的真出图/片计数。"""
+    stages_def = [
+        ("建图(种子/主题)", EventName.PRO_SEEDED.value),
+        ("点运行", EventName.PRO_RUN_SUBMITTED.value),
+        ("出片成功", EventName.PRO_RUN_DONE.value),
+    ]
+    db = await _connect()
+    try:
+        stages: list[dict] = []
+        for label, ev in stages_def:
+            rows = await db.execute_fetchall(
+                "SELECT COUNT(DISTINCT user_id) FROM events WHERE event_name = ?", (ev,)
+            )
+            stages.append({"label": label, "event": ev, "users": int((rows[0][0] if rows else 0) or 0)})
+        # 真出图/片次数(canvas_image / canvas_video / canvas_comfyui 记账事件)。
+        cost_rows = await db.execute_fetchall(
+            "SELECT payload_json FROM events WHERE event_name = ?", (EventName.GENERATION_COST.value,)
+        )
+        imgs = vids = 0
+        for (pj,) in cost_rows:
+            try:
+                kind = json.loads(pj or "{}").get("call_kind", "")
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if kind in ("canvas_image", "canvas_comfyui"):
+                imgs += 1
+            elif kind == "canvas_video":
+                vids += 1
+    finally:
+        await db.close()
+    top = stages[0]["users"] or 0
+    for i, s in enumerate(stages):
+        s["pct_of_top"] = round(s["users"] / top, 3) if top else None
+        prev = stages[i - 1]["users"] if i > 0 else None
+        s["step_conv"] = round(s["users"] / prev, 3) if prev else None
+    return 200, {"stages": stages, "real_outputs": {"images": imgs, "videos": vids}}, "OK"
 
 
 async def handle_anchors_get(qs: dict, body: dict) -> tuple[int, dict, str]:
@@ -621,6 +661,14 @@ async def handle_pro_estimate(qs: dict, body: dict) -> tuple[int, dict, str]:
     return 200, est, "OK"
 
 
+async def _emit_pro_seeded(user_id: str, thread_id: str | None, source: str) -> None:
+    """漏斗:用户开/刷新了一张创作图(emit 失败不阻塞)。"""
+    try:
+        await emit(EventName.PRO_SEEDED, user_id=user_id, run_id=thread_id or "pro", payload={"source": source})
+    except Exception:  # noqa: BLE001
+        pass
+
+
 async def handle_pro_seed(qs: dict, body: dict) -> tuple[int, dict, str]:
     """分析 → 种子可执行图(plan §6)。不花钱。body={analysis_id?, thread_id}。
 
@@ -647,6 +695,7 @@ async def handle_pro_seed(qs: dict, body: dict) -> tuple[int, dict, str]:
         if exc.code == "analysis_not_found":
             return 200, {"graph": None}, "OK"  # 容错:当作无分析,走主题输入
         return 400, {"error": exc.code, "message": exc.message}, "Bad Request"
+    await _emit_pro_seeded(user_id, thread_id, "analysis")
     return 200, {"graph": graph}, "OK"
 
 
@@ -673,6 +722,7 @@ async def handle_pro_seed_from_theme(qs: dict, body: dict) -> tuple[int, dict, s
         cost_cny=cost_guard.PREDICT_REWRITE_CNY, provider="doubao",
         latency_ms=int((time.monotonic() - _t0) * 1000),
     )
+    await _emit_pro_seeded(user_id, run_id, "theme_or_regen")
     return 200, {"graph": graph}, "OK"
 
 
@@ -698,6 +748,7 @@ async def handle_pro_regen_from_script(qs: dict, body: dict) -> tuple[int, dict,
         cost_cny=cost_guard.PREDICT_REWRITE_CNY, provider="doubao",
         latency_ms=int((time.monotonic() - _t0) * 1000),
     )
+    await _emit_pro_seeded(user_id, run_id, "theme_or_regen")
     return 200, {"graph": graph}, "OK"
 
 
@@ -708,6 +759,41 @@ async def handle_pro_regen_from_script(qs: dict, body: dict) -> tuple[int, dict,
 
 def _pro_uid(qs: dict, body: dict) -> str:
     return str(body.get("user_id") or qs.get("user_id", [""])[0] or "default")
+
+
+async def handle_pro_films_get(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """列出当前 user 的「我的成片」。"""
+    if not config.PRO_CANVAS_ENABLED:
+        return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
+    films = await asyncio.to_thread(pro_films_repo.list_films, user_id=_pro_uid(qs, body))
+    return 200, {"films": films}, "OK"
+
+
+async def handle_pro_film_post(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """存一条成片到「我的成片」。body={video_url, title?, thread_id?}。"""
+    if not config.PRO_CANVAS_ENABLED:
+        return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
+    video_url = str(body.get("video_url") or "").strip()
+    if not video_url:
+        return 400, {"error": "video_url_required"}, "Bad Request"
+    film = await asyncio.to_thread(
+        pro_films_repo.save_film,
+        user_id=_pro_uid(qs, body),
+        video_url=video_url,
+        title=str(body.get("title") or "").strip(),
+        thread_id=str(body.get("thread_id") or "").strip(),
+    )
+    return 200, film, "OK"
+
+
+async def handle_pro_film_delete(qs: dict, body: dict) -> tuple[int, dict, str]:
+    if not config.PRO_CANVAS_ENABLED:
+        return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
+    film_id = str(body.get("film_id") or "").strip()
+    if not film_id:
+        return 400, {"error": "film_id_required"}, "Bad Request"
+    await asyncio.to_thread(pro_films_repo.delete_film, user_id=_pro_uid(qs, body), film_id=film_id)
+    return 200, {"deleted": True}, "OK"
 
 
 async def handle_pro_graph_get(qs: dict, body: dict) -> tuple[int, dict, str]:
@@ -806,6 +892,7 @@ EXACT_ROUTES: dict[tuple[str, str], HandlerFn] = {
     ("GET", "/api/events"): handle_events_get,
     ("POST", "/api/events"): handle_events_post,
     ("GET", "/api/funnel"): handle_funnel,
+    ("GET", "/api/pro/funnel"): handle_pro_funnel,
     ("GET", "/api/anchors"): handle_anchors_get,
     ("POST", "/api/anchors"): handle_anchors_post,
     ("POST", "/api/rewrite"): handle_rewrite,
@@ -827,6 +914,9 @@ EXACT_ROUTES: dict[tuple[str, str], HandlerFn] = {
     ("POST", "/api/pro/template"): handle_pro_template_post,
     ("GET", "/api/pro/template"): handle_pro_template_get,
     ("POST", "/api/pro/template/delete"): handle_pro_template_delete,
+    ("GET", "/api/pro/films"): handle_pro_films_get,
+    ("POST", "/api/pro/film"): handle_pro_film_post,
+    ("POST", "/api/pro/film/delete"): handle_pro_film_delete,
 }
 
 # (method, prefix, suffix, param_name, handler) — 路径里的可变段会作为 path_param 传入。
@@ -856,6 +946,7 @@ ADMIN_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("GET", "/api/creators"),
     ("GET", "/api/health/summary"),
     ("POST", "/api/showcase/status"),  # founder hide/restore a showcase case
+    ("GET", "/api/pro/funnel"),  # cross-user Pro 漏斗聚合
 })
 
 

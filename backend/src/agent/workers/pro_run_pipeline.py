@@ -98,6 +98,17 @@ async def _push(user_id: str, payload: dict) -> None:
         pass
 
 
+async def _emit_run_done(uid: str, run_id: str, n_outputs: int) -> None:
+    """漏斗:出片成功(emit 失败不阻塞)。"""
+    try:
+        from agent.cascade import events as cascade_events
+        from agent.cascade.event_names import EventName
+
+        await cascade_events.emit(EventName.PRO_RUN_DONE, user_id=uid, run_id=run_id, payload={"outputs": n_outputs})
+    except Exception:  # noqa: BLE001
+        pass
+
+
 async def _persist_outputs(outputs: list[str], key: str) -> list[str]:
     """把 provider 产物 URL 落到自有 media(易过期)。失败/无法下载(如 fixture data: URL)→ 回落原 URL。"""
     final: list[str] = []
@@ -191,8 +202,8 @@ async def _run_domestic(run: dict, graph: dict) -> None:
         ntype = node.get("type")
         params = node.get("params") or {}
 
-        if ntype in ("Model", "Script"):
-            continue
+        if ntype in ("Model", "Script", "TTS"):
+            continue  # 配置/信息/占位节点(TTS 执行下轮)→ 不产出、不执行
         if ntype == "Prompt":
             produced[nid] = {"text": str(params.get("text") or "")}
             continue
@@ -221,7 +232,10 @@ async def _run_domestic(run: dict, graph: dict) -> None:
                 return
             ps = _src(nid, "positive")
             prompt = produced.get(ps, {}).get("text", "") if ps else ""
-            ref = _img_in(nid)
+            # 逐镜锚点:收齐所有连进 image 口的参考图(multi),境内 Seedream 收多图。
+            refs = [produced.get(s, {}).get("image") for s in incoming_all.get((nid, "image"), [])]
+            refs = [u for u in refs if u]
+            ref = refs[0] if refs else None
             if str(params.get("backend") or "境内") == _COMFYUI_BACKEND:
                 t0 = time.time()
                 url = await _comfyui_one(_mini_image_graph(prompt, ref, params), run_id=run_id, uid=uid)
@@ -243,7 +257,7 @@ async def _run_domestic(run: dict, graph: dict) -> None:
 
                 seed_provider = SeedreamProvider()
             t0 = time.time()
-            res = await seed_provider.generate(prompt or "高质量竖屏画面", image_urls=[ref] if ref else None)
+            res = await seed_provider.generate(prompt or "高质量竖屏画面", image_urls=refs or None)
             url = res.get("url")
             if url:
                 # 只在成功(真出图)时记账 —— 失败不扣费(与 image_pipeline 同口径)。
@@ -326,12 +340,42 @@ async def _run_domestic(run: dict, graph: dict) -> None:
                 any_failed = True
             pro_runs_repo.touch_lease(run_id, user_id=uid, thread_id=tid)  # 下载+ffmpeg 略慢 → 续租
             continue
+        if ntype in ("Subtitle", "BGM"):
+            # 视频后期(字幕烧入 / BGM 混音)。best-effort:失败/无字体/无曲目 → 透传上游视频,不阻断。
+            if _cancelled():
+                return
+            s = _src(nid, "video")
+            vurl = produced.get(s, {}).get("video") if s else None
+            if not vurl:
+                any_failed = True
+                continue
+            out = None
+            try:
+                if ntype == "Subtitle":
+                    from agent.tools.av_post import burn_subtitle
+
+                    out = await burn_subtitle(vurl, str(params.get("text") or ""))
+                else:
+                    from agent.tools.av_post import mux_bgm
+
+                    out = await mux_bgm(vurl, str(params.get("track") or ""), float(params.get("volume") or 0.3))
+            except Exception:  # noqa: BLE001
+                out = None
+            if out:
+                final = _save_media_bytes(out, f"{run_id}_{nid}")
+                produced[nid] = {"video": final}
+                await _push(uid, {"type": "pro_run_node_done", "thread_id": tid, "run_id": run_id, "output_url": final})
+            else:
+                produced[nid] = {"video": vurl}  # 透传(后期未生效)
+            pro_runs_repo.touch_lease(run_id, user_id=uid, thread_id=tid)
+            continue
 
     if _cancelled():
         return
     if outputs:
         pro_runs_repo.update_pro_run_state(run_id, "done", user_id=uid, thread_id=tid, result=outputs)
         await _push(uid, {"type": "pro_run_done", "thread_id": tid, "run_id": run_id, "outputs": outputs})
+        await _emit_run_done(uid, run_id, len(outputs))
         print(f"[ProWorker:domestic] 完成 run={run_id[:16]} outputs={len(outputs)} partial={any_failed}")
     else:
         # 不自动重试 domestic(重跑会重复扣已成节点);直接置 failed。
@@ -390,6 +434,7 @@ async def _run_comfyui(run: dict, graph: dict, provider_name: str) -> None:
         for url in final_urls:
             await _push(uid, {"type": "pro_run_node_done", "thread_id": tid, "run_id": run_id, "output_url": url})
         await _push(uid, {"type": "pro_run_done", "thread_id": tid, "run_id": run_id, "outputs": final_urls})
+        await _emit_run_done(uid, run_id, len(final_urls))
     else:
         err = res.get("error") or "执行失败"
         retried = pro_runs_repo.schedule_pro_run_retry(run_id, err, user_id=uid, thread_id=tid)
@@ -439,6 +484,7 @@ async def recover_pro_run_task(run: dict) -> None:
         final_urls = await _persist_outputs(res["outputs"], run_id)
         pro_runs_repo.update_pro_run_state(run_id, "done", user_id=uid, thread_id=tid, result=final_urls, expected_prompt_id=prompt_id)
         await _push(uid, {"type": "pro_run_done", "thread_id": tid, "run_id": run_id, "outputs": final_urls})
+        await _emit_run_done(uid, run_id, len(final_urls))
     elif res.get("status") == "failed":
         err = res.get("error") or "执行失败"
         if not pro_runs_repo.schedule_pro_run_retry(run_id, err, user_id=uid, thread_id=tid):

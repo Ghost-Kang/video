@@ -186,3 +186,41 @@ export async function deleteTemplate(templateId: string): Promise<void> {
     body: JSON.stringify({ template_id: templateId }),
   });
 }
+
+// ── 我的成片库 ───────────────────────────────────────────────────────────────────
+
+export interface ProFilm {
+  film_id: string;
+  video_url: string;
+  title: string;
+  thread_id: string;
+  created_at: string;
+}
+
+export async function saveFilm(videoUrl: string, threadId: string, title = ""): Promise<ProFilm> {
+  const res = await apiFetch("/api/pro/film", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ video_url: videoUrl, thread_id: threadId, title }),
+  });
+  if (!res.ok) throw await readError(res);
+  return res.json();
+}
+
+export async function listFilms(): Promise<ProFilm[]> {
+  try {
+    const res = await apiFetch("/api/pro/films");
+    if (!res.ok) return [];
+    return ((await res.json()).films as ProFilm[]) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function deleteFilm(filmId: string): Promise<void> {
+  await apiFetch("/api/pro/film/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ film_id: filmId }),
+  });
+}

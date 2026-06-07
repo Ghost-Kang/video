@@ -15,6 +15,8 @@ export interface ProNodeProps {
   resultUrl: string | null;
   /** 实例标签(如「镜1·画面」),卡片头部 badge。 */
   label: string;
+  /** 上游已变(被重生过)→ 本节点用的是旧产物,提示「需重生」。 */
+  needsRegen: boolean;
 }
 
 /** Pro 计算图节点 = 一个 tldraw 自定义 shape。节点本体住 editor(源真相);连线住 proCanvasStore。 */
@@ -42,6 +44,7 @@ export class ProNodeShapeUtil extends ShapeUtil<ProNodeShape> {
     status: T.string,
     resultUrl: T.string.nullable(),
     label: T.string,
+    needsRegen: T.boolean,
   };
 
   override getDefaultProps(): ProNodeProps {
@@ -55,6 +58,7 @@ export class ProNodeShapeUtil extends ShapeUtil<ProNodeShape> {
       status: "idle",
       resultUrl: null,
       label: "",
+      needsRegen: false,
     };
   }
 
