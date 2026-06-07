@@ -44,7 +44,7 @@ def captured_canvas(monkeypatch):
     """stub canvas_tools.update_generation_state / _update_node_result / notify_user / get_ref_urls。"""
     calls: dict[str, list] = {"state": [], "result": [], "notify": []}
 
-    def _state(nid, status, task_id=None, error=None, *, user_id=None, thread_id=None):
+    def _state(nid, status, task_id=None, error=None, *, user_id=None, thread_id=None, expected_task_id=None):
         calls["state"].append({
             "nid": nid, "status": status, "task_id": task_id, "error": error,
             "user_id": user_id, "thread_id": thread_id,

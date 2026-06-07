@@ -127,11 +127,18 @@ def update_generation_state(
     *,
     user_id: str | None = None,
     thread_id: str | None = None,
+    expected_task_id: str | None = None,
 ) -> None:
     """更新节点的生成队列状态 + 同步 asset_status。
 
     worker pipeline 必须显式传 user_id/thread_id;handler 调用可省略走 ContextVar。
-    """
+
+    M10(审计 2026-06-06)fencing token:worker 的**终态回写**(done/failed,submit 之后)传它
+    正在跑的 ``expected_task_id``;若节点当前 ``generation_task_id`` 已变(restore/regenerate
+    在途清掉/换掉它 —— 二者跑在 ``asyncio.to_thread`` 与事件循环上 worker 回写跨线程非事务),
+    说明这条 worker 已被作废,其迟到的状态翻转必须跳过(否则 regenerate 后新一轮在途生成会被旧
+    worker 闪成 done/failed)。``None`` = 不 fencing(polling 写入 task_id 的那次 / handler 直接
+    调用 / submit 失败时还没 task_id,行为不变,向后兼容)。"""
     node = _load_node(node_id, user_id=user_id, thread_id=thread_id)
     if not node:
         return
@@ -139,6 +146,9 @@ def update_generation_state(
     # 优先,防 in-flight 竞态:已 claim 的任务跑完会盖掉取消)。重新生成走 enqueue 直接置
     # pending(不经此函数),故能正常重启;只有这条旧任务的回写被拦下。
     if node.get("generation_status") == "cancelled":
+        return
+    # fencing:节点已被 restore/regenerate 重置(task_id 变更)→ 这条陈旧 worker 的终态回写作废。
+    if expected_task_id is not None and node.get("generation_task_id") != expected_task_id:
         return
     node["generation_status"] = status
     if task_id is not None:

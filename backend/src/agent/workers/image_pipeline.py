@@ -84,27 +84,27 @@ async def process_image_task(node: dict) -> None:
 
     result = await provider.poll(submitted["task_id"])
 
-    task_id = submitted["task_id"]  # M10 fencing token:回写产物时校验节点仍属这条 task
+    task_id = submitted["task_id"]  # M10 fencing token:终态回写校验节点仍属这条 task
     if result.get("url"):
         s3_url = await download_and_upload(result["url"], nid)
         final_url = s3_url or result["url"]
-        canvas_tools.update_generation_state(nid, "done", user_id=uid, thread_id=tid)
+        canvas_tools.update_generation_state(nid, "done", user_id=uid, thread_id=tid, expected_task_id=task_id)
         canvas_tools._update_node_result(nid, {"url": final_url, "actual_time": result.get("actual_time", 0)}, user_id=uid, thread_id=tid, expected_task_id=task_id)
         print(f"[Worker] 生图完成 node={nid} url={final_url[:60]}...")
     elif result.get("image_data"):
         s3_url = upload_bytes_to_s3(result["image_data"], f"{nid}.png")
         if s3_url:
-            canvas_tools.update_generation_state(nid, "done", user_id=uid, thread_id=tid)
+            canvas_tools.update_generation_state(nid, "done", user_id=uid, thread_id=tid, expected_task_id=task_id)
             canvas_tools._update_node_result(nid, {"url": s3_url, "actual_time": result.get("actual_time", 0)}, user_id=uid, thread_id=tid, expected_task_id=task_id)
             print(f"[Worker] 生图完成 node={nid} url={s3_url[:60]}...")
         else:
-            canvas_tools.update_generation_state(nid, "failed", error="S3 上传失败", user_id=uid, thread_id=tid)
+            canvas_tools.update_generation_state(nid, "failed", error="S3 上传失败", user_id=uid, thread_id=tid, expected_task_id=task_id)
     else:
         is_timeout = result.get("error") == "timeout"
         err = result.get("error", "")
         if is_timeout:
             err = "timeout"
-        canvas_tools.update_generation_state(nid, "failed", error=err, user_id=uid, thread_id=tid)
+        canvas_tools.update_generation_state(nid, "failed", error=err, user_id=uid, thread_id=tid, expected_task_id=task_id)
         print(f"[Worker] 生图{'超时' if is_timeout else '失败'} node={nid} {err}")
 
     notify_user(uid, tid)
