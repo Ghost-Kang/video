@@ -74,6 +74,14 @@ import type {
 } from "./ws_generated";
 import type { CanvasData } from "./canvas";
 import type { CascadeAnalysisContract } from "./cascade";
+import type {
+  ProRunSubmitMsg,
+  ProRunCancelMsg,
+  ProRunProgressEvent,
+  ProRunNodeDoneEvent,
+  ProRunDoneEvent,
+  ProRunFailedEvent,
+} from "./pro";
 
 export interface ChatMessageEvent {
   role: "user" | "agent";
@@ -284,7 +292,9 @@ export type WSCommand =
   | SeedCanvasMsg
   | CancelGenerationMsg
   | ReviewDecisionMsg
-  | UserMessageMsg;
+  | UserMessageMsg
+  | ProRunSubmitMsg
+  | ProRunCancelMsg;
 
 /** 服务端 → 客户端 推送。app 用 switch on `event.type` 分发。*/
 export type WSEvent =
@@ -306,4 +316,8 @@ export type WSEvent =
   | FilmReturnedEvent
   | AnalysisAnswerReturnedEvent
   | AnalysisFailedEvent
-  | AnalysisProgressEvent;
+  | AnalysisProgressEvent
+  | ProRunProgressEvent
+  | ProRunNodeDoneEvent
+  | ProRunDoneEvent
+  | ProRunFailedEvent;
