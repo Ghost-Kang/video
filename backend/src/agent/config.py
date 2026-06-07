@@ -41,6 +41,19 @@ IMAGE_GEN_GOOGLE_MODEL = os.getenv("IMAGE_GEN_GOOGLE_MODEL", "gemini-3.1-flash-i
 # Seedream(火山方舟图像)模型;走 ARK_API_KEY + ARK_BASE_URL,无独立密钥。
 SEEDREAM_MODEL = os.getenv("SEEDREAM_MODEL", "doubao-seedream-4-0-250828")
 
+# -------- Pro 高级子画布 / ComfyUI 执行后端(plan: PRO_CANVAS_TLDRAW_COMFYUI_PLAN.md)--------
+# 在「低门槛 Agent 模式」之外增量引入「Pro 高级子画布」轨:用户在 tldraw 上拖拽连线出通用可执行
+# 计算图,编译成 ComfyUI prompt / RunningHub payload,经现有队列 + cost_guard + 熔断执行。
+# PRO_CANVAS_ENABLED 灰度开关,默认 OFF(零行为变更);开时才放行 Pro Run / seed / estimate 入口。
+PRO_CANVAS_ENABLED = os.getenv("PRO_CANVAS_ENABLED", "0").strip().lower() not in ("0", "false", "no", "off", "")
+# ComfyUI provider 路由:selfhosted(境内 GPU 自建,默认,数据不出境)| runninghub(境外托管,opt-in,
+# 受 STRICT_CROSS_BORDER_REJECT 默认拦截)| fixture(无 GPU 确定性占位,dev/测试用)。
+COMFYUI_PROVIDER = os.getenv("COMFYUI_PROVIDER", "selfhosted").strip().lower()
+COMFYUI_BASE_URL = os.getenv("COMFYUI_BASE_URL", "http://127.0.0.1:8188")
+# RunningHub(境外)—— 默认不配置;仅在 COMFYUI_PROVIDER=runninghub 且跨境闸放开时才用。
+RUNNINGHUB_API_KEY = os.getenv("RUNNINGHUB_API_KEY", "")
+RUNNINGHUB_BASE_URL = os.getenv("RUNNINGHUB_BASE_URL", "https://www.runninghub.ai")
+
 # -------- 落地页案例自动发布(auto-showcase)--------
 # 用户跑完一条分析,达标即自动做成落地页轮播案例(clip 复制到永久 showcase/ 目录
 # + 写 showcase_cases 表),落地页动态 fetch 显示。founder 定:高置信度自动上 + 可下架。

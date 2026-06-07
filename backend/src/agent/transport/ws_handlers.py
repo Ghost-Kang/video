@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+import uuid
 from typing import Any, Awaitable, Callable
 
 from agent import config  # 通过 module 访问(REWRITE_ENABLED kill-switch 运行时读)
@@ -21,9 +22,12 @@ from agent.cascade import events as cascade_events  # module 访问,test 可 pat
 from agent.cascade import storage as cascade_storage  # module 访问,test 可 patch
 from agent.cascade.event_names import EventName
 from agent.cascade.failures import HardFailure
+from agent.comfyui.compiler import CompileError, estimate_graph_cost
+from agent.comfyui.provider import comfyui_provider_blocked
 from agent.config import IMAGE_GEN_PROVIDER
 from agent.tools import canvas as canvas_tools
 from agent.tools import generation  # M3 — 跨境生图门控谓词(cross_border_image_blocked)
+from agent.tools.canvas_persistence import pro_runs_repo
 from agent.transport import agent_runner, run_state  # module 访问同理
 from agent.transport.context import WSCtx, canvas_data, send_json
 from agent.transport.ws_messages import (
@@ -37,6 +41,8 @@ from agent.transport.ws_messages import (
     ListNodeVersionsMsg,
     ListSessionsMsg,
     OptimizePromptMsg,
+    ProRunCancelMsg,
+    ProRunSubmitMsg,
     RegenerateNodeMsg,
     RegenerateScriptNodeMsg,
     CancelGenerationMsg,
@@ -733,6 +739,85 @@ async def handle_review_decision(ctx: WSCtx, msg: ReviewDecisionMsg) -> None:
 
 # ---------- registry ----------
 
+async def handle_pro_run_submit(ctx: WSCtx, msg: ProRunSubmitMsg) -> None:
+    """Pro 画布整图执行:flag → 合规 → 编译校验+估算 → 成本闸 → 入队 pro_runs。worker 接力跑。
+
+    run_id 由后端铸造(不信客户端,防伪造/碰撞),首帧回带让前端关联。user_id 取 server-derived
+    ctx.user_id(不可绕成本闸)。校验/编译错误即时回 error 帧;过闸后入队,即刻回 queued 进度帧。
+    """
+    if not config.PRO_CANVAS_ENABLED:
+        await send_json(ctx.ws, type="error", code="pro_canvas_disabled", message="Pro 画布未开启。")
+        return
+
+    provider_name = (msg.provider or config.COMFYUI_PROVIDER or "selfhosted").lower()
+    # 境内合规:跨境 provider(runninghub)默认拦截(STRICT 开)。
+    if comfyui_provider_blocked(provider_name):
+        await send_json(
+            ctx.ws,
+            type="error",
+            code="cross_border_blocked",
+            message="境内合规:已禁用跨境执行后端(RunningHub),请用境内 ComfyUI。",
+        )
+        return
+
+    # 编译校验 + 成本估算(非法图前移到这里报,绝不入队)。
+    try:
+        est = estimate_graph_cost(msg.graph)
+    except CompileError as exc:
+        await send_json(ctx.ws, type="error", code=exc.code, message=exc.message, bad_type="pro_run_submit")
+        return
+
+    run_id = f"pro_{uuid.uuid4().hex[:12]}"
+    predicted = float(est["cost_cny"])
+
+    # 成本闸(plan §5):server-derived user_id + 本 run 唯一 run_id(与 worker 记账同桶)。
+    # 超 ¥25/run 或 ¥30/天 → 拒绝,绝不入队(worker 永不花钱)。
+    try:
+        await cost_guard.cost_guard(ctx.user_id, run_id, predicted)
+    except HardFailure as exc:
+        await send_json(
+            ctx.ws,
+            type="pro_run_failed",
+            thread_id=msg.thread_id,
+            run_id=run_id,
+            error=exc.hint or "生成预算超限,请稍后再试。",
+        )
+        return
+
+    graph_json = json.dumps(msg.graph, ensure_ascii=False)
+
+    def _enqueue() -> None:
+        pro_runs_repo.create_pro_run(
+            run_id,
+            user_id=ctx.user_id,
+            thread_id=msg.thread_id,
+            graph_json=graph_json,
+            provider=provider_name,
+            cost_est=predicted,
+        )
+
+    await asyncio.to_thread(_enqueue)
+    # 即刻回 queued 进度帧(带 run_id 供前端关联);后续进度/产物由 worker 经 send_to_user 推。
+    await send_json(
+        ctx.ws, type="pro_run_progress", thread_id=msg.thread_id, run_id=run_id, status="queued", pct=0
+    )
+
+
+async def handle_pro_run_cancel(ctx: WSCtx, msg: ProRunCancelMsg) -> None:
+    """逐 run 取消(置 cancelled 终态;在途 worker 回写靠取消守卫/fencing 被拦)。"""
+    if not config.PRO_CANVAS_ENABLED:
+        await send_json(ctx.ws, type="error", code="pro_canvas_disabled", message="Pro 画布未开启。")
+        return
+
+    def _cancel() -> bool:
+        return pro_runs_repo.cancel_pro_run(msg.run_id, user_id=ctx.user_id, thread_id=msg.thread_id)
+
+    await asyncio.to_thread(_cancel)
+    await send_json(
+        ctx.ws, type="pro_run_progress", thread_id=msg.thread_id, run_id=msg.run_id, status="cancelled", pct=0
+    )
+
+
 HandlerFn = Callable[[WSCtx, Any], Awaitable[None]]
 
 # (model class, handler) — ws_server dispatch 查这个表,先验证再调用 handler
@@ -757,6 +842,8 @@ HANDLERS: dict[str, tuple[type, HandlerFn]] = {
     "cancel_generation": (CancelGenerationMsg, handle_cancel_generation),
     "review_decision": (ReviewDecisionMsg, handle_review_decision),
     "user_message": (UserMessageMsg, handle_user_message),
+    "pro_run_submit": (ProRunSubmitMsg, handle_pro_run_submit),
+    "pro_run_cancel": (ProRunCancelMsg, handle_pro_run_cancel),
 }
 
 

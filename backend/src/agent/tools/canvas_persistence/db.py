@@ -136,6 +136,29 @@ def _db() -> sqlite3.Connection:
             PRIMARY KEY (user_id, thread_id, node_id, version_seq)
         )"""
     )
+    # Pro 高级子画布(ComfyUI 计算图)整图执行队列。一个 run = 一张提交的计算图(不是 canvas 节点),
+    # 故独立成表(不复用 canvas_nodes)。队列列(status/lease/attempt/retry/comfy_prompt_id)镜像
+    # generation_repo 的 claim/lease/fencing/retry 语义;result 存产物 URL 列表 JSON。
+    # status ∈ idle/pending/submitted/polling/done/failed/cancelled(同 canvas 生成状态机)。
+    db.execute(
+        """CREATE TABLE IF NOT EXISTS pro_runs (
+            user_id TEXT NOT NULL DEFAULT 'default',
+            thread_id TEXT NOT NULL,
+            run_id TEXT NOT NULL,
+            graph_json TEXT NOT NULL DEFAULT '{}',
+            provider TEXT NOT NULL DEFAULT 'selfhosted',
+            status TEXT NOT NULL DEFAULT 'pending',
+            comfy_prompt_id TEXT,
+            cost_est REAL NOT NULL DEFAULT 0,
+            error TEXT,
+            result TEXT,
+            attempt_count INTEGER NOT NULL DEFAULT 0,
+            lease_until TEXT,
+            next_retry_at TEXT,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, thread_id, run_id)
+        )"""
+    )
 
     # ALTER migrations — run once per path per process (see _MIGRATED_PATHS).
     if path_key not in _MIGRATED_PATHS:

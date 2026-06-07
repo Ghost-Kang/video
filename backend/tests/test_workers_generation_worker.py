@@ -87,8 +87,8 @@ def _task(nid: str = "n1", *, task_type: str = "image", task_id: str | None = No
 
 
 class TestStartWorkers:
-    def test_first_call_creates_three_tasks(self, monkeypatch):
-        """start_workers 应通过 asyncio.create_task 启动 3 个 worker(image/video/composite)。"""
+    def test_first_call_creates_four_tasks(self, monkeypatch):
+        """start_workers 应通过 asyncio.create_task 启动 4 个 worker(image/video/composite/pro_run)。"""
         created: list = []
         # _started 是 module-level,前一个 test 可能跑过,reset
         monkeypatch.setattr(generation_worker, "_started", False)
@@ -97,7 +97,7 @@ class TestStartWorkers:
         # coro 不会被 await,Python 会 warn — 用 close() 主动消毒。
         try:
             generation_worker.start_workers()
-            assert len(created) == 3
+            assert len(created) == 4
         finally:
             for coro in created:
                 coro.close()
@@ -109,7 +109,7 @@ class TestStartWorkers:
         try:
             generation_worker.start_workers()
             generation_worker.start_workers()
-            assert len(created) == 3, "第二次 start_workers 应是 no-op(idempotent)"
+            assert len(created) == 4, "第二次 start_workers 应是 no-op(idempotent)"
         finally:
             for coro in created:
                 coro.close()

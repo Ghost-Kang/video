@@ -222,6 +222,24 @@ class UserMessageMsg(_Base):
     selected_niche: Optional[Niche] = None
 
 
+class ProRunSubmitMsg(_Base):
+    """Pro 画布(ComfyUI 计算图)整图执行。后端校验+估算→成本闸→入队 pro_runs,worker 执行,
+    经 pro_run_* 帧回推进度/产物。run_id 由后端铸造(不信客户端,防伪造/碰撞),首帧回带。"""
+
+    type: Literal["pro_run_submit"]
+    thread_id: str = Field(min_length=1)
+    graph: dict[str, Any]
+    provider: str | None = None  # 缺省走 config.COMFYUI_PROVIDER
+
+
+class ProRunCancelMsg(_Base):
+    """逐 run 取消(对应 pro_runs_repo.cancel_pro_run;在途 worker 回写靠取消守卫/fencing 被拦)。"""
+
+    type: Literal["pro_run_cancel"]
+    thread_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+
+
 # tagged union by `type` field — Pydantic 2 用 Field(discriminator=...)
 WSInbound = Annotated[
     Union[
@@ -246,6 +264,8 @@ WSInbound = Annotated[
         CancelGenerationMsg,
         ReviewDecisionMsg,
         UserMessageMsg,
+        ProRunSubmitMsg,
+        ProRunCancelMsg,
     ],
     Field(discriminator="type"),
 ]
@@ -464,6 +484,38 @@ class ReviewRequiredEvent(_Base):
     interrupt_id: str = ""
 
 
+# ---------- Pro 画布 outbound(worker → 前端) ----------
+
+
+class ProRunProgressEvent(_Base):
+    type: Literal["pro_run_progress"]
+    thread_id: str
+    run_id: str
+    status: str  # queued | submitting | running
+    pct: int = 0
+
+
+class ProRunNodeDoneEvent(_Base):
+    type: Literal["pro_run_node_done"]
+    thread_id: str
+    run_id: str
+    output_url: str
+
+
+class ProRunDoneEvent(_Base):
+    type: Literal["pro_run_done"]
+    thread_id: str
+    run_id: str
+    outputs: list[str]
+
+
+class ProRunFailedEvent(_Base):
+    type: Literal["pro_run_failed"]
+    thread_id: str
+    run_id: str
+    error: str
+
+
 WSOutbound = Annotated[
     Union[
         ErrorEvent,
@@ -483,6 +535,10 @@ WSOutbound = Annotated[
         AnalysisAnswerReturnedEvent,
         AnalysisFailedEvent,
         AnalysisProgressEvent,
+        ProRunProgressEvent,
+        ProRunNodeDoneEvent,
+        ProRunDoneEvent,
+        ProRunFailedEvent,
     ],
     Field(discriminator="type"),
 ]
@@ -511,4 +567,6 @@ INBOUND_MODELS: dict[str, type[_Base]] = {
     "cancel_generation": CancelGenerationMsg,
     "review_decision": ReviewDecisionMsg,
     "user_message": UserMessageMsg,
+    "pro_run_submit": ProRunSubmitMsg,
+    "pro_run_cancel": ProRunCancelMsg,
 }
