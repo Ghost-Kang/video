@@ -37,6 +37,10 @@ COPY frontend/ ./
 # 全量开 = "true";一键关回 = 改 build-arg 为 "false" 重建。默认 false(安全)。
 ARG VITE_REWRITE_ENABLED=false
 ENV VITE_REWRITE_ENABLED=${VITE_REWRITE_ENABLED}
+# Pro 画布(tldraw)在 prod 域名需 licenseKey,否则画布被 tl-license-expired 挡住(localhost 豁免)。
+# 注册 tldraw.dev 拿 key(免费带水印 / 付费去水印)→ 设到 prod .env 重建。空 = 不传(本地够用)。
+ARG VITE_TLDRAW_LICENSE_KEY=
+ENV VITE_TLDRAW_LICENSE_KEY=${VITE_TLDRAW_LICENSE_KEY}
 RUN npm run build
 
 # ---
