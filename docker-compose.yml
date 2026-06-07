@@ -58,6 +58,8 @@ services:
       args:
         # 改写解封全量开(2026-06-01)。一键关回:设 false 重建 frontend。
         VITE_REWRITE_ENABLED: ${VITE_REWRITE_ENABLED:-true}
+        # Pro 画布 tldraw license(prod 域名必需,localhost 豁免)。设到 .env 重建 frontend 后生效。
+        VITE_TLDRAW_LICENSE_KEY: ${VITE_TLDRAW_LICENSE_KEY:-}
     container_name: cascade-frontend
     restart: unless-stopped
     logging:

@@ -222,6 +222,9 @@ export default function ProCanvas({ userId }: { userId: string }) {
         </div>
       )}
       <Tldraw
+        // tldraw 在非 localhost 域名(prod)需 licenseKey,否则渲染 tl-license-expired、画布不出。
+        // 构建期烤进 VITE_TLDRAW_LICENSE_KEY(Dockerfile ARG);本地/未设时为 undefined(localhost 豁免)。
+        licenseKey={import.meta.env.VITE_TLDRAW_LICENSE_KEY || undefined}
         shapeUtils={PRO_SHAPE_UTILS}
         components={PRO_COMPONENTS}
         onMount={(editor) => {
