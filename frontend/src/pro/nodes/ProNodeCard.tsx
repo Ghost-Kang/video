@@ -27,7 +27,7 @@ export function ProNodeCard({ shape }: { shape: ProNodeShape }) {
     }
     const p = st.pending;
     if (p && p.end === "source" && p.nodeId !== shape.id && proPortsCompatible(p.portType, port.type)) {
-      st.addEdge({ source: p.nodeId, sourceHandle: p.handle, target: shape.id, targetHandle: port.name });
+      st.addEdge({ source: p.nodeId, sourceHandle: p.handle, target: shape.id, targetHandle: port.name }, { multi: port.multi });
       st.cancelConnection();
     }
   };

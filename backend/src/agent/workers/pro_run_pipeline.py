@@ -53,15 +53,18 @@ async def _persist_outputs(outputs: list[str], key: str) -> list[str]:
 # ── domestic per-node 执行器 ─────────────────────────────────────────────────────
 
 
-def _topo(nodes: dict, edges: list) -> tuple[list, dict]:
-    """拓扑序 + incoming 映射 {(target, targetHandle): (source, sourceHandle)}。"""
+def _topo(nodes: dict, edges: list) -> tuple[list, dict, dict]:
+    """拓扑序 + 单值 incoming {(target,handle):(source,sh)} + 多值 incoming_all {(target,handle):[source,...]}(边序)。"""
     incoming: dict = {}
+    incoming_all: dict = {}
     adj: dict = {nid: [] for nid in nodes}
     indeg: dict = {nid: 0 for nid in nodes}
     for e in edges:
         s, t = e.get("source"), e.get("target")
         if s in nodes and t in nodes:
-            incoming[(t, e.get("targetHandle"))] = (s, e.get("sourceHandle"))
+            key = (t, e.get("targetHandle"))
+            incoming[key] = (s, e.get("sourceHandle"))
+            incoming_all.setdefault(key, []).append(s)
             adj[s].append(t)
             indeg[t] += 1
     queue = [n for n, d in indeg.items() if d == 0]
@@ -75,13 +78,24 @@ def _topo(nodes: dict, edges: list) -> tuple[list, dict]:
                 queue.append(nxt)
     if len(order) != len(nodes):  # 兜底(validate 已挡环)
         order = list(nodes)
-    return order, incoming
+    return order, incoming, incoming_all
+
+
+def _save_media_bytes(data: bytes, key: str, ext: str = "mp4") -> str:
+    """合成产物 bytes → 写本地 media 卷(nginx /media 服务),返回 /media URL(dev/prod 都行,不依赖 S3)。"""
+    from agent.cascade.mediakit.clip_extractor import media_root
+
+    d = media_root() / key
+    d.mkdir(parents=True, exist_ok=True)
+    p = d / f"out.{ext}"
+    p.write_bytes(data)
+    return f"/media/{key}/out.{ext}"
 
 
 async def _run_domestic(run: dict, graph: dict) -> None:
     run_id, uid, tid = run["run_id"], run["user_id"], run["thread_id"]
     nodes = {n["id"]: n for n in graph.get("nodes", []) if isinstance(n, dict) and n.get("id")}
-    order, incoming = _topo(nodes, graph.get("edges", []) or [])
+    order, incoming, incoming_all = _topo(nodes, graph.get("edges", []) or [])
 
     try:
         await cost_guard.cost_guard(uid, run_id, float(run.get("cost_est") or 0.0))
@@ -197,6 +211,26 @@ async def _run_domestic(run: dict, graph: dict) -> None:
             else:
                 any_failed = True
             pro_runs_repo.touch_lease(run_id, user_id=uid, thread_id=tid)  # video 慢 → 续租防误抢
+            continue
+        if ntype == "Compose":
+            if _cancelled():
+                return
+            srcs = incoming_all.get((nid, "videos"), [])
+            vurls = [produced.get(s, {}).get("video") for s in srcs]
+            vurls = [u for u in vurls if u]
+            if not vurls:
+                any_failed = True
+                continue
+            from agent.tools.compose import compose_videos
+
+            data = await compose_videos(vurls)
+            if data:
+                final = _save_media_bytes(data, f"{run_id}_compose")
+                produced[nid] = {"video": final}
+                await _push(uid, {"type": "pro_run_node_done", "thread_id": tid, "run_id": run_id, "output_url": final})
+            else:
+                any_failed = True
+            pro_runs_repo.touch_lease(run_id, user_id=uid, thread_id=tid)  # 下载+ffmpeg 略慢 → 续租
             continue
 
     if _cancelled():

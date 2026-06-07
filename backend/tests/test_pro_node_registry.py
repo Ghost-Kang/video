@@ -15,15 +15,20 @@ from agent.comfyui.node_registry import (
 
 def test_node_types_present():
     assert set(NODE_TYPES) == {
-        "Model", "Prompt", "LoadImage", "Anchor", "Generate", "Upscale", "Video", "Script", "Preview",
+        "Model", "Prompt", "LoadImage", "Anchor", "Generate", "Upscale", "Video", "Script", "Compose", "Preview",
     }
 
 
 def test_billable_nodes_are_generate_and_video():
     assert is_billable("Generate") is True
     assert is_billable("Video") is True
-    for k in ("Model", "Prompt", "LoadImage", "Anchor", "Upscale", "Script", "Preview"):
+    for k in ("Model", "Prompt", "LoadImage", "Anchor", "Upscale", "Script", "Compose", "Preview"):
         assert is_billable(k) is False
+
+
+def test_compose_videos_input_is_multi():
+    assert NODE_TYPES["Compose"].input("videos").multi is True
+    assert NODE_TYPES["Compose"].input("videos").required is True
 
 
 def test_generate_model_input_optional():

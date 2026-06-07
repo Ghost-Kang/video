@@ -316,6 +316,37 @@ def test_estimate_video_priced_by_duration():
     assert est["cost_cny"] == pytest.approx(3.0)
 
 
+def _compose_graph():
+    return {
+        "version": 1,
+        "nodes": [
+            {"id": "li", "type": "LoadImage", "params": {"image_url": "https://x/i.png"}},
+            {"id": "v1", "type": "Video", "params": {}},
+            {"id": "v2", "type": "Video", "params": {}},
+            {"id": "c", "type": "Compose", "params": {}},
+            {"id": "pv", "type": "Preview", "params": {}},
+        ],
+        "edges": [
+            {"id": "1", "source": "li", "sourceHandle": "image", "target": "v1", "targetHandle": "image"},
+            {"id": "2", "source": "li", "sourceHandle": "image", "target": "v2", "targetHandle": "image"},
+            {"id": "3", "source": "v1", "sourceHandle": "video", "target": "c", "targetHandle": "videos"},
+            {"id": "4", "source": "v2", "sourceHandle": "video", "target": "c", "targetHandle": "videos"},
+            {"id": "5", "source": "c", "sourceHandle": "video", "target": "pv", "targetHandle": "image"},
+        ],
+    }
+
+
+def test_compose_multi_input_validates():
+    # 两个 Video → Compose.videos(multi)不报 multi_input
+    validate_graph(_compose_graph())
+
+
+def test_compose_rejected_by_comfyui_compile():
+    with pytest.raises(CompileError) as ei:
+        compile_graph(_compose_graph(), target="selfhosted")
+    assert ei.value.code == "comfyui_unsupported"
+
+
 def test_estimate_skips_cached_generate():
     g = _text2img_graph()
     g["nodes"] = [

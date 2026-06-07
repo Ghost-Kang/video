@@ -97,7 +97,7 @@ export default function ProCanvas({ userId }: { userId: string }) {
         const previews = pronodeShapes(editor).filter((s) => s.props.nodeType === "Preview");
         editor.run(() => {
           for (const s of pronodeShapes(editor)) {
-            if (["Generate", "Video", "Preview"].includes(s.props.nodeType))
+            if (["Generate", "Video", "Compose", "Preview"].includes(s.props.nodeType))
               updateProNode(editor, s.id, { status: "done" });
           }
           previews.forEach((s, i) => {
@@ -105,7 +105,7 @@ export default function ProCanvas({ userId }: { userId: string }) {
           });
         });
       } else if (ev.type === "pro_run_failed") {
-        setStatus(editor, (s) => ["Generate", "Video", "Preview"].includes(s.props.nodeType), "failed");
+        setStatus(editor, (s) => ["Generate", "Video", "Compose", "Preview"].includes(s.props.nodeType), "failed");
       }
     },
     [threadId],

@@ -27,7 +27,8 @@ export function hasThumb(t: ProNodeTypeKey): boolean {
     t === "LoadImage" ||
     t === "Anchor" ||
     t === "Upscale" ||
-    t === "Video"
+    t === "Video" ||
+    t === "Compose"
   );
 }
 
@@ -44,6 +45,7 @@ export interface PortPos {
   type: ProPortType;
   side: "in" | "out";
   required: boolean;
+  multi: boolean;
   x: number;
   y: number;
 }
@@ -52,10 +54,10 @@ export function getPorts(t: ProNodeTypeKey): PortPos[] {
   const spec = PRO_NODE_SPECS[t];
   const out: PortPos[] = [];
   spec.inputs.forEach((p, i) =>
-    out.push({ name: p.name, type: p.type, side: "in", required: !!p.required, x: 0, y: PORT_TOP + i * PORT_GAP }),
+    out.push({ name: p.name, type: p.type, side: "in", required: !!p.required, multi: !!p.multi, x: 0, y: PORT_TOP + i * PORT_GAP }),
   );
   spec.outputs.forEach((p, i) =>
-    out.push({ name: p.name, type: p.type, side: "out", required: false, x: NODE_W, y: PORT_TOP + i * PORT_GAP }),
+    out.push({ name: p.name, type: p.type, side: "out", required: false, multi: false, x: NODE_W, y: PORT_TOP + i * PORT_GAP }),
   );
   return out;
 }

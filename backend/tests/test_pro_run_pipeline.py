@@ -210,6 +210,41 @@ def test_domestic_cached_generate_skips_seedream(monkeypatch, tmp_path):
     assert [c["call_kind"] for c in costs] == ["canvas_video"]
 
 
+def test_domestic_compose_concats_videos(monkeypatch, tmp_path):
+    frames, costs = _setup(monkeypatch, tmp_path)
+    _patch_domestic(monkeypatch)
+    composed = {"urls": None}
+
+    async def fake_compose(urls):
+        composed["urls"] = list(urls)
+        return b"FAKE-MP4-BYTES"
+
+    monkeypatch.setattr("agent.tools.compose.compose_videos", fake_compose)
+    # media_root writes under CASCADE_DB_PATH parent (tmp) — real write, fine.
+    g = {
+        "version": 1,
+        "nodes": [
+            {"id": "p", "type": "Prompt", "params": {"text": "猫"}},
+            {"id": "g", "type": "Generate", "params": {}},
+            {"id": "v", "type": "Video", "params": {"duration": 4}},
+            {"id": "c", "type": "Compose", "params": {}},
+            {"id": "pv", "type": "Preview", "params": {}},
+        ],
+        "edges": [
+            {"id": "1", "source": "p", "sourceHandle": "text", "target": "g", "targetHandle": "positive"},
+            {"id": "2", "source": "g", "sourceHandle": "image", "target": "v", "targetHandle": "image"},
+            {"id": "3", "source": "v", "sourceHandle": "video", "target": "c", "targetHandle": "videos"},
+            {"id": "4", "source": "c", "sourceHandle": "video", "target": "pv", "targetHandle": "image"},
+        ],
+    }
+    run = _enqueue(graph=g, provider="domestic", cost=5.0)
+    asyncio.run(pipe.process_pro_run_task(run))
+    after = repo.get_pro_run("r1", user_id="u1", thread_id="t1")
+    assert after["status"] == "done"
+    assert composed["urls"] == ["https://vid/a.mp4"]  # 合成收到了分镜视频
+    assert after["result"] and after["result"][0].startswith("/media/")  # 成片落 /media
+
+
 def test_domestic_partial_failure_still_outputs(monkeypatch, tmp_path):
     frames, costs = _setup(monkeypatch, tmp_path)
 
