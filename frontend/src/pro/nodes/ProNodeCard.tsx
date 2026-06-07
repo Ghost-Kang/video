@@ -34,6 +34,10 @@ export function ProNodeCard({ shape }: { shape: ProNodeShape }) {
 
   const thumb = shape.props.resultUrl || shape.props.cachedUrl;
   const status = shape.props.status;
+  const thumbIsVideo =
+    shape.props.nodeType === "Video" ||
+    shape.props.nodeType === "Compose" ||
+    /\.(mp4|webm|mov)(\?|$)/i.test(thumb || "");
 
   return (
     <div
@@ -92,15 +96,26 @@ export function ProNodeCard({ shape }: { shape: ProNodeShape }) {
         <div style={{ overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
           {paramSummary(shape) || <span style={{ opacity: 0.5 }}>(双击空白选中后在右侧编辑)</span>}
         </div>
-        {thumb && (
-          <img
-            src={thumb}
-            alt=""
-            draggable={false}
-            onPointerDown={(e) => e.stopPropagation()}
-            style={{ marginTop: 6, width: "100%", height: 70, objectFit: "cover", borderRadius: 8, background: "#0001" }}
-          />
-        )}
+        {thumb &&
+          (thumbIsVideo ? (
+            <video
+              src={thumb}
+              muted
+              loop
+              playsInline
+              controls
+              onPointerDown={(e) => e.stopPropagation()}
+              style={{ marginTop: 6, width: "100%", height: 84, objectFit: "cover", borderRadius: 8, background: "#000" }}
+            />
+          ) : (
+            <img
+              src={thumb}
+              alt=""
+              draggable={false}
+              onPointerDown={(e) => e.stopPropagation()}
+              style={{ marginTop: 6, width: "100%", height: 70, objectFit: "cover", borderRadius: 8, background: "#0001" }}
+            />
+          ))}
       </div>
 
       {/* ports */}
