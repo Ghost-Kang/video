@@ -57,8 +57,6 @@ NodeType = Literal["script", "image", "video", "composite"]
 ImageSubtype = Literal["character", "scene", "grid"] | None
 NodeStatus = Literal["reviewing", "confirmed"]
 AssetStatus = Literal["idle", "generating", "done", "failed", "timeout"]
-# 旧 status 保留兼容,新代码使用 node_status + asset_status
-LegacyStatus = Literal["pending", "approved", "executing", "awaiting_review", "done", "failed"]
 
 
 def _node_id(type: str) -> str:
@@ -123,7 +121,14 @@ def _find_parent_by_type(type: str, subtype: str | None = None) -> str:
 
 
 def create_canvas_edge(source: str, target: str) -> dict:
-    """手动创建一条边。返回 edge 或 error。"""
+    """手动创建一条边(source→target,即 source 是 target 的上游/父)。返回 edge 或 error。
+
+    M2(审计 2026-06-06):手动连线必须过和 create_canvas_node 同一套领域约束 —— 否则前端可
+    手拖出非法层级 / 未确认父 / 环,而成环后 worker 的 get_ref_urls 会把不该作参考的 url 喂进
+    生成致产出错乱、且白烧钱。Director 建节点走 _upsert_edge 直连(已在 create_canvas_node 里
+    校验过),只有这条「手动连线」端点之前零校验。"""
+    if source == target:
+        return {"error": "不能把节点连到自身"}
     src_node = _load_node(source)
     tgt_node = _load_node(target)
     if not src_node:
@@ -134,6 +139,16 @@ def create_canvas_edge(source: str, target: str) -> dict:
     for e in existing:
         if e["source"] == source and e["target"] == target:
             return {"error": "边已存在"}
+    # 父(source)必须已确认 —— 与 create_canvas_node 的「上游未确认不建下游」硬闸一致。
+    if src_node.get("node_status") != "confirmed":
+        return {"error": f"上游节点「{src_node['title']}」尚未确认,先确认它再连下游。"}
+    # 层级约束:target 的 type/subtype 必须允许挂在 source 之下(script→image→grid)。
+    err = _validate_hierarchy(tgt_node["type"], tgt_node.get("subtype"), src_node)
+    if err:
+        return err
+    # 环检测:若 source 已是 target 的下游(target→…→source 已存在),加这条边会成环。
+    if source in _descendants(target):
+        return {"error": "这条连接会形成环路"}
     edge_id = f"e-{source}-{target}"
     edge = {"id": edge_id, "source": source, "target": target}
     _upsert_edge(edge)
@@ -371,6 +386,23 @@ def execute_node(node_id: str, node_type: NodeType, description: str, image_gen_
     if not node:
         return {"error": f"节点 {node_id} 不存在,请先 create"}
 
+    # H2 幂等守卫:媒体节点已在途(pending/submitted/polling)时,重发(第二个 tab /
+    # 重连重放 / 手构 WS 消息)绝不能把它重置 generating 并重新 _pending_submit —— 那会
+    # 二次提交付费 provider 调用 + 让两个 in-flight worker 并发回写 result.url。镜像
+    # restore_node_version 的在途硬闸。返回不带 _pending_submit → handler 不会再入队。
+    # 脚本节点无生成生命周期(同步解析,免费),不需守卫。
+    if node_type in ("image", "video", "composite") and node.get("generation_status") in (
+        "pending",
+        "submitted",
+        "polling",
+    ):
+        return {
+            "id": node_id,
+            "asset_status": node.get("asset_status"),
+            "generation_status": node.get("generation_status"),
+            "_already_in_flight": True,
+        }
+
     if node_type == "script":
         content = node["description"]
         shots = _parse_storyboard(content)
@@ -489,6 +521,32 @@ def enqueue_generation(node_id: str) -> dict | None:
     return node
 
 
+def pending_generation_reserved_cny(
+    *, user_id: str | None = None, thread_id: str | None = None
+) -> float:
+    """M4(审计 2026-06-06)预占额度:本线程内**已入队待生成(generation_status='pending')**
+    的媒体节点的预测成本之和,供 enqueue-time cost_guard 计入「本 run 已占用」。
+
+    没有它,一轮里 burst 入队多个生成会各自看到 recorded≈0 而全部放行,绕过 ¥/run cap
+    (只有完成记账后才拦,为时已晚)。**只数 pending**:submitted/polling 已在 submit 时
+    emit 了 GENERATION_COST(走 recorded),再数会双计;done/failed/cancelled 不占额度。
+    预测口径与 cost_guard.predict_generation_cost 一致(图 ¥1.5/张、视频 ¥0.30/秒)。"""
+    from agent.cascade.cost_guard import predict_generation_cost
+
+    nodes = _load_all_nodes(user_id=user_id, thread_id=thread_id)
+    total = 0.0
+    for n in nodes.values():
+        if n.get("generation_status") != "pending":
+            continue
+        ntype = n.get("type")
+        if ntype == "image":
+            total += predict_generation_cost("image", n_images=1)
+        elif ntype == "video":
+            seconds = float((n.get("result") or {}).get("duration") or 5)
+            total += predict_generation_cost("video", video_seconds=seconds)
+    return total
+
+
 # ---------- time-travel 回溯(P2 slice-2):回上游改 → 标脏下游 → 重生 ----------
 
 
@@ -543,6 +601,11 @@ def regenerate_node(node_id: str, reason: str = "regenerate") -> dict | None:
     返回更新后的节点(含 needs_regen 已清);节点不存在返回 None。"""
     node = _load_node(node_id)
     if not node:
+        return None
+    # H2 幂等守卫:已在途(pending/submitted/polling)时不重启 —— 否则重复 submit 付费调用
+    # + 两个 worker 并发回写。镜像 restore_node_version。handler 忽略返回值并回推当前快照
+    # → 重发幂等。done/failed/cancelled 等终态不在此集合,正常重生不受影响。
+    if node.get("generation_status") in ("pending", "submitted", "polling"):
         return None
     # 1. 快照旧版本(覆盖前)。best-effort:版本写失败不该挡住重生。
     try:
@@ -677,7 +740,6 @@ __all__ = [
     "ImageSubtype",
     "NodeStatus",
     "AssetStatus",
-    "LegacyStatus",
     "HIERARCHY",
     # back-compat re-exports from canvas_persistence
     "_DB_DIR",

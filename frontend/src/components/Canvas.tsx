@@ -11,6 +11,7 @@ import {
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,
+  type FitViewOptions,
 } from "@xyflow/react";
 import dagre from "dagre";
 import "@xyflow/react/dist/style.css";
@@ -202,6 +203,24 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
   const selectNode = useCanvasStore((s) => s.selectNode);
 
   const [rfNodes, setRfNodes] = useState<Node[]>(() => defaultLayout(canvasNodes));
+  // 只取我们用到的 fitView,结构化类型避开 ReactFlowInstance 的 Node/Edge 泛型与 store 边类型打架。
+  const rfRef = useRef<{ fitView: (opts?: FitViewOptions) => unknown } | null>(null);
+
+  // M7 — 「下一步」导航:大画布里用户得自己找该操作的节点。指向首个待确认(reviewing)节点,
+  // 没有则指向首个待重生(needs_regen)节点。点按 → 居中放大 + 选中,打开右侧详情面板。
+  const nextNode =
+    canvasNodes.find((n) => n.node_status === "reviewing") ||
+    canvasNodes.find((n) => n.needs_regen);
+  const nextLabel = nextNode
+    ? nextNode.node_status === "reviewing"
+      ? "下一步 · 确认节点"
+      : "下一步 · 待重生"
+    : "";
+  const focusNext = () => {
+    if (!nextNode) return;
+    selectNode(nextNode.id);
+    rfRef.current?.fitView({ nodes: [{ id: nextNode.id }], duration: 500, maxZoom: 1.3, padding: 0.45 });
+  };
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -316,6 +335,7 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        onInit={(inst) => { rfRef.current = inst; }}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
@@ -355,6 +375,12 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
       {/* 空画布引导(0 节点时):告诉用户这是创作画布 + 一键唤起导演。 */}
       {canvasNodes.length === 0 && <CanvasEmptyState />}
       <button onClick={handleAutoLayout} style={S.layoutBtn}>自动排版</button>
+      {/* M7 — 「下一步」导航:有待确认/待重生节点时出现,点按居中放大 + 选中(打开详情)。 */}
+      {nextNode && (
+        <button onClick={focusNext} style={S.nextBtn} title={nextNode.title}>
+          {nextLabel}
+        </button>
+      )}
     </div>
   );
 }
@@ -386,6 +412,26 @@ const S = {
     borderRadius: "50%",
     background: "radial-gradient(circle, rgba(124,45,18,0.08) 0%, rgba(124,45,18,0) 70%)",
     filter: "blur(44px)",
+  } as React.CSSProperties,
+  nextBtn: {
+    position: "absolute",
+    bottom: 20,
+    left: "50%",
+    transform: "translateX(-50%)",
+    height: 38,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    background: "linear-gradient(135deg, #ea580c 0%, #c2410c 100%)",
+    border: "none",
+    borderRadius: 19,
+    cursor: "pointer",
+    color: "#fff",
+    fontWeight: 600,
+    fontSize: 13,
+    padding: "0 20px",
+    zIndex: 12,
+    boxShadow: "0 4px 16px rgba(234,88,12,0.32)",
   } as React.CSSProperties,
   layoutBtn: {
     position: "absolute",

@@ -9,10 +9,10 @@ export function AnchorCard({ anchor, onPick }: { anchor: Anchor; onPick?: (ancho
       draggable
       onDragStart={(event) => event.dataTransfer.setData("application/json", JSON.stringify(anchor))}
       onClick={() => onPick?.(anchor)}
-      className="w-full text-left rounded-xl border border-stone-200 bg-white p-2 hover:bg-stone-50 cursor-grab"
+      className="w-full text-left rounded-xl border border-stone-200 bg-white p-2 hover:bg-stone-50 cursor-grab dark:border-stone-700 dark:bg-stone-800 dark:hover:bg-stone-700"
     >
-      <div className="relative aspect-square rounded-lg bg-stone-100 flex items-center justify-center overflow-hidden">
-        {anchor.image_url ? <img src={anchor.image_url} alt="" className="h-full w-full object-cover" /> : <ImageIcon className="h-6 w-6 text-stone-300" />}
+      <div className="relative aspect-square rounded-lg bg-stone-100 flex items-center justify-center overflow-hidden dark:bg-stone-700">
+        {anchor.image_url ? <img src={anchor.image_url} alt="" className="h-full w-full object-cover" /> : <ImageIcon className="h-6 w-6 text-stone-300 dark:text-stone-500" />}
         {showPill && (
           <span
             className="absolute top-1 right-1 rounded-full bg-stone-900/80 px-1.5 py-0.5 text-[10px] font-medium text-white"
@@ -23,7 +23,7 @@ export function AnchorCard({ anchor, onPick }: { anchor: Anchor; onPick?: (ancho
           </span>
         )}
       </div>
-      <div className="mt-2 text-sm text-stone-700 truncate">{anchor.label}</div>
+      <div className="mt-2 text-sm text-stone-700 truncate dark:text-stone-200">{anchor.label}</div>
     </button>
   );
 }

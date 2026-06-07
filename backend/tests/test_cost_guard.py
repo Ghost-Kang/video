@@ -219,3 +219,30 @@ def test_emit_generation_cost_real_run_id_feeds_run_cap(
     st = asyncio.run(cost_status("u1", run))
     assert st["run_cost_cny"] == 1.5  # per-run 读到了(此前恒 0)
     assert st["user_today_cost_cny"] == 1.5  # 日级也读到了
+
+
+# ── M4(审计 2026-06-06):预占额度(run_reserved_cny)折进 run cap,防 burst 绕过 ──
+
+
+def test_run_reserved_counts_toward_run_cap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """recorded=0 但已有 pending 预占时,新请求 reserved+predicted 超 run cap → 拒。"""
+    _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_RUN_CAP_CNY", "3.0")
+    # reserved 2.5 + predicted 1.0 = 3.5 > 3.0 → 拒(即使无任何完成记账)
+    with pytest.raises(HardFailure) as ei:
+        asyncio.run(cost_guard("u1", "r1", 1.0, run_reserved_cny=2.5))
+    assert ei.value.code == FailureCode.S8_UPSTREAM_REFUSED
+    # reserved 1.0 + predicted 1.0 = 2.0 < 3.0 → 放行
+    asyncio.run(cost_guard("u1", "r1", 1.0, run_reserved_cny=1.0))
+
+
+def test_run_reserved_not_applied_to_day_cap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """reserved 只进 run 检查,不进 user-day 检查(跨 run、按 recorded)。"""
+    _use_tmp_db(monkeypatch, tmp_path)
+    monkeypatch.setenv("CASCADE_RUN_CAP_CNY", "100.0")  # run cap 放高
+    monkeypatch.setenv("CASCADE_USER_DAY_CAP_CNY", "3.0")  # day cap 低
+    # 大 reserved 不该触发 day cap:day = recorded(0)+predicted(1.0)=1.0 < 3.0 → 放行
+    asyncio.run(cost_guard("u1", "r1", 1.0, run_reserved_cny=50.0))
+    # day cap 仍按 recorded+predicted 生效:predicted 4.0 > 3.0 → 拒
+    with pytest.raises(HardFailure):
+        asyncio.run(cost_guard("u1", "r1", 4.0, run_reserved_cny=0.0))

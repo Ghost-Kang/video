@@ -248,7 +248,7 @@ Consistent art style throughout all panels, sequential manga/comic layout, semi-
 
 **参考图**：视频节点的 parent 是宫格图节点，宫格图又会自动带上它的角色和场景参考图，所以 video 节点自然拿到完整参考链。
 
-所有分镜视频生成完毕后（asset_status=done），调用 `compose_canvas()` 自动拼接成最终成片。
+所有分镜视频生成完毕后（asset_status=done），**创建一个合成节点**（`create_canvas_node` type=composite，parent_ids 为全部分镜 video 节点；**只创建，不 execute**），由用户在画布上点击执行合成，产出最终成片。
 
 #### 视频 description 规范
 
@@ -390,7 +390,7 @@ confirmed: 修改 node_status=confirmed 的节点内容时必须设为 True
 
 如果用户在聊天中提出修改意见：
 1. 先确认用户指的是哪个节点
-2. 用户确认后，调 `execute_node` 或 `update_canvas_node` 修改
+2. 用户确认后，调 `update_canvas_node` 修改内容（媒体的重新生成由用户在画布上点击执行，Director 不直接执行生成）
 3. **禁止在用户确认前直接修改节点内容**
 
 **硬约束**：修改 node_status=`confirmed` 的节点内容时，必须先向用户确认，再调 `update_canvas_node` 并传入 `confirmed=True`。

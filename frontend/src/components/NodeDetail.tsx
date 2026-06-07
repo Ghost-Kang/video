@@ -4,6 +4,8 @@ import remarkGfm from "remark-gfm";
 import type { CanvasNode, Shot } from "../types";
 import type { NodeActions } from "../hooks/useNodeActions";
 import { useCanvasStore } from "../store/canvasStore";
+import { useToastStore } from "../store/toastStore";
+import { buildCanvasPublishPack } from "../lib/buildPublishPack";
 import { NodeVersionHistory } from "./NodeVersionHistory";
 
 interface Props {
@@ -182,14 +184,14 @@ function MediaPanel({ node, actions }: {
 }) {
   const resultPrompt = (node.result as Record<string, unknown> | null)?.prompt as string | undefined;
   const [prompt, setPrompt] = useState(resultPrompt || node.description || "");
-  const [provider, setProvider] = useState(node.image_gen_provider || "apimart");
+  const [provider, setProvider] = useState(node.image_gen_provider || "seedream");
   const [duration, setDuration] = useState(5);
   const [resolution, setResolution] = useState("720p");
   const [generateAudio, setGenerateAudio] = useState(true);
   useEffect(() => {
     const rp = (node.result as Record<string, unknown> | null)?.prompt as string | undefined;
     setPrompt(rp || node.description || "");
-    setProvider(node.image_gen_provider || "apimart");
+    setProvider(node.image_gen_provider || "seedream");
   }, [node.id, node.description, node.asset_status]);
   const [showPolish, setShowPolish] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -211,6 +213,11 @@ function MediaPanel({ node, actions }: {
   const btnLabel = isComposite ? (isGenerating ? "合成中..." : "合成") : isGenerating ? "生成中..." : "生成";
   const btnDisabled = isGenerating;
 
+  // M6 — 生成前给用户一个成本预期(此前画布全程不暴露花费,撞 cap 才哑失败)。
+  // 与后端 cost_guard.predict_generation_cost 口径一致:图 ¥1.5/张、视频 ¥0.30/秒、合成本地免费。
+  const estCny = isComposite ? 0 : isVideo ? duration * 0.3 : 1.5;
+  const costHint = isComposite ? "本地合成 · 免费" : `预计 ¥${estCny.toFixed(estCny % 1 === 0 ? 0 : 1)}`;
+
   return (
     <section style={S.section}>
       {!isVideo && !isComposite && (
@@ -223,8 +230,11 @@ function MediaPanel({ node, actions }: {
               nodes: s.nodes.map((n) => n.id === node.id ? { ...n, image_gen_provider: v } : n),
             }));
           }} style={S.providerSelect}>
+            {/* seedream(火山·境内)= 后端 IMAGE_GEN_PROVIDER 默认,复用 ARK key、境内合规。
+                之前默认 apimart(常无 key→生成失败)且 google 会让 prompt+参考图跨境(H3)。 */}
+            <option value="seedream">Seedream(火山·境内)</option>
             <option value="apimart">Apimart</option>
-            <option value="google">Google Gemini</option>
+            <option value="google">Google Gemini(跨境)</option>
           </select>
         </>
       )}
@@ -271,6 +281,7 @@ function MediaPanel({ node, actions }: {
         </>
       )}
 
+      <div style={{ ...S.muted, marginTop: 4 }}>{costHint}</div>
       <div style={S.actions}>
         <button
           onClick={handleGenerate}
@@ -361,32 +372,79 @@ function ResultView({ node }: { node: CanvasNode }) {
     case "video":
     case "composite":
       return (
-        <section style={S.section}>
-          <div style={S.label}>{node.type === "composite" ? "合成结果" : "生成结果"}</div>
-          {r.url ? (
-            node.type === "image"
-              ? <img src={String(r.url)} alt={node.title} style={S.resultImg} />
-              : <video
-                  src={String(r.url)}
-                  controls
-                  style={S.resultVideo}
-                  onPlay={(e) => {
-                    document.querySelectorAll("video").forEach((v) => {
-                      if (v !== e.currentTarget) v.pause();
-                    });
-                  }}
-                />
-          ) : (
-            <div style={S.muted}>
-              {node.asset_status === "generating" ? "生成中..." : node.asset_status === "failed" ? (r.error ? `失败: ${String(r.error)}` : "生成失败") : node.asset_status === "timeout" ? (r.error ? `超时: ${String(r.error)}` : "超时") : "等待生成"}
-            </div>
-          )}
-        </section>
+        <>
+          <section style={S.section}>
+            <div style={S.label}>{node.type === "composite" ? "合成结果" : "生成结果"}</div>
+            {r.url ? (
+              node.type === "image"
+                ? <img src={String(r.url)} alt={node.title} style={S.resultImg} />
+                : <video
+                    src={String(r.url)}
+                    controls
+                    style={S.resultVideo}
+                    onPlay={(e) => {
+                      document.querySelectorAll("video").forEach((v) => {
+                        if (v !== e.currentTarget) v.pause();
+                      });
+                    }}
+                  />
+            ) : (
+              <div style={S.muted}>
+                {node.asset_status === "generating" ? "生成中..." : node.asset_status === "failed" ? (r.error ? `失败: ${String(r.error)}` : "生成失败") : node.asset_status === "timeout" ? (r.error ? `超时: ${String(r.error)}` : "超时") : "等待生成"}
+              </div>
+            )}
+          </section>
+          {/* H1:成片做完即出「一键复制发布包」—— 画布闭环最后一公里(此前 publish 只活在
+              被 flag 暂挂的 CardStack)。从策划书/图片/本节点成片就地组装。 */}
+          {node.type === "composite" && <CompositePublishPack node={node} />}
+        </>
       );
 
     default:
       return null;
   }
+}
+
+/** 合成节点的发布包(H1)。成片完成时出一键复制:标题候选 + 标签 + 完整脚本 + 镜头图 + 成片链接。
+ *  数据就地从画布节点取(策划书节点→脚本,image 节点→镜头图,本 composite 节点→成片)。 */
+function CompositePublishPack({ node }: { node: CanvasNode }) {
+  const nodes = useCanvasStore((s) => s.nodes);
+  const analysis = useCanvasStore((s) => s.analysis);
+  const rewriteShots = useCanvasStore((s) => s.rewriteShots);
+  const pushToast = useToastStore((s) => s.push);
+  const [copied, setCopied] = useState(false);
+
+  const filmUrl = (node.result as Record<string, unknown> | null)?.url as string | undefined;
+  if (!filmUrl) return null; // 成片未完成时不出发布包(hooks 已全部在此之前调用)
+
+  const handleCopy = async () => {
+    const scriptNode = nodes.find((n) => n.type === "script");
+    const sr = scriptNode?.result as Record<string, unknown> | null;
+    const scriptText = (sr?.content as string) || scriptNode?.description || "";
+    const shotImageUrls = nodes
+      .filter((n) => n.type === "image" && (n.result as Record<string, unknown> | null)?.url)
+      .sort((a, b) => (Number(a.shot_no) || 1e9) - (Number(b.shot_no) || 1e9))
+      .map((n) => String((n.result as Record<string, unknown>).url));
+    const pack = buildCanvasPublishPack({ scriptText, shotImageUrls, filmUrl, analysis, rewriteShots });
+    try {
+      await navigator.clipboard.writeText(pack);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      pushToast({ kind: "info", title: "发布包已复制", body: "标题/标签/脚本/镜头图/成片已进剪贴板" });
+    } catch {
+      pushToast({ kind: "error", title: "复制失败", body: "请手动选中文本复制" });
+    }
+  };
+
+  return (
+    <section style={S.section}>
+      <div style={S.label}>发布包</div>
+      <button onClick={handleCopy} style={S.generateBtn(false)}>
+        {copied ? "✓ 已复制" : "一键复制发布包"}
+      </button>
+      <div style={S.muted}>标题候选 · 标签 · 完整脚本 · 镜头图 · 成片链接</div>
+    </section>
+  );
 }
 
 const mdComponents = {

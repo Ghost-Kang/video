@@ -129,10 +129,14 @@ class TestVersionSnapshot:
         _thread()
         _mk("X", asset_status="done", result={"url": "v0.png"})
         regenerate_node("X")
-        # simulate a new product, then regenerate again
+        # simulate the worker completing the regen (generation_status → done), then
+        # regenerate again. generation_status MUST be terminal here — an in-flight
+        # node (pending/submitted/polling) is intentionally blocked from re-regen by
+        # the H2 idempotency guard, mirroring real flow where the worker finishes first.
         n = canvas_tools._load_node("X")
         n["result"] = {"url": "v1.png"}
         n["asset_status"] = "done"
+        n["generation_status"] = "done"
         canvas_tools._upsert_node(n)
         regenerate_node("X")
         versions = list_versions("X")
@@ -239,6 +243,7 @@ class TestListNodeVersionsHandler:
         n = canvas_tools._load_node("X")
         n["result"] = {"url": "v2.png"}
         n["asset_status"] = "done"
+        n["generation_status"] = "done"  # worker finished; not in-flight (H2 guard)
         canvas_tools._upsert_node(n)
         regenerate_node("X")  # snapshots v2
 
