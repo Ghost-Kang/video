@@ -69,13 +69,28 @@ async def _run_ffmpeg(args: list[str]) -> bytes | None:
     return None  # caller reads the output file
 
 
-def _esc_drawtext(text: str) -> str:
-    # drawtext 文本转义:冒号/单引号/反斜杠/百分号。
-    return text.replace("\\", "\\\\").replace(":", "\\:").replace("'", "’").replace("%", "\\%")
+def _wrap_caption(text: str, per_line: float = 14.0, max_lines: int = 3) -> str:
+    """按视觉宽度换行(CJK≈全宽1.0、其余≈半宽0.5),超 max_lines 截断加…。竖屏短视频字幕用。"""
+    text = " ".join((text or "").split())  # 折叠空白
+    lines: list[str] = []
+    cur, w = "", 0.0
+    for ch in text:
+        cw = 1.0 if ord(ch) > 0x2E80 else 0.5
+        if w + cw > per_line and cur:
+            lines.append(cur)
+            cur, w = "", 0.0
+        cur += ch
+        w += cw
+    if cur:
+        lines.append(cur)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1][:-1] + "…"
+    return "\n".join(lines)
 
 
 async def burn_subtitle(video_url: str, text: str) -> bytes | None:
-    """视频底部烧一行字幕。无字体/失败 → None(透传)。"""
+    """视频底部烧字幕(长文自动换行 + 居中 + 黑底框)。无字体/失败 → None(透传)。"""
     text = (text or "").strip()
     if not text:
         return None
@@ -85,12 +100,15 @@ async def burn_subtitle(video_url: str, text: str) -> bytes | None:
         return None
     with tempfile.TemporaryDirectory() as d:
         src, out = os.path.join(d, "in.mp4"), os.path.join(d, "out.mp4")
+        txt = os.path.join(d, "cap.txt")
         if not await _download(video_url, src):
             return None
+        Path(txt).write_text(_wrap_caption(text), encoding="utf-8")
+        # textfile 传多行(避开转义地狱);fontsize=h/26 给长文留空间;底部留 8% 边距;居中。
         draw = (
-            f"drawtext=fontfile='{font}':text='{_esc_drawtext(text)}':"
-            f"fontcolor=white:fontsize=h/18:box=1:boxcolor=black@0.5:boxborderw=10:"
-            f"x=(w-text_w)/2:y=h-(text_h*2.2)"
+            f"drawtext=fontfile='{font}':textfile='{txt}':"
+            f"fontcolor=white:fontsize=h/26:line_spacing=8:box=1:boxcolor=black@0.5:boxborderw=12:"
+            f"x=(w-text_w)/2:y=h-text_h-(h*0.08)"
         )
         await _run_ffmpeg(["-y", "-i", src, "-vf", draw, "-c:a", "copy", "-c:v", "libx264", "-preset", "veryfast", out])
         p = Path(out)
