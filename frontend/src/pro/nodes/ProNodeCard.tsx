@@ -65,6 +65,20 @@ export function ProNodeCard({ shape }: { shape: ProNodeShape }) {
       >
         <span style={{ width: 8, height: 8, borderRadius: 99, background: spec.accent }} />
         <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-ink, #1c1917)" }}>{spec.label}</span>
+        {shape.props.label && (
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: spec.accent,
+              background: `${spec.accent}1a`,
+              borderRadius: 6,
+              padding: "1px 6px",
+            }}
+          >
+            {shape.props.label}
+          </span>
+        )}
         <span style={{ marginLeft: "auto", fontSize: 11 }}>
           {shape.props.cached && <span title="命中缓存,不重渲染" style={{ color: "#16a34a" }}>♻︎</span>}
           {status === "running" && <span style={{ color: spec.accent }}>⏳</span>}

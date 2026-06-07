@@ -38,6 +38,7 @@ interface CreateOpts {
   params?: Record<string, string | number>;
   cached?: boolean;
   cachedUrl?: string | null;
+  label?: string;
 }
 
 export function createNode(editor: Editor, t: ProNodeTypeKey, x: number, y: number, opts: CreateOpts = {}): TLShapeId {
@@ -53,6 +54,7 @@ export function createNode(editor: Editor, t: ProNodeTypeKey, x: number, y: numb
     cachedUrl,
     status: "idle",
     resultUrl: cached ? cachedUrl : null,
+    label: opts.label ?? "",
   };
   editor.createShape<ProNodeShape>({ id, type: "pronode", x, y, props });
   return id;
@@ -65,6 +67,7 @@ export function nodesFromEditor(editor: Editor): ProNode[] {
     params: s.props.params,
     cached: s.props.cached,
     cached_url: s.props.cachedUrl,
+    label: s.props.label,
     x: s.x,
     y: s.y,
   }));
@@ -90,6 +93,7 @@ export function loadGraph(editor: Editor, graph: ProGraph): void {
         params: n.params,
         cached: n.cached,
         cachedUrl: n.cached_url,
+        label: n.label,
       });
     }
   });

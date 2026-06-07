@@ -86,10 +86,11 @@ def test_seed_disabled_403(monkeypatch):
     assert status == 403
 
 
-def test_seed_missing_analysis_id_400(monkeypatch):
+def test_seed_no_analysis_returns_null(monkeypatch):
+    # 无 analysis_id 且无 thread → 200 {graph: null}(前端转主题输入框,不报错)
     monkeypatch.setattr(config, "PRO_CANVAS_ENABLED", True)
     status, body, _ = asyncio.run(http_router.handle_pro_seed({}, {}))
-    assert status == 400 and body["error"] == "analysis_id_required"
+    assert status == 200 and body["graph"] is None
 
 
 def test_seed_ok(monkeypatch):
@@ -106,7 +107,8 @@ def test_seed_ok(monkeypatch):
     assert body["graph"]["meta"]["analysis_id"] == "ana_x"
 
 
-def test_seed_not_found_404(monkeypatch):
+def test_seed_not_found_returns_null(monkeypatch):
+    # analysis_not_found → 当作无分析,返回 {graph: null}(容错,前端走主题输入)
     monkeypatch.setattr(config, "PRO_CANVAS_ENABLED", True)
     from agent.comfyui.seed_builder import SeedBuildError
 
@@ -115,7 +117,32 @@ def test_seed_not_found_404(monkeypatch):
 
     monkeypatch.setattr("agent.transport.http_router.build_seed_graph", fake_build)
     status, body, _ = asyncio.run(http_router.handle_pro_seed({}, {"analysis_id": "missing"}))
-    assert status == 404 and body["error"] == "analysis_not_found"
+    assert status == 200 and body["graph"] is None
+
+
+def test_seed_from_theme_ok(monkeypatch):
+    monkeypatch.setattr(config, "PRO_CANVAS_ENABLED", True)
+
+    async def fake_theme(theme, user_id):
+        return {"version": 1, "nodes": [], "edges": [], "meta": {"source": "theme", "theme": theme}}
+
+    async def ok_guard(*a, **k):
+        return None
+
+    async def ok_record(**k):
+        return None
+
+    monkeypatch.setattr("agent.transport.http_router.build_seed_graph_from_theme", fake_theme)
+    monkeypatch.setattr(http_router.cost_guard, "cost_guard", ok_guard)
+    monkeypatch.setattr(http_router.cost_guard, "record_generation_cost", ok_record)
+    status, body, _ = asyncio.run(http_router.handle_pro_seed_from_theme({}, {"theme": "宝宝辅食", "thread_id": "t1"}))
+    assert status == 200 and body["graph"]["meta"]["source"] == "theme"
+
+
+def test_seed_from_theme_missing_theme_400(monkeypatch):
+    monkeypatch.setattr(config, "PRO_CANVAS_ENABLED", True)
+    status, body, _ = asyncio.run(http_router.handle_pro_seed_from_theme({}, {}))
+    assert status == 400 and body["error"] == "theme_required"
 
 
 # ── WS pro_run_submit ───────────────────────────────────────────────────────────

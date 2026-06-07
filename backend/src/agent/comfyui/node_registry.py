@@ -26,6 +26,7 @@ class PortType:
     IMAGE = "image"
     TEXT = "text"
     MODEL = "model"
+    VIDEO = "video"
     ANY = "any"
 
 
@@ -70,6 +71,11 @@ class NodeType:
     params: tuple[ParamSpec, ...] = ()
     providers: tuple[str, ...] = (PROVIDER_ANY,)
     billable: bool = False
+    # 成本口径(estimate_graph_cost 用):None=免费;"image"=按图(¥/张);"video"=按时长(¥/秒,
+    # 取节点 duration 参数)。必须与 cost_guard.predict_generation_cost 对齐,否则计费节点对成本闸不可见。
+    cost_kind: str | None = None
+    # 该参数名是计费时长来源(cost_kind="video" 时取它,秒)。
+    duration_param: str | None = None
 
     def input(self, name: str) -> Port | None:
         for p in self.inputs:
@@ -155,10 +161,12 @@ NODE_TYPES: dict[str, NodeType] = {
         category="generate",
         comfy_class="__GENERATE__",  # 宏:compiler 展开成 (VAEEncode?)+EmptyLatentImage?+KSampler+VAEDecode
         inputs=(
-            Port("model", PortType.MODEL, required=True),
+            # model 改为可选:境内 Seedream 执行不需要 checkpoint(自带模型);只有 ComfyUI target
+            # 需要 model,缺失时由 ComfyUI compiler 报错(不在通用 validate 强制)。
+            Port("model", PortType.MODEL, required=False),
             Port("positive", PortType.TEXT, required=True),
             Port("negative", PortType.TEXT, required=False),
-            Port("image", PortType.IMAGE, required=False),  # 传图 = 图生图(denoise<1)
+            Port("image", PortType.IMAGE, required=False),  # 传图 = 图生图(denoise<1 / 锚点参考)
         ),
         outputs=(Port("image", PortType.IMAGE),),
         params=(
@@ -172,13 +180,61 @@ NODE_TYPES: dict[str, NodeType] = {
             ParamSpec("height", "int", DEFAULT_HEIGHT, label="高", minimum=64, maximum=4096),
         ),
         billable=True,
+        cost_kind="image",
+    ),
+    # 放大(免费插值,ImageScaleBy):image→image。不调模型 = 不计费(模型超分属未来扩展)。
+    "Upscale": NodeType(
+        key="Upscale",
+        label="放大",
+        category="generate",
+        comfy_class="ImageScaleBy",
+        inputs=(Port("image", PortType.IMAGE, required=True),),
+        outputs=(Port("image", PortType.IMAGE),),
+        params=(
+            ParamSpec("upscale_method", "str", "lanczos", label="插值",
+                      choices=("nearest-exact", "bilinear", "area", "bicubic", "lanczos")),
+            ParamSpec("scale_by", "float", 2.0, label="倍数", minimum=1.0, maximum=8.0),
+        ),
+    ),
+    # 图生视频(i2v):image→video。billable,按 duration 秒计费(plan §6.3 [Generate video i2v])。
+    # comfy_class 是宏:compiler 展开成 ComfyUI 视频子图。**注**:具体视频节点(SVD/AnimateDiff/
+    # CogVideoX 等)随 SelfHosted 实例安装的自定义节点而定,需按部署 pin(plan §8 节点版本漂移);
+    # compiler 产出结构(image 输入接好 + 参数 + video 输出被引用)是被单测锁住的契约,fixture 路径不关心。
+    "Video": NodeType(
+        key="Video",
+        label="生成视频",
+        category="generate",
+        comfy_class="__VIDEO__",
+        inputs=(Port("image", PortType.IMAGE, required=True),),
+        outputs=(Port("video", PortType.VIDEO),),
+        params=(
+            ParamSpec("duration", "int", 5, label="时长(秒)", minimum=1, maximum=10),
+            ParamSpec("fps", "int", 8, label="帧率", minimum=1, maximum=30),
+            ParamSpec("motion", "int", 127, label="运动强度", minimum=0, maximum=255),
+            ParamSpec("video_ckpt", "str", "svd_xt.safetensors", label="视频模型"),
+        ),
+        billable=True,
+        cost_kind="video",
+        duration_param="duration",
+    ),
+    # 脚本卡(策划书/脚本文本)。信息/参考节点:无端口、无执行(compiler 与 per-node 执行器都跳过),
+    # 用户可编辑。主题→脚本种子时承载整篇脚本;分镜的画面文案在各 Prompt 卡。
+    "Script": NodeType(
+        key="Script",
+        label="脚本",
+        category="script",
+        comfy_class="",
+        params=(
+            ParamSpec("script_markdown", "str", "", label="脚本"),
+        ),
     ),
     "Preview": NodeType(
         key="Preview",
         label="预览",
         category="output",
         comfy_class="SaveImage",
-        inputs=(Port("image", PortType.IMAGE, required=True),),
+        # ANY 以同时接 image 与 video(compiler 按上游产出类型选 SaveImage / 视频保存节点)。
+        inputs=(Port("image", PortType.ANY, required=True),),
     ),
 }
 

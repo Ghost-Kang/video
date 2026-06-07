@@ -751,7 +751,9 @@ async def handle_pro_run_submit(ctx: WSCtx, msg: ProRunSubmitMsg) -> None:
         await send_json(ctx.ws, type="error", code="pro_canvas_disabled", message="Pro 画布未开启。")
         return
 
-    provider_name = (msg.provider or config.COMFYUI_PROVIDER or "selfhosted").lower()
+    # 默认 domestic(境内 per-node 执行器:Seedream 图 / Seedance 视频),现在就能真出图出片。
+    # 显式传 selfhosted/runninghub/fixture 才走 ComfyUI 整图路径。
+    provider_name = (msg.provider or "domestic").lower()
     # 境内合规:跨境 provider(runninghub)默认拦截(STRICT 开)。
     if comfyui_provider_blocked(provider_name):
         await send_json(

@@ -13,6 +13,8 @@ export interface ProNodeProps {
   cachedUrl: string | null;
   status: string; // idle | running | done | failed
   resultUrl: string | null;
+  /** 实例标签(如「镜1·画面」),卡片头部 badge。 */
+  label: string;
 }
 
 /** Pro 计算图节点 = 一个 tldraw 自定义 shape。节点本体住 editor(源真相);连线住 proCanvasStore。 */
@@ -39,6 +41,7 @@ export class ProNodeShapeUtil extends ShapeUtil<ProNodeShape> {
     cachedUrl: T.string.nullable(),
     status: T.string,
     resultUrl: T.string.nullable(),
+    label: T.string,
   };
 
   override getDefaultProps(): ProNodeProps {
@@ -51,6 +54,7 @@ export class ProNodeShapeUtil extends ShapeUtil<ProNodeShape> {
       cachedUrl: null,
       status: "idle",
       resultUrl: null,
+      label: "",
     };
   }
 

@@ -61,7 +61,7 @@ export async function estimateGraph(graph: ProGraph): Promise<ProEstimate> {
   return res.json();
 }
 
-/** POST /api/pro/seed → 分析+改写+锚点 → 开箱可跑种子图。 */
+/** POST /api/pro/seed → 分析+改写+锚点 → 开箱可跑创作图。 */
 export async function fetchSeedGraph(analysisId: string, threadId: string): Promise<ProGraph> {
   const res = await apiFetch("/api/pro/seed", {
     method: "POST",
@@ -73,10 +73,105 @@ export async function fetchSeedGraph(analysisId: string, threadId: string): Prom
   return data.graph as ProGraph;
 }
 
+/** 自动种子:只给 thread,后端从 session pointers 解析分析;无分析 → null(前端显示主题输入框)。 */
+export async function seedFromThread(threadId: string): Promise<ProGraph | null> {
+  try {
+    const res = await apiFetch("/api/pro/seed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ thread_id: threadId }),
+    });
+    if (!res.ok) return null;
+    return ((await res.json()).graph as ProGraph | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** 主题 → Doubao 脚本+分镜 → 创作图(空白入口)。 */
+export async function seedFromTheme(theme: string, threadId: string): Promise<ProGraph> {
+  const res = await apiFetch("/api/pro/seed_from_theme", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ theme, thread_id: threadId }),
+  });
+  if (!res.ok) throw await readError(res);
+  return (await res.json()).graph as ProGraph;
+}
+
 export function buildSubmitCommand(threadId: string, graph: ProGraph, provider?: string | null): ProRunSubmitMsg {
   return { type: "pro_run_submit", thread_id: threadId, graph, ...(provider ? { provider } : {}) };
 }
 
 export function buildCancelCommand(threadId: string, runId: string): ProRunCancelMsg {
   return { type: "pro_run_cancel", thread_id: threadId, run_id: runId };
+}
+
+// ── 持久化:当前图 autosave + 模板 ───────────────────────────────────────────────
+
+export interface ProTemplateMeta {
+  template_id: string;
+  name: string;
+  created_at: string;
+}
+
+/** 自动保存当前图(best-effort,失败不抛 —— 不打扰编辑)。 */
+export async function saveGraph(threadId: string, graph: ProGraph): Promise<void> {
+  try {
+    await apiFetch("/api/pro/graph", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ thread_id: threadId, graph }),
+    });
+  } catch {
+    /* autosave 失败静默 */
+  }
+}
+
+/** 恢复该 thread 上次保存的图;无/失败 → null(不阻断挂载)。 */
+export async function loadSavedGraph(threadId: string): Promise<ProGraph | null> {
+  try {
+    const res = await apiFetch(`/api/pro/graph?thread_id=${encodeURIComponent(threadId)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.graph as ProGraph | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function listTemplates(): Promise<ProTemplateMeta[]> {
+  try {
+    const res = await apiFetch("/api/pro/templates");
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.templates as ProTemplateMeta[]) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveTemplate(name: string, graph: ProGraph): Promise<ProTemplateMeta> {
+  const res = await apiFetch("/api/pro/template", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, graph }),
+  });
+  if (!res.ok) throw await readError(res);
+  return res.json();
+}
+
+export async function loadTemplate(templateId: string): Promise<ProGraph> {
+  const res = await apiFetch(`/api/pro/template?id=${encodeURIComponent(templateId)}`);
+  if (!res.ok) throw await readError(res);
+  const data = await res.json();
+  return data.graph as ProGraph;
+}
+
+export async function deleteTemplate(templateId: string): Promise<void> {
+  await apiFetch("/api/pro/template/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ template_id: templateId }),
+  });
 }

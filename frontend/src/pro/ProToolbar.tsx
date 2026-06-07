@@ -4,6 +4,7 @@ import { PRO_NODE_ORDER, PRO_NODE_SPECS } from "../types/pro";
 import { useProCanvasStore } from "../store/proCanvasStore";
 import { createNode } from "./graphIO";
 import { NODE_W } from "./nodes/layout";
+import { ProTemplates } from "./ProTemplates";
 
 let _addCount = 0;
 
@@ -68,6 +69,7 @@ export function ProToolbar({ onRun, threadId }: { onRun: () => void; threadId: s
             {run.status === "running" && run.pct ? ` ${run.pct}%` : ""}
           </span>
         )}
+        <ProTemplates />
         <button
           type="button"
           onClick={onRun}
