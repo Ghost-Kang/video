@@ -47,6 +47,7 @@ def _build_graph_from_shots(
     scene_anchors: list,
     assets_by_shot: dict[int, dict],
     meta: dict[str, Any],
+    theme: str = "",
 ) -> dict[str, Any]:
     """shots = [{shot_index, text}]。返回境内创作图(Script + 每镜 Prompt→Generate→Video→Preview)。"""
     nodes: list[dict] = []
@@ -58,10 +59,10 @@ def _build_graph_from_shots(
         eid += 1
         edges.append({"id": f"e{eid}", "source": src, "sourceHandle": src_h, "target": dst, "targetHandle": dst_h})
 
-    # 脚本卡(信息/可编辑,不执行)
+    # 脚本卡(信息/可编辑,不执行)。theme 留底支持「改主题→重生整篇」。
     nodes.append(
         {"id": "script_main", "type": "Script", "label": "脚本",
-         "params": {"script_markdown": script_markdown or ""}, "x": _x(0), "y": _y(0)}
+         "params": {"theme": theme or "", "script_markdown": script_markdown or ""}, "x": _x(0), "y": _y(0)}
     )
 
     # 共享锚点(跨镜复用一份;MVP 取首个 character 锚点作 img2img 参考)
@@ -162,6 +163,7 @@ async def build_seed_graph_from_theme(theme: str, user_id: str) -> dict[str, Any
         scene_anchors=scene_anchors,
         assets_by_shot={},
         meta={"source": "theme", "theme": theme[:200]},
+        theme=theme[:500],
     )
 
 

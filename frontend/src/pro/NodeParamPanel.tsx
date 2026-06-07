@@ -4,7 +4,7 @@ import { PRO_NODE_SPECS } from "../types/pro";
 import { useProCanvasStore } from "../store/proCanvasStore";
 import { useToastStore } from "../store/toastStore";
 import { getProNode, loadGraph, updateProNode } from "./graphIO";
-import { ProApiError, proErrorTitle, regenFromScript } from "./proExecution";
+import { ProApiError, proErrorTitle, regenFromScript, seedFromTheme } from "./proExecution";
 import type { ProNodeShape } from "./nodes/NodeShape";
 
 /** 选中单个节点时,右侧参数编辑面板。改参数 → editor.updateShape(单一真相在 editor)。 */
@@ -34,6 +34,26 @@ export function NodeParamPanel({ threadId }: { threadId: string }) {
     setRegenBusy(true);
     try {
       loadGraph(editor, await regenFromScript(script, threadId));
+    } catch (e) {
+      const err = e as ProApiError;
+      useToastStore.getState().push({ kind: "error", title: proErrorTitle(err.code), body: err.detail });
+    } finally {
+      setRegenBusy(false);
+    }
+  };
+
+  // 改主题→重生整篇:用主题重新生成脚本+分镜 → 替换画布。
+  const regenFromThemeCard = async () => {
+    const theme = String(selected.props.params.theme ?? "").trim();
+    if (regenBusy) return;
+    if (!theme) {
+      useToastStore.getState().push({ kind: "warning", title: "请先在「主题」里填写主题" });
+      return;
+    }
+    if (!window.confirm("根据主题重新生成整篇脚本与分镜?会替换画布上现有节点。")) return;
+    setRegenBusy(true);
+    try {
+      loadGraph(editor, await seedFromTheme(theme, threadId));
     } catch (e) {
       const err = e as ProApiError;
       useToastStore.getState().push({ kind: "error", title: proErrorTitle(err.code), body: err.detail });
@@ -126,15 +146,26 @@ export function NodeParamPanel({ threadId }: { threadId: string }) {
       </div>
 
       {selected.props.nodeType === "Script" && (
-        <button
-          type="button"
-          onClick={regenFromScriptCard}
-          disabled={regenBusy}
-          data-testid="pro-script-regen"
-          className="mt-4 w-full rounded-lg bg-[var(--color-clay)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--color-clay-soft)] disabled:opacity-50"
-        >
-          {regenBusy ? "重新生成分镜中…" : "🔄 重新生成分镜"}
-        </button>
+        <div className="mt-4 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={regenFromThemeCard}
+            disabled={regenBusy}
+            data-testid="pro-theme-regen"
+            className="w-full rounded-lg bg-[var(--color-clay)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--color-clay-soft)] disabled:opacity-50"
+          >
+            {regenBusy ? "重新生成中…" : "🎬 改主题·重生整篇"}
+          </button>
+          <button
+            type="button"
+            onClick={regenFromScriptCard}
+            disabled={regenBusy}
+            data-testid="pro-script-regen"
+            className="w-full rounded-lg border border-[var(--color-clay)]/40 px-3 py-1.5 text-xs font-semibold text-[var(--color-clay)] transition hover:bg-[var(--color-paper-deeper)] disabled:opacity-50"
+          >
+            {regenBusy ? "重新生成中…" : "🔄 按脚本重拆分镜"}
+          </button>
+        </div>
       )}
 
       <button
