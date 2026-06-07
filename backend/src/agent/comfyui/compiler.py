@@ -169,9 +169,9 @@ def validate_graph(graph: dict) -> _Graph:
                 f"端口类型不兼容:{out_port.type} → {in_port.type}({src}.{s_handle} → {dst}.{d_handle})",
             )
         key = (dst, d_handle)
-        if key in incoming:
+        if key in incoming and not in_port.multi:
             raise CompileError("multi_input", f"输入端口被多次连接:{dst}.{d_handle}")
-        incoming[key] = _SourceRef(node_id=src, handle=s_handle)
+        incoming[key] = _SourceRef(node_id=src, handle=s_handle)  # multi 端口由 domestic 执行器扫边收齐
         adjacency[src].append(dst)
 
     # 3) 必填输入齐全
@@ -311,6 +311,9 @@ class _ComfyEmitter:
 
     def _video_ref(self, pro_id: str) -> list:
         """Video 节点的 video 输出(帧批)。Video 在 build() 的 Video 循环里发射,这里返回其解码 ref。"""
+        if self.g.nodes[pro_id]["type"] != "Video":
+            # Compose 等非 Video 的 video 产出在 ComfyUI 不支持(合成走境内 ffmpeg)。
+            raise CompileError("comfyui_unsupported", "合成成片(Compose)仅支持境内执行后端")
         return [f"svd_decode_{pro_id}", 0]
 
     def _emit_video(self, vid_id: str) -> None:

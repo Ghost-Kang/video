@@ -44,7 +44,7 @@ interface ProCanvasStore {
   run: ProRunState;
 
   setEdges: (edges: ProEdge[]) => void;
-  addEdge: (edge: Omit<ProEdge, "id"> & { id?: string }) => void;
+  addEdge: (edge: Omit<ProEdge, "id"> & { id?: string }, opts?: { multi?: boolean }) => void;
   removeEdge: (edgeId: string) => void;
   removeEdgesForNodes: (nodeIds: string[]) => void;
   startConnection: (c: PendingConnection) => void;
@@ -77,11 +77,14 @@ export const useProCanvasStore = create<ProCanvasStore>((set, get) => ({
 
   setEdges: (edges) => set({ edges }),
 
-  addEdge: (edge) => {
+  addEdge: (edge, opts) => {
     // 单值输入:同一 (target, targetHandle) 只保留一条 —— 新连替换旧连(与后端 multi_input 守卫一致)。
-    // 同时去掉完全相同的重复边。
-    const filtered = get().edges.filter(
-      (e) => !(e.target === edge.target && e.targetHandle === edge.targetHandle),
+    // multi 输入(如 Compose.videos):保留多条,只去掉完全相同的重复边。
+    const multi = !!opts?.multi;
+    const filtered = get().edges.filter((e) =>
+      multi
+        ? !(e.source === edge.source && e.sourceHandle === edge.sourceHandle && e.target === edge.target && e.targetHandle === edge.targetHandle)
+        : !(e.target === edge.target && e.targetHandle === edge.targetHandle),
     );
     filtered.push({ id: edge.id ?? nextEdgeId(), source: edge.source, sourceHandle: edge.sourceHandle, target: edge.target, targetHandle: edge.targetHandle });
     set({ edges: filtered });

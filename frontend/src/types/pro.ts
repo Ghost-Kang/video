@@ -17,12 +17,15 @@ export type ProNodeTypeKey =
   | "Upscale"
   | "Video"
   | "Script"
+  | "Compose"
   | "Preview";
 
 export interface ProPort {
   name: string;
   type: ProPortType;
   required?: boolean;
+  /** 多输入端口(如 Compose.videos):可接多条连线。 */
+  multi?: boolean;
 }
 
 export interface ProParamSpec {
@@ -245,6 +248,17 @@ export const PRO_NODE_SPECS: Record<ProNodeTypeKey, ProNodeSpec> = {
     outputs: [],
     params: [{ name: "script_markdown", type: "str", default: "", label: "脚本" }],
   },
+  Compose: {
+    key: "Compose",
+    label: "合成成片",
+    category: "output",
+    billable: false,
+    accent: "#9333ea",
+    // videos 多输入:收所有分镜视频 → ffmpeg 拼接成片(境内执行)。
+    inputs: [{ name: "videos", type: "video", required: true, multi: true }],
+    outputs: [{ name: "video", type: "video" }],
+    params: [],
+  },
   Preview: {
     key: "Preview",
     label: "预览",
@@ -266,6 +280,7 @@ export const PRO_NODE_ORDER: ProNodeTypeKey[] = [
   "Generate",
   "Video",
   "Upscale",
+  "Compose",
   "Preview",
   "Model",
 ];

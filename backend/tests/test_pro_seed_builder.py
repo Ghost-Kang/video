@@ -78,16 +78,21 @@ def test_seed_from_rewrite_creation_flow(monkeypatch):
     assert g["meta"]["source"] == "rewrite"
     t = _types(g)
     assert t["Script"] == 1 and t.get("Model", 0) == 0  # 脚本卡有、无 Model 节点
-    assert t["Prompt"] == 3 and t["Generate"] == 3 and t["Video"] == 3 and t["Preview"] == 3
+    assert t["Prompt"] == 3 and t["Generate"] == 3 and t["Video"] == 3
+    assert t["Compose"] == 1 and t["Preview"] == 1  # 末端合成成片 + 一个成片预览
     # 脚本卡承载整篇脚本
     script = next(n for n in g["nodes"] if n["id"] == "script_main")
     assert script["params"]["script_markdown"] == "# 脚本正文"
     # 分镜带镜号 label + 画面文案
     p1 = next(n for n in g["nodes"] if n["id"] == "prompt_1")
     assert p1["params"]["text"] == "画面1" and "镜1" in p1["label"]
-    # 链路:prompt→gen→vid→prev
+    # 链路:prompt→gen→vid→compose→prev
     handles = {(e["source"].split("_")[0], e["target"].split("_")[0]) for e in g["edges"]}
-    assert ("prompt", "gen") in handles and ("gen", "vid") in handles and ("vid", "prev") in handles
+    assert ("prompt", "gen") in handles and ("gen", "vid") in handles
+    assert ("vid", "compose") in handles and ("compose", "prev") in handles
+    # 所有分镜视频都连到 Compose
+    compose_in = [e for e in g["edges"] if e["target"] == "compose_main" and e["targetHandle"] == "videos"]
+    assert len(compose_in) == 3
 
 
 def test_seed_marks_cached(monkeypatch):
@@ -173,7 +178,8 @@ def test_seed_from_theme(monkeypatch):
     g = asyncio.run(build_seed_graph_from_theme("宝宝辅食", "u1"))
     validate_graph(g)
     assert g["meta"]["source"] == "theme" and g["meta"]["shot_count"] == 2
-    assert _types(g)["Script"] == 1 and _types(g)["Generate"] == 2 and _types(g)["Video"] == 2
+    t = _types(g)
+    assert t["Script"] == 1 and t["Generate"] == 2 and t["Video"] == 2 and t["Compose"] == 1 and t["Preview"] == 1
     assert next(n for n in g["nodes"] if n["id"] == "prompt_1")["params"]["text"] == "开场画面"
 
 

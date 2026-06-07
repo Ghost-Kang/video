@@ -81,6 +81,7 @@ def _build_graph_from_shots(
                 ref_anchor_id = aid
             row += 1
 
+    video_ids: list[str] = []
     for i, shot in enumerate(shots):
         si = int(shot["shot_index"])
         idx = i + 1  # 节点 id 用连续序号,不用 shot_index(LLM 可能重复)
@@ -88,7 +89,7 @@ def _build_graph_from_shots(
         asset = assets_by_shot.get(si) or {}
         img_cached = asset.get("image_url")
         vid_cached = asset.get("video_url")
-        prompt_id, gen_id, vid_id, prev_id = f"prompt_{idx}", f"gen_{idx}", f"vid_{idx}", f"prev_{idx}"
+        prompt_id, gen_id, vid_id = f"prompt_{idx}", f"gen_{idx}", f"vid_{idx}"
         mark = f"镜{idx}"
 
         nodes.append(
@@ -103,15 +104,20 @@ def _build_graph_from_shots(
             {"id": vid_id, "type": "Video", "label": mark, "params": {},
              "cached": bool(vid_cached), "cached_url": vid_cached, "x": _x(3), "y": _y(i)}
         )
-        nodes.append(
-            {"id": prev_id, "type": "Preview", "label": mark, "params": {}, "x": _x(4), "y": _y(i)}
-        )
 
         add_edge(prompt_id, "text", gen_id, "positive")
         if ref_anchor_id is not None:
             add_edge(ref_anchor_id, "image", gen_id, "image")
         add_edge(gen_id, "image", vid_id, "image")
-        add_edge(vid_id, "video", prev_id, "image")
+        video_ids.append(vid_id)
+
+    # 末端:合成成片 + 成片预览(所有分镜视频 → Compose → Preview)
+    mid_y = _y(max(0, (len(shots) - 1) // 2))
+    nodes.append({"id": "compose_main", "type": "Compose", "label": "成片", "params": {}, "x": _x(4), "y": mid_y})
+    nodes.append({"id": "prev_final", "type": "Preview", "label": "成片", "params": {}, "x": _x(5), "y": mid_y})
+    for vid_id in video_ids:
+        add_edge(vid_id, "video", "compose_main", "videos")
+    add_edge("compose_main", "video", "prev_final", "image")
 
     graph: dict[str, Any] = {
         "version": 1,

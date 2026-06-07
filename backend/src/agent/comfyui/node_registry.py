@@ -38,11 +38,13 @@ PROVIDER_RUNNINGHUB = "runninghub"
 
 @dataclass(frozen=True)
 class Port:
-    """一个数据端口。required 仅对 input 有意义(output 恒为产出)。"""
+    """一个数据端口。required 仅对 input 有意义(output 恒为产出)。multi=True 的输入可接多条连线
+    (如 Compose 的 videos 收所有分镜视频);其余输入单值(多连即替换)。"""
 
     name: str
     type: str
     required: bool = True
+    multi: bool = False
 
 
 @dataclass(frozen=True)
@@ -228,6 +230,15 @@ NODE_TYPES: dict[str, NodeType] = {
             ParamSpec("script_markdown", "str", "", label="脚本"),
         ),
     ),
+    # 合成成片:多个分镜视频 → ffmpeg 拼接 → 一条成片。境内/ffmpeg-only(不进 ComfyUI 编译)。
+    "Compose": NodeType(
+        key="Compose",
+        label="合成成片",
+        category="output",
+        comfy_class="",
+        inputs=(Port("videos", PortType.VIDEO, required=True, multi=True),),
+        outputs=(Port("video", PortType.VIDEO),),
+    ),
     "Preview": NodeType(
         key="Preview",
         label="预览",
@@ -281,7 +292,7 @@ def registry_json() -> dict[str, Any]:
                 "category": nt.category,
                 "providers": list(nt.providers),
                 "billable": nt.billable,
-                "inputs": [{"name": p.name, "type": p.type, "required": p.required} for p in nt.inputs],
+                "inputs": [{"name": p.name, "type": p.type, "required": p.required, "multi": p.multi} for p in nt.inputs],
                 "outputs": [{"name": p.name, "type": p.type} for p in nt.outputs],
                 "params": [_param_json(p) for p in nt.params],
             }
