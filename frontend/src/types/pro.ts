@@ -6,7 +6,7 @@
  * UI 元信息(颜色/分组)。WS 帧手写在此(同 ws.ts 里 DeleteSessionsMsg 等单命令的先例,不跑 codegen)。
  */
 
-export type ProPortType = "image" | "text" | "model" | "video" | "any";
+export type ProPortType = "image" | "text" | "model" | "video" | "audio" | "any";
 
 export type ProNodeTypeKey =
   | "Model"
@@ -18,6 +18,9 @@ export type ProNodeTypeKey =
   | "Video"
   | "Script"
   | "Compose"
+  | "TTS"
+  | "Subtitle"
+  | "BGM"
   | "Preview";
 
 export interface ProPort {
@@ -41,7 +44,7 @@ export interface ProParamSpec {
 export interface ProNodeSpec {
   key: ProNodeTypeKey;
   label: string;
-  category: "model" | "prompt" | "input" | "generate" | "output" | "script";
+  category: "model" | "prompt" | "input" | "generate" | "output" | "script" | "audio";
   billable: boolean;
   inputs: ProPort[];
   outputs: ProPort[];
@@ -193,10 +196,10 @@ export const PRO_NODE_SPECS: Record<ProNodeTypeKey, ProNodeSpec> = {
     billable: true,
     accent: "#c2410c",
     inputs: [
-      { name: "model", type: "model", required: true },
+      { name: "model", type: "model", required: false },
       { name: "positive", type: "text", required: true },
       { name: "negative", type: "text", required: false },
-      { name: "image", type: "image", required: false },
+      { name: "image", type: "image", required: false, multi: true },
     ],
     outputs: [{ name: "image", type: "image" }],
     params: [
@@ -253,6 +256,42 @@ export const PRO_NODE_SPECS: Record<ProNodeTypeKey, ProNodeSpec> = {
       { name: "script_markdown", type: "str", default: "", label: "脚本" },
     ],
   },
+  TTS: {
+    key: "TTS",
+    label: "配音",
+    category: "audio",
+    billable: false,
+    accent: "#0d9488",
+    inputs: [{ name: "text", type: "text" }],
+    outputs: [{ name: "audio", type: "audio" }],
+    params: [
+      { name: "text", type: "str", default: "", label: "口播文案" },
+      { name: "voice", type: "str", default: "温柔女声", label: "音色", choices: ["温柔女声", "活力男声", "知性女声", "童声"] },
+    ],
+  },
+  Subtitle: {
+    key: "Subtitle",
+    label: "字幕",
+    category: "output",
+    billable: false,
+    accent: "#0891b2",
+    inputs: [{ name: "video", type: "video", required: true }],
+    outputs: [{ name: "video", type: "video" }],
+    params: [{ name: "text", type: "str", default: "", label: "字幕文案" }],
+  },
+  BGM: {
+    key: "BGM",
+    label: "背景音乐",
+    category: "output",
+    billable: false,
+    accent: "#7c3aed",
+    inputs: [{ name: "video", type: "video", required: true }],
+    outputs: [{ name: "video", type: "video" }],
+    params: [
+      { name: "track", type: "str", default: "none", label: "曲目", choices: ["none", "轻快童谣", "温馨钢琴", "lo-fi", "活力流行"] },
+      { name: "volume", type: "float", default: 0.3, label: "音量", min: 0, max: 1 },
+    ],
+  },
   Compose: {
     key: "Compose",
     label: "合成成片",
@@ -285,6 +324,9 @@ export const PRO_NODE_ORDER: ProNodeTypeKey[] = [
   "Generate",
   "Video",
   "Upscale",
+  "TTS",
+  "Subtitle",
+  "BGM",
   "Compose",
   "Preview",
   "Model",

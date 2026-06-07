@@ -14,7 +14,7 @@ import { ProToolbar } from "./ProToolbar";
 import { NodeParamPanel } from "./NodeParamPanel";
 import { RunOutputs } from "./RunOutputs";
 import { CostModal } from "./CostModal";
-import { compileGraph, loadGraph, pronodeShapes, updateProNode } from "./graphIO";
+import { buildRegenSubgraph, compileGraph, downstreamGeneratedIds, loadGraph, pronodeShapes, updateProNode } from "./graphIO";
 import {
   buildSubmitCommand,
   estimateGraph,
@@ -71,6 +71,7 @@ export default function ProCanvas({ userId }: { userId: string }) {
   const [searchParams] = useSearchParams();
   const editorRef = useRef<Editor | null>(null);
   const graphRef = useRef<ProGraph | null>(null);
+  const regenRef = useRef<string | null>(null); // 待重生的目标节点 id(cost-modal 确认后用)
   const [editorReady, setEditorReady] = useState(false);
   const [restored, setRestored] = useState(false);
   const seededRef = useRef(false);
@@ -87,25 +88,44 @@ export default function ProCanvas({ userId }: { userId: string }) {
       }
       if (!isProRunEvent(ev)) return;
       if (ev.thread_id !== threadId) return;
+      // 单节点重生:这一 run 只动该节点(读 applyProRunEvent 前的 regenNode)。
+      const regen = useProCanvasStore.getState().run.regenNode;
       useProCanvasStore.getState().applyProRunEvent(ev);
       const editor = editorRef.current;
       if (!editor) return;
       if (ev.type === "pro_run_progress") {
-        if (ev.status === "running" || ev.status === "submitting") setStatus(editor, () => true, "running");
-        else if (ev.status === "cancelled") setStatus(editor, () => true, "idle");
+        const pred = regen ? (s: ProNodeShape) => String(s.id) === regen : () => true;
+        if (ev.status === "running" || ev.status === "submitting") setStatus(editor, pred, "running");
+        else if (ev.status === "cancelled") setStatus(editor, pred, "idle");
       } else if (ev.type === "pro_run_done") {
-        const previews = pronodeShapes(editor).filter((s) => s.props.nodeType === "Preview");
-        editor.run(() => {
-          for (const s of pronodeShapes(editor)) {
-            if (["Generate", "Video", "Compose", "Preview"].includes(s.props.nodeType))
-              updateProNode(editor, s.id, { status: "done" });
-          }
-          previews.forEach((s, i) => {
-            if (ev.outputs[i]) updateProNode(editor, s.id, { status: "done", resultUrl: ev.outputs[i] });
+        if (regen) {
+          // 只更新目标节点的产物 + 给下游标脏(用旧产物了)。
+          const url = ev.outputs[0];
+          editor.run(() => {
+            updateProNode(editor, regen as ProNodeShape["id"], { status: "done", needsRegen: false, ...(url ? { resultUrl: url } : {}) });
+            const downstream = new Set(downstreamGeneratedIds(regen));
+            for (const s of pronodeShapes(editor)) {
+              if (downstream.has(String(s.id)) && ["Generate", "Video", "Compose"].includes(s.props.nodeType))
+                updateProNode(editor, s.id, { needsRegen: true });
+            }
           });
-        });
+        } else {
+          const previews = pronodeShapes(editor).filter((s) => s.props.nodeType === "Preview");
+          editor.run(() => {
+            for (const s of pronodeShapes(editor)) {
+              if (["Generate", "Video", "Compose", "Subtitle", "BGM", "Preview"].includes(s.props.nodeType))
+                updateProNode(editor, s.id, { status: "done" });
+            }
+            previews.forEach((s, i) => {
+              if (ev.outputs[i]) updateProNode(editor, s.id, { status: "done", resultUrl: ev.outputs[i] });
+            });
+          });
+        }
       } else if (ev.type === "pro_run_failed") {
-        setStatus(editor, (s) => ["Generate", "Video", "Compose", "Preview"].includes(s.props.nodeType), "failed");
+        const pred = regen
+          ? (s: ProNodeShape) => String(s.id) === regen
+          : (s: ProNodeShape) => ["Generate", "Video", "Compose", "Subtitle", "BGM", "Preview"].includes(s.props.nodeType);
+        setStatus(editor, pred, "failed");
       }
     },
     [threadId],
@@ -193,6 +213,7 @@ export default function ProCanvas({ userId }: { userId: string }) {
     try {
       const est = await estimateGraph(graph);
       graphRef.current = graph;
+      regenRef.current = null;
       openCostModal(est);
     } catch (e) {
       const err = e as ProApiError;
@@ -200,17 +221,43 @@ export default function ProCanvas({ userId }: { userId: string }) {
     }
   }, [openCostModal]);
 
+  // 单节点重生:目标节点 + 当前上游 子图 → 估算 → cost modal(确认后只跑该节点)。
+  const handleRegen = useCallback(
+    async (nodeId: string) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      const graph = buildRegenSubgraph(editor, nodeId);
+      try {
+        const est = await estimateGraph(graph);
+        graphRef.current = graph;
+        regenRef.current = nodeId;
+        openCostModal(est);
+      } catch (e) {
+        const err = e as ProApiError;
+        useToastStore.getState().push({ kind: "error", title: proErrorTitle(err.code), body: err.detail });
+      }
+    },
+    [openCostModal],
+  );
+
   const handleConfirmRun = useCallback(() => {
     const graph = graphRef.current;
     if (!graph) return;
+    const regenNode = regenRef.current;
     resetRun();
     const editor = editorRef.current;
     if (editor) {
       editor.run(() => {
-        for (const s of pronodeShapes(editor))
-          updateProNode(editor, s.id, { status: "idle", resultUrl: s.props.cached ? s.props.cachedUrl : null });
+        if (regenNode) {
+          updateProNode(editor, regenNode as ProNodeShape["id"], { status: "idle" });
+        } else {
+          for (const s of pronodeShapes(editor))
+            updateProNode(editor, s.id, { status: "idle", resultUrl: s.props.cached ? s.props.cachedUrl : null });
+        }
       });
     }
+    if (regenNode) useProCanvasStore.getState().setRun({ regenNode });
+    regenRef.current = null;
     sendCommand(buildSubmitCommand(threadId, graph));
   }, [resetRun, sendCommand, threadId]);
 
@@ -233,8 +280,8 @@ export default function ProCanvas({ userId }: { userId: string }) {
         }}
       >
         <ProToolbar onRun={handleRun} threadId={threadId} />
-        <NodeParamPanel threadId={threadId} />
-        <RunOutputs />
+        <NodeParamPanel threadId={threadId} onRegen={handleRegen} />
+        <RunOutputs threadId={threadId} />
         <ProThemeInput threadId={threadId} ready={restored} />
         <CostModal onConfirm={handleConfirmRun} />
       </Tldraw>

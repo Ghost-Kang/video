@@ -248,6 +248,38 @@ def test_domestic_node_backend_comfyui(monkeypatch, tmp_path):
     assert "canvas_comfyui" in [c["call_kind"] for c in costs]  # 记 comfyui 账(非 seedream)
 
 
+def test_domestic_subtitle_passthrough(monkeypatch, tmp_path):
+    # 字幕 best-effort:av_post 返回 None(无字体)→ 透传上游视频,run 照常 done。
+    frames, costs = _setup(monkeypatch, tmp_path)
+    _patch_domestic(monkeypatch)
+
+    async def no_burn(video_url, text):
+        return None
+
+    monkeypatch.setattr("agent.tools.av_post.burn_subtitle", no_burn)
+    g = {
+        "version": 1,
+        "nodes": [
+            {"id": "p", "type": "Prompt", "params": {"text": "猫"}},
+            {"id": "g", "type": "Generate", "params": {}},
+            {"id": "v", "type": "Video", "params": {"duration": 4}},
+            {"id": "sub", "type": "Subtitle", "params": {"text": "字幕"}},
+            {"id": "pv", "type": "Preview", "params": {}},
+        ],
+        "edges": [
+            {"id": "1", "source": "p", "sourceHandle": "text", "target": "g", "targetHandle": "positive"},
+            {"id": "2", "source": "g", "sourceHandle": "image", "target": "v", "targetHandle": "image"},
+            {"id": "3", "source": "v", "sourceHandle": "video", "target": "sub", "targetHandle": "video"},
+            {"id": "4", "source": "sub", "sourceHandle": "video", "target": "pv", "targetHandle": "image"},
+        ],
+    }
+    run = _enqueue(graph=g, provider="domestic", cost=5.0)
+    asyncio.run(pipe.process_pro_run_task(run))
+    after = repo.get_pro_run("r1", user_id="u1", thread_id="t1")
+    assert after["status"] == "done"
+    assert after["result"] == ["https://vid/a.mp4"]  # 字幕透传 → 仍是上游视频
+
+
 def test_domestic_compose_concats_videos(monkeypatch, tmp_path):
     frames, costs = _setup(monkeypatch, tmp_path)
     _patch_domestic(monkeypatch)

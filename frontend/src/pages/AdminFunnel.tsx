@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { PageShell } from "../components/PageShell";
-import { fetchFunnel, type FunnelStage } from "../lib/funnelApi";
+import { fetchFunnel, fetchProFunnel, type FunnelStage, type ProFunnel } from "../lib/funnelApi";
 
 export function AdminFunnel() {
   const [stages, setStages] = useState<FunnelStage[]>([]);
+  const [pro, setPro] = useState<ProFunnel | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = () => {
@@ -12,6 +13,7 @@ export function AdminFunnel() {
       setStages(s);
       setLoading(false);
     });
+    void fetchProFunnel().then(setPro);
   };
   useEffect(() => {
     // 初始拉取:setState 放异步 .then 回调里(非 effect 体内同步),避开 set-state-in-effect。
@@ -22,10 +24,15 @@ export function AdminFunnel() {
       setStages(s);
       setLoading(false);
     });
+    void fetchProFunnel().then((p) => {
+      if (active) setPro(p);
+    });
     return () => {
       active = false;
     };
   }, []);
+
+  const proTop = pro?.stages[0]?.users ?? 0;
 
   const top = stages[0]?.users ?? 0;
   const hasData = stages.length > 0 && top > 0;
@@ -84,6 +91,39 @@ export function AdminFunnel() {
               ))
             )}
           </section>
+
+          {pro && (
+            <section className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/70 dark:border-stone-800/70 p-5 shadow-soft space-y-3" aria-label="Pro 画布漏斗">
+              <div className="flex items-baseline justify-between">
+                <h2 className="font-serif-cn text-xl text-stone-900 dark:text-stone-50">⚡ Pro 画布漏斗</h2>
+                <span className="text-xs text-stone-500 dark:text-stone-400 tabular-nums">
+                  真出图 {pro.real_outputs.images} · 真出片 {pro.real_outputs.videos}
+                </span>
+              </div>
+              {proTop === 0 ? (
+                <p className="text-sm text-stone-500 dark:text-stone-400">还没有 Pro 画布数据 — 等用户建图/运行。</p>
+              ) : (
+                pro.stages.map((s) => (
+                  <div key={s.label}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-stone-800 dark:text-stone-200">{s.label}</span>
+                      <span className="tabular-nums text-stone-500 dark:text-stone-400">
+                        {s.users} 人{s.step_conv != null && <> · 转化 {(s.step_conv * 100).toFixed(0)}%</>}
+                      </span>
+                    </div>
+                    <div className="h-6 rounded-lg bg-stone-100 dark:bg-stone-800 overflow-hidden">
+                      <div
+                        className="h-full bg-[#9333ea] flex items-center px-2 text-[11px] text-white tabular-nums transition-all duration-500"
+                        style={{ width: `${Math.max(3, proTop ? (s.users / proTop) * 100 : 0)}%` }}
+                      >
+                        {s.pct_of_top != null ? `${(s.pct_of_top * 100).toFixed(0)}%` : ""}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </section>
+          )}
 
           <p className="text-xs text-stone-500 dark:text-stone-400">
             口径:每阶段「至少触发过一次该事件的去重 user_id」(近似漏斗,Beta 量足够)。起点用「分析完成」

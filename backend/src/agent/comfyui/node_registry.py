@@ -27,6 +27,7 @@ class PortType:
     TEXT = "text"
     MODEL = "model"
     VIDEO = "video"
+    AUDIO = "audio"
     ANY = "any"
 
 
@@ -168,7 +169,8 @@ NODE_TYPES: dict[str, NodeType] = {
             Port("model", PortType.MODEL, required=False),
             Port("positive", PortType.TEXT, required=True),
             Port("negative", PortType.TEXT, required=False),
-            Port("image", PortType.IMAGE, required=False),  # 传图 = 图生图(denoise<1 / 锚点参考)
+            # multi:逐镜可选锚点 —— 一个 Generate 可接多个锚点(角色+场景)作参考(境内 Seedream 收多图)。
+            Port("image", PortType.IMAGE, required=False, multi=True),
         ),
         outputs=(Port("image", PortType.IMAGE),),
         params=(
@@ -244,6 +246,42 @@ NODE_TYPES: dict[str, NodeType] = {
         comfy_class="",
         inputs=(Port("videos", PortType.VIDEO, required=True, multi=True),),
         outputs=(Port("video", PortType.VIDEO),),
+    ),
+    # 配音(TTS):口播文案 → 语音。占位节点 —— 执行下轮(需 TTS_API_KEY);run 时跳过(同 Script)。
+    "TTS": NodeType(
+        key="TTS",
+        label="配音",
+        category="audio",
+        comfy_class="",
+        inputs=(Port("text", PortType.TEXT, required=False),),
+        outputs=(Port("audio", PortType.AUDIO),),
+        params=(
+            ParamSpec("text", "str", "", label="口播文案"),
+            ParamSpec("voice", "str", "温柔女声", label="音色", choices=("温柔女声", "活力男声", "知性女声", "童声")),
+        ),
+    ),
+    # 字幕:视频 → 烧字幕。境内 ffmpeg(best-effort:失败/无字体则透传原视频,绝不阻断)。
+    "Subtitle": NodeType(
+        key="Subtitle",
+        label="字幕",
+        category="output",
+        comfy_class="",
+        inputs=(Port("video", PortType.VIDEO, required=True),),
+        outputs=(Port("video", PortType.VIDEO),),
+        params=(ParamSpec("text", "str", "", label="字幕文案"),),
+    ),
+    # 背景音乐:视频 → 混入 BGM。内置免版权小素材库(data/bgm/<track>.mp3);缺曲则透传。
+    "BGM": NodeType(
+        key="BGM",
+        label="背景音乐",
+        category="output",
+        comfy_class="",
+        inputs=(Port("video", PortType.VIDEO, required=True),),
+        outputs=(Port("video", PortType.VIDEO),),
+        params=(
+            ParamSpec("track", "str", "none", label="曲目", choices=("none", "轻快童谣", "温馨钢琴", "lo-fi", "活力流行")),
+            ParamSpec("volume", "float", 0.3, label="音量", minimum=0.0, maximum=1.0),
+        ),
     ),
     "Preview": NodeType(
         key="Preview",

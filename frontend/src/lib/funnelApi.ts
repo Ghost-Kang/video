@@ -17,3 +17,16 @@ export async function fetchFunnel(): Promise<FunnelStage[]> {
   const body = (await res.json()) as { stages?: FunnelStage[] };
   return Array.isArray(body.stages) ? body.stages : [];
 }
+
+export interface ProFunnel {
+  stages: FunnelStage[];
+  real_outputs: { images: number; videos: number };
+}
+
+/** Pro 画布漏斗:建图→运行→出片 + 真出图/片计数(后端 /api/pro/funnel,admin-gated)。 */
+export async function fetchProFunnel(): Promise<ProFunnel | null> {
+  const res = await apiFetch("/api/pro/funnel");
+  if (!res.ok) return null;
+  const body = (await res.json()) as ProFunnel;
+  return body && Array.isArray(body.stages) ? body : null;
+}

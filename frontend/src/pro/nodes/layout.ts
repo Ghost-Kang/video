@@ -17,6 +17,7 @@ export const PORT_COLOR: Record<ProPortType, string> = {
   text: "#0f766e",
   model: "#7c2d12",
   video: "#be185d",
+  audio: "#0d9488",
   any: "#78716c",
 };
 
@@ -28,7 +29,9 @@ export function hasThumb(t: ProNodeTypeKey): boolean {
     t === "Anchor" ||
     t === "Upscale" ||
     t === "Video" ||
-    t === "Compose"
+    t === "Compose" ||
+    t === "Subtitle" ||
+    t === "BGM"
   );
 }
 

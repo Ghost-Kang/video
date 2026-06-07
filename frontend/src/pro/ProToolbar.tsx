@@ -5,6 +5,7 @@ import { useProCanvasStore } from "../store/proCanvasStore";
 import { createNode } from "./graphIO";
 import { NODE_W } from "./nodes/layout";
 import { ProTemplates } from "./ProTemplates";
+import { ProFilms } from "./ProFilms";
 
 let _addCount = 0;
 
@@ -70,6 +71,7 @@ export function ProToolbar({ onRun, threadId }: { onRun: () => void; threadId: s
           </span>
         )}
         <ProTemplates />
+        <ProFilms />
         <button
           type="button"
           onClick={onRun}

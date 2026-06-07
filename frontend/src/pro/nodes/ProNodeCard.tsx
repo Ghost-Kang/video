@@ -83,6 +83,14 @@ export function ProNodeCard({ shape }: { shape: ProNodeShape }) {
             {shape.props.label}
           </span>
         )}
+        {shape.props.needsRegen && (
+          <span
+            title="上游已变,这一节点用的是旧产物 — 建议重新生成"
+            style={{ fontSize: 10, fontWeight: 600, color: "#b45309", background: "#fde68a66", borderRadius: 6, padding: "1px 6px" }}
+          >
+            需重生
+          </span>
+        )}
         <span style={{ marginLeft: "auto", fontSize: 11 }}>
           {shape.props.cached && <span title="命中缓存,不重渲染" style={{ color: "#16a34a" }}>♻︎</span>}
           {status === "running" && <span style={{ color: spec.accent }}>⏳</span>}

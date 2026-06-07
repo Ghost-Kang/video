@@ -801,6 +801,14 @@ async def handle_pro_run_submit(ctx: WSCtx, msg: ProRunSubmitMsg) -> None:
         )
 
     await asyncio.to_thread(_enqueue)
+    # 漏斗:运行已提交(emit 失败不阻塞)。
+    try:
+        await cascade_events.emit(
+            EventName.PRO_RUN_SUBMITTED, user_id=ctx.user_id, run_id=run_id,
+            payload={"thread_id": msg.thread_id, "provider": provider_name, "cost_est": predicted},
+        )
+    except Exception:  # noqa: BLE001
+        pass
     # 即刻回 queued 进度帧(带 run_id 供前端关联);后续进度/产物由 worker 经 send_to_user 推。
     await send_json(
         ctx.ws, type="pro_run_progress", thread_id=msg.thread_id, run_id=run_id, status="queued", pct=0
