@@ -20,15 +20,39 @@ export function RunOutputs() {
           <span className="shrink-0 text-xs font-medium text-[var(--color-ink-soft)]">
             产物 {run.outputs.length}
           </span>
-          {run.outputs.map((url, i) => (
-            <a key={i} href={url} target="_blank" rel="noreferrer" className="shrink-0">
-              <img
-                src={url}
-                alt={`output ${i + 1}`}
-                className="h-16 w-16 rounded-lg border border-[var(--color-clay)]/15 object-cover"
-              />
-            </a>
-          ))}
+          {run.outputs.map((url, i) => {
+            const isVid = /\.(mp4|webm|mov)(\?|$)/i.test(url);
+            return (
+              <div key={i} className="flex shrink-0 flex-col items-center gap-1">
+                {isVid ? (
+                  <video
+                    src={url}
+                    controls
+                    muted
+                    playsInline
+                    className="h-20 w-32 rounded-lg border border-[var(--color-clay)]/15 bg-black object-cover"
+                  />
+                ) : (
+                  <a href={url} target="_blank" rel="noreferrer">
+                    <img
+                      src={url}
+                      alt={`output ${i + 1}`}
+                      className="h-16 w-16 rounded-lg border border-[var(--color-clay)]/15 object-cover"
+                    />
+                  </a>
+                )}
+                <a
+                  href={url}
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] font-medium text-[var(--color-clay)] hover:underline"
+                >
+                  ⬇ 下载{isVid ? "成片" : ""}
+                </a>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

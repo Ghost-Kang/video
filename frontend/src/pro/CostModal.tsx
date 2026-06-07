@@ -32,7 +32,7 @@ export function CostModal({ onConfirm }: CostModalProps) {
       >
         <h2 className="text-lg font-semibold text-[var(--color-ink)]">确认运行这张图</h2>
         <p className="mt-1 text-sm text-[var(--color-ink-soft)]">
-          执行在境内 ComfyUI 后端,扣费前请确认成本。
+          境内执行(图 Seedream / 视频 Seedance),扣费前请确认成本。
         </p>
 
         <div className="mt-4 rounded-xl bg-[var(--color-paper-deeper)] p-4">
