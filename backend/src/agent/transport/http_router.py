@@ -38,7 +38,12 @@ from agent.cascade.rewrite_service import error_payload, request_rewrite
 from agent.cascade.storage import list_creators, list_events
 from agent.comfyui.compiler import CompileError, estimate_graph_cost
 from agent.comfyui.script_gen import ScriptGenError
-from agent.comfyui.seed_builder import SeedBuildError, build_seed_graph, build_seed_graph_from_theme
+from agent.comfyui.seed_builder import (
+    SeedBuildError,
+    build_seed_graph,
+    build_seed_graph_from_script,
+    build_seed_graph_from_theme,
+)
 from agent.tools.canvas_persistence import pro_graphs_repo
 
 
@@ -671,6 +676,31 @@ async def handle_pro_seed_from_theme(qs: dict, body: dict) -> tuple[int, dict, s
     return 200, {"graph": graph}, "OK"
 
 
+async def handle_pro_regen_from_script(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """脚本卡重生:编辑后的脚本 → Doubao 重拆分镜 → 创作图。body={script, thread_id?}。LLM 一次,走成本闸。"""
+    if not config.PRO_CANVAS_ENABLED:
+        return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
+    script = str(body.get("script") or "").strip()
+    if not script:
+        return 400, {"error": "script_required"}, "Bad Request"
+    user_id = _pro_uid(qs, body)
+    run_id = str(body.get("thread_id") or "default")
+    await cost_guard.cost_guard(user_id, run_id, cost_guard.PREDICT_REWRITE_CNY)
+    _t0 = time.monotonic()
+    try:
+        graph = await build_seed_graph_from_script(script, user_id)
+    except ScriptGenError as exc:
+        return 422, {"error": exc.code, "message": exc.message}, "Unprocessable Entity"
+    except SeedBuildError as exc:
+        return 400, {"error": exc.code, "message": exc.message}, "Bad Request"
+    await cost_guard.record_generation_cost(
+        user_id=user_id, run_id=run_id, call_kind="pro_script",
+        cost_cny=cost_guard.PREDICT_REWRITE_CNY, provider="doubao",
+        latency_ms=int((time.monotonic() - _t0) * 1000),
+    )
+    return 200, {"graph": graph}, "OK"
+
+
 # ---------- Pro 画布 图持久化 + 模板 ----------
 # 同 estimate/seed:COHORT + PRO_CANVAS_ENABLED 门控;user_id 取 body["user_id"](dispatcher 对
 # mapped 邀请码已钉成 server-derived;GET 也会被钉,因 body 缺省 {})。graph 存原样(可为 WIP)。
@@ -790,6 +820,7 @@ EXACT_ROUTES: dict[tuple[str, str], HandlerFn] = {
     ("POST", "/api/pro/estimate"): handle_pro_estimate,
     ("POST", "/api/pro/seed"): handle_pro_seed,
     ("POST", "/api/pro/seed_from_theme"): handle_pro_seed_from_theme,
+    ("POST", "/api/pro/regen_from_script"): handle_pro_regen_from_script,
     ("GET", "/api/pro/graph"): handle_pro_graph_get,
     ("POST", "/api/pro/graph"): handle_pro_graph_post,
     ("GET", "/api/pro/templates"): handle_pro_templates_get,

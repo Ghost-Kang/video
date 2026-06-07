@@ -55,6 +55,19 @@ def _content(res) -> str:
     return res.content if hasattr(res, "content") else str(res)
 
 
+def _norm_shots(raw: list) -> list[dict]:
+    """LLM shots → 规范化 [{shot_index, visual, dialogue}](丢无 visual 的,钳到 _MAX_SHOTS)。"""
+    shots: list[dict] = []
+    for s in (raw or [])[:_MAX_SHOTS]:
+        if not isinstance(s, dict):
+            continue
+        visual = str(s.get("visual") or "").strip()
+        if not visual:
+            continue
+        shots.append({"shot_index": len(shots) + 1, "visual": visual, "dialogue": str(s.get("dialogue") or "").strip()})
+    return shots
+
+
 async def generate_script_from_theme(theme: str) -> dict:
     theme = (theme or "").strip()
     if not theme:
@@ -74,15 +87,7 @@ async def generate_script_from_theme(theme: str) -> dict:
     if not data or not isinstance(data.get("shots"), list):
         raise ScriptGenError("bad_output", "脚本生成失败,请换个主题或重试")
 
-    shots: list[dict] = []
-    for s in data["shots"][:_MAX_SHOTS]:
-        if not isinstance(s, dict):
-            continue
-        visual = str(s.get("visual") or "").strip()
-        if not visual:
-            continue
-        shots.append({"shot_index": len(shots) + 1, "visual": visual, "dialogue": str(s.get("dialogue") or "").strip()})
-
+    shots = _norm_shots(data["shots"])
     if not shots:
         raise ScriptGenError("bad_output", "脚本没有可用分镜,请换个主题或重试")
 
@@ -91,3 +96,42 @@ async def generate_script_from_theme(theme: str) -> dict:
         "shots": shots,
         "model": current_model_name(),
     }
+
+
+_SHOTS_PROMPT = """下面是一支竖屏短视频的完整脚本。请把它拆成可拍摄的分镜。
+要求:
+- 全程中文。
+- 分镜数量按脚本内容自适应(一般 3~8 个镜,最多 12)。
+- 每镜给:visual(画面描述,具体到场景/主体/动作/光线/景别,能直接拿去生成图)、dialogue(口播或字幕,可空)。
+只输出 JSON,不要任何额外文字、不要 markdown 代码块:
+{{"shots": [{{"visual": "...", "dialogue": "..."}}]}}
+
+【脚本】:
+{script}
+"""
+
+
+async def generate_shots_from_script(script_markdown: str) -> dict:
+    """脚本卡重生:给定(用户可能已编辑的)脚本 → 重新拆分镜。保留原脚本文本。"""
+    script = (script_markdown or "").strip()
+    if not script:
+        raise ScriptGenError("script_required", "缺少脚本")
+    if len(script) > 4000:
+        script = script[:4000]
+
+    model = get_chat_model()
+    prompt = _SHOTS_PROMPT.format(script=script)
+    try:
+        data = _extract_json(_content(await model.ainvoke([{"role": "user", "content": prompt}])))
+        if data is None:
+            data = _extract_json(_content(await model.ainvoke([{"role": "user", "content": prompt + _RETRY}])))
+    except Exception as e:  # noqa: BLE001
+        raise ScriptGenError("llm_error", f"分镜生成调用失败: {e}") from e
+
+    if not data or not isinstance(data.get("shots"), list):
+        raise ScriptGenError("bad_output", "分镜生成失败,请改脚本或重试")
+    shots = _norm_shots(data["shots"])
+    if not shots:
+        raise ScriptGenError("bad_output", "脚本没有可用分镜,请改脚本或重试")
+
+    return {"script_markdown": script, "shots": shots, "model": current_model_name()}

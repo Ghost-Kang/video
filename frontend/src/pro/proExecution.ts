@@ -99,6 +99,17 @@ export async function seedFromTheme(theme: string, threadId: string): Promise<Pr
   return (await res.json()).graph as ProGraph;
 }
 
+/** 脚本卡重生:编辑后的脚本 → Doubao 重拆分镜 → 创作图(替换画布)。 */
+export async function regenFromScript(script: string, threadId: string): Promise<ProGraph> {
+  const res = await apiFetch("/api/pro/regen_from_script", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ script, thread_id: threadId }),
+  });
+  if (!res.ok) throw await readError(res);
+  return (await res.json()).graph as ProGraph;
+}
+
 export function buildSubmitCommand(threadId: string, graph: ProGraph, provider?: string | null): ProRunSubmitMsg {
   return { type: "pro_run_submit", thread_id: threadId, graph, ...(provider ? { provider } : {}) };
 }

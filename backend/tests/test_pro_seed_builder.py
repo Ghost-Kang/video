@@ -11,7 +11,12 @@ from types import SimpleNamespace
 import pytest
 
 from agent.comfyui.compiler import estimate_graph_cost, validate_graph
-from agent.comfyui.seed_builder import SeedBuildError, build_seed_graph, build_seed_graph_from_theme
+from agent.comfyui.seed_builder import (
+    SeedBuildError,
+    build_seed_graph,
+    build_seed_graph_from_script,
+    build_seed_graph_from_theme,
+)
 from agent.cascade.rewrite_service import RewriteResult, RewriteShot
 
 
@@ -181,6 +186,29 @@ def test_seed_from_theme(monkeypatch):
     t = _types(g)
     assert t["Script"] == 1 and t["Generate"] == 2 and t["Video"] == 2 and t["Compose"] == 1 and t["Preview"] == 1
     assert next(n for n in g["nodes"] if n["id"] == "prompt_1")["params"]["text"] == "开场画面"
+
+
+def test_seed_from_script_regen(monkeypatch):
+    async def fake_shots(script):
+        return {
+            "script_markdown": script,
+            "shots": [
+                {"shot_index": 1, "visual": "改后画面1", "dialogue": ""},
+                {"shot_index": 2, "visual": "改后画面2", "dialogue": ""},
+            ],
+            "model": "doubao",
+        }
+
+    monkeypatch.setattr("agent.comfyui.script_gen.generate_shots_from_script", fake_shots)
+    monkeypatch.setattr("agent.cascade.anchors.list_anchors", lambda **k: _empty())
+    g = asyncio.run(build_seed_graph_from_script("# 用户编辑后的脚本", "u1"))
+    validate_graph(g)
+    assert g["meta"]["source"] == "script_regen"
+    # 保留用户编辑的脚本文本
+    assert next(n for n in g["nodes"] if n["id"] == "script_main")["params"]["script_markdown"] == "# 用户编辑后的脚本"
+    t = _types(g)
+    assert t["Generate"] == 2 and t["Video"] == 2 and t["Compose"] == 1 and t["Preview"] == 1
+    assert next(n for n in g["nodes"] if n["id"] == "prompt_1")["params"]["text"] == "改后画面1"
 
 
 async def _empty():

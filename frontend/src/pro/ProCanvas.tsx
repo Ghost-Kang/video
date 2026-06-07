@@ -230,7 +230,7 @@ export default function ProCanvas({ userId }: { userId: string }) {
         }}
       >
         <ProToolbar onRun={handleRun} threadId={threadId} />
-        <NodeParamPanel />
+        <NodeParamPanel threadId={threadId} />
         <RunOutputs />
         <ProThemeInput threadId={threadId} ready={restored} />
         <CostModal onConfirm={handleConfirmRun} />
