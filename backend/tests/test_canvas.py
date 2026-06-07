@@ -386,6 +386,39 @@ def test_update_node_result_fencing_blocks_stale_writeback():
     assert (canvas_tools._load_node(nid).get("result") or {}).get("url") == "restored.png"
 
 
+def test_update_generation_state_fencing_blocks_stale_status_flip():
+    """M10(收口):节点 task_id 变更后,陈旧 worker 的终态状态回写(done/failed)被 fencing 跳过
+    —— 防 regenerate 后新一轮在途生成被旧 worker 闪成 done/failed。"""
+    from agent.tools.canvas import update_generation_state
+
+    tid = _unique_thread()
+    canvas_tools.set_thread_id(tid)
+    n = create_canvas_node("image", "图", "p")
+    nid = n["id"]
+    # 新一轮在途:task_id=NEW, status=submitted
+    node = canvas_tools._load_node(nid)
+    node["generation_task_id"] = "NEW"
+    node["generation_status"] = "submitted"
+    canvas_tools._upsert_node(node)
+    # 旧 worker 迟到回写 failed(expected=OLD)→ fencing 跳过,不闪 failed
+    update_generation_state(nid, "failed", error="stale", expected_task_id="OLD")
+    assert canvas_tools._load_node(nid)["generation_status"] == "submitted"
+    # 本轮 worker 回写 done(expected=NEW)→ 正常落地
+    update_generation_state(nid, "done", expected_task_id="NEW")
+    assert canvas_tools._load_node(nid)["generation_status"] == "done"
+
+
+def test_update_generation_state_no_fence_when_expected_none():
+    """expected_task_id=None(polling 写 task_id / handler 调用)→ 不 fencing(向后兼容)。"""
+    from agent.tools.canvas import update_generation_state
+
+    tid = _unique_thread()
+    canvas_tools.set_thread_id(tid)
+    n = create_canvas_node("image", "图", "p")
+    update_generation_state(n["id"], "polling", task_id="T1")  # 无 expected → 照常写
+    assert canvas_tools._load_node(n["id"])["generation_status"] == "polling"
+
+
 def test_update_node_result_no_fence_when_expected_none():
     """expected_task_id=None(composite / handler 直接调用)→ 不 fencing,照常写(向后兼容)。"""
     tid = _unique_thread()
