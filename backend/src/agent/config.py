@@ -85,6 +85,15 @@ INTERRUPT_GATE_TOOLS = frozenset(
     if t.strip()
 )
 
+# -------- 进画布自动开工(H5,审计 2026-06-06)--------
+# 默认 OFF。开时:用户从爆点分析「在画布上做我的版本」进画布(seed_canvas)且画布是首次 seed
+# (带 📊 分析参考节点)→ 后端自动发一条 [canvas_autostart] 给 Director,让它**立刻基于分析把
+# 改写后的策划书写进「✍️ 我的策划书」节点**(画布创作模式),用户进画布就看到「导演在动」,
+# 消除冷启动空窗。**会花钱**:每次首次进画布烧一轮 Director LLM(写策划书;不含图/视频生成 —— 那
+# 仍要用户点 execute)。故默认 OFF、env 控制、可秒关。OFF 时退回手动 CTA(前端「告诉导演开始」)。
+# 仅在已有分析上下文(analysis_summary 非空)时触发 —— 没分析没什么可自动开工的。
+CANVAS_AUTOSTART_DIRECTOR = os.getenv("CANVAS_AUTOSTART_DIRECTOR", "0").strip().lower() not in ("0", "false", "no", "off", "")
+
 # canvas 统筹 P2 ④ — 长会话上下文降本:由 deepagents 内置 summarization middleware 提供
 # (无条件挂、profile-aware、非破坏式 offload),无需自建 flag/中间件。详见 main.py 注释。
 

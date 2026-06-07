@@ -467,7 +467,7 @@ class TestRegenerateScriptHandler:
     def test_sends_frames_and_triggers_director(self, monkeypatch):
         calls = []
 
-        async def _fake_run_agent(user_id, pool, thread_id, content, ws, selected_niche=None):
+        async def _fake_run_agent(user_id, pool, thread_id, content, ws, selected_niche=None, agent_prefix=""):
             calls.append({"thread_id": thread_id, "content": content})
 
         monkeypatch.setattr("agent.transport.agent_runner.run_agent", _fake_run_agent)
