@@ -186,6 +186,8 @@ def test_seed_from_theme(monkeypatch):
     t = _types(g)
     assert t["Script"] == 1 and t["Generate"] == 2 and t["Video"] == 2 and t["Compose"] == 1 and t["Preview"] == 1
     assert next(n for n in g["nodes"] if n["id"] == "prompt_1")["params"]["text"] == "开场画面"
+    # 主题留底在脚本卡 → 支持「改主题→重生整篇」
+    assert next(n for n in g["nodes"] if n["id"] == "script_main")["params"]["theme"] == "宝宝辅食"
 
 
 def test_seed_from_script_regen(monkeypatch):

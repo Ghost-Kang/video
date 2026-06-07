@@ -246,7 +246,10 @@ export const PRO_NODE_SPECS: Record<ProNodeTypeKey, ProNodeSpec> = {
     accent: "#475569",
     inputs: [],
     outputs: [],
-    params: [{ name: "script_markdown", type: "str", default: "", label: "脚本" }],
+    params: [
+      { name: "theme", type: "str", default: "", label: "主题" },
+      { name: "script_markdown", type: "str", default: "", label: "脚本" },
+    ],
   },
   Compose: {
     key: "Compose",

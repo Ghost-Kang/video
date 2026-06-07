@@ -227,6 +227,8 @@ NODE_TYPES: dict[str, NodeType] = {
         category="script",
         comfy_class="",
         params=(
+            # theme 留底:从主题种子时填,支持「改主题→重生整篇」(theme→script+shots)。
+            ParamSpec("theme", "str", "", label="主题"),
             ParamSpec("script_markdown", "str", "", label="脚本"),
         ),
     ),
