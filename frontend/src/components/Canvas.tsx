@@ -208,9 +208,11 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
 
   // M7 — 「下一步」导航:大画布里用户得自己找该操作的节点。指向首个待确认(reviewing)节点,
   // 没有则指向首个待重生(needs_regen)节点。点按 → 居中放大 + 选中,打开右侧详情面板。
+  // 跳过 seed 脚手架里那个空的「我的策划书」(reviewing 但还没内容)——「确认空节点」无意义。
   const nextNode =
-    canvasNodes.find((n) => n.node_status === "reviewing") ||
-    canvasNodes.find((n) => n.needs_regen);
+    canvasNodes.find(
+      (n) => n.node_status === "reviewing" && !(n.type === "script" && !(n.description || "").trim()),
+    ) || canvasNodes.find((n) => n.needs_regen);
   const nextLabel = nextNode
     ? nextNode.node_status === "reviewing"
       ? "下一步 · 确认节点"
@@ -221,6 +223,15 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
     selectNode(nextNode.id);
     rfRef.current?.fitView({ nodes: [{ id: nextNode.id }], duration: 500, maxZoom: 1.3, padding: 0.45 });
   };
+
+  // H5 — 刚 seed 完(只有脚手架 script 节点、没有任何媒体、且「我的策划书」还空着):不让用户
+  // 对着空策划书发懵,给一个「告诉导演开始」的明确 CTA(指向底部对话 dock,**不自动触发付费
+  // Director**,留给用户主动开口)。和 M7 互斥(此时 nextNode 为空,不显「下一步」)。
+  const myPlan = canvasNodes.find((n) => n.type === "script" && (n.title || "").includes("我的策划书"));
+  const seededNotStarted =
+    canvasNodes.length > 0 &&
+    !canvasNodes.some((n) => n.type === "image" || n.type === "video" || n.type === "composite") &&
+    !!myPlan && !(myPlan.description || "").trim();
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -381,6 +392,16 @@ export function Canvas({ onPositionChange, onCreateEdge, onDeleteEdge }: Props) 
           {nextLabel}
         </button>
       )}
+      {/* H5 — 刚 seed 完的冷启动 CTA(与 M7 互斥):指向底部对话,让用户开口,导演才开始(不自动烧钱)。 */}
+      {seededNotStarted && (
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("open_canvas_chat"))}
+          style={S.seedCta}
+          className="anim-cta-breathe"
+        >
+          ✦ 告诉导演你想做的方向,他就开始搭这条片子
+        </button>
+      )}
     </div>
   );
 }
@@ -432,6 +453,27 @@ const S = {
     padding: "0 20px",
     zIndex: 12,
     boxShadow: "0 4px 16px rgba(234,88,12,0.32)",
+  } as React.CSSProperties,
+  seedCta: {
+    position: "absolute",
+    bottom: 20,
+    left: "50%",
+    transform: "translateX(-50%)",
+    height: 40,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    background: "linear-gradient(135deg, #ea580c 0%, #c2410c 100%)",
+    border: "none",
+    borderRadius: 20,
+    cursor: "pointer",
+    color: "#fff",
+    fontWeight: 600,
+    fontSize: 13,
+    padding: "0 22px",
+    zIndex: 12,
+    maxWidth: "90%",
+    boxShadow: "0 8px 24px -6px rgba(234,88,12,0.45)",
   } as React.CSSProperties,
   layoutBtn: {
     position: "absolute",

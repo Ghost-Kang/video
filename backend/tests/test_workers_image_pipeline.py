@@ -125,7 +125,7 @@ def captured_canvas(monkeypatch):
             "user_id": user_id, "thread_id": thread_id,
         })
 
-    def _result(nid, updates, *, user_id=None, thread_id=None):
+    def _result(nid, updates, *, user_id=None, thread_id=None, expected_task_id=None):
         calls["result"].append({"nid": nid, "updates": updates, "user_id": user_id, "thread_id": thread_id})
 
     def _notify(uid, tid):

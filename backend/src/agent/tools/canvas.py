@@ -619,6 +619,9 @@ def regenerate_node(node_id: str, reason: str = "regenerate") -> dict | None:
     node["generation_error"] = None
     node["generation_lease_until"] = None
     node["generation_next_retry_at"] = None
+    # M10 fencing:清旧 task_id —— 否则上一轮 in-flight worker 的迟到回写(task_id 仍匹配)会
+    # 盖到本次重生的节点上。清掉后那条陈旧回写在 _update_node_result 被 fencing 拦下。
+    node["generation_task_id"] = None
     node["needs_regen"] = False
     _upsert_node(node)
     # 3. 标下游脏(这个节点重生 = 下游的参考会变 → 下游过时)。
