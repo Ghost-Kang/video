@@ -324,6 +324,23 @@ class GoogleProvider:
 # ─── 工厂 ──────────────────────────────────────────────────────────────────────
 
 
+# 境内合规:apimart(中转跨境 OpenAI)与 google(直连跨境)都会让 prompt + 参考图出境;
+# 只有 seedream(火山 ARK,境内)是境内 provider。M3(审计 2026-06-06):分析源 URL 已被
+# adapter 的 STRICT_CROSS_BORDER_REJECT 拦,但生成图经这两个 provider 出境之前没拦。
+_CROSS_BORDER_IMAGE_PROVIDERS = {"google", "apimart"}
+
+
+def cross_border_image_blocked(name: str | None) -> bool:
+    """STRICT_CROSS_BORDER_REJECT 开(默认)时,该生图 provider 是否因跨境被禁。
+
+    用在 enqueue 入口(execute_node/regenerate handler)即时拒绝跨境生图请求 —— 与本仓
+    「factory 纯路由、合规在使用点拦」的约定一致(不污染 get_provider 的路由测试)。动态读
+    config 以便 env 变更/测试 monkeypatch 生效。"""
+    from agent import config
+
+    return config.STRICT_CROSS_BORDER_REJECT and (name or "").lower() in _CROSS_BORDER_IMAGE_PROVIDERS
+
+
 def get_provider() -> ApimartProvider | GoogleProvider | SeedreamProvider:
     """根据 IMAGE_GEN_PROVIDER 返回 provider 实例(动态读 config,resp env/测试)。"""
     from agent import config

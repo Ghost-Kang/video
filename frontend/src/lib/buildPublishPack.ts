@@ -84,6 +84,67 @@ export function buildPublishPack(
   return lines.join("\n").trim();
 }
 
+/** 从策划书正文取前几条「像台词/句子」的短句做标题候选 —— 画布无结构化 analysis 时的来源。
+ *  跳过 markdown 标题(##)与分镜表格行(|),剥 Hxx 钩子码,按句读切成短句。 */
+function titlesFromScript(scriptText: string): string[] {
+  const clauses = stripHookCode(scriptText)
+    .split(/\n+/)
+    .map((l) => l.replace(/^#+\s*/, "").replace(/^[-*\d.>\s]+/, "").trim())
+    .filter((l) => l && !l.startsWith("|") && !l.startsWith("##"))
+    .map((l) => titleClause(l))
+    .filter((t) => t.length >= 4);
+  return Array.from(new Set(clauses)).slice(0, 2);
+}
+
+/**
+ * 画布原生发布包(审计 2026-06-06 H1:Pro 画布此前没有发布出口,成片停在「能播放」)。
+ * Pro 画布是 agent 驱动(策划书由 Director 写,不一定走 CascadeAnalysisContract),所以
+ * 画布上没有结构化 analysis 时,标题回退到策划书自身句子;有 analysis(从分析进画布的链路)
+ * 时复用 getPublishTitles/getPublishTags。复用与 buildPublishPack 相同的 scrub + 格式,
+ * 保证卡片栈与画布两轨输出一致。
+ */
+export function buildCanvasPublishPack(opts: {
+  scriptText: string;
+  shotImageUrls: string[];
+  filmUrl?: string;
+  analysis?: CascadeAnalysisContract | null;
+  rewriteShots?: RewriteShot[];
+  niche?: string | null;
+}): string {
+  const { scriptText, shotImageUrls, filmUrl, analysis, rewriteShots = [], niche } = opts;
+  const titles = (analysis
+    ? getPublishTitles(analysis, rewriteShots, niche)
+    : titlesFromScript(scriptText)
+  )
+    .map(scrubUiForbidden)
+    .filter(Boolean)
+    .slice(0, 3);
+  const tags = analysis ? getPublishTags(niche, analysis) : GENERIC_TAGS;
+  const cleanScript = scrubUiForbidden(scriptText.trim());
+  const imageLines = shotImageUrls
+    .map((url, index) => (url ? `镜头 ${index + 1}: ${url}` : null))
+    .filter((line): line is string => line !== null);
+  const lines = [
+    "【标题候选】",
+    (titles.length ? titles : [GENERIC_TAGLINE]).map((t, i) => `${i + 1}. ${t}`).join("\n"),
+    "",
+    "【标签】",
+    tags.join(" "),
+    "",
+    "【完整脚本】",
+    cleanScript || "(在策划书节点编辑脚本后自动填入)",
+    "",
+    "【镜头图】",
+    imageLines.length ? imageLines.join("\n") : "(草稿图生成后自动填入)",
+    "",
+    "【成片】",
+    filmUrl || "(合成整片后自动填入)",
+    "",
+    "—— 用 Cascade 做的 · cascade.app",
+  ];
+  return lines.join("\n").trim();
+}
+
 /**
  * 标题候选优先来自「改写稿」—— 那是创作者目标方向的、她自己口吻的台词,
  * 比源片 hook/climax 贴切得多。没有改写稿时才回退到源片 hook/climax(剥掉 Hxx 码)。

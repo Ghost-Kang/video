@@ -36,6 +36,8 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
+from agent.cascade.event_names import EventName
+from agent.cascade.events import emit
 from agent.cascade.failures import FailureCode, HardFailure
 from agent.cascade.storage import sum_generation_cost
 
@@ -80,6 +82,57 @@ def predict_generation_cost(kind: str, *, n_images: int = 0, video_seconds: floa
     return 0.0
 
 
+async def record_generation_cost(
+    *,
+    user_id: str,
+    run_id: str,
+    call_kind: str,
+    cost_cny: float,
+    provider: str = "",
+    model: str = "",
+    latency_ms: int = 0,
+    outcome: str = "ok",
+) -> None:
+    """Record actual canvas-generation spend as a GENERATION_COST event.
+
+    The per-run + per-day caps (``cost_guard`` / ``cost_status``) read spend via
+    ``sum_generation_cost``, which ONLY sums GENERATION_COST events. The canvas
+    generation workers (image/video/composite) previously emitted no cost event,
+    so the caps read ~0 for the entire canvas path — the main paid creation
+    surface was uncapped and invisible to /admin/cost (audit 2026-06-06 C1, same
+    class as the 2026-06-04 #1-7 prod cost-guard failure).
+
+    Call this from a worker right after a paid provider call is committed (submit
+    succeeded → task accepted → billable), so retries (re-submits) each count and
+    a retry storm actually trips the cap. ``run_id`` MUST match the bucket the
+    enqueue-time guard charges against — the canvas layer keys the run by
+    ``thread_id`` (see handle_execute_node) — so the worker passes ``thread_id``
+    here. ``user_id`` is the node owner (drives the per-day cap).
+
+    best-effort: telemetry must NEVER break the generation path.
+    """
+    try:
+        await emit(
+            EventName.GENERATION_COST,
+            user_id=user_id,
+            run_id=run_id,
+            payload={
+                "run_id": run_id,
+                "call_kind": call_kind,
+                "provider": provider,
+                "model": model,
+                "cost_fen": int(round(max(0.0, cost_cny) * 100)),
+                "latency_ms": latency_ms,
+                "tokens_in": 0,
+                "tokens_out": 0,
+                "outcome": outcome,
+            },
+        )
+    except Exception:
+        # 遥测绝不破坏用户可见的生成路径。
+        pass
+
+
 def _run_cap() -> float:
     # Default ¥25 = runaway circuit breaker sized to hold one legal full film turn
     # (~¥18-20). See module docstring — raised from ¥3 on 2026-06-06 when run_id
@@ -96,16 +149,35 @@ def _utc_day_start() -> str:
     return now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
 
 
-async def cost_guard(user_id: str, run_id: str, predicted_cost_cny: float) -> None:
+async def cost_guard(
+    user_id: str,
+    run_id: str,
+    predicted_cost_cny: float,
+    *,
+    run_reserved_cny: float = 0.0,
+) -> None:
+    """Enqueue-time spend cap.
+
+    ``run_reserved_cny`` (M4, audit 2026-06-06) = predicted cost of work already
+    committed THIS run but NOT yet recorded as a GENERATION_COST event — i.e.
+    media nodes sitting in ``generation_status='pending'``. Without it a burst of
+    enqueues inside one turn each see recorded≈0 and ALL pass the run cap (the
+    cap only bites once completed work records, far too late). Folding the
+    pending reservation into the run check makes the Nth concurrent enqueue see
+    the (N-1) still-queued ones. It applies to the RUN cap only — the per-user-day
+    cap is cross-run and keyed on recorded spend, so it must not double-count this
+    run's transient queue. submitted/polling nodes already emit GENERATION_COST at
+    submit (recorded), so counting only ``pending`` here avoids double-charging.
+    """
     run_consumed = await _run_cost(run_id)
     user_today_consumed = await _user_today_cost(user_id)
     run_cap = _run_cap()
     user_cap = _user_day_cap()
 
-    if run_consumed + predicted_cost_cny > run_cap:
+    if run_consumed + run_reserved_cny + predicted_cost_cny > run_cap:
         raise HardFailure(
             FailureCode.S8_UPSTREAM_REFUSED,
-            f"run {run_id} cost {run_consumed + predicted_cost_cny:.2f} > cap {run_cap}",
+            f"run {run_id} cost {run_consumed + run_reserved_cny + predicted_cost_cny:.2f} > cap {run_cap}",
         )
     if user_today_consumed + predicted_cost_cny > user_cap:
         raise HardFailure(

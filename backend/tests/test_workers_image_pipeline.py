@@ -320,3 +320,50 @@ class TestProcessImageTask:
         asyncio.run(process_image_task(node))
 
         assert provider.submit_calls[0][0] == "fallback prompt"
+
+
+# ---------- 成本记账(C1:画布生成必须 emit GENERATION_COST,否则成本闸读 0) ----------
+
+
+class TestProcessImageTaskCost:
+    """submit 成功 = 付费 provider 调用已提交 → 必须记 GENERATION_COST,且 run_id/user_id
+    与 enqueue-time cost_guard 同桶(run_id=thread_id),否则 ¥25/run + ¥30/天 闸读不到。"""
+
+    def _capture_cost(self, monkeypatch) -> list[dict]:
+        calls: list[dict] = []
+
+        async def _rec(**kw):
+            calls.append(kw)
+
+        monkeypatch.setattr(image_pipeline.cost_guard, "record_generation_cost", _rec)
+        return calls
+
+    def test_records_cost_after_successful_submit(self, captured_canvas, monkeypatch):
+        provider = _FakeProvider(
+            submit_result={"task_id": "T1"},
+            poll_result={"error": "timeout"},  # poll 结果不影响 submit 后的记账
+        )
+        monkeypatch.setattr(image_pipeline, "make_image_provider", lambda _name: provider)
+        cost_calls = self._capture_cost(monkeypatch)
+
+        asyncio.run(process_image_task(_node()))
+
+        assert len(cost_calls) == 1
+        c = cost_calls[0]
+        assert c["call_kind"] == "canvas_image"
+        assert c["cost_cny"] == 1.5  # PREDICT_SHOT_IMAGE_CNY × 1 image
+        assert c["run_id"] == "t1"  # thread_id 桶 = enqueue-guard 的 run key(同桶才读得到)
+        assert c["user_id"] == "u1"
+
+    def test_no_cost_record_when_submit_fails(self, captured_canvas, monkeypatch):
+        """submit 没拿到 task_id = provider 没接活 = 没花钱 → 不记成本。"""
+        provider = _FakeProvider(
+            submit_result={"task_id": None, "error": "rate_limited"},
+            poll_result={},
+        )
+        monkeypatch.setattr(image_pipeline, "make_image_provider", lambda _name: provider)
+        cost_calls = self._capture_cost(monkeypatch)
+
+        asyncio.run(process_image_task(_node()))
+
+        assert cost_calls == []

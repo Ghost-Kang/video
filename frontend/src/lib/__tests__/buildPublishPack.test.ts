@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MOCK_BAOMAM_ANALYSIS, buildDefaultScript } from "../../fixtures/baomamFushi001";
-import { buildPublishPack, getPublishTags, getPublishTitles } from "../buildPublishPack";
+import { buildCanvasPublishPack, buildPublishPack, getPublishTags, getPublishTitles } from "../buildPublishPack";
 import type { RewriteShot } from "../cascadeMapper";
 import { FORBIDDEN_TERMS } from "../cardCopy";
 
@@ -118,5 +118,51 @@ describe("buildPublishPack", () => {
     const payload = buildPublishPack(buildDefaultScript(MOCK_BAOMAM_ANALYSIS), MOCK_BAOMAM_ANALYSIS, []);
     expect(payload).not.toContain("镜头 1: 待补充");
     expect(payload).toContain("草稿图生成后自动填入");
+  });
+});
+
+// ── H1(审计 2026-06-06):画布原生发布包 —— Pro 画布闭环最后一公里 ──────────────
+describe("buildCanvasPublishPack", () => {
+  it("assembles titles from the script when no structured analysis is on the canvas", () => {
+    const pack = buildCanvasPublishPack({
+      scriptText: "今天教你三步搞定免烤提拉米苏\n## 分镜表\n1 | 中景 | 摆盘",
+      shotImageUrls: ["https://img/1.png", "https://img/2.png"],
+      filmUrl: "https://media/film.mp4",
+    });
+    expect(pack).toContain("【标题候选】");
+    expect(pack).toContain("今天教你三步搞定免烤提拉米苏");
+    // 镜头图按序、成片就位
+    expect(pack.indexOf("镜头 1: https://img/1.png")).toBeLessThan(pack.indexOf("镜头 2: https://img/2.png"));
+    expect(pack).toContain("https://media/film.mp4");
+    // 标题不混进分镜表格行(| 开头)
+    expect(pack).not.toContain("1. 1 | 中景");
+  });
+
+  it("scrubs forbidden terms from the script before clipboard", () => {
+    const pack = buildCanvasPublishPack({
+      scriptText: "用这个神器三步搞定，营养师都推荐",
+      shotImageUrls: [],
+      filmUrl: "https://media/film.mp4",
+    });
+    const [body] = pack.split("—— 用 Cascade 做的");
+    for (const term of FORBIDDEN_TERMS) {
+      expect(body).not.toMatch(new RegExp(term, "i"));
+    }
+  });
+
+  it("prefers structured analysis titles/tags when present (analysis→canvas path)", () => {
+    const pack = buildCanvasPublishPack({
+      scriptText: "占位脚本",
+      shotImageUrls: [],
+      analysis: MOCK_BAOMAM_ANALYSIS,
+      niche: "baomam_fushi",
+    });
+    expect(pack).toContain("#辅食");
+  });
+
+  it("shows placeholders when film/images not ready yet (no broken links)", () => {
+    const pack = buildCanvasPublishPack({ scriptText: "脚本", shotImageUrls: [] });
+    expect(pack).toContain("草稿图生成后自动填入");
+    expect(pack).toContain("合成整片后自动填入");
   });
 });

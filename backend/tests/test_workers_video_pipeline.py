@@ -228,6 +228,47 @@ class TestProcessVideoTask:
         assert captured_canvas["state"][-1]["status"] == "failed"
         assert captured_canvas["state"][-1]["error"] == "provider_5xx"
 
+    def test_records_cost_after_successful_submit(self, captured_canvas, monkeypatch):
+        """C1:画布视频是最贵的 leg —— submit 成功必须记 GENERATION_COST。成本按时长估
+        (duration × ¥0.30/s),run_id=thread_id 与 enqueue-guard 同桶。"""
+        provider = _FakeVideoProvider(
+            submit_result={"task_id": "VT1"},
+            poll_result={"error": "timeout"},  # poll 结果不影响 submit 后记账
+        )
+        _set_provider(monkeypatch, provider)
+        cost_calls: list[dict] = []
+
+        async def _rec(**kw):
+            cost_calls.append(kw)
+
+        monkeypatch.setattr(video_pipeline.cost_guard, "record_generation_cost", _rec)
+
+        asyncio.run(process_video_task(_node()))  # duration=8
+
+        assert len(cost_calls) == 1
+        c = cost_calls[0]
+        assert c["call_kind"] == "canvas_video"
+        assert c["cost_cny"] == pytest.approx(8 * 0.30)  # PREDICT_VIDEO_SECOND_CNY × duration
+        assert c["run_id"] == "t1"
+        assert c["user_id"] == "u1"
+
+    def test_no_cost_record_when_submit_fails(self, captured_canvas, monkeypatch):
+        provider = _FakeVideoProvider(
+            submit_result={"task_id": None, "error": "rate_limited"},
+            poll_result={},
+        )
+        _set_provider(monkeypatch, provider)
+        cost_calls: list[dict] = []
+
+        async def _rec(**kw):
+            cost_calls.append(kw)
+
+        monkeypatch.setattr(video_pipeline.cost_guard, "record_generation_cost", _rec)
+
+        asyncio.run(process_video_task(_node()))
+
+        assert cost_calls == []
+
     def test_explicit_user_thread_propagated(self, captured_canvas, monkeypatch):
         """A2 contract:worker 必须显式传 user_id/thread_id 给所有 canvas_tools 调用。"""
         provider = _FakeVideoProvider(

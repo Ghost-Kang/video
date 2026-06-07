@@ -23,6 +23,7 @@ from agent.cascade.event_names import EventName
 from agent.cascade.failures import HardFailure
 from agent.config import IMAGE_GEN_PROVIDER
 from agent.tools import canvas as canvas_tools
+from agent.tools import generation  # M3 — 跨境生图门控谓词(cross_border_image_blocked)
 from agent.transport import agent_runner, run_state  # module 访问同理
 from agent.transport.context import WSCtx, canvas_data, send_json
 from agent.transport.ws_messages import (
@@ -309,12 +310,14 @@ async def handle_create_edge(ctx: WSCtx, msg: CreateEdgeMsg) -> None:
     def _work() -> tuple[dict, dict | None]:
         canvas_tools.set_thread_id(msg.thread_id)
         result = canvas_tools.create_canvas_edge(msg.source, msg.target)
-        snapshot = canvas_data(msg.thread_id) if "error" not in result else None
-        return result, snapshot
+        # 无论成败都回当前快照:成功 → 含新边;失败 → 把前端乐观加的「幻影边」回滚掉
+        # (M2:前端 onConnect 是乐观 addEdge,后端拒绝若不回快照会留下不存在的边)。
+        return result, canvas_data(msg.thread_id)
 
     result, snapshot = await asyncio.to_thread(_work)
-    if "error" not in result:
-        await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
+    await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
+    if "error" in result:
+        await send_json(ctx.ws, type="error", code="invalid_edge", message=str(result["error"]))
     else:
         print(f"[边] 创建失败: {result['error']}")
 
@@ -367,6 +370,17 @@ async def handle_execute_node(ctx: WSCtx, msg: ExecuteNodeMsg) -> None:
         f"[执行] execute_node node={msg.node_id} type={msg.node_type} provider={provider} prompt={msg.description[:50]}..."
     )
 
+    # M3 — 境内合规:image 节点用跨境 provider(google/apimart)时,STRICT 开(默认)则
+    # enqueue 前拒绝(与 adapter 拦分析源 URL 同口径;video 走 Seedance 境内不涉及)。
+    if msg.node_type == "image" and generation.cross_border_image_blocked(provider):
+        await send_json(
+            ctx.ws,
+            type="error",
+            code="cross_border_blocked",
+            message="境内合规:已禁用跨境生图(Google/Apimart),请改用 Seedream(火山·境内)。",
+        )
+        return
+
     # B3 — enqueue-time cost guard for the generation leg. Charged ONCE here
     # (retries go through schedule_generation_retry, not this path, so they don't
     # re-charge). user_id is server-derived from the authenticated ctx, NOT the
@@ -379,8 +393,12 @@ async def handle_execute_node(ctx: WSCtx, msg: ExecuteNodeMsg) -> None:
             n_images=1 if msg.node_type == "image" else 0,
             video_seconds=float(msg.duration) if (msg.node_type == "video" and msg.duration) else 0.0,
         )
+        # M4 — 预占额度:把本 run 里仍 pending 的生成预测成本计入,防一轮 burst 入队绕过 cap。
+        reserved = await asyncio.to_thread(
+            canvas_tools.pending_generation_reserved_cny, user_id=ctx.user_id, thread_id=msg.thread_id
+        )
         try:
-            await cost_guard.cost_guard(ctx.user_id, msg.thread_id, predicted)
+            await cost_guard.cost_guard(ctx.user_id, msg.thread_id, predicted, run_reserved_cny=reserved)
         except HardFailure as exc:
             await send_json(
                 ctx.ws,
@@ -430,6 +448,17 @@ async def handle_regenerate_node(ctx: WSCtx, msg: RegenerateNodeMsg) -> None:
         return
 
     node_type = node.get("type")
+    # M3 — 重生 image 节点同样过跨境门控(节点可能存了 google/apimart provider)。
+    if node_type == "image" and generation.cross_border_image_blocked(
+        node.get("image_gen_provider") or IMAGE_GEN_PROVIDER
+    ):
+        await send_json(
+            ctx.ws,
+            type="error",
+            code="cross_border_blocked",
+            message="境内合规:已禁用跨境生图(Google/Apimart),请改用 Seedream(火山·境内)。",
+        )
+        return
     # 媒体节点重生要花钱 → enqueue 前 cost guard(同 execute_node)。文字节点免费,跳过。
     if node_type in ("image", "video"):
         # 重生用节点已存的时长(video),没有就按 5s 估;图按 1 张。
@@ -441,8 +470,12 @@ async def handle_regenerate_node(ctx: WSCtx, msg: RegenerateNodeMsg) -> None:
             n_images=1 if node_type == "image" else 0,
             video_seconds=video_seconds,
         )
+        # M4 — 同 execute_node:把本 run 仍 pending 的预测成本计入预占额度。
+        reserved = await asyncio.to_thread(
+            canvas_tools.pending_generation_reserved_cny, user_id=ctx.user_id, thread_id=msg.thread_id
+        )
         try:
-            await cost_guard.cost_guard(ctx.user_id, msg.thread_id, predicted)
+            await cost_guard.cost_guard(ctx.user_id, msg.thread_id, predicted, run_reserved_cny=reserved)
         except HardFailure as exc:
             await send_json(
                 ctx.ws,

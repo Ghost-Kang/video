@@ -93,7 +93,14 @@ const ERROR_CODE_TITLES: Record<string, string> = {
   malformed_json: "数据格式不对",
   // P2 — backend refused a new message while a review gate is pending.
   review_pending: "先确认这一步生成",
+  // M2 — manual edge rejected (illegal hierarchy / unconfirmed parent / cycle).
+  invalid_edge: "连接无效",
+  // M3 — cross-border image provider blocked under STRICT_CROSS_BORDER_REJECT.
+  cross_border_blocked: "境内合规拦截",
 };
+
+// 这些 code 的 message 是后端精心写给用户看的(非 Pydantic 内部细节),可直接当 body 展示。
+const USER_FACING_MESSAGE_CODES = new Set(["review_pending", "invalid_edge", "cross_border_blocked"]);
 
 const TOOL_LABELS: Record<string, string> = {
   script_writer: "🍳 在写开头脚本…",
@@ -442,13 +449,17 @@ export const useWSStore = create<WSStore>((set, get) => ({
           progressDetail: event.detail,
         });
         break;
-      case "analysis_failed":
+      case "analysis_failed": {
         // W5D3 Risk 1 fix — structured failure push (replaces fragile
         // chat-message heuristic). Backend agent_runner pushes this in
         // exception handler with code + hint + actions + request_id.
         // ChatPanel's `failed` state derives from canvasStore.failure being
         // non-null,so this drives the UI directly without keyword matching.
         set({ loading: false, thinking: [] });
+        // M6b — 生成阶段失败(撞成本 cap 等)在 pro-view 画布会哑掉:FailureBanner 只在
+        // CardStack 渲染,画布不读 canvasStore.failure。给 stage=generation 补一条 toast,
+        // 让画布用户也看得到「为什么没生成」。分析阶段失败保持原 FailureBanner UX 不变。
+        const failStage = (event as { stage?: string }).stage;
         queueMicrotask(() => {
           // W5D3 P2 / W5D4 — runtime-validate code/actions before downcasting
           // (the WS contract types them as plain strings). Shared with the
@@ -466,8 +477,16 @@ export const useWSStore = create<WSStore>((set, get) => ({
           // Clear any in-flight streaming so it doesn't visually compete
           // with the failure banner.
           useCanvasStore.setState({ streamingContent: "" });
+          if (failStage === "generation") {
+            useToastStore.getState().push({
+              kind: "error",
+              title: "生成没成功",
+              body: event.hint || "生成预算超限或上游繁忙,请稍后再试。",
+            });
+          }
         });
         break;
+      }
       case "review_required":
         // P2 审核闸门 — Director 自主生成被 LangGraph interrupt 拦下,弹审核卡。
         // 清掉 loading/thinking(回合没结束但在等用户,spinner 该停),把卡交给
@@ -495,8 +514,11 @@ export const useWSStore = create<WSStore>((set, get) => ({
         console.warn("[WS] error", event.code, event.message, event.bad_type);
         // 推到 toast 让用户实际看到 — 不然 Pydantic 校验失败完全静默。
         const title = ERROR_CODE_TITLES[event.code] ?? "请求出错";
-        // body 用 bad_type 给开发者线索;不暴露 Pydantic 详细 message(那对用户无意义)。
-        const body = event.bad_type ? `操作:${event.bad_type}` : undefined;
+        // 精心写给用户的 message(review_pending / invalid_edge)直接展示;其余仍只用
+        // bad_type 给开发者线索,不暴露 Pydantic 详细 message(那对用户无意义)。
+        const body = USER_FACING_MESSAGE_CODES.has(event.code) && event.message
+          ? event.message
+          : event.bad_type ? `操作:${event.bad_type}` : undefined;
 
         // W4D5-T2 — 已知可一键恢复的 case 注入 action,其他不给(避免误导)。
         // - malformed_json: 多半是 JS 端序列化坏掉,reload 重置整个会话状态最简单。

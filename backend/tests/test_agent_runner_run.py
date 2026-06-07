@@ -351,3 +351,33 @@ class TestToolFailureLifecycle:
 
         statuses = [c[0] for c in captured_lifecycle]
         assert statuses == ["running", "done"]
+
+
+# ---------- run_id 注入(成本 cap 复活的根因修复)----------
+
+
+class TestRunIdInjection:
+    """M9(审计 2026-06-06):run_agent 必须把 run_id=f'{thread_id}#{run_seq}' 注入 RUN_CTX。
+
+    run_id 曾被硬编码 None → _run_cost(None)≈0 → ¥/run cap 静默归零(审计#1-7 根因 A,
+    b94ca84 修)。这是反复栽跟头的成本守卫,直接锁这行:若有人重构把 run_id 写回 None 或
+    改了拼接格式(与 GENERATION_COST emit 侧不一致 → cap 再次读不到),本测试立刻红。
+    captured_lifecycle 把 mark_running 固定返回 run_seq=1。"""
+
+    def test_run_id_injected_as_thread_hash_run_seq(self, saved_messages, stub_canvas_data, captured_lifecycle):
+        from agent.transport.runtime_ctx import get_run_ctx
+
+        seen: dict[str, Any] = {}
+
+        class CapturingAgent:
+            async def astream(self, _input, *, config, stream_mode, version):
+                # 在 stream 内读 —— ContextVar 不跨 asyncio.run 的新 loop 传回外部。
+                seen["run_id"] = get_run_ctx().get("run_id")
+                yield {"data": (AIMessageChunk(content="x"), {})}
+
+            async def aget_state(self, config):
+                return _clean_state()
+
+        asyncio.run(run_agent("u9", FakePool(CapturingAgent()), "t9", "msg", FakeWS()))
+
+        assert seen["run_id"] == "t9#1"  # f"{thread_id}#{run_seq}"

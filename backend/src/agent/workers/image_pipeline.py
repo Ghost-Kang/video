@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import time
 
+from agent.cascade import cost_guard
 from agent.config import IMAGE_GEN_PROVIDER
 from agent.tools import canvas as canvas_tools
 from agent.transport.notify import notify_user
@@ -68,6 +69,18 @@ async def process_image_task(node: dict) -> None:
 
     canvas_tools.update_generation_state(nid, "polling", task_id=submitted["task_id"], user_id=uid, thread_id=tid)
     print(f"[Worker] 已提交 node={nid} task_id={submitted['task_id']} 耗时={elapsed:.0f}ms")
+
+    # 成本记账(C1):submit 成功 = 付费 provider 调用已提交(可计费)→ 记 GENERATION_COST,
+    # 否则画布生成对 ¥25/run + ¥30/天 两道闸完全不可见。run_id 用 thread_id 与 enqueue-time
+    # guard 同桶;每次 submit(含重试)都记,重试风暴才能触发 cap。best-effort,绝不挡生成。
+    await cost_guard.record_generation_cost(
+        user_id=uid,
+        run_id=tid,
+        call_kind="canvas_image",
+        cost_cny=cost_guard.predict_generation_cost("image", n_images=1),
+        provider=provider_name,
+        latency_ms=int(elapsed),
+    )
 
     result = await provider.poll(submitted["task_id"])
 
