@@ -15,6 +15,7 @@ import asyncio
 import json
 import time
 
+from agent import config
 from agent.cascade import cost_guard
 from agent.cascade.failures import HardFailure
 from agent.comfyui.provider import comfyui_provider_blocked, get_comfyui_provider
@@ -27,6 +28,67 @@ POLL_INTERVAL_S = 3
 POLL_MAX_S = 300
 
 _COMFYUI_PROVIDERS = ("selfhosted", "runninghub", "fixture")
+_COMFYUI_BACKEND = "ComfyUI"  # Generate/Video 的 backend 参数值(节点级后端选择)
+
+
+def _mini_image_graph(prompt: str, ref_url: str | None, params: dict) -> dict:
+    """单 Generate 节点 → 最小 ComfyUI 图(Model→Generate←Prompt[←LoadImage]→Preview)。"""
+    p = {k: v for k, v in params.items() if k != "backend"}
+    nodes = [
+        {"id": "m", "type": "Model", "params": {}},
+        {"id": "p", "type": "Prompt", "params": {"text": prompt or "高质量竖屏画面", "role": "positive"}},
+        {"id": "g", "type": "Generate", "params": p},
+        {"id": "o", "type": "Preview", "params": {}},
+    ]
+    edges = [
+        {"id": "e1", "source": "m", "sourceHandle": "model", "target": "g", "targetHandle": "model"},
+        {"id": "e2", "source": "p", "sourceHandle": "text", "target": "g", "targetHandle": "positive"},
+        {"id": "e3", "source": "g", "sourceHandle": "image", "target": "o", "targetHandle": "image"},
+    ]
+    if ref_url:
+        nodes.append({"id": "li", "type": "LoadImage", "params": {"image_url": ref_url}})
+        edges.append({"id": "e4", "source": "li", "sourceHandle": "image", "target": "g", "targetHandle": "image"})
+    return {"version": 1, "nodes": nodes, "edges": edges}
+
+
+def _mini_video_graph(ref_url: str, params: dict) -> dict:
+    """单 Video 节点 → 最小 ComfyUI 图(LoadImage→Video→Preview,展开 SVD)。"""
+    p = {k: v for k, v in params.items() if k != "backend"}
+    return {
+        "version": 1,
+        "nodes": [
+            {"id": "li", "type": "LoadImage", "params": {"image_url": ref_url}},
+            {"id": "v", "type": "Video", "params": p},
+            {"id": "o", "type": "Preview", "params": {}},
+        ],
+        "edges": [
+            {"id": "e1", "source": "li", "sourceHandle": "image", "target": "v", "targetHandle": "image"},
+            {"id": "e2", "source": "v", "sourceHandle": "video", "target": "o", "targetHandle": "image"},
+        ],
+    }
+
+
+async def _comfyui_one(mini: dict, *, run_id: str, uid: str) -> str | None:
+    """单节点 ComfyUI 执行(节点级 backend=ComfyUI)。返回产物 URL 或 None。需境内 GPU 实例;
+    跨境 provider 被合规闸拦 → None。"""
+    pname = (config.COMFYUI_PROVIDER or "selfhosted").lower()
+    if comfyui_provider_blocked(pname):
+        return None
+    provider = get_comfyui_provider(pname)
+    sub = await provider.submit(mini, user_id=uid, run_id=run_id)
+    task_id = sub.get("task_id")
+    if not task_id:
+        return None
+    deadline = time.time() + POLL_MAX_S
+    res: dict = {}
+    while time.time() < deadline:
+        res = await provider.poll(task_id)
+        if res.get("status") in ("completed", "failed"):
+            break
+        await asyncio.sleep(POLL_INTERVAL_S)
+    if res.get("status") == "completed" and res.get("outputs"):
+        return res["outputs"][0]
+    return None
 
 
 async def _push(user_id: str, payload: dict) -> None:
@@ -160,6 +222,22 @@ async def _run_domestic(run: dict, graph: dict) -> None:
             ps = _src(nid, "positive")
             prompt = produced.get(ps, {}).get("text", "") if ps else ""
             ref = _img_in(nid)
+            if str(params.get("backend") or "境内") == _COMFYUI_BACKEND:
+                t0 = time.time()
+                url = await _comfyui_one(_mini_image_graph(prompt, ref, params), run_id=run_id, uid=uid)
+                if url:
+                    await cost_guard.record_generation_cost(
+                        user_id=uid, run_id=run_id, call_kind="canvas_comfyui",
+                        cost_cny=cost_guard.predict_generation_cost("comfyui", n_images=1),
+                        provider=f"comfyui:{config.COMFYUI_PROVIDER}", latency_ms=int((time.time() - t0) * 1000),
+                    )
+                    final = (await _persist_outputs([url], f"{run_id}_{nid}"))[0]
+                    produced[nid] = {"image": final}
+                    await _push(uid, {"type": "pro_run_node_done", "thread_id": tid, "run_id": run_id, "output_url": final})
+                else:
+                    any_failed = True
+                pro_runs_repo.touch_lease(run_id, user_id=uid, thread_id=tid)
+                continue
             if seed_provider is None:
                 from agent.tools.generation import SeedreamProvider
 
@@ -190,6 +268,22 @@ async def _run_domestic(run: dict, graph: dict) -> None:
             img = _img_in(nid)
             if not img:
                 any_failed = True
+                continue
+            if str(params.get("backend") or "境内") == _COMFYUI_BACKEND:
+                t0 = time.time()
+                url = await _comfyui_one(_mini_video_graph(img, params), run_id=run_id, uid=uid)
+                if url:
+                    await cost_guard.record_generation_cost(
+                        user_id=uid, run_id=run_id, call_kind="canvas_comfyui",
+                        cost_cny=cost_guard.predict_generation_cost("comfyui", n_images=1),
+                        provider=f"comfyui:{config.COMFYUI_PROVIDER}", latency_ms=int((time.time() - t0) * 1000),
+                    )
+                    final = (await _persist_outputs([url], f"{run_id}_{nid}"))[0]
+                    produced[nid] = {"video": final}
+                    await _push(uid, {"type": "pro_run_node_done", "thread_id": tid, "run_id": run_id, "output_url": final})
+                else:
+                    any_failed = True
+                pro_runs_repo.touch_lease(run_id, user_id=uid, thread_id=tid)
                 continue
             if video_provider is None:
                 from agent.tools.video_generation import get_video_provider

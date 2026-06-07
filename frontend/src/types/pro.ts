@@ -200,6 +200,7 @@ export const PRO_NODE_SPECS: Record<ProNodeTypeKey, ProNodeSpec> = {
     ],
     outputs: [{ name: "image", type: "image" }],
     params: [
+      { name: "backend", type: "str", default: "境内", label: "执行后端", choices: ["境内", "ComfyUI"] },
       { name: "seed", type: "int", default: 0, label: "随机种子", min: 0 },
       { name: "steps", type: "int", default: 20, label: "步数", min: 1, max: 150 },
       { name: "cfg", type: "float", default: 7.0, label: "CFG", min: 0, max: 30 },
@@ -232,6 +233,7 @@ export const PRO_NODE_SPECS: Record<ProNodeTypeKey, ProNodeSpec> = {
     inputs: [{ name: "image", type: "image", required: true }],
     outputs: [{ name: "video", type: "video" }],
     params: [
+      { name: "backend", type: "str", default: "境内", label: "执行后端", choices: ["境内", "ComfyUI"] },
       { name: "duration", type: "int", default: 5, label: "时长(秒)", min: 1, max: 10 },
       { name: "fps", type: "int", default: 8, label: "帧率", min: 1, max: 30 },
       { name: "motion", type: "int", default: 127, label: "运动强度", min: 0, max: 255 },
