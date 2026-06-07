@@ -15,15 +15,21 @@ from agent.comfyui.node_registry import (
 
 def test_node_types_present():
     assert set(NODE_TYPES) == {
-        "Model", "Prompt", "LoadImage", "Anchor", "Generate", "Upscale", "Video", "Preview",
+        "Model", "Prompt", "LoadImage", "Anchor", "Generate", "Upscale", "Video", "Script", "Preview",
     }
 
 
 def test_billable_nodes_are_generate_and_video():
     assert is_billable("Generate") is True
     assert is_billable("Video") is True
-    for k in ("Model", "Prompt", "LoadImage", "Anchor", "Upscale", "Preview"):
+    for k in ("Model", "Prompt", "LoadImage", "Anchor", "Upscale", "Script", "Preview"):
         assert is_billable(k) is False
+
+
+def test_generate_model_input_optional():
+    # 境内 Seedream 不需要 checkpoint → model 输入可选(ComfyUI 缺它在 compile 报错,不在 validate)。
+    assert NODE_TYPES["Generate"].input("model").required is False
+    assert NODE_TYPES["Generate"].input("positive").required is True
 
 
 def test_cost_kinds():
@@ -35,7 +41,7 @@ def test_cost_kinds():
 def test_generate_ports():
     gen = get_node_type("Generate")
     assert gen is not None
-    assert gen.input("model").required is True
+    assert gen.input("model").required is False  # 境内不需 checkpoint;ComfyUI 在 compile 检查
     assert gen.input("positive").required is True
     assert gen.input("negative").required is False
     assert gen.input("image").required is False

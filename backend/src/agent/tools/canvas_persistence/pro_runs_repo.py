@@ -263,6 +263,21 @@ def cancel_pro_run(run_id: str, *, user_id: str, thread_id: str) -> bool:
         db.close()
 
 
+def touch_lease(run_id: str, *, user_id: str, thread_id: str) -> None:
+    """续租(per-node 执行器在每个慢节点后调,防长 run 被 recover 误抢)。仅对非终态/非取消生效。"""
+    db = _db()
+    lease_until = _iso(_utc_now() + timedelta(seconds=PRO_RUN_LEASE_SECONDS))
+    try:
+        db.execute(
+            """UPDATE pro_runs SET lease_until=?
+               WHERE user_id=? AND thread_id=? AND run_id=? AND status NOT IN ('done','failed','cancelled')""",
+            (lease_until, user_id, thread_id, run_id),
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
 def get_pro_run(run_id: str, *, user_id: str, thread_id: str) -> dict | None:
     """读单条 run(状态查询 / 测试)。"""
     return _load_run(run_id, user_id=user_id, thread_id=thread_id)

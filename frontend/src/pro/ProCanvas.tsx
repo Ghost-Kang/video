@@ -23,7 +23,9 @@ import {
   proErrorTitle,
   ProApiError,
   saveGraph,
+  seedFromThread,
 } from "./proExecution";
+import { ProThemeInput } from "./ProThemeInput";
 
 const PRO_SHAPE_UTILS = [ProNodeShapeUtil];
 
@@ -70,6 +72,7 @@ export default function ProCanvas({ userId }: { userId: string }) {
   const editorRef = useRef<Editor | null>(null);
   const graphRef = useRef<ProGraph | null>(null);
   const [editorReady, setEditorReady] = useState(false);
+  const [restored, setRestored] = useState(false);
   const seededRef = useRef(false);
   const restoredRef = useRef(false);
 
@@ -94,7 +97,7 @@ export default function ProCanvas({ userId }: { userId: string }) {
         const previews = pronodeShapes(editor).filter((s) => s.props.nodeType === "Preview");
         editor.run(() => {
           for (const s of pronodeShapes(editor)) {
-            if (s.props.nodeType === "Generate" || s.props.nodeType === "Preview")
+            if (["Generate", "Video", "Preview"].includes(s.props.nodeType))
               updateProNode(editor, s.id, { status: "done" });
           }
           previews.forEach((s, i) => {
@@ -102,7 +105,7 @@ export default function ProCanvas({ userId }: { userId: string }) {
           });
         });
       } else if (ev.type === "pro_run_failed") {
-        setStatus(editor, (s) => s.props.nodeType === "Generate" || s.props.nodeType === "Preview", "failed");
+        setStatus(editor, (s) => ["Generate", "Video", "Preview"].includes(s.props.nodeType), "failed");
       }
     },
     [threadId],
@@ -141,12 +144,17 @@ export default function ProCanvas({ userId }: { userId: string }) {
           loadGraph(editor, saved);
         } else if (analysisId) {
           loadGraph(editor, await fetchSeedGraph(analysisId, threadId));
+        } else {
+          // 进 Pro 自动种子:该 thread 有分析则铺出创作图;没有则留空 → ProThemeInput 显示
+          const g = await seedFromThread(threadId);
+          if (g && Array.isArray(g.nodes) && g.nodes.length) loadGraph(editor, g);
         }
       } catch (e) {
         const err = e as ProApiError;
         useToastStore.getState().push({ kind: "error", title: proErrorTitle(err.code), body: err.detail });
       } finally {
         restoredRef.current = true; // 解锁 autosave(在此之前的 store 变更不触发保存)
+        setRestored(true);
       }
     })();
   }, [editorReady, searchParams, threadId]);
@@ -224,6 +232,7 @@ export default function ProCanvas({ userId }: { userId: string }) {
         <ProToolbar onRun={handleRun} threadId={threadId} />
         <NodeParamPanel />
         <RunOutputs />
+        <ProThemeInput threadId={threadId} ready={restored} />
         <CostModal onConfirm={handleConfirmRun} />
       </Tldraw>
     </div>

@@ -98,9 +98,25 @@ def test_validate_multi_input():
 
 def test_validate_missing_required_input():
     g = _text2img_graph()
-    g["edges"] = [e for e in g["edges"] if e["id"] != "e1"]  # drop model edge
+    g["edges"] = [e for e in g["edges"] if e["id"] != "e2"]  # drop positive edge (still required)
     with pytest.raises(CompileError) as ei:
         validate_graph(g)
+    assert ei.value.code == "missing_required_input"
+
+
+def test_validate_passes_without_model():
+    # model 现在可选(境内不需要 checkpoint)→ validate 不该因缺 model 报错
+    g = _text2img_graph()
+    g["edges"] = [e for e in g["edges"] if e["id"] != "e1"]  # drop model edge
+    validate_graph(g)  # no raise
+
+
+def test_comfyui_compile_requires_model():
+    # 但 ComfyUI target 缺 model → compile 期报错(检查移到 ComfyUI emit)
+    g = _text2img_graph()
+    g["edges"] = [e for e in g["edges"] if e["id"] != "e1"]
+    with pytest.raises(CompileError) as ei:
+        compile_graph(g, target="selfhosted")
     assert ei.value.code == "missing_required_input"
 
 

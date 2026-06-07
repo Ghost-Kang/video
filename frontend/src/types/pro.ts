@@ -16,6 +16,7 @@ export type ProNodeTypeKey =
   | "Generate"
   | "Upscale"
   | "Video"
+  | "Script"
   | "Preview";
 
 export interface ProPort {
@@ -37,7 +38,7 @@ export interface ProParamSpec {
 export interface ProNodeSpec {
   key: ProNodeTypeKey;
   label: string;
-  category: "model" | "prompt" | "input" | "generate" | "output";
+  category: "model" | "prompt" | "input" | "generate" | "output" | "script";
   billable: boolean;
   inputs: ProPort[];
   outputs: ProPort[];
@@ -53,6 +54,8 @@ export interface ProNode {
   params?: Record<string, string | number>;
   cached?: boolean;
   cached_url?: string | null;
+  /** 实例标签(如「镜1·画面」),卡片头部 badge 显示。 */
+  label?: string;
   x?: number;
   y?: number;
 }
@@ -232,6 +235,16 @@ export const PRO_NODE_SPECS: Record<ProNodeTypeKey, ProNodeSpec> = {
       { name: "video_ckpt", type: "str", default: "svd_xt.safetensors", label: "视频模型" },
     ],
   },
+  Script: {
+    key: "Script",
+    label: "脚本",
+    category: "script",
+    billable: false,
+    accent: "#475569",
+    inputs: [],
+    outputs: [],
+    params: [{ name: "script_markdown", type: "str", default: "", label: "脚本" }],
+  },
   Preview: {
     key: "Preview",
     label: "预览",
@@ -246,14 +259,15 @@ export const PRO_NODE_SPECS: Record<ProNodeTypeKey, ProNodeSpec> = {
 };
 
 export const PRO_NODE_ORDER: ProNodeTypeKey[] = [
-  "Model",
+  "Script",
   "Prompt",
   "LoadImage",
   "Anchor",
   "Generate",
-  "Upscale",
   "Video",
+  "Upscale",
   "Preview",
+  "Model",
 ];
 
 /** Pro 级端口类型兼容(MVP 弱校验,与后端 _ports_compatible 同口径)。 */

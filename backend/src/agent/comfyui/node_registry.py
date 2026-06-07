@@ -161,10 +161,12 @@ NODE_TYPES: dict[str, NodeType] = {
         category="generate",
         comfy_class="__GENERATE__",  # 宏:compiler 展开成 (VAEEncode?)+EmptyLatentImage?+KSampler+VAEDecode
         inputs=(
-            Port("model", PortType.MODEL, required=True),
+            # model 改为可选:境内 Seedream 执行不需要 checkpoint(自带模型);只有 ComfyUI target
+            # 需要 model,缺失时由 ComfyUI compiler 报错(不在通用 validate 强制)。
+            Port("model", PortType.MODEL, required=False),
             Port("positive", PortType.TEXT, required=True),
             Port("negative", PortType.TEXT, required=False),
-            Port("image", PortType.IMAGE, required=False),  # 传图 = 图生图(denoise<1)
+            Port("image", PortType.IMAGE, required=False),  # 传图 = 图生图(denoise<1 / 锚点参考)
         ),
         outputs=(Port("image", PortType.IMAGE),),
         params=(
@@ -214,6 +216,17 @@ NODE_TYPES: dict[str, NodeType] = {
         billable=True,
         cost_kind="video",
         duration_param="duration",
+    ),
+    # 脚本卡(策划书/脚本文本)。信息/参考节点:无端口、无执行(compiler 与 per-node 执行器都跳过),
+    # 用户可编辑。主题→脚本种子时承载整篇脚本;分镜的画面文案在各 Prompt 卡。
+    "Script": NodeType(
+        key="Script",
+        label="脚本",
+        category="script",
+        comfy_class="",
+        params=(
+            ParamSpec("script_markdown", "str", "", label="脚本"),
+        ),
     ),
     "Preview": NodeType(
         key="Preview",

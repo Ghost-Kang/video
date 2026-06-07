@@ -370,7 +370,10 @@ class _ComfyEmitter:
         params = _resolved_params(self.g.nodes[gen_id])
         model_src = self._src(gen_id, "model")
         pos_src = self._src(gen_id, "positive")
-        # validate_graph 已保证 model/positive 必填存在
+        # ComfyUI 必须有 checkpoint(model 在 registry 是可选 —— 境内 Seedream 不需要;故在此 ComfyUI
+        # 编译点强制,而非通用 validate)。positive 由 validate 保证存在。
+        if model_src is None:
+            raise CompileError("missing_required_input", f"生成图像({gen_id})连 ComfyUI 需要 Model 输入")
         ckpt = self._ckpt(model_src.node_id)
         pos_ref = self._clip_encode(pos_src.node_id, ckpt)
         neg_src = self._src(gen_id, "negative")

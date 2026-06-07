@@ -75,10 +75,10 @@ export function NodeParamPanel() {
                   ))}
                 </select>
               ) : p.type === "str" ? (
-                p.name === "text" ? (
+                p.name === "text" || p.name === "script_markdown" ? (
                   <textarea
                     value={String(val)}
-                    rows={3}
+                    rows={p.name === "script_markdown" ? 8 : 3}
                     onChange={(e) => setParam(p.name, e.target.value)}
                     className="rounded-lg border border-[var(--color-ink)]/15 bg-white px-2 py-1.5 text-sm"
                   />

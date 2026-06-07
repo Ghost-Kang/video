@@ -143,6 +143,91 @@ def test_recover_repolls_completed(monkeypatch, tmp_path):
     assert after["result"] == ["http://x/a.png"]
 
 
+DOMESTIC_GRAPH = {
+    "version": 1,
+    "nodes": [
+        {"id": "p", "type": "Prompt", "params": {"text": "一只猫"}},
+        {"id": "g", "type": "Generate", "params": {}},
+        {"id": "vid", "type": "Video", "params": {"duration": 4}},
+        {"id": "prev", "type": "Preview", "params": {}},
+    ],
+    "edges": [
+        {"id": "1", "source": "p", "sourceHandle": "text", "target": "g", "targetHandle": "positive"},
+        {"id": "2", "source": "g", "sourceHandle": "image", "target": "vid", "targetHandle": "image"},
+        {"id": "3", "source": "vid", "sourceHandle": "video", "target": "prev", "targetHandle": "image"},
+    ],
+}
+
+
+class _FakeSeed:
+    async def generate(self, prompt, image_urls=None):
+        return {"url": "https://img/a.png"}
+
+
+class _FakeVid:
+    async def generate(self, prompt, duration=5, image_urls=None):
+        return {"video_url": "https://vid/a.mp4"}
+
+
+def _patch_domestic(monkeypatch):
+    monkeypatch.setattr("agent.tools.generation.SeedreamProvider", lambda: _FakeSeed())
+    monkeypatch.setattr("agent.tools.video_generation.get_video_provider", lambda: _FakeVid())
+
+
+def test_domestic_pipeline_image_and_video(monkeypatch, tmp_path):
+    frames, costs = _setup(monkeypatch, tmp_path)
+    _patch_domestic(monkeypatch)
+    run = _enqueue(graph=DOMESTIC_GRAPH, provider="domestic", cost=5.0)
+    asyncio.run(pipe.process_pro_run_task(run))
+    after = repo.get_pro_run("r1", user_id="u1", thread_id="t1")
+    assert after["status"] == "done"
+    assert after["result"] == ["https://vid/a.mp4"]  # Preview 收的是 Video 产物
+    kinds = [c["call_kind"] for c in costs]
+    assert "canvas_image" in kinds and "canvas_video" in kinds  # 逐节点记账
+    assert frames[-1]["type"] == "pro_run_done"
+
+
+def test_domestic_cached_generate_skips_seedream(monkeypatch, tmp_path):
+    frames, costs = _setup(monkeypatch, tmp_path)
+    called = {"seed": False}
+
+    class _Seed:
+        async def generate(self, prompt, image_urls=None):
+            called["seed"] = True
+            return {"url": "https://img/new.png"}
+
+    monkeypatch.setattr("agent.tools.generation.SeedreamProvider", lambda: _Seed())
+    monkeypatch.setattr("agent.tools.video_generation.get_video_provider", lambda: _FakeVid())
+    g = json.loads(json.dumps(DOMESTIC_GRAPH))
+    for n in g["nodes"]:
+        if n["id"] == "g":
+            n["cached"] = True
+            n["cached_url"] = "https://img/cached.png"
+    run = _enqueue(graph=g, provider="domestic", cost=1.5)
+    asyncio.run(pipe.process_pro_run_task(run))
+    assert called["seed"] is False  # 缓存命中 → 不调 Seedream
+    # 只记了视频成本(图缓存)
+    assert [c["call_kind"] for c in costs] == ["canvas_video"]
+
+
+def test_domestic_partial_failure_still_outputs(monkeypatch, tmp_path):
+    frames, costs = _setup(monkeypatch, tmp_path)
+
+    class _SeedFail:
+        async def generate(self, prompt, image_urls=None):
+            return {"error": "seedream down"}
+
+    monkeypatch.setattr("agent.tools.generation.SeedreamProvider", lambda: _SeedFail())
+    monkeypatch.setattr("agent.tools.video_generation.get_video_provider", lambda: _FakeVid())
+    run = _enqueue(graph=DOMESTIC_GRAPH, provider="domestic", cost=5.0)
+    asyncio.run(pipe.process_pro_run_task(run))
+    after = repo.get_pro_run("r1", user_id="u1", thread_id="t1")
+    # 图失败 → 视频缺输入跳过 → 零产物 → failed(不自动重试,避免重跑扣费)
+    assert after["status"] == "failed"
+    # 图失败不记账(没成);视频没调(缺输入)
+    assert costs == []
+
+
 def test_recover_no_prompt_id_requeues(monkeypatch, tmp_path):
     frames, costs = _setup(monkeypatch, tmp_path)
     run = _enqueue()

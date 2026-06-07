@@ -37,7 +37,8 @@ from agent.cascade.persistence.db import _connect
 from agent.cascade.rewrite_service import error_payload, request_rewrite
 from agent.cascade.storage import list_creators, list_events
 from agent.comfyui.compiler import CompileError, estimate_graph_cost
-from agent.comfyui.seed_builder import SeedBuildError, build_seed_graph
+from agent.comfyui.script_gen import ScriptGenError
+from agent.comfyui.seed_builder import SeedBuildError, build_seed_graph, build_seed_graph_from_theme
 from agent.tools.canvas_persistence import pro_graphs_repo
 
 
@@ -616,22 +617,57 @@ async def handle_pro_estimate(qs: dict, body: dict) -> tuple[int, dict, str]:
 
 
 async def handle_pro_seed(qs: dict, body: dict) -> tuple[int, dict, str]:
-    """分析 → 种子可执行图(plan §6)。不花钱。body={analysis_id, thread_id?}。"""
+    """分析 → 种子可执行图(plan §6)。不花钱。body={analysis_id?, thread_id}。
+
+    缺 analysis_id 时从 thread 的 session pointers 解析(进 Pro 自动种子);该 thread 没有分析 →
+    返回 {graph: null}(前端转去显示主题输入框)。鉴权 A 残留同 handle_rewrite,见 synthesis §6.1。"""
     if not config.PRO_CANVAS_ENABLED:
         return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
     analysis_id = str(body.get("analysis_id") or qs.get("analysis_id", [""])[0] or "").strip()
     thread_id = str(body.get("thread_id") or qs.get("thread_id", [""])[0] or "").strip() or None
-    # 鉴权 A (B8-3) — 同 handle_rewrite:per-user MAPPED 邀请码下 dispatcher 已把 body["user_id"]
-    # 钉成 server-derived(不可伪造);共享码下仍是 client 自报(全站既有的弱模式残留,见 synthesis §6.1,
-    # 迁移路径=每人一码)。seed 只读不花钱 → 这是数据隔离层面的同款残留,非本功能新增的洞。
-    user_id = str(body.get("user_id") or "default")
+    user_id = _pro_uid(qs, body)
+    if not analysis_id and thread_id:
+        try:
+            from agent.cascade.persistence.session_results_repo import load_pointers
+
+            aid, _rw = await load_pointers(user_id, thread_id)
+            analysis_id = (aid or "").strip()
+        except Exception:  # noqa: BLE001
+            analysis_id = ""
     if not analysis_id:
-        return 400, {"error": "analysis_id_required"}, "Bad Request"
+        return 200, {"graph": None}, "OK"  # 无分析 → 前端显示主题输入框
     try:
         graph = await build_seed_graph(analysis_id, user_id, thread_id=thread_id)
     except SeedBuildError as exc:
-        status = 404 if exc.code == "analysis_not_found" else 400
-        return status, {"error": exc.code, "message": exc.message}, "Bad Request"
+        if exc.code == "analysis_not_found":
+            return 200, {"graph": None}, "OK"  # 容错:当作无分析,走主题输入
+        return 400, {"error": exc.code, "message": exc.message}, "Bad Request"
+    return 200, {"graph": graph}, "OK"
+
+
+async def handle_pro_seed_from_theme(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """主题 → Doubao 脚本+分镜 → 创作图(空白入口)。body={theme, thread_id?}。LLM 一次,走成本闸。"""
+    if not config.PRO_CANVAS_ENABLED:
+        return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
+    theme = str(body.get("theme") or "").strip()
+    if not theme:
+        return 400, {"error": "theme_required"}, "Bad Request"
+    user_id = _pro_uid(qs, body)
+    run_id = str(body.get("thread_id") or "default")
+    # 成本闸:脚本生成是一次 LLM 调用(≈ rewrite)。over-cap 抛 HardFailure → dispatcher 503。
+    await cost_guard.cost_guard(user_id, run_id, cost_guard.PREDICT_REWRITE_CNY)
+    _t0 = time.monotonic()
+    try:
+        graph = await build_seed_graph_from_theme(theme, user_id)
+    except ScriptGenError as exc:
+        return 422, {"error": exc.code, "message": exc.message}, "Unprocessable Entity"
+    except SeedBuildError as exc:
+        return 400, {"error": exc.code, "message": exc.message}, "Bad Request"
+    await cost_guard.record_generation_cost(
+        user_id=user_id, run_id=run_id, call_kind="pro_script",
+        cost_cny=cost_guard.PREDICT_REWRITE_CNY, provider="doubao",
+        latency_ms=int((time.monotonic() - _t0) * 1000),
+    )
     return 200, {"graph": graph}, "OK"
 
 
@@ -753,6 +789,7 @@ EXACT_ROUTES: dict[tuple[str, str], HandlerFn] = {
     ("POST", "/api/showcase/status"): handle_showcase_status_post,
     ("POST", "/api/pro/estimate"): handle_pro_estimate,
     ("POST", "/api/pro/seed"): handle_pro_seed,
+    ("POST", "/api/pro/seed_from_theme"): handle_pro_seed_from_theme,
     ("GET", "/api/pro/graph"): handle_pro_graph_get,
     ("POST", "/api/pro/graph"): handle_pro_graph_post,
     ("GET", "/api/pro/templates"): handle_pro_templates_get,
