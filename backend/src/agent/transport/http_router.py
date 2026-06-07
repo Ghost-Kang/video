@@ -38,6 +38,7 @@ from agent.cascade.rewrite_service import error_payload, request_rewrite
 from agent.cascade.storage import list_creators, list_events
 from agent.comfyui.compiler import CompileError, estimate_graph_cost
 from agent.comfyui.seed_builder import SeedBuildError, build_seed_graph
+from agent.tools.canvas_persistence import pro_graphs_repo
 
 
 # Slowloris guard for the hand-rolled HTTP server: cap how long we wait for a
@@ -634,6 +635,102 @@ async def handle_pro_seed(qs: dict, body: dict) -> tuple[int, dict, str]:
     return 200, {"graph": graph}, "OK"
 
 
+# ---------- Pro 画布 图持久化 + 模板 ----------
+# 同 estimate/seed:COHORT + PRO_CANVAS_ENABLED 门控;user_id 取 body["user_id"](dispatcher 对
+# mapped 邀请码已钉成 server-derived;GET 也会被钉,因 body 缺省 {})。graph 存原样(可为 WIP)。
+
+
+def _pro_uid(qs: dict, body: dict) -> str:
+    return str(body.get("user_id") or qs.get("user_id", [""])[0] or "default")
+
+
+async def handle_pro_graph_get(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """加载该 thread 的当前图(autosave 恢复)。"""
+    if not config.PRO_CANVAS_ENABLED:
+        return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
+    thread_id = str(body.get("thread_id") or qs.get("thread_id", [""])[0] or "").strip()
+    if not thread_id:
+        return 400, {"error": "thread_id_required"}, "Bad Request"
+    raw = await asyncio.to_thread(pro_graphs_repo.load_graph, user_id=_pro_uid(qs, body), thread_id=thread_id)
+    graph = None
+    if raw:
+        try:
+            graph = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            graph = None
+    return 200, {"graph": graph}, "OK"
+
+
+async def handle_pro_graph_post(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """自动保存该 thread 的当前图。body={thread_id, graph}。"""
+    if not config.PRO_CANVAS_ENABLED:
+        return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
+    thread_id = str(body.get("thread_id") or "").strip()
+    graph = body.get("graph")
+    if not thread_id or not isinstance(graph, dict):
+        return 400, {"error": "thread_id_and_graph_required"}, "Bad Request"
+    await asyncio.to_thread(
+        pro_graphs_repo.save_graph,
+        user_id=_pro_uid(qs, body),
+        thread_id=thread_id,
+        graph_json=json.dumps(graph, ensure_ascii=False),
+    )
+    return 200, {"ok": True}, "OK"
+
+
+async def handle_pro_templates_get(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """列出当前 user 的模板(不带 graph,轻量)。"""
+    if not config.PRO_CANVAS_ENABLED:
+        return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
+    templates = await asyncio.to_thread(pro_graphs_repo.list_templates, user_id=_pro_uid(qs, body))
+    return 200, {"templates": templates}, "OK"
+
+
+async def handle_pro_template_post(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """另存为模板。body={name, graph}。"""
+    if not config.PRO_CANVAS_ENABLED:
+        return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
+    name = str(body.get("name") or "未命名模板").strip()[:60]
+    graph = body.get("graph")
+    if not isinstance(graph, dict):
+        return 400, {"error": "graph_required"}, "Bad Request"
+    template_id = await asyncio.to_thread(
+        pro_graphs_repo.save_template,
+        user_id=_pro_uid(qs, body),
+        name=name,
+        graph_json=json.dumps(graph, ensure_ascii=False),
+    )
+    return 200, {"template_id": template_id, "name": name}, "OK"
+
+
+async def handle_pro_template_get(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """套用模板:按 id 取 graph。"""
+    if not config.PRO_CANVAS_ENABLED:
+        return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
+    template_id = str(body.get("template_id") or qs.get("id", [""])[0] or "").strip()
+    if not template_id:
+        return 400, {"error": "id_required"}, "Bad Request"
+    raw = await asyncio.to_thread(pro_graphs_repo.load_template, user_id=_pro_uid(qs, body), template_id=template_id)
+    if raw is None:
+        return 404, {"error": "template_not_found"}, "Not Found"
+    try:
+        graph = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return 422, {"error": "template_corrupt"}, "Unprocessable Entity"
+    return 200, {"graph": graph}, "OK"
+
+
+async def handle_pro_template_delete(qs: dict, body: dict) -> tuple[int, dict, str]:
+    """删模板。body={template_id}。"""
+    if not config.PRO_CANVAS_ENABLED:
+        return 403, {"error": "pro_canvas_disabled"}, "Forbidden"
+    template_id = str(body.get("template_id") or "").strip()
+    if not template_id:
+        return 400, {"error": "template_id_required"}, "Bad Request"
+    ok = await asyncio.to_thread(pro_graphs_repo.delete_template, user_id=_pro_uid(qs, body), template_id=template_id)
+    return 200, {"deleted": ok}, "OK"
+
+
 # ---------- routing ----------
 
 
@@ -656,6 +753,12 @@ EXACT_ROUTES: dict[tuple[str, str], HandlerFn] = {
     ("POST", "/api/showcase/status"): handle_showcase_status_post,
     ("POST", "/api/pro/estimate"): handle_pro_estimate,
     ("POST", "/api/pro/seed"): handle_pro_seed,
+    ("GET", "/api/pro/graph"): handle_pro_graph_get,
+    ("POST", "/api/pro/graph"): handle_pro_graph_post,
+    ("GET", "/api/pro/templates"): handle_pro_templates_get,
+    ("POST", "/api/pro/template"): handle_pro_template_post,
+    ("GET", "/api/pro/template"): handle_pro_template_get,
+    ("POST", "/api/pro/template/delete"): handle_pro_template_delete,
 }
 
 # (method, prefix, suffix, param_name, handler) — 路径里的可变段会作为 path_param 传入。

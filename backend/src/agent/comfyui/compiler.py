@@ -289,7 +289,82 @@ class _ComfyEmitter:
             if self._is_cached(pro_id):
                 return self._cached_ref(pro_id)
             return [f"vae_decode_{pro_id}", 0]
+        if ntype == "Upscale":
+            return self._emit_upscale(pro_id)
         raise CompileError("port_type_mismatch", f"{ntype} 不产出 image,无法作图像源")
+
+    def _emit_upscale(self, pro_id: str) -> list:
+        """放大(ImageScaleBy,免费插值)。按需发射,递归解析其 image 输入。"""
+        cid = f"upscale_{pro_id}"
+        if cid not in self.prompt:
+            src = self._src(pro_id, "image")  # validate 保证必填存在
+            p = _resolved_params(self.g.nodes[pro_id])
+            self.prompt[cid] = {
+                "class_type": "ImageScaleBy",
+                "inputs": {
+                    "image": self._image_ref(src.node_id),
+                    "upscale_method": p["upscale_method"],
+                    "scale_by": p["scale_by"],
+                },
+            }
+        return [cid, 0]
+
+    def _video_ref(self, pro_id: str) -> list:
+        """Video 节点的 video 输出(帧批)。Video 在 build() 的 Video 循环里发射,这里返回其解码 ref。"""
+        return [f"svd_decode_{pro_id}", 0]
+
+    def _emit_video(self, vid_id: str) -> None:
+        """图生视频(i2v)→ ComfyUI SVD 子图。注:依赖 SelfHosted 实例装有 SVD 节点+检查点
+        (video_ckpt),按部署 pin(plan §8);结构(image 接好 + 参数 + 输出被引用)被单测锁。"""
+        p = _resolved_params(self.g.nodes[vid_id])
+        img_src = self._src(vid_id, "image")  # validate 保证必填
+        img = self._image_ref(img_src.node_id)
+        ckpt = f"svd_ckpt_{vid_id}"
+        self.prompt[ckpt] = {
+            "class_type": "ImageOnlyCheckpointLoader",
+            "inputs": {"ckpt_name": p["video_ckpt"]},
+        }
+        cond = f"svd_cond_{vid_id}"
+        frames = max(1, int(p["duration"]) * int(p["fps"]))
+        self.prompt[cond] = {
+            "class_type": "SVD_img2vid_Conditioning",
+            "inputs": {
+                "clip_vision": [ckpt, 1],
+                "init_image": img,
+                "vae": [ckpt, 2],
+                "width": 1024,
+                "height": 576,
+                "video_frames": frames,
+                "motion_bucket_id": p["motion"],
+                "fps": p["fps"],
+                "augmentation_level": 0.0,
+            },
+        }
+        ks = f"svd_sampler_{vid_id}"
+        self.prompt[ks] = {
+            "class_type": "KSampler",
+            "inputs": {
+                "model": [ckpt, 0],
+                "positive": [cond, 0],
+                "negative": [cond, 1],
+                "latent_image": [cond, 2],
+                "seed": 0,
+                "steps": 20,
+                "cfg": 2.5,
+                "sampler_name": "euler",
+                "scheduler": "karras",
+                "denoise": 1.0,
+            },
+        }
+        self.prompt[f"svd_decode_{vid_id}"] = {
+            "class_type": "VAEDecode",
+            "inputs": {"samples": [ks, 0], "vae": [ckpt, 2]},
+        }
+
+    def _output_type(self, pro_id: str, handle: str) -> str | None:
+        nt = NODE_TYPES[self.g.nodes[pro_id]["type"]]
+        port = nt.output(handle)
+        return port.type if port else None
 
     def _emit_generate(self, gen_id: str) -> None:
         params = _resolved_params(self.g.nodes[gen_id])
@@ -340,18 +415,37 @@ class _ComfyEmitter:
 
     def _emit_preview(self, prev_id: str) -> None:
         img_src = self._src(prev_id, "image")  # validate 保证必填
-        self.prompt[f"save_{prev_id}"] = {
-            "class_type": "SaveImage",
-            "inputs": {"images": self._image_ref(img_src.node_id), "filename_prefix": "rhtv_pro"},
-        }
+        # 上游产出 video → 存视频(SaveAnimatedWEBP);否则存图(SaveImage)。Preview 输入是 ANY。
+        if self._output_type(img_src.node_id, img_src.handle) == PortType.VIDEO:
+            p = _resolved_params(self.g.nodes[img_src.node_id])
+            self.prompt[f"save_{prev_id}"] = {
+                "class_type": "SaveAnimatedWEBP",
+                "inputs": {
+                    "images": self._video_ref(img_src.node_id),
+                    "fps": float(p.get("fps", 8)),
+                    "lossless": False,
+                    "quality": 90,
+                    "method": "default",
+                    "filename_prefix": "rhtv_pro",
+                },
+            }
+        else:
+            self.prompt[f"save_{prev_id}"] = {
+                "class_type": "SaveImage",
+                "inputs": {"images": self._image_ref(img_src.node_id), "filename_prefix": "rhtv_pro"},
+            }
 
     def build(self) -> dict[str, dict]:
-        # 先发射所有未命中缓存的 Generate(其 vae_decode id 被下游确定性引用),再发射 Preview。
-        # 命中缓存的 Generate 不发射 KSampler 链(由 _image_ref 解析成 cached LoadImage),与
-        # estimate_graph_cost 的 ¥0 记账一致 —— cached 镜不重渲染、不重复花钱。
+        # 先发射所有未命中缓存的 Generate(其 vae_decode id 被下游确定性引用)+ Video(SVD 链),
+        # 再发射 Preview。命中缓存的 Generate 不发射 KSampler 链(由 _image_ref 解析成 cached
+        # LoadImage),与 estimate_graph_cost 的 ¥0 记账一致 —— cached 镜不重渲染、不重复花钱。
+        # Upscale 是纯变换,按需在 _image_ref 里 lazy 发射(被消费才出现)。
         for nid in self.g.order:
-            if self.g.nodes[nid]["type"] == "Generate" and not self._is_cached(nid):
+            t = self.g.nodes[nid]["type"]
+            if t == "Generate" and not self._is_cached(nid):
                 self._emit_generate(nid)
+            elif t == "Video":
+                self._emit_video(nid)
         for nid in self.g.order:
             if self.g.nodes[nid]["type"] == "Preview":
                 self._emit_preview(nid)
@@ -390,8 +484,12 @@ def estimate_graph_cost(graph: dict) -> dict[str, Any]:
     cost_guard.predict_generation_cost('comfyui', n_images=...) 计算 —— 与 Run 时记账同源单价。
     """
     g = validate_graph(graph)
+    # 延迟导入避免循环依赖(cost_guard 不依赖 comfyui)。
+    from agent.cascade.cost_guard import predict_generation_cost
+
     billable = 0
     cached = 0
+    cost_cny = 0.0
     for nid in g.order:
         node = g.nodes[nid]
         nt = get_node_type(node["type"])
@@ -401,9 +499,12 @@ def estimate_graph_cost(graph: dict) -> dict[str, Any]:
             cached += 1
             continue
         billable += 1
+        # 按 cost_kind 计价(与 worker 记账同源)。video=按 duration 秒;其余(image)=按图。
+        if nt.cost_kind == "video":
+            params = _resolved_params(node)
+            secs = float(params.get(nt.duration_param) or 0) if nt.duration_param else 0.0
+            cost_cny += predict_generation_cost("video", video_seconds=secs)
+        else:
+            cost_cny += predict_generation_cost("comfyui", n_images=1)
 
-    # 延迟导入避免循环依赖(cost_guard 不依赖 comfyui)。
-    from agent.cascade.cost_guard import predict_generation_cost
-
-    cost_cny = predict_generation_cost("comfyui", n_images=billable)
-    return {"billable_node_count": billable, "cached_skipped": cached, "cost_cny": cost_cny}
+    return {"billable_node_count": billable, "cached_skipped": cached, "cost_cny": round(cost_cny, 4)}

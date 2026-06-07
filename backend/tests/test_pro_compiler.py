@@ -78,13 +78,11 @@ def test_validate_bad_edge_endpoint():
 
 
 def test_validate_port_type_mismatch():
-    # Model.model (model) → Preview.image (image) — incompatible
+    # Model.model (model) → Generate.positive (text) — incompatible, neither is ANY.
+    # (Preview.image is ANY now to accept image|video, so use a typed pair instead.)
     g = _text2img_graph()
-    g["edges"].append({"id": "x", "source": "m", "sourceHandle": "model", "target": "v", "targetHandle": "image"})
-    with pytest.raises(CompileError) as ei:
-        validate_graph(g)
-    # Preview.image already filled by g → multi_input fires first; drop e4 to isolate
-    g["edges"] = [e for e in g["edges"] if e["id"] != "e4"]
+    g["edges"] = [e for e in g["edges"] if e["id"] != "e2"]  # free up Generate.positive
+    g["edges"].append({"id": "x", "source": "m", "sourceHandle": "model", "target": "g", "targetHandle": "positive"})
     with pytest.raises(CompileError) as ei:
         validate_graph(g)
     assert ei.value.code == "port_type_mismatch"
@@ -253,6 +251,53 @@ def test_estimate_counts_billable_generate_nodes():
     assert est["billable_node_count"] == 1
     assert est["cached_skipped"] == 0
     assert est["cost_cny"] == pytest.approx(1.5)
+
+
+def test_upscale_emits_imagescaleby():
+    g = _text2img_graph()
+    g["nodes"].append({"id": "up", "type": "Upscale", "params": {"scale_by": 2.0}})
+    # rewire Preview to take the upscaled image: g -> up -> v
+    g["edges"] = [e for e in g["edges"] if e["id"] != "e4"]
+    g["edges"].append({"id": "u1", "source": "g", "sourceHandle": "image", "target": "up", "targetHandle": "image"})
+    g["edges"].append({"id": "u2", "source": "up", "sourceHandle": "image", "target": "v", "targetHandle": "image"})
+    prompt = compile_graph(g, target="selfhosted")
+    scale = next((k for k, val in prompt.items() if val["class_type"] == "ImageScaleBy"), None)
+    assert scale is not None
+    vd = next(k for k, val in prompt.items() if val["class_type"] == "VAEDecode")
+    assert prompt[scale]["inputs"]["image"] == [vd, 0]
+    save = next(val for val in prompt.values() if val["class_type"] == "SaveImage")
+    assert save["inputs"]["images"] == [scale, 0]
+
+
+def test_video_emits_svd_chain_and_webp_save():
+    g = _text2img_graph()
+    g["nodes"].append({"id": "vid", "type": "Video", "params": {"duration": 4, "fps": 8}})
+    g["edges"] = [e for e in g["edges"] if e["id"] != "e4"]
+    g["edges"].append({"id": "v1", "source": "g", "sourceHandle": "image", "target": "vid", "targetHandle": "image"})
+    g["edges"].append({"id": "v2", "source": "vid", "sourceHandle": "video", "target": "v", "targetHandle": "image"})
+    prompt = compile_graph(g, target="selfhosted")
+    classes = [val["class_type"] for val in prompt.values()]
+    assert "ImageOnlyCheckpointLoader" in classes
+    assert "SVD_img2vid_Conditioning" in classes
+    assert "SaveAnimatedWEBP" in classes  # video preview, not SaveImage
+    assert "SaveImage" not in classes
+    cond = next(val for val in prompt.values() if val["class_type"] == "SVD_img2vid_Conditioning")
+    # i2v init_image wired from the generate's VAEDecode
+    vd = next(k for k, val in prompt.items() if val["class_type"] == "VAEDecode" and k.startswith("vae_decode_"))
+    assert cond["inputs"]["init_image"] == [vd, 0]
+    assert cond["inputs"]["video_frames"] == 32  # 4s * 8fps
+
+
+def test_estimate_video_priced_by_duration():
+    g = _text2img_graph()
+    g["nodes"].append({"id": "vid", "type": "Video", "params": {"duration": 5, "fps": 8}})
+    g["edges"] = [e for e in g["edges"] if e["id"] != "e4"]
+    g["edges"].append({"id": "v1", "source": "g", "sourceHandle": "image", "target": "vid", "targetHandle": "image"})
+    g["edges"].append({"id": "v2", "source": "vid", "sourceHandle": "video", "target": "v", "targetHandle": "image"})
+    est = estimate_graph_cost(g)
+    # 1 Generate (¥1.5, image) + 1 Video 5s (5 * ¥0.30 = ¥1.5) = ¥3.0
+    assert est["billable_node_count"] == 2
+    assert est["cost_cny"] == pytest.approx(3.0)
 
 
 def test_estimate_skips_cached_generate():

@@ -159,6 +159,27 @@ def _db() -> sqlite3.Connection:
             PRIMARY KEY (user_id, thread_id, run_id)
         )"""
     )
+    # Pro 画布图持久化:每个 (user, thread) 一张「当前图」(autosave,刷新/重连恢复);另 templates
+    # 表存「另存为模板」的具名图(跨 thread 复用)。graph_json 存原样 ProGraph(可为 WIP,不强制编译通过)。
+    db.execute(
+        """CREATE TABLE IF NOT EXISTS pro_graphs (
+            user_id TEXT NOT NULL DEFAULT 'default',
+            thread_id TEXT NOT NULL,
+            graph_json TEXT NOT NULL DEFAULT '{}',
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, thread_id)
+        )"""
+    )
+    db.execute(
+        """CREATE TABLE IF NOT EXISTS pro_graph_templates (
+            user_id TEXT NOT NULL DEFAULT 'default',
+            template_id TEXT NOT NULL,
+            name TEXT NOT NULL DEFAULT '',
+            graph_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, template_id)
+        )"""
+    )
 
     # ALTER migrations — run once per path per process (see _MIGRATED_PATHS).
     if path_key not in _MIGRATED_PATHS:

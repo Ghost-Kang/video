@@ -13,14 +13,23 @@ from agent.comfyui.node_registry import (
 )
 
 
-def test_five_mvp_node_types_present():
-    assert set(NODE_TYPES) == {"Model", "Prompt", "LoadImage", "Anchor", "Generate", "Preview"}
+def test_node_types_present():
+    assert set(NODE_TYPES) == {
+        "Model", "Prompt", "LoadImage", "Anchor", "Generate", "Upscale", "Video", "Preview",
+    }
 
 
-def test_only_generate_is_billable():
+def test_billable_nodes_are_generate_and_video():
     assert is_billable("Generate") is True
-    for k in ("Model", "Prompt", "LoadImage", "Anchor", "Preview"):
+    assert is_billable("Video") is True
+    for k in ("Model", "Prompt", "LoadImage", "Anchor", "Upscale", "Preview"):
         assert is_billable(k) is False
+
+
+def test_cost_kinds():
+    assert NODE_TYPES["Generate"].cost_kind == "image"
+    assert NODE_TYPES["Video"].cost_kind == "video"
+    assert NODE_TYPES["Video"].duration_param == "duration"
 
 
 def test_generate_ports():

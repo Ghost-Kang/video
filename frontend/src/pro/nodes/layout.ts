@@ -16,11 +16,19 @@ export const PORT_COLOR: Record<ProPortType, string> = {
   image: "#a16207",
   text: "#0f766e",
   model: "#7c2d12",
+  video: "#be185d",
   any: "#78716c",
 };
 
 export function hasThumb(t: ProNodeTypeKey): boolean {
-  return t === "Generate" || t === "Preview" || t === "LoadImage" || t === "Anchor";
+  return (
+    t === "Generate" ||
+    t === "Preview" ||
+    t === "LoadImage" ||
+    t === "Anchor" ||
+    t === "Upscale" ||
+    t === "Video"
+  );
 }
 
 export function nodeHeight(t: ProNodeTypeKey): number {

@@ -6,7 +6,7 @@
  * UI 元信息(颜色/分组)。WS 帧手写在此(同 ws.ts 里 DeleteSessionsMsg 等单命令的先例,不跑 codegen)。
  */
 
-export type ProPortType = "image" | "text" | "model" | "any";
+export type ProPortType = "image" | "text" | "model" | "video" | "any";
 
 export type ProNodeTypeKey =
   | "Model"
@@ -14,6 +14,8 @@ export type ProNodeTypeKey =
   | "LoadImage"
   | "Anchor"
   | "Generate"
+  | "Upscale"
+  | "Video"
   | "Preview";
 
 export interface ProPort {
@@ -202,13 +204,42 @@ export const PRO_NODE_SPECS: Record<ProNodeTypeKey, ProNodeSpec> = {
       { name: "height", type: "int", default: 1024, label: "高", min: 64, max: 4096 },
     ],
   },
+  Upscale: {
+    key: "Upscale",
+    label: "放大",
+    category: "generate",
+    billable: false,
+    accent: "#0369a1",
+    inputs: [{ name: "image", type: "image", required: true }],
+    outputs: [{ name: "image", type: "image" }],
+    params: [
+      { name: "upscale_method", type: "str", default: "lanczos", label: "插值", choices: ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"] },
+      { name: "scale_by", type: "float", default: 2.0, label: "倍数", min: 1.0, max: 8.0 },
+    ],
+  },
+  Video: {
+    key: "Video",
+    label: "生成视频",
+    category: "generate",
+    billable: true,
+    accent: "#be185d",
+    inputs: [{ name: "image", type: "image", required: true }],
+    outputs: [{ name: "video", type: "video" }],
+    params: [
+      { name: "duration", type: "int", default: 5, label: "时长(秒)", min: 1, max: 10 },
+      { name: "fps", type: "int", default: 8, label: "帧率", min: 1, max: 30 },
+      { name: "motion", type: "int", default: 127, label: "运动强度", min: 0, max: 255 },
+      { name: "video_ckpt", type: "str", default: "svd_xt.safetensors", label: "视频模型" },
+    ],
+  },
   Preview: {
     key: "Preview",
     label: "预览",
     category: "output",
     billable: false,
     accent: "#1c1917",
-    inputs: [{ name: "image", type: "image", required: true }],
+    // ANY 以同时接 image / video(与后端 node_registry 对齐)。
+    inputs: [{ name: "image", type: "any", required: true }],
     outputs: [],
     params: [],
   },
@@ -220,6 +251,8 @@ export const PRO_NODE_ORDER: ProNodeTypeKey[] = [
   "LoadImage",
   "Anchor",
   "Generate",
+  "Upscale",
+  "Video",
   "Preview",
 ];
 

@@ -15,7 +15,15 @@ import { NodeParamPanel } from "./NodeParamPanel";
 import { RunOutputs } from "./RunOutputs";
 import { CostModal } from "./CostModal";
 import { compileGraph, loadGraph, pronodeShapes, updateProNode } from "./graphIO";
-import { buildSubmitCommand, estimateGraph, fetchSeedGraph, proErrorTitle, ProApiError } from "./proExecution";
+import {
+  buildSubmitCommand,
+  estimateGraph,
+  fetchSeedGraph,
+  loadSavedGraph,
+  proErrorTitle,
+  ProApiError,
+  saveGraph,
+} from "./proExecution";
 
 const PRO_SHAPE_UTILS = [ProNodeShapeUtil];
 
@@ -63,6 +71,7 @@ export default function ProCanvas({ userId }: { userId: string }) {
   const graphRef = useRef<ProGraph | null>(null);
   const [editorReady, setEditorReady] = useState(false);
   const seededRef = useRef(false);
+  const restoredRef = useRef(false);
 
   const openCostModal = useProCanvasStore((s) => s.openCostModal);
   const resetRun = useProCanvasStore((s) => s.resetRun);
@@ -117,21 +126,53 @@ export default function ProCanvas({ userId }: { userId: string }) {
   // 卸载时清状态(切线程/离开)
   useEffect(() => () => useProCanvasStore.getState().reset(), []);
 
-  // 种子图:?seed=analysis:<id> / ?analysis_id=<id> → 灌进画布(只一次)
+  // 挂载恢复(只一次):已保存的图 **优先**于 seed —— 这样带 ?seed= 的 URL 刷新不会覆盖用户的
+  // 编辑(seed 只在该 thread 还没存过图时消费一次)。都没有则空白画布。
   useEffect(() => {
     if (!editorReady || seededRef.current) return;
-    const analysisId = parseSeed(searchParams);
-    if (!analysisId) return;
     seededRef.current = true;
     const editor = editorRef.current;
     if (!editor) return;
-    fetchSeedGraph(analysisId, threadId)
-      .then((g) => loadGraph(editor, g))
-      .catch((e) => {
+    const analysisId = parseSeed(searchParams);
+    (async () => {
+      try {
+        const saved = await loadSavedGraph(threadId);
+        if (saved && Array.isArray(saved.nodes) && saved.nodes.length) {
+          loadGraph(editor, saved);
+        } else if (analysisId) {
+          loadGraph(editor, await fetchSeedGraph(analysisId, threadId));
+        }
+      } catch (e) {
         const err = e as ProApiError;
         useToastStore.getState().push({ kind: "error", title: proErrorTitle(err.code), body: err.detail });
-      });
+      } finally {
+        restoredRef.current = true; // 解锁 autosave(在此之前的 store 变更不触发保存)
+      }
+    })();
   }, [editorReady, searchParams, threadId]);
+
+  // 自动保存(debounce):节点拖动/参数改 + 连线变更 → 序列化整图存后端。restoredRef 守卫确保
+  // 恢复阶段灌图引发的 store 变更不会反过来触发保存。
+  useEffect(() => {
+    if (!editorReady) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = () => {
+      if (!restoredRef.current) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => void saveGraph(threadId, compileGraph(editor)), 1200);
+    };
+    const unlistenEditor = editor.store.listen(schedule, { scope: "document", source: "user" });
+    const unsubStore = useProCanvasStore.subscribe((s, prev) => {
+      if (s.edges !== prev.edges) schedule();
+    });
+    return () => {
+      clearTimeout(timer);
+      unlistenEditor();
+      unsubStore();
+    };
+  }, [editorReady, threadId]);
 
   const handleRun = useCallback(async () => {
     const editor = editorRef.current;
