@@ -300,6 +300,9 @@ class SessionStateEvent(_Base):
     # Present (FailurePayload-shaped: code/hint/actions/request_id) when
     # run_status == "failed", so the client can replay the failure UI.
     failure: dict[str, Any] | None = None
+    # Pro 高级子画布灰度 kill-switch(config.PRO_CANVAS_ENABLED 权威下发)。前端据此显隐
+    # Agent 模式的「⚡ Pro 画布」/「⚡ 展开为计算图」入口 —— flag OFF 时不暴露入口(零打扰)。
+    pro_canvas_enabled: bool = False
 
 
 class CanvasUpdatedEvent(_Base):
