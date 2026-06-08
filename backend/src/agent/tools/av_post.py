@@ -8,13 +8,24 @@ BGM:从 bgm_root()(data/bgm/<track>.mp3)取曲目混入(缺曲 → None)。曲�
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
 import tempfile
+import uuid
 from pathlib import Path
 
 import httpx
 
+from agent import config
 from agent.cascade.mediakit.clip_extractor import media_root
+
+# 节点 voice 选项 → 火山 voice_type(founder 可在控制台核对/调整真实 id)。
+_VOICE_MAP = {
+    "温柔女声": "BV001_streaming",
+    "活力男声": "BV002_streaming",
+    "知性女声": "BV700_streaming",
+    "童声": "BV051_streaming",
+}
 
 _CJK_FONT_CANDIDATES = [
     "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
@@ -135,5 +146,48 @@ async def mux_bgm(video_url: str, track: str, volume: float = 0.3) -> bytes | No
             "-filter_complex", f"[1:a]volume={vol}[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=2[a]",
             "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-shortest", out,
         ])
+        p = Path(out)
+        return p.read_bytes() if p.exists() and p.stat().st_size > 0 else None
+
+
+async def synth_voice(text: str, voice_label: str) -> bytes | None:
+    """火山语音(openspeech v1)文本→语音 mp3 bytes。缺 appid/token 或失败 → None。
+    注意:用 TTS_APP_ID/TTS_ACCESS_TOKEN(火山语音控制台),**非 ARK_API_KEY**(ARK 无 TTS)。"""
+    text = (text or "").strip()
+    if not text or not config.TTS_APP_ID or not config.TTS_ACCESS_TOKEN:
+        return None
+    voice_type = _VOICE_MAP.get(voice_label, voice_label or "BV001_streaming")
+    payload = {
+        "app": {"appid": config.TTS_APP_ID, "token": config.TTS_ACCESS_TOKEN, "cluster": config.TTS_CLUSTER},
+        "user": {"uid": "pro_canvas"},
+        "audio": {"voice_type": voice_type, "encoding": "mp3"},
+        "request": {"reqid": uuid.uuid4().hex, "text": text[:1500], "operation": "query"},
+    }
+    headers = {"Authorization": f"Bearer;{config.TTS_ACCESS_TOKEN}", "Content-Type": "application/json"}
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.post(config.TTS_TTS_URL, json=payload, headers=headers)
+        data = r.json()
+        if data.get("code") == 3000 and data.get("data"):
+            return base64.b64decode(data["data"])
+        print(f"[av_post] TTS code={data.get('code')} msg={data.get('message')}")
+        return None
+    except Exception as e:  # noqa: BLE001
+        print(f"[av_post] TTS 异常: {e}")
+        return None
+
+
+async def voiceover(video_url: str, text: str, voice_label: str) -> bytes | None:
+    """合成口播并替换视频音轨。无 creds/失败 → None(透传)。"""
+    voice = await synth_voice(text, voice_label)
+    if not voice:
+        return None
+    with tempfile.TemporaryDirectory() as d:
+        src, vo, out = os.path.join(d, "in.mp4"), os.path.join(d, "vo.mp3"), os.path.join(d, "out.mp4")
+        if not await _download(video_url, src):
+            return None
+        Path(vo).write_bytes(voice)
+        # 用口播替换原音轨(分镜视频原声多为占位);-shortest 跟较短的走。
+        await _run_ffmpeg(["-y", "-i", src, "-i", vo, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-shortest", out])
         p = Path(out)
         return p.read_bytes() if p.exists() and p.stat().st_size > 0 else None

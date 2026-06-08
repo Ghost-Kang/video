@@ -37,3 +37,13 @@ def test_ascii_half_width():
     # ASCII 半宽:per_line=4 → 能放 ~8 个 ASCII
     out = _wrap_caption("abcdefgh", per_line=4)
     assert out == "abcdefgh"  # 8*0.5=4.0,不超
+
+
+def test_synth_voice_none_without_creds(monkeypatch):
+    # 无 TTS_APP_ID/ACCESS_TOKEN → None(节点透传,不报错)。ARK key 不覆盖 TTS。
+    import asyncio
+    from agent import config
+    from agent.tools.av_post import synth_voice
+    monkeypatch.setattr(config, "TTS_APP_ID", "")
+    monkeypatch.setattr(config, "TTS_ACCESS_TOKEN", "")
+    assert asyncio.run(synth_voice("你好", "温柔女声")) is None

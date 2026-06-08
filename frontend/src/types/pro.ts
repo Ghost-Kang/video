@@ -262,8 +262,8 @@ export const PRO_NODE_SPECS: Record<ProNodeTypeKey, ProNodeSpec> = {
     category: "audio",
     billable: false,
     accent: "#0d9488",
-    inputs: [{ name: "text", type: "text" }],
-    outputs: [{ name: "audio", type: "audio" }],
+    inputs: [{ name: "video", type: "video", required: true }],
+    outputs: [{ name: "video", type: "video" }],
     params: [
       { name: "text", type: "str", default: "", label: "口播文案" },
       { name: "voice", type: "str", default: "温柔女声", label: "音色", choices: ["温柔女声", "活力男声", "知性女声", "童声"] },

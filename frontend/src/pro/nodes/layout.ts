@@ -31,7 +31,8 @@ export function hasThumb(t: ProNodeTypeKey): boolean {
     t === "Video" ||
     t === "Compose" ||
     t === "Subtitle" ||
-    t === "BGM"
+    t === "BGM" ||
+    t === "TTS"
   );
 }
 

@@ -202,8 +202,8 @@ async def _run_domestic(run: dict, graph: dict) -> None:
         ntype = node.get("type")
         params = node.get("params") or {}
 
-        if ntype in ("Model", "Script", "TTS"):
-            continue  # 配置/信息/占位节点(TTS 执行下轮)→ 不产出、不执行
+        if ntype in ("Model", "Script"):
+            continue  # 配置/信息节点 → 不产出、不执行
         if ntype == "Prompt":
             produced[nid] = {"text": str(params.get("text") or "")}
             continue
@@ -340,8 +340,8 @@ async def _run_domestic(run: dict, graph: dict) -> None:
                 any_failed = True
             pro_runs_repo.touch_lease(run_id, user_id=uid, thread_id=tid)  # 下载+ffmpeg 略慢 → 续租
             continue
-        if ntype in ("Subtitle", "BGM"):
-            # 视频后期(字幕烧入 / BGM 混音)。best-effort:失败/无字体/无曲目 → 透传上游视频,不阻断。
+        if ntype in ("Subtitle", "BGM", "TTS"):
+            # 视频后期(字幕烧入 / BGM 混音 / TTS 配音)。best-effort:失败/缺字体/曲目/creds → 透传,不阻断。
             if _cancelled():
                 return
             s = _src(nid, "video")
@@ -355,6 +355,10 @@ async def _run_domestic(run: dict, graph: dict) -> None:
                     from agent.tools.av_post import burn_subtitle
 
                     out = await burn_subtitle(vurl, str(params.get("text") or ""))
+                elif ntype == "TTS":
+                    from agent.tools.av_post import voiceover
+
+                    out = await voiceover(vurl, str(params.get("text") or ""), str(params.get("voice") or ""))
                 else:
                     from agent.tools.av_post import mux_bgm
 
