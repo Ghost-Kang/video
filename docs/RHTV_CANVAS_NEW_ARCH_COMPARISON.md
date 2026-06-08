@@ -37,6 +37,50 @@ OpenRHTV 的画布和「新架构」**形似而神不同**:
 | Agent 层 | **LangChain** 做「NL→节点图」规划 | 把自然语言意图翻译成可执行节点图 |
 | 开源参照 | **`MaLunan/AIGCCanvasFlow`** | 这套思路的全栈开源缩小版 |
 
+### 1.2b 实际落地对照(2026-06-07 更新 · Pro 画布已上线 prod 灰度)
+
+> 本文初稿(2026-06-06)写的「OpenRHTV 现状」= 当时的 Agent 画布(React Flow 创作产物树)。**2026-06-07 我们另建了 `/pro` 高级子画布(tldraw + 自研执行器),形态最接近 §1.2 设想**。下表是 §1.2 四件套**设想 vs 我们实际落地**的逐层对照(基于代码,非设想):
+
+| 层 | §1.2 设想 | OpenRHTV 实际落地(`/pro` 画布) | 一致度 |
+|---|---|---|---|
+| 画布 | tldraw / VueFlow | **tldraw 5.1.0**(`/pro/:threadId`,自定义 `pronode` shape;prod 非 localhost 需 licenseKey) | ✅ 选了 tldraw |
+| 执行后端 | **ComfyUI(litegraph 内核)** + 异步队列 | **自研境内 per-node DAG 执行器**:`workers/pro_run_pipeline.py` 的 `_topo()`(Kahn 拓扑排序)+ `_run_domestic()`(逐节点路由);**「跑模型」= 调火山 API**(Generate→Seedream、Video→Seedance)+ 本地 ffmpeg(Compose/字幕/BGM/TTS),**非 litegraph 本地推理**。异步队列 = sqlite `pro_runs` 表 + 第 4 个 worker(claim→执行→续租→推帧) | ◐ **形状一致(DAG+拓扑+异步队列),内核不同(火山 API 非 ComfyUI)** |
+| ComfyUI 路径 | (即上一行) | **代码在但 opt-in、默认关、已搁置**:`_run_comfyui()` + `comfyui/compiler.py`(图→ComfyUI prompt)+ `provider.py`(submit /prompt、图 URL 自动上传 /upload/image、poll images/gifs)。节点级 backend 下拉可选 ComfyUI。**搁置原因:prod 2 核 3G 无 GPU 带不动;火山 API 本就 GPU-free 境内合规更省**(founder 2026-06-07 拍板跳过) | ◐ 备而不用 |
+| Agent 层 | **LangChain** NL→节点图 | **不是 LangChain 通用规划器**:主题→脚本+分镜 = Doubao 直调结构化(`comfyui/script_gen.py`);图的生成走**确定性编译**(`seed_builder.py`:主题/分析→种子创作图),非「自然语言→任意节点图」LLM 布图。Agent 模式另有 Director(deepagents)编排 Agent 画布 | ◐ 有 LLM 生成、非通用 NL→图 |
+| 开源参照 | `MaLunan/AIGCCanvasFlow` | **借鉴思路未照搬**:异步 `task_id` 轮询 ✅、统一 provider 适配器 ✅、受控数据流图(连线住 Zustand store)✅;但栈不同(asyncio worker + sqlite + 火山 provider,无 Vue/Celery/Redis/MinIO) | ◐ 借鉴 |
+
+**一句话**:画布层照 §1.2 选了 tldraw;**执行后端刻意偏离了 §1.2** —— 用「自研 DAG 执行器 + 火山 API」替代「ComfyUI/litegraph 内核」(DAG/拓扑/异步队列的**形状**保留,**引擎**换成境内 API),ComfyUI 仅作可选后端备而不用;Agent 层用确定性编译 + Doubao 生成,非 LangChain 通用 NL→图 规划。代码见 `backend/src/agent/workers/pro_run_pipeline.py`、`backend/src/agent/comfyui/{compiler,provider,seed_builder,script_gen}.py`。
+
+> 补:§1.2 设想保留 ComfyUI 范式的**护城河取舍**——通用节点/模型生态拿到了一半(tldraw 画布 UX),但执行内核换成火山 API 后,失去了 ComfyUI 的 1.37 万节点生态;换来的是境内合规 + GPU-free + 成本闸可控。这正是 TL;DR 说的「混合演进而非整体替换」的落地形态。
+
+### 1.2c Agent 层:设想 vs 实际 的优缺点 + 混合演进状态
+
+**本质区别**:§1.2 设想 = **LLM 即兴规划整张图**(NL→任意节点图);实际落地 = **LLM 只生成内容、图结构由代码确定性编译**(`script_gen` 出脚本/分镜 → `seed_builder` 编成固定形状图)。
+
+| | 设想:LangChain NL→任意节点图 | 实际:Doubao 结构化 + 确定性编译 |
+|---|---|---|
+| 灵活性 | ✅ 高(任意工作流/长尾节点) | ❌ 低(只出「主题→成片」一种固定流程) |
+| 可靠性 | ❌ 低(LLM 布图易连错口/缺节点,要重校验+纠错) | ✅ 高(模板编译 + `validate_graph` 保证不改直接 Run) |
+| 领域护栏 | ❌ 难加(自由布图难强制审核闸/合规/成本闸) | ✅ 天然嵌入(模板里直接带成本闸/合规/锚点级联/缓存) |
+| 质量稳定 | ❌ 看 LLM 当次发挥 | ✅ 固定 schema + 专调 prompt(可版本守卫) |
+| 成本/速度 | ❌ 每次一大轮 LLM(+纠错轮) | ✅ 一次 Doubao 出内容,图编译纯代码 0 LLM,成本可预测 |
+| 创意上限 | ✅ 高(自由组合) | ❌ 被模板封顶 |
+| 「Agent 原生」体验 | ✅ 对话驱动画布 | ❌ LLM 只种子时介入一次,之后人工编辑+重生 |
+| 工程/可测 | ❌ 重(agent+工具schema+校验+恢复) | ✅ 确定性编译=纯函数,好测、故障面小 |
+
+**取舍结论**:当前产品(短视频「主题→成片」批量生产)要的是**可靠/可控/省钱/合规**,不是通用生成 IDE 的灵活 → **确定性编译是对的选择**;LLM 自由布图华丽但失败率/烧钱/护栏缺失会反噬。
+
+**混合演进路径 = 确定性骨架 + LLM 局部布图。实现状态(2026-06-07):**
+
+| 组成 | 状态 | 实现 |
+|---|---|---|
+| 确定性骨架(主干) | ✅ 完整 | `seed_builder.py`(主题/分析→固定创作图),已上线 |
+| 手动局部编辑 | ✅ 有(人驱动,非 LLM) | 增删节点/连线、单节点重生、改脚本/改主题重生 |
+| **LLM 局部布图**(在骨架上让 LLM 增删/重连局部节点) | ❌ **未做**,仅方向 | — |
+| LLM 工具搭节点(现成内核,在另一轨) | ◐ 有但未接 | Agent 模式 **Director(deepagents)** 能 `create/update_canvas_node`+锚点级联+人在环,但在 **Agent 画布(React Flow)**,**未接到 Pro tldraw 画布**;两套画布尚未打通 |
+
+> 即:混合演进的「**LLM 那一半**」要落地,需把 Director 的工具编排搬到 Pro 画布、或合并两套画布 —— **都还没做**。目前 Pro 画布的「智能」只在种子那一下(主题→脚本/分镜),之后纯人工 + 单点重生。
+
 ### 1.3 开源参照的关键实现(读码/读文沉淀)
 
 **`MaLunan/AIGCCanvasFlow`**(Vue3 全栈,架构最接近 RHTV):
