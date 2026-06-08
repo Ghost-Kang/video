@@ -124,8 +124,9 @@ export default function App({ userId, onLogout }: AppProps) {
   // calls `cascade_generate_first_frame`. ShotCard owns the local "generating"
   // spinner; the WS frame `shot_first_frame_returned` patches the image in.
   const onGenerateFirstFrame = useCallback((idx: number) => {
+    trackEvent("generate_clicked", { kind: "first_frame", shot_index: idx }, tid);
     sendChatMessage(`[generate_first_frame: shot_index=${idx}]`);
-  }, [sendChatMessage]);
+  }, [sendChatMessage, tid]);
   // 图生视频(单镜)/ 合成整片 —— bracket 标记由 Director §0.7b/§0.7c 解析,异步生成,
   // 完成后端推帧自动渲染(视频要几分钟,合成几十秒)。
   const onGenerateShotVideo = useCallback((idx: number) => {
@@ -316,6 +317,7 @@ export default function App({ userId, onLogout }: AppProps) {
           .filter(Boolean)
           .join("\n\n")
       : "";
+    trackEvent("generate_clicked", { kind: "seed_canvas" }, tid);
     sendCommand({ type: "seed_canvas", thread_id: tid, analysis_id: analysis?.analysis_id ?? "", analysis_summary: summary });
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);

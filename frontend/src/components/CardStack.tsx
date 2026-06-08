@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { trackEvent } from "../lib/eventsApi";
 import { ViralAnalysisCard } from "./cards/ViralAnalysisCard";
 import { SceneAnalysisCard } from "./cards/SceneAnalysisCard";
 import { AnalysisStatStrip } from "./cards/AnalysisStatStrip";
@@ -58,6 +59,15 @@ export function CardStack({ onTriggerRewrite, onGenerateFirstFrame, onGenerateSh
     [rewriteCohortFlag],
   );
   const { ref: headerRef, inView: headerInView } = useInView<HTMLHeadingElement>();
+
+  // 漏斗诊断埋点:用户「看到改写结果」一次(分母)。hook 必须在 early return 之前。
+  const rewriteViewedRef = useRef(false);
+  useEffect(() => {
+    if (REWRITE_ENABLED && rewriteShots.length > 0 && !rewriteQualityGated && !rewriteViewedRef.current) {
+      rewriteViewedRef.current = true;
+      trackEvent("rewrite_viewed", { shots: rewriteShots.length });
+    }
+  }, [REWRITE_ENABLED, rewriteShots.length, rewriteQualityGated]);
 
   if (!analysis) {
     // 分析中 → 沉浸骨架(把用户刚点的那条带进等待态 + 内嵌进度真理之源)。

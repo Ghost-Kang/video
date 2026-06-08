@@ -13,6 +13,10 @@ class EventName(StrEnum):
     # /admin/events can audit which analyses creators are interrogating.
     ANALYSIS_ANSWER_RETURNED = "analysis_answer_returned"
     SCRIPT_REWRITTEN = "script_rewritten"
+    # 漏斗诊断(2026-06-08):改写→生成 92% 掉点定位。rewrite_viewed=用户看到改写结果(分母);
+    # generate_clicked=点了「生成草稿图」或「在画布上做我的版本」(创作意图)。前端 emit。
+    REWRITE_VIEWED = "rewrite_viewed"
+    GENERATE_CLICKED = "generate_clicked"
     SHOT_GENERATED = "shot_generated"
     SHOT_FIRST_FRAME_RETURNED = "shot_first_frame_returned"
     SHOT_VIDEO_RETURNED = "shot_video_returned"

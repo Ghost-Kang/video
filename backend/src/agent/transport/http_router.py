@@ -135,6 +135,8 @@ async def handle_funnel(qs: dict, body: dict) -> tuple[int, dict, str]:
     stages_def = [
         ("分析完成", EventName.ANALYSIS_RETURNED.value),
         ("改写", EventName.SCRIPT_REWRITTEN.value),
+        ("查看改写", EventName.REWRITE_VIEWED.value),  # 2026-06-08 诊断:定位改写→生成断点
+        ("点生成", EventName.GENERATE_CLICKED.value),  # 看到没点 vs 点了没成,一目了然
         ("草稿图", EventName.SHOT_FIRST_FRAME_RETURNED.value),
         ("发布", EventName.PUBLISH_PACK_COPIED.value),
     ]
