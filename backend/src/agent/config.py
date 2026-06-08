@@ -120,6 +120,12 @@ ARK_VIDEO_MODEL = os.getenv("ARK_VIDEO_MODEL", "doubao-seedance-2-0-260128")
 # -------- TTS --------
 TTS_API_KEY = os.getenv("TTS_API_KEY")
 TTS_BASE_URL = os.getenv("TTS_BASE_URL")
+# 火山语音(openspeech)TTS —— 注意:**与 ARK_API_KEY 是两套**(ARK 无 TTS,见 av_post 探测)。
+# 需火山语音控制台的 appid + access_token;缺则 Pro 的 TTS 节点透传(不出声、不报错)。
+TTS_APP_ID = os.getenv("TTS_APP_ID", "")
+TTS_ACCESS_TOKEN = os.getenv("TTS_ACCESS_TOKEN", "")
+TTS_CLUSTER = os.getenv("TTS_CLUSTER", "volcano_tts")
+TTS_TTS_URL = os.getenv("TTS_TTS_URL", "https://openspeech.bytedance.com/api/v1/tts")
 
 # -------- ASR --------
 ASR_API_KEY = os.getenv("ASR_API_KEY")

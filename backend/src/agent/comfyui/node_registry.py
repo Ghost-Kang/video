@@ -247,14 +247,15 @@ NODE_TYPES: dict[str, NodeType] = {
         inputs=(Port("videos", PortType.VIDEO, required=True, multi=True),),
         outputs=(Port("video", PortType.VIDEO),),
     ),
-    # 配音(TTS):口播文案 → 语音。占位节点 —— 执行下轮(需 TTS_API_KEY);run 时跳过(同 Script)。
+    # 配音(TTS):视频 + 口播文案 → 火山语音合成口播,替换视频音轨。境内 best-effort(缺
+    # TTS_APP_ID/ACCESS_TOKEN 或失败 → 透传)。注意 TTS 用火山语音独立 creds,非 ARK_API_KEY。
     "TTS": NodeType(
         key="TTS",
         label="配音",
         category="audio",
         comfy_class="",
-        inputs=(Port("text", PortType.TEXT, required=False),),
-        outputs=(Port("audio", PortType.AUDIO),),
+        inputs=(Port("video", PortType.VIDEO, required=True),),
+        outputs=(Port("video", PortType.VIDEO),),
         params=(
             ParamSpec("text", "str", "", label="口播文案"),
             ParamSpec("voice", "str", "温柔女声", label="音色", choices=("温柔女声", "活力男声", "知性女声", "童声")),
