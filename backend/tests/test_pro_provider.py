@@ -169,6 +169,70 @@ def test_selfhosted_poll_running_when_absent(monkeypatch):
     assert res["status"] == "running"
 
 
+class _UploadResp:
+    def __init__(self, status_code, data=None, content=b""):
+        self.status_code = status_code
+        self._data = data or {}
+        self.content = content
+
+    def json(self):
+        return self._data
+
+
+class _RoutingClient:
+    """按 URL 路由:GET 任意=下图;POST /upload/image=上传;POST /prompt=提交(捕获 body)。"""
+
+    def __init__(self, captured):
+        self._captured = captured
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def get(self, url):
+        return _UploadResp(200, content=b"IMGDATA")
+
+    async def post(self, url, *, json=None, files=None, data=None):
+        if url.endswith("/upload/image"):
+            return _UploadResp(200, {"name": "uploaded.png", "subfolder": ""})
+        if url.endswith("/prompt"):
+            self._captured["prompt"] = json["prompt"]
+            return _UploadResp(200, {"prompt_id": "pid-up"})
+        return _UploadResp(404, {})
+
+
+def test_selfhosted_uploads_url_loadimage(monkeypatch):
+    # 真 ComfyUI:LoadImage 的 http URL 提交前上传 → 文件名被改写,/prompt 收到的是已上传名(非 URL)。
+    monkeypatch.setattr(config, "COMFYUI_BASE_URL", "http://gpu:8188")
+    captured: dict = {}
+    monkeypatch.setattr(prov.httpx, "AsyncClient", lambda *a, **k: _RoutingClient(captured))
+    graph = {
+        "version": 1,
+        "nodes": [
+            {"id": "li", "type": "LoadImage", "params": {"image_url": "http://x/a.png"}},
+            {"id": "pv", "type": "Preview", "params": {}},
+        ],
+        "edges": [{"id": "1", "source": "li", "sourceHandle": "image", "target": "pv", "targetHandle": "image"}],
+    }
+    res = asyncio.run(prov.SelfHostedComfyUIProvider().submit(graph, user_id="u", run_id="r"))
+    assert res == {"task_id": "pid-up"}
+    loadimage = [n for n in captured["prompt"].values() if n.get("class_type") == "LoadImage"]
+    assert loadimage and loadimage[0]["inputs"]["image"] == "uploaded.png"  # URL → 上传名
+
+
+def test_selfhosted_poll_video_gifs(monkeypatch):
+    # 视频产物在 history 的 gifs 键(VHS 等)→ poll 也要收。
+    monkeypatch.setattr(config, "COMFYUI_BASE_URL", "http://gpu:8188")
+    history = {"pid-1": {"status": {"status_str": "success"},
+                         "outputs": {"9": {"gifs": [{"filename": "v.webp", "subfolder": "", "type": "output"}]}}}}
+    monkeypatch.setattr(prov.httpx, "AsyncClient", lambda *a, **k: _FakeClient(get=_Resp(200, history)))
+    res = asyncio.run(prov.SelfHostedComfyUIProvider().poll("pid-1"))
+    assert res["status"] == "completed"
+    assert "v.webp" in res["outputs"][0]
+
+
 def test_runninghub_submit_requires_key(monkeypatch):
     monkeypatch.setattr(config, "RUNNINGHUB_API_KEY", "")
     p = prov.RunningHubComfyUIProvider()

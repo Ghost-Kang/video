@@ -68,9 +68,13 @@ class SelfHostedComfyUIProvider(ComfyUIProvider):
             prompt = compile_graph(graph, target=TARGET_SELFHOSTED)
         except CompileError as e:
             return {"error": f"图编译失败({e.code}): {e.message}"}
-        body = {"prompt": prompt, "client_id": run_id or uuid.uuid4().hex}
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            async with httpx.AsyncClient(timeout=60) as client:
+                # 真 ComfyUI 关键:LoadImage 的 image 是我方 URL(Seedream/锚点),原生 LoadImage 只
+                # 读 input 目录文件名 → 提交前把 URL 图 upload 到 ComfyUI(/upload/image)再改写文件名,
+                # 无需服务器装自定义 URL 节点(stock 兼容)。任一上传失败保留原值(让 ComfyUI 报清楚的错)。
+                await self._upload_url_images(client, prompt)
+                body = {"prompt": prompt, "client_id": run_id or uuid.uuid4().hex}
                 resp = await client.post(f"{self._base}/prompt", json=body)
                 data = resp.json()
         except Exception as e:  # noqa: BLE001 — provider 错误以 dict 返回
@@ -81,6 +85,27 @@ class SelfHostedComfyUIProvider(ComfyUIProvider):
         if not prompt_id:
             return {"error": f"ComfyUI 未返回 prompt_id: {data}"}
         return {"task_id": prompt_id}
+
+    async def _upload_url_images(self, client: "httpx.AsyncClient", prompt: dict) -> None:
+        """把 prompt 里 LoadImage 节点的 http(s) image 上传到 ComfyUI,改写成已上传的文件名。"""
+        for node in prompt.values():
+            if not isinstance(node, dict) or node.get("class_type") != "LoadImage":
+                continue
+            img = (node.get("inputs") or {}).get("image", "")
+            if not isinstance(img, str) or not img.startswith(("http://", "https://")):
+                continue
+            try:
+                r = await client.get(img)
+                if r.status_code != 200 or not r.content:
+                    continue
+                files = {"image": ("ref.png", r.content, "image/png")}
+                up = await client.post(f"{self._base}/upload/image", files={**files}, data={"overwrite": "false"})
+                name = up.json().get("name") if up.status_code == 200 else None
+                if name:
+                    sub = up.json().get("subfolder", "")
+                    node["inputs"]["image"] = f"{sub}/{name}" if sub else name
+            except Exception:  # noqa: BLE001 — 上传失败保留原值
+                continue
 
     async def poll(self, task_id: str) -> dict:
         try:
@@ -97,16 +122,17 @@ class SelfHostedComfyUIProvider(ComfyUIProvider):
             return {"status": "failed", "outputs": [], "error": "ComfyUI 执行报错"}
         outputs: list[str] = []
         for node_out in (entry.get("outputs") or {}).values():
-            for img in node_out.get("images", []) or []:
-                fn = img.get("filename")
+            # images = 图 / SaveAnimatedWEBP;gifs = 视频(VHS 等)。两者都收。
+            for item in (node_out.get("images", []) or []) + (node_out.get("gifs", []) or []):
+                fn = item.get("filename")
                 if not fn:
                     continue
-                sub = img.get("subfolder", "")
-                typ = img.get("type", "output")
+                sub = item.get("subfolder", "")
+                typ = item.get("type", "output")
                 outputs.append(f"{self._base}/view?filename={fn}&subfolder={sub}&type={typ}")
         if outputs:
             return {"status": "completed", "outputs": outputs}
-        # history 有条目但还没图 → 仍在跑
+        # history 有条目但还没产物 → 仍在跑
         return {"status": "running", "outputs": []}
 
 
