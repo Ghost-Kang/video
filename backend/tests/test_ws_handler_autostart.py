@@ -113,3 +113,22 @@ def test_autostart_idempotent_when_canvas_nonempty(captured_autostart, monkeypat
     canvas_tools.create_canvas_node("script", "已存在", "x")  # 画布非空
     asyncio.run(handle_seed_canvas(_ctx(), _seed_msg(tid, "为什么火")))
     assert captured_autostart == []
+
+
+def test_concurrent_seed_only_seeds_once(captured_autostart, monkeypatch):
+    """P3 竞态修复(2026-06-10 审计):双开 tab / 重连重发并发 seed_canvas ——
+    「查空→创建」此前非原子,并发会重复节点 + 双倍 autostart(两轮 Director LLM
+    花费)。加 per-thread seed 锁后:只 seed 一次、autostart 只触发一次。"""
+    monkeypatch.setattr(config, "CANVAS_AUTOSTART_DIRECTOR", True)
+    tid = f"as-{uuid.uuid4().hex[:8]}"
+    canvas_tools.set_thread_id(tid)
+
+    async def _both():
+        await asyncio.gather(
+            handle_seed_canvas(_ctx(), _seed_msg(tid, "为什么火:钩子强")),
+            handle_seed_canvas(_ctx(), _seed_msg(tid, "为什么火:钩子强")),
+        )
+
+    asyncio.run(_both())
+    assert len(canvas_tools.get_canvas_state()["nodes"]) == 2  # 📊+✍️,不翻倍
+    assert len(captured_autostart) == 1  # 自动开工恰好一次

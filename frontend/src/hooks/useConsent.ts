@@ -30,13 +30,41 @@ function readStored(): ConsentRecord | null {
   }
 }
 
+const ANON_COOKIE_MAX_AGE_S = 60 * 60 * 24 * 365; // 1 年
+
+function readAnonCookie(key: string): string | null {
+  try {
+    const m = document.cookie.match(new RegExp(`(?:^|;\\s*)${key}=([^;]+)`));
+    return m ? decodeURIComponent(m[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeAnonCookie(key: string, value: string): void {
+  try {
+    document.cookie = `${key}=${encodeURIComponent(value)}; max-age=${ANON_COOKIE_MAX_AGE_S}; path=/; SameSite=Lax`;
+  } catch {
+    /* cookie 不可用(隐私模式等)→ 仍有 localStorage */
+  }
+}
+
 function anonId(): string {
+  // P3 加固(2026-06-10 审计):匿名身份此前仅存 localStorage —— 清浏览器数据 =
+  // 身份永久丢失 = 所有画布/会话静默变空白(数据按 user+thread 双键存在后端,
+  // 前端却再也指不到)。双写 cookie(1 年):清 localStorage(最常见丢失方式)
+  // 后可从 cookie 恢复同一身份。仍是同浏览器方案;换设备要靠未来的账号体系。
   const KEY = "openrhtv_anon_id";
   let id = window.localStorage.getItem(KEY);
+  if (!id) {
+    id = readAnonCookie(KEY);
+    if (id) window.localStorage.setItem(KEY, id); // cookie → localStorage 回填
+  }
   if (!id) {
     id = `anon-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
     window.localStorage.setItem(KEY, id);
   }
+  writeAnonCookie(KEY, id); // 每次访问续期
   return id;
 }
 

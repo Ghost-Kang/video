@@ -60,22 +60,36 @@ _THREAD_RUN_LOCKS: dict[str, asyncio.Lock] = {}
 _MAX_THREAD_LOCKS = 512
 
 
-def _get_thread_run_lock(thread_id: str) -> asyncio.Lock:
-    """Per-thread run lock with a bound on dict growth.
+def _get_bounded_lock(locks: dict[str, asyncio.Lock], thread_id: str) -> asyncio.Lock:
+    """Per-thread lock with a bound on dict growth.
 
     Previously `setdefault` grew this dict forever (one entry per thread_id
     ever seen) — a slow leak over long uptime. When we exceed the cap we drop
     currently-unlocked entries (an unlocked asyncio.Lock has no holder and no
     waiters, so removing it is safe).
     """
-    lock = _THREAD_RUN_LOCKS.get(thread_id)
+    lock = locks.get(thread_id)
     if lock is None:
-        if len(_THREAD_RUN_LOCKS) >= _MAX_THREAD_LOCKS:
-            for k in [k for k, l in _THREAD_RUN_LOCKS.items() if not l.locked()]:
-                del _THREAD_RUN_LOCKS[k]
+        if len(locks) >= _MAX_THREAD_LOCKS:
+            for k in [k for k, l in locks.items() if not l.locked()]:
+                del locks[k]
         lock = asyncio.Lock()
-        _THREAD_RUN_LOCKS[thread_id] = lock
+        locks[thread_id] = lock
     return lock
+
+
+def _get_thread_run_lock(thread_id: str) -> asyncio.Lock:
+    return _get_bounded_lock(_THREAD_RUN_LOCKS, thread_id)
+
+
+# seed_canvas 专用锁(P3 修复 2026-06-10):「查空画布→创建节点」非原子,双开 tab /
+# 重连重发并发 seed → 重复节点 + 双倍 autostart(两轮 Director LLM 花费)。
+# 不复用 _THREAD_RUN_LOCKS —— 那把锁被 Director 长 turn 持有数分钟,seed 必须秒级。
+_SEED_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+def _get_seed_lock(thread_id: str) -> asyncio.Lock:
+    return _get_bounded_lock(_SEED_LOCKS, thread_id)
 
 
 async def _run_agent_serialized(ctx: WSCtx, msg: UserMessageMsg, agent_prefix: str = "") -> None:
@@ -639,7 +653,10 @@ async def handle_seed_canvas(ctx: WSCtx, msg: SeedCanvasMsg) -> None:
             seeded = True
         return canvas_data(msg.thread_id), seeded
 
-    snapshot, seeded = await asyncio.to_thread(_work)
+    # P3 竞态修复:锁内执行「查空→seed」,并发的第二个 seed_canvas 看到非空画布 →
+    # seeded=False → 不重复建节点、不二次触发 autostart。锁只罩 ms 级 sqlite 操作。
+    async with _get_seed_lock(msg.thread_id):
+        snapshot, seeded = await asyncio.to_thread(_work)
     await send_json(ctx.ws, type="canvas_updated", thread_id=msg.thread_id, canvas=snapshot)
 
     # H5 — 进画布自动开工(默认 OFF)。只在「首次 seed + 有分析上下文」触发:幂等 seed 保证每张

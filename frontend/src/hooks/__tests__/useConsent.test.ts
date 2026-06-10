@@ -68,3 +68,47 @@ describe("useConsent", () => {
     expect(result.current.accepted).toBe(false);
   });
 });
+
+describe("anonId cookie 加固(P3 2026-06-10)", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    // jsdom 的 document.cookie 可读写;逐个过期清掉
+    document.cookie.split(";").forEach((c) => {
+      const k = c.split("=")[0]?.trim();
+      if (k) document.cookie = `${k}=; max-age=0; path=/`;
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("accept() 双写身份到 localStorage + cookie", async () => {
+    const { result } = renderHook(() => useConsent());
+    await act(async () => {
+      await result.current.accept();
+    });
+    const id = window.localStorage.getItem("openrhtv_anon_id");
+    expect(id).toMatch(/^anon-/);
+    expect(document.cookie).toContain(`openrhtv_anon_id=${encodeURIComponent(id as string)}`);
+  });
+
+  it("清 localStorage 后从 cookie 恢复同一身份(画布不再静默丢失)", async () => {
+    const first = renderHook(() => useConsent());
+    await act(async () => {
+      await first.result.current.accept();
+    });
+    const original = window.localStorage.getItem("openrhtv_anon_id");
+    expect(original).toMatch(/^anon-/);
+
+    // 模拟用户清浏览器 localStorage(最常见的身份丢失方式);cookie 仍在
+    window.localStorage.clear();
+
+    const second = renderHook(() => useConsent());
+    await act(async () => {
+      await second.result.current.accept();
+    });
+    expect(window.localStorage.getItem("openrhtv_anon_id")).toBe(original);
+    expect(window.localStorage.getItem("rhtv_user")).toBe(original);
+  });
+});

@@ -34,6 +34,11 @@ export function CanvasEmptyState() {
           告诉导演你想做什么
         </button>
         <div style={S.hint}>每一步你都可以审核、修改、重生,导演只在你确认后才往下走。</div>
+        {/* P3(2026-06-10 审计):匿名身份存于本浏览器,换设备/清缓存后旧画布会「静默
+            变空白」—— 用户以为数据丢了。空态里给一句解释,把静默坑变成已知行为。 */}
+        <div style={S.identityNote} data-testid="empty-identity-note">
+          之前在这条链接创作过却看到空白?创作记录跟随本浏览器的匿名身份,换设备或清浏览器数据后,旧会话暂时无法在这里找回。
+        </div>
       </div>
     </div>
   );
@@ -105,4 +110,12 @@ const S: Record<string, React.CSSProperties> = {
     boxShadow: "0 8px 24px -8px rgba(124,45,18,0.5)",
   },
   hint: { fontSize: 11.5, color: "#a8a29e", marginTop: 14, lineHeight: 1.5 },
+  identityNote: {
+    fontSize: 11,
+    color: "#a8a29e",
+    marginTop: 8,
+    lineHeight: 1.5,
+    paddingTop: 8,
+    borderTop: "1px dashed rgba(124,45,18,0.12)",
+  },
 };
