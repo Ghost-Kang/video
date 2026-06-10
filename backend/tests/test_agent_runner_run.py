@@ -156,6 +156,59 @@ class TestHappyPath:
         assert captured == {"user_id": "u_target", "thread_id": "t_target"}
 
 
+# ---------- 工具内嵌 LLM 泄漏(2026-06-09 真用户事故) ----------
+
+
+class TestToolEmbeddedLLMFilter:
+    """stream_mode='messages' 会捕获工具内嵌的 LangChain 模型调用(如改写管线
+    rewrite._invoke_llm)。这些 chunk 的 meta.langgraph_node == 'tools',不是导演的话,
+    曾把改写原始 JSON 整段流进聊天并存进 messages.db — 必须被过滤。"""
+
+    def test_tools_node_text_is_not_streamed_or_saved(self, saved_messages, stub_canvas_data):
+        leaked_json = '{"script_markdown": "### 改写脚本", "confidence": 0.8}'
+        chunks = [
+            (AIMessageChunk(content=leaked_json), {"langgraph_node": "tools"}),
+            (AIMessageChunk(content="改好了, 画布上看。"), {"langgraph_node": "model"}),
+        ]
+        ws = FakeWS()
+        asyncio.run(run_agent("u1", FakePool(FakeAgent(chunks)), "t1", "改一版", ws))
+
+        texts = [
+            m["content"] for m in ws.sent
+            if m.get("type") == "agent_stream" and m.get("event") == "text"
+        ]
+        assert texts == ["改好了, 画布上看。"]
+        agent_saved = [c for c in saved_messages if c[2] == "agent"]
+        assert agent_saved[-1][3] == "改好了, 画布上看。"
+
+    def test_tools_node_tool_call_chunks_also_skipped(self, saved_messages, stub_canvas_data):
+        tool_chunk = AIMessageChunk(
+            content="",
+            tool_calls=[{"name": "nested_llm_call", "args": {}, "id": "call_x"}],
+        )
+        chunks = [(tool_chunk, {"langgraph_node": "tools"})]
+        ws = FakeWS()
+        asyncio.run(run_agent("u1", FakePool(FakeAgent(chunks)), "t1", "hi", ws))
+
+        tc_frames = [
+            m for m in ws.sent
+            if m.get("type") == "agent_stream" and m.get("event") == "tool_call"
+        ]
+        assert tc_frames == []
+
+    def test_meta_none_still_streams(self, saved_messages, stub_canvas_data):
+        # 防御:meta 为 None/缺 langgraph_node(老版本/测试桩)时保持旧行为照常流。
+        chunks = [(AIMessageChunk(content="正常文本"), None)]
+        ws = FakeWS()
+        asyncio.run(run_agent("u1", FakePool(FakeAgent(chunks)), "t1", "hi", ws))
+
+        texts = [
+            m["content"] for m in ws.sent
+            if m.get("type") == "agent_stream" and m.get("event") == "text"
+        ]
+        assert texts == ["正常文本"]
+
+
 # ---------- tool_call 流 ----------
 
 

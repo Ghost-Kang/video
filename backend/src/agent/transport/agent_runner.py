@@ -131,6 +131,13 @@ async def _stream_once(agent, agent_input, config, user_id: str, thread_id: str,
     ):
         msg, meta = chunk["data"]
 
+        # stream_mode="messages" 捕获 graph 内**所有** LangChain 模型调用,包括工具内嵌的
+        # (如改写管线 rewrite._invoke_llm)。那些是管线中间产物不是导演的话——2026-06-09
+        # 真用户事故:改写 LLM 的原始 JSON 整段流进聊天并存进 messages.db。按节点过滤:
+        # 来自 "tools" 节点的 LLM 输出一律不进聊天流。
+        if (meta or {}).get("langgraph_node") == "tools":
+            continue
+
         if isinstance(msg, AIMessageChunk) and msg.tool_calls:
             for tc in msg.tool_calls:
                 await notify.send_to_user(

@@ -293,6 +293,60 @@ async def cascade_analyze(source_url: str) -> dict:
     return _compact_analysis(contract)
 
 
+def _fill_canvas_script_node(user_id: str, thread_id: str, script_markdown: str) -> str | None:
+    """画布确定性桥(2026-06-09 真用户卡死修复):改写成功后,若该会话画布上存在
+    等待填充的 script 创作锚(seed_canvas 建的空「✍️ 我的策划书」),把脚本直接写进去。
+
+    背景:画布路由此前**纯靠 director.md prompt 自觉**(先调 get_canvas_state 判定,
+    画布模式走 update_canvas_node)。真实用户事故里 Director 跳过判定直接调了
+    cascade_rewrite——结果只推卡片栈帧,画布视图里看不见,策划书节点 word_count=0,
+    用户卡死。这里把"改写结果落到画布"变成代码保证,不再依赖模型遵从。
+
+    目标节点选择(保守,选不中就跳过、行为同旧版):
+    1. 首选:内容为空的 script 节点(seed 的创作锚;分析参考节点「📊 这条为什么火」
+       内容非空,天然排除)。
+    2. 次选:标题含「我的策划书」且未 confirmed 的 script 节点(用户改方向重写的场景)。
+       confirmed 的不碰——改已确认内容必须经用户同意(update_canvas_node 同款守卫)。
+
+    返回写入的 node_id;没有合适节点(纯卡片栈会话)返回 None。
+    与 canvas.update_canvas_node 的 script 分支保持同构(content/word_count/shots +
+    回到 reviewing 待用户审)。
+    """
+    from agent.tools.canvas import _parse_storyboard
+    from agent.tools.canvas_persistence.nodes_repo import _load_all_nodes, _upsert_node
+
+    nodes = [
+        n for n in _load_all_nodes(user_id=user_id, thread_id=thread_id).values()
+        if n.get("type") == "script"
+    ]
+    target = next(
+        (
+            n for n in nodes
+            if not ((n.get("result") or {}).get("content") or "").strip()
+            and not (n.get("description") or "").strip()
+        ),
+        None,
+    ) or next(
+        (
+            n for n in nodes
+            if "我的策划书" in (n.get("title") or "") and n.get("node_status") != "confirmed"
+        ),
+        None,
+    )
+    if target is None:
+        return None
+
+    target["description"] = script_markdown
+    target["result"] = {
+        "content": script_markdown,
+        "word_count": len(script_markdown),
+        "shots": _parse_storyboard(script_markdown),
+    }
+    target["node_status"] = "reviewing"
+    _upsert_node(target, user_id=user_id, thread_id=thread_id)
+    return target["id"]
+
+
 @tool
 async def cascade_rewrite(analysis_id: str, niche: str, topic: str = "") -> dict:
     """把已分析的视频改写成创作者自己的版本(脚本 + 分镜)。
@@ -312,13 +366,16 @@ async def cascade_rewrite(analysis_id: str, niche: str, topic: str = "") -> dict
     **返回**：
     - 成功：{"rewrite_id": "rw_...", "analysis_id": "ana_...", "niche": "...",
               "script_markdown": "...", "shots_count": int, "confidence": float,
-              "cost_cny": float}
+              "cost_cny": float, "canvas_node_updated": str | None}
     - 失败：{"error": "FAILURE_CODE", "message": "..."} 或
             {"error": "UNKNOWN_NICHE", "message": "..."} 或
             {"error": "ANALYSIS_NOT_FOUND", "message": "..."}
 
-    成功后系统会自动把脚本和分镜推到前端 CardStack 渲染。chat 回复保持极简
-    一句话即可，**不要复述脚本内容**——前端会显示完整版本。
+    成功后系统会自动把脚本和分镜推到前端 CardStack 渲染。如果用户在画布上有等待
+    填充的「✍️ 我的策划书」节点，系统**也会自动把脚本写进那个节点**(返回值
+    canvas_node_updated=node_id；None 表示本会话无画布策划书节点)。chat 回复保持
+    极简一句话即可，**不要复述脚本内容**——前端会显示完整版本;canvas_node_updated
+    非 None 时告诉用户「策划书已写进画布」,无需再调 update_canvas_node 重复写入。
 
     **缓存**：同一 (analysis_id, niche, user_id) 在 24 小时内返回同一个结果，
     重复调用不会额外计费。
@@ -363,6 +420,7 @@ async def cascade_rewrite(analysis_id: str, niche: str, topic: str = "") -> dict
             "message": f"改写过程出错: {exc}",
         }
 
+    canvas_node_updated: str | None = None
     if thread_id:
         # W5D4 — persist thread→rewrite pointer before push (reload replay).
         try:
@@ -375,6 +433,13 @@ async def cascade_rewrite(analysis_id: str, niche: str, topic: str = "") -> dict
             "analysis_id": analysis_id,
             "rewrite": result.model_dump(mode="json"),
         })
+        # 画布确定性桥 — best-effort:桥失败不破坏改写本身(卡片栈路径照常)。
+        try:
+            canvas_node_updated = await asyncio.to_thread(
+                _fill_canvas_script_node, user_id, thread_id, result.script_markdown
+            )
+        except Exception:
+            canvas_node_updated = None
 
     return {
         "rewrite_id": result.rewrite_id,
@@ -384,6 +449,7 @@ async def cascade_rewrite(analysis_id: str, niche: str, topic: str = "") -> dict
         "shots_count": len(result.shots),
         "confidence": result.confidence,
         "cost_cny": result.cost_cny,
+        "canvas_node_updated": canvas_node_updated,
     }
 
 
