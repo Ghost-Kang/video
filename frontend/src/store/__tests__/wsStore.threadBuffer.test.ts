@@ -60,7 +60,7 @@ describe("wsStore P0-C per-thread buffering", () => {
     }
     expect(useWSStore.getState().pendingByThread.tB).toHaveLength(200);
     // oldest dropped: the first buffered detail "0" is gone, "249" retained
-    const details = useWSStore.getState().pendingByThread.tB.map((e: any) => e.detail);
+    const details = useWSStore.getState().pendingByThread.tB.map((e) => (e as { detail?: string }).detail);
     expect(details).not.toContain("0");
     expect(details[details.length - 1]).toBe("249");
   });

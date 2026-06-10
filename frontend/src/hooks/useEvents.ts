@@ -21,7 +21,11 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
   const [nextOffset, setNextOffset] = useState<number | null>(null);
 
   const filtersRef = useRef(filters);
-  filtersRef.current = filters;
+  // latest-value ref:render 期写 ref 违反 react-hooks/refs(并发渲染下可能写入
+  // 被丢弃渲染的值)。挪进 effect — 下面的首刷 effect 排在其后,顺序保证可见。
+  useEffect(() => {
+    filtersRef.current = filters;
+  });
 
   const refresh = useCallback(async () => {
     setIsLoading(true);

@@ -12,13 +12,10 @@ function useTypewriterPlaceholder(phrases: string[], paused: boolean): string {
   const [text, setText] = useState("");
 
   useEffect(() => {
+    // paused 时不动状态(显示值在 return 处派生为 ""),避免 effect 里同步 setState
+    // (react-hooks/set-state-in-effect)。
+    if (paused) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    if (paused) {
-      setText("");
-      return () => {
-        if (timer) clearTimeout(timer);
-      };
-    }
     let phraseIdx = 0;
     let charIdx = 0;
     let mode: "typing" | "holding" | "deleting" = "typing";
@@ -50,11 +47,16 @@ function useTypewriterPlaceholder(phrases: string[], paused: boolean): string {
       }
     };
 
-    timer = setTimeout(tick, 400);
+    // 重启动画前先清上一轮残留(异步回调内 setState,规则允许),再 400ms 起打。
+    timer = setTimeout(() => {
+      setText("");
+      timer = setTimeout(tick, 400);
+    }, 0);
     return () => clearTimeout(timer);
   }, [phrases, paused]);
 
-  return text;
+  // paused → 派生空串(用户聚焦/已输入时不打字机);恢复时 effect 重启动画。
+  return paused ? "" : text;
 }
 
 export function UrlFallback({ onSubmit }: { onSubmit: (url: string) => void }) {

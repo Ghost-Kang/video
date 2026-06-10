@@ -188,11 +188,16 @@ function MediaPanel({ node, actions }: {
   const [duration, setDuration] = useState(5);
   const [resolution, setResolution] = useState("720p");
   const [generateAudio, setGenerateAudio] = useState(true);
-  useEffect(() => {
-    const rp = (node.result as Record<string, unknown> | null)?.prompt as string | undefined;
-    setPrompt(rp || node.description || "");
+  // 切换节点 / 描述变化 / 生成完成 → 重置本地编辑态。用 render 期「adjust state
+  // when props change」官方模式替代 effect 里 setState(react-hooks/set-state-in-effect):
+  // 同一渲染内重置,不再多一帧旧 prompt 闪烁。
+  const resetKey = `${node.id}|${node.description}|${node.asset_status}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
+    setPrompt(resultPrompt || node.description || "");
     setProvider(node.image_gen_provider || "seedream");
-  }, [node.id, node.description, node.asset_status]);
+  }
   const [showPolish, setShowPolish] = useState(false);
   const [feedback, setFeedback] = useState("");
 
