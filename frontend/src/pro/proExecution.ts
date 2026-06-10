@@ -50,12 +50,25 @@ async function readError(res: Response): Promise<ProApiError> {
   return new ProApiError(code, detail);
 }
 
+/** 当前匿名身份(与 WS auth 同源:localStorage.rhtv_user)。
+ * 2026-06-10 审计:pro HTTP 端点身份从 body/qs 取,前端此前从不传 → 服务端全部
+ * 归因 "default"(pro_seeded 遥测失真 / 成片库全用户混库 / theme 成本闸池化)。
+ * 所有 pro API 调用统一带上;per-user mapped 邀请码场景 dispatcher 仍会用
+ * server-derived 身份覆盖 body.user_id(http_router 鉴权 A),此处不降低安全性。 */
+function proUid(): string {
+  try {
+    return window.localStorage.getItem("rhtv_user") || "default";
+  } catch {
+    return "default";
+  }
+}
+
 /** POST /api/pro/estimate → 整图成本估算(Run 前确认弹窗)。不花钱。 */
 export async function estimateGraph(graph: ProGraph): Promise<ProEstimate> {
   const res = await apiFetch("/api/pro/estimate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ graph }),
+    body: JSON.stringify({ graph, user_id: proUid() }),
   });
   if (!res.ok) throw await readError(res);
   return res.json();
@@ -66,7 +79,7 @@ export async function fetchSeedGraph(analysisId: string, threadId: string): Prom
   const res = await apiFetch("/api/pro/seed", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ analysis_id: analysisId, thread_id: threadId }),
+    body: JSON.stringify({ analysis_id: analysisId, thread_id: threadId, user_id: proUid() }),
   });
   if (!res.ok) throw await readError(res);
   const data = await res.json();
@@ -79,7 +92,7 @@ export async function seedFromThread(threadId: string): Promise<ProGraph | null>
     const res = await apiFetch("/api/pro/seed", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ thread_id: threadId }),
+      body: JSON.stringify({ thread_id: threadId, user_id: proUid() }),
     });
     if (!res.ok) return null;
     return ((await res.json()).graph as ProGraph | null) ?? null;
@@ -93,7 +106,7 @@ export async function seedFromTheme(theme: string, threadId: string): Promise<Pr
   const res = await apiFetch("/api/pro/seed_from_theme", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ theme, thread_id: threadId }),
+    body: JSON.stringify({ theme, thread_id: threadId, user_id: proUid() }),
   });
   if (!res.ok) throw await readError(res);
   return (await res.json()).graph as ProGraph;
@@ -104,7 +117,7 @@ export async function regenFromScript(script: string, threadId: string): Promise
   const res = await apiFetch("/api/pro/regen_from_script", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ script, thread_id: threadId }),
+    body: JSON.stringify({ script, thread_id: threadId, user_id: proUid() }),
   });
   if (!res.ok) throw await readError(res);
   return (await res.json()).graph as ProGraph;
@@ -132,7 +145,7 @@ export async function saveGraph(threadId: string, graph: ProGraph): Promise<void
     await apiFetch("/api/pro/graph", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ thread_id: threadId, graph }),
+      body: JSON.stringify({ thread_id: threadId, graph, user_id: proUid() }),
     });
   } catch {
     /* autosave 失败静默 */
@@ -142,7 +155,7 @@ export async function saveGraph(threadId: string, graph: ProGraph): Promise<void
 /** 恢复该 thread 上次保存的图;无/失败 → null(不阻断挂载)。 */
 export async function loadSavedGraph(threadId: string): Promise<ProGraph | null> {
   try {
-    const res = await apiFetch(`/api/pro/graph?thread_id=${encodeURIComponent(threadId)}`);
+    const res = await apiFetch(`/api/pro/graph?thread_id=${encodeURIComponent(threadId)}&user_id=${encodeURIComponent(proUid())}`);
     if (!res.ok) return null;
     const data = await res.json();
     return (data.graph as ProGraph | null) ?? null;
@@ -166,7 +179,7 @@ export async function saveTemplate(name: string, graph: ProGraph): Promise<ProTe
   const res = await apiFetch("/api/pro/template", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, graph }),
+    body: JSON.stringify({ name, graph, user_id: proUid() }),
   });
   if (!res.ok) throw await readError(res);
   return res.json();
@@ -183,7 +196,7 @@ export async function deleteTemplate(templateId: string): Promise<void> {
   await apiFetch("/api/pro/template/delete", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ template_id: templateId }),
+    body: JSON.stringify({ template_id: templateId, user_id: proUid() }),
   });
 }
 
@@ -201,7 +214,7 @@ export async function saveFilm(videoUrl: string, threadId: string, title = ""): 
   const res = await apiFetch("/api/pro/film", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ video_url: videoUrl, thread_id: threadId, title }),
+    body: JSON.stringify({ video_url: videoUrl, thread_id: threadId, title, user_id: proUid() }),
   });
   if (!res.ok) throw await readError(res);
   return res.json();
@@ -209,7 +222,7 @@ export async function saveFilm(videoUrl: string, threadId: string, title = ""): 
 
 export async function listFilms(): Promise<ProFilm[]> {
   try {
-    const res = await apiFetch("/api/pro/films");
+    const res = await apiFetch(`/api/pro/films?user_id=${encodeURIComponent(proUid())}`);
     if (!res.ok) return [];
     return ((await res.json()).films as ProFilm[]) ?? [];
   } catch {

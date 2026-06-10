@@ -182,8 +182,17 @@ async def _run_domestic(run: dict, graph: dict) -> None:
     produced: dict = {}
     outputs: list[str] = []
     any_failed = False
+    # 2026-06-10 审计:此前失败只置布尔 any_failed,原因三处全丢(日志/DB/前端)——
+    # ¥21 的 run 7 分镜只出 2 个、用户和我们都无从知道为什么。每个失败必须留痕。
+    node_errors: list[str] = []
     seed_provider = None
     video_provider = None
+
+    def _node_fail(nid: str, reason: str) -> None:
+        nonlocal any_failed
+        any_failed = True
+        node_errors.append(f"{nid}: {reason}")
+        print(f"[ProWorker:domestic] 节点失败 run={run_id[:16]} node={nid} {reason[:200]}")
 
     def _src(nid, handle):
         e = incoming.get((nid, handle))
@@ -249,7 +258,7 @@ async def _run_domestic(run: dict, graph: dict) -> None:
                     produced[nid] = {"image": final}
                     await _push(uid, {"type": "pro_run_node_done", "thread_id": tid, "run_id": run_id, "output_url": final})
                 else:
-                    any_failed = True
+                    _node_fail(nid, "ComfyUI 生图失败/超时")
                 pro_runs_repo.touch_lease(run_id, user_id=uid, thread_id=tid)
                 continue
             if seed_provider is None:
@@ -270,7 +279,7 @@ async def _run_domestic(run: dict, graph: dict) -> None:
                 produced[nid] = {"image": final}
                 await _push(uid, {"type": "pro_run_node_done", "thread_id": tid, "run_id": run_id, "output_url": final})
             else:
-                any_failed = True
+                _node_fail(nid, str(res.get("error") or "Seedream 无产出"))
             continue
         if ntype == "Video":
             if node.get("cached") and node.get("cached_url"):
@@ -281,7 +290,7 @@ async def _run_domestic(run: dict, graph: dict) -> None:
                 return
             img = _img_in(nid)
             if not img:
-                any_failed = True
+                _node_fail(nid, "无图输入(上游图节点未产出)")
                 continue
             if str(params.get("backend") or "境内") == _COMFYUI_BACKEND:
                 t0 = time.time()
@@ -296,7 +305,7 @@ async def _run_domestic(run: dict, graph: dict) -> None:
                     produced[nid] = {"video": final}
                     await _push(uid, {"type": "pro_run_node_done", "thread_id": tid, "run_id": run_id, "output_url": final})
                 else:
-                    any_failed = True
+                    _node_fail(nid, "ComfyUI 生视频失败/超时")
                 pro_runs_repo.touch_lease(run_id, user_id=uid, thread_id=tid)
                 continue
             if video_provider is None:
@@ -317,7 +326,7 @@ async def _run_domestic(run: dict, graph: dict) -> None:
                 produced[nid] = {"video": final}
                 await _push(uid, {"type": "pro_run_node_done", "thread_id": tid, "run_id": run_id, "output_url": final})
             else:
-                any_failed = True
+                _node_fail(nid, str(res.get("error") or "Seedance 无产出"))
             pro_runs_repo.touch_lease(run_id, user_id=uid, thread_id=tid)  # video 慢 → 续租防误抢
             continue
         if ntype == "Compose":
@@ -327,8 +336,11 @@ async def _run_domestic(run: dict, graph: dict) -> None:
             vurls = [produced.get(s, {}).get("video") for s in srcs]
             vurls = [u for u in vurls if u]
             if not vurls:
-                any_failed = True
+                _node_fail(nid, "无视频输入(上游视频节点均未产出)")
                 continue
+            if len(vurls) < len(srcs):
+                # 部分分镜缺片仍合成(best-effort),但要留痕 —— 用户拿到的是「部分成片」。
+                _node_fail(nid, f"仅 {len(vurls)}/{len(srcs)} 路视频可用,成片为部分合成")
             from agent.tools.compose import compose_videos
 
             data = await compose_videos(vurls)
@@ -337,7 +349,7 @@ async def _run_domestic(run: dict, graph: dict) -> None:
                 produced[nid] = {"video": final}
                 await _push(uid, {"type": "pro_run_node_done", "thread_id": tid, "run_id": run_id, "output_url": final})
             else:
-                any_failed = True
+                _node_fail(nid, "ffmpeg 合成失败")
             pro_runs_repo.touch_lease(run_id, user_id=uid, thread_id=tid)  # 下载+ffmpeg 略慢 → 续租
             continue
         if ntype in ("Subtitle", "BGM", "TTS"):
@@ -347,7 +359,7 @@ async def _run_domestic(run: dict, graph: dict) -> None:
             s = _src(nid, "video")
             vurl = produced.get(s, {}).get("video") if s else None
             if not vurl:
-                any_failed = True
+                _node_fail(nid, "无视频输入(上游视频节点未产出)")
                 continue
             out = None
             try:
@@ -371,20 +383,28 @@ async def _run_domestic(run: dict, graph: dict) -> None:
                 await _push(uid, {"type": "pro_run_node_done", "thread_id": tid, "run_id": run_id, "output_url": final})
             else:
                 produced[nid] = {"video": vurl}  # 透传(后期未生效)
+                node_errors.append(f"{nid}: {ntype} 后期未生效(已透传原视频)")
+                print(f"[ProWorker:domestic] 后期透传 run={run_id[:16]} node={nid} type={ntype}")
             pro_runs_repo.touch_lease(run_id, user_id=uid, thread_id=tid)
             continue
 
     if _cancelled():
         return
+    err_summary = "; ".join(node_errors)[:500] or None
     if outputs:
-        pro_runs_repo.update_pro_run_state(run_id, "done", user_id=uid, thread_id=tid, result=outputs)
-        await _push(uid, {"type": "pro_run_done", "thread_id": tid, "run_id": run_id, "outputs": outputs})
+        # partial 也算 done(产物可用),但错误摘要必须持久化(DB error 列)+ 推给前端,
+        # 不能再让「7 分镜只出 2 个」无声无息。
+        pro_runs_repo.update_pro_run_state(run_id, "done", user_id=uid, thread_id=tid, result=outputs, error=err_summary)
+        done_frame: dict = {"type": "pro_run_done", "thread_id": tid, "run_id": run_id, "outputs": outputs}
+        if node_errors:
+            done_frame["partial_errors"] = node_errors[:20]
+        await _push(uid, done_frame)
         await _emit_run_done(uid, run_id, len(outputs))
-        print(f"[ProWorker:domestic] 完成 run={run_id[:16]} outputs={len(outputs)} partial={any_failed}")
+        print(f"[ProWorker:domestic] 完成 run={run_id[:16]} outputs={len(outputs)} partial={any_failed} errors={len(node_errors)}")
     else:
-        # 不自动重试 domestic(重跑会重复扣已成节点);直接置 failed。
-        err = "分镜生成失败,请重试或换主题" if any_failed else "图里没有可输出的预览"
-        pro_runs_repo.update_pro_run_state(run_id, "failed", user_id=uid, thread_id=tid, error=err)
+        # 不自动重试 domestic(重跑会重复扣已成节点);直接置 failed。带上首因可诊断。
+        err = node_errors[0] if node_errors else "图里没有可输出的预览"
+        pro_runs_repo.update_pro_run_state(run_id, "failed", user_id=uid, thread_id=tid, error=err_summary or err)
         await _push(uid, {"type": "pro_run_failed", "thread_id": tid, "run_id": run_id, "error": err})
 
 
@@ -419,10 +439,14 @@ async def _run_comfyui(run: dict, graph: dict, provider_name: str) -> None:
     task_id = submitted["task_id"]
     pro_runs_repo.update_pro_run_state(run_id, "polling", user_id=uid, thread_id=tid, comfy_prompt_id=task_id)
     await _push(uid, {"type": "pro_run_progress", "thread_id": tid, "run_id": run_id, "status": "running", "pct": 30})
-    await cost_guard.record_generation_cost(
-        user_id=uid, run_id=run_id, call_kind="canvas_comfyui",
-        cost_cny=float(run.get("cost_est") or 0.0), provider=f"comfyui:{provider_name}", latency_ms=int(elapsed),
-    )
+    # 记账口径(2026-06-10 审计):submit 成功即 provider 侧可计费 → 记一次;但**只记
+    # 首跑**(claim 前 attempt_count==0)。retry 重提交此前会再记一次全额 cost_est,
+    # 把失败重试当双倍花费灌进 ¥30/天闸,几轮 retry 就把用户额度烧穿。
+    if int(run.get("attempt_count") or 0) == 0:
+        await cost_guard.record_generation_cost(
+            user_id=uid, run_id=run_id, call_kind="canvas_comfyui",
+            cost_cny=float(run.get("cost_est") or 0.0), provider=f"comfyui:{provider_name}", latency_ms=int(elapsed),
+        )
     res: dict = {"status": "running", "outputs": []}
     deadline = time.time() + POLL_MAX_S
     while time.time() < deadline:

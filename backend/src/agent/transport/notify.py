@@ -88,9 +88,13 @@ async def send_to_user(user_id: str, payload: dict, *, fallback_ws: Any = None) 
 
 
 def notify_user(user_id: str, thread_id: str) -> None:
-    """向指定用户推送 canvas_updated(worker 路径)。无连接则 log skip。"""
+    """向指定用户推送 canvas_updated(worker 路径)。无连接则 log skip。
+
+    canvas_data 必须显式传 user_id:worker 任务上下文的 user ContextVar 是
+    "default",靠它解析会查空快照(真实用户生成完成永不可见,2026-06-10 事故)。
+    """
     if not _ws_registry.get(user_id):
         print(f"[通知] user={user_id} 未连接,跳过推送 thread={thread_id}")
         return
-    payload = {"type": "canvas_updated", "thread_id": thread_id, "canvas": canvas_data(thread_id)}
+    payload = {"type": "canvas_updated", "thread_id": thread_id, "canvas": canvas_data(thread_id, user_id=user_id)}
     asyncio.create_task(send_to_user(user_id, payload))

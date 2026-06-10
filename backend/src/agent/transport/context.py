@@ -69,12 +69,16 @@ async def send_json(ws, **kwargs) -> None:
         await ws.send(payload)
 
 
-def canvas_data(thread_id: str) -> dict | None:
+def canvas_data(thread_id: str, user_id: str | None = None) -> dict | None:
     """快照当前 thread 的 canvas (nodes + edges)。无节点返回 None。
 
-    Note: 仍然走 canvas_tools.set_thread_id (ContextVar) — 见 Claude-A2 待办。
+    Claude-A2(2026-06-10 真用户事故修复):画布按 (user_id, thread_id) 双键存,
+    user 此前只从 ContextVar 取 —— **worker 任务上下文里是默认值 "default"**,导致
+    notify_user 推给真实用户的快照永远是空(canvas:null,前端静默丢)→ 用户付了钱
+    UI 永挂「生成中」。跨上下文调用方(worker)必须显式传 user_id;不传时回退
+    ContextVar(WS 连接路径在 auth 时已 set,行为不变)。
     """
     canvas_tools.set_thread_id(thread_id)
-    nodes = canvas_tools._load_all_nodes()
-    edges = canvas_tools._load_all_edges()
+    nodes = canvas_tools._load_all_nodes(user_id=user_id, thread_id=thread_id)
+    edges = canvas_tools._load_all_edges(user_id=user_id, thread_id=thread_id)
     return {"nodes": nodes, "edges": edges} if nodes else None

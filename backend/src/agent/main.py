@@ -10,6 +10,7 @@
 
 import asyncio
 import aiosqlite
+import functools
 import sys
 from pathlib import Path
 
@@ -80,6 +81,39 @@ def _make_backend() -> CompositeBackend:
     )
 
 
+def _with_canvas_push(fn):
+    """画布写工具包一层:每次成功调用后立即推增量 canvas_updated。
+
+    2026-06-10 真机观察:Director 长 turn(写策划书 + 级联建锚点 ≈3 分钟)期间
+    画布零更新 —— 快照只在 turn 结束统一推,用户盯着空画布以为死机。工具在
+    graph 执行上下文里跑(RUN_CTX 有 user/thread,事件循环可用),mutation 后
+    best-effort 推一帧;推送失败不影响工具返回值。
+    """
+
+    @functools.wraps(fn)
+    async def _wrapped(*args, **kwargs):
+        result = fn(*args, **kwargs)
+        try:
+            from agent.transport import notify
+            from agent.transport.context import canvas_data
+            from agent.transport.runtime_ctx import get_run_ctx
+
+            ctx = get_run_ctx()
+            uid = ctx.get("user_id")
+            tid = ctx.get("thread_id")
+            if uid and tid:
+                await notify.send_to_user(
+                    uid,
+                    {"type": "canvas_updated", "thread_id": tid, "canvas": canvas_data(tid, user_id=uid)},
+                    fallback_ws=ctx.get("ws"),
+                )
+        except Exception:  # noqa: BLE001 — 增量推送绝不破坏工具本身
+            pass
+        return result
+
+    return _wrapped
+
+
 def create_director_agent(
     checkpointer=None,
     interrupt_on: dict | None = "default",
@@ -100,9 +134,9 @@ def create_director_agent(
         model=model,
         system_prompt=system_prompt,
         tools=[
-            create_canvas_node,
-            update_canvas_node,
-            delete_canvas_node,
+            _with_canvas_push(create_canvas_node),
+            _with_canvas_push(update_canvas_node),
+            _with_canvas_push(delete_canvas_node),
             # get_canvas_state — Director 自己也要能读画布(判定「画布创作模式 vs 卡片栈改写」,
             # 见 director.md §0.6;此前只 canvas-manager 子 agent 有,Director 调不到 → 路由判定
             # 无法执行)。读单节点也能拿 node_id/description 给 update_canvas_node 用。

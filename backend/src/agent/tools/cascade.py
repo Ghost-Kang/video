@@ -440,6 +440,18 @@ async def cascade_rewrite(analysis_id: str, niche: str, topic: str = "") -> dict
             )
         except Exception:
             canvas_node_updated = None
+        if canvas_node_updated:
+            # 桥写入成功 → 立刻推增量画布帧,用户不用等整个 Director turn 结束才看到策划书。
+            try:
+                from agent.transport.context import canvas_data
+
+                await _push_ws({
+                    "type": "canvas_updated",
+                    "thread_id": thread_id,
+                    "canvas": canvas_data(thread_id, user_id=user_id),
+                })
+            except Exception:
+                pass
 
     return {
         "rewrite_id": result.rewrite_id,

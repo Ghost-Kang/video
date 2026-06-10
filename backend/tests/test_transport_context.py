@@ -166,3 +166,38 @@ class TestSendJsonLock:
             assert events[i][0] == "start", f"events[{i}] = {events[i]}"
             assert events[i + 1][0] == "end", f"events[{i+1}] = {events[i+1]}"
             assert events[i][1] == events[i + 1][1], "send not atomic"
+
+
+# ── 2026-06-10 真用户事故修复:canvas_data 显式 user_id ─────────────────────────
+
+
+class TestCanvasDataUserScoped:
+    @pytest.fixture(autouse=True)
+    def _reset_user_ctx(self):
+        # user ContextVar 是进程级状态,泄漏会污染后续测试(image_pipeline 的
+        # get_ref_urls 等按默认 "default" 取数)— 测试后必须复位。
+        yield
+        canvas_tools.set_user_id("default")
+
+    def test_explicit_user_id_overrides_contextvar(self):
+        """worker 上下文里 user ContextVar 是 "default" — 显式传 user_id 必须查到
+        真实用户的节点(此前 notify_user 推给真实用户的快照永远是 None)。"""
+        tid = _unique_thread()
+        canvas_tools.set_user_id("real-user")
+        canvas_tools.set_thread_id(tid)
+        canvas_tools.create_canvas_node("script", "策划书", "内容")
+
+        # 模拟 worker 上下文:user ContextVar 退回 default
+        canvas_tools.set_user_id("default")
+        assert canvas_data(tid) is None  # 旧行为:default 视角查不到(这就是事故)
+        scoped = canvas_data(tid, user_id="real-user")
+        assert scoped is not None and len(scoped["nodes"]) == 1
+
+    def test_default_arg_keeps_contextvar_behavior(self):
+        """不传 user_id = 旧行为(WS 连接路径 auth 时已 set,不受影响)。"""
+        tid = _unique_thread()
+        canvas_tools.set_user_id("ws-user")
+        canvas_tools.set_thread_id(tid)
+        canvas_tools.create_canvas_node("script", "n", "d")
+        result = canvas_data(tid)
+        assert result is not None and len(result["nodes"]) == 1
