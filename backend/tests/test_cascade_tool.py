@@ -31,7 +31,9 @@ from agent.cascade.contract import (
 )
 from agent.cascade.failures import FailureCode, HardFailure
 from agent.cascade.rewrite_service import RewriteResult, RewriteShot
+from agent.tools import canvas as canvas_svc
 from agent.tools import cascade as cascade_tools
+from agent.tools.canvas_persistence import db as canvas_db
 from agent.tools.cascade import (
     cascade_analyze,
     cascade_ask,
@@ -39,6 +41,15 @@ from agent.tools.cascade import (
     cascade_rewrite,
 )
 from agent.transport.runtime_ctx import set_run_ctx
+
+
+@pytest.fixture(autouse=True)
+def _isolated_dbs(tmp_path, monkeypatch):
+    """画布桥让 cascade_rewrite 读写 canvas.db — 每个测试独立 DB,避免桥碰到
+    开发库残留节点(顺带隔离 record_rewrite 落的 cascade.db)。同 test_canvas.py 模式。"""
+    monkeypatch.setenv("CASCADE_DB_PATH", str(tmp_path / "cascade.db"))
+    canvas_db._MIGRATED_PATHS.discard(str(tmp_path / "canvas.db"))
+    yield
 
 
 # ---------- fakes ----------
@@ -794,3 +805,107 @@ class TestCascadeAsk:
 
         # WS push echoes the question but bounded at 200.
         assert len(ws.sent[0]["question"]) == 200
+
+
+# ---------- cascade_rewrite 画布确定性桥(2026-06-09 真用户卡死修复) ----------
+
+
+class TestCascadeRewriteCanvasBridge:
+    """画布路由此前纯靠 director.md prompt 自觉;真实用户事故里 Director 跳过
+    get_canvas_state 直接调 cascade_rewrite → 改写只推卡片栈帧,画布「我的策划书」
+    节点 word_count=0,用户卡死。桥把"改写落进画布"变成代码保证。"""
+
+    def _install(self, monkeypatch):
+        async def fake_service(*, analysis_id, niche, user_id, run_id=None, topic=None):
+            return _fake_rewrite_result()
+
+        monkeypatch.setattr(cascade_tools, "request_rewrite", fake_service)
+
+    def _rewrite(self):
+        return asyncio.run(cascade_rewrite.ainvoke({
+            "analysis_id": "ana_fake",
+            "niche": "generic",
+        }))
+
+    def test_fills_empty_plan_anchor_and_returns_node_id(self, monkeypatch):
+        ws = FakeWS()
+        set_run_ctx({"user_id": "u1", "thread_id": "t-bridge", "ws": ws, "run_id": None})
+        canvas_svc.set_user_id("u1")
+        canvas_svc.set_thread_id("t-bridge")
+        # seed_canvas 的两个节点:分析参考(非空)+ 创作锚(空)
+        ref = canvas_svc.create_canvas_node("script", "📊 这条为什么火", "主题:xxx\n\n为什么火:yyy")
+        anchor = canvas_svc.create_canvas_node("script", "✍️ 我的策划书", "")
+        self._install(monkeypatch)
+
+        result = self._rewrite()
+
+        assert result["canvas_node_updated"] == anchor["id"]
+        filled = canvas_svc._load_node(anchor["id"])
+        assert filled["description"].startswith("### 改写脚本")
+        assert filled["result"]["content"].startswith("### 改写脚本")
+        assert filled["result"]["word_count"] > 0
+        assert filled["node_status"] == "reviewing"
+        # 分析参考节点不被覆盖
+        ref_after = canvas_svc._load_node(ref["id"])
+        assert ref_after["description"].startswith("主题:xxx")
+
+    def test_no_canvas_nodes_card_stack_behavior_unchanged(self, monkeypatch):
+        ws = FakeWS()
+        set_run_ctx({"user_id": "u1", "thread_id": "t-cardstack", "ws": ws, "run_id": None})
+        canvas_svc.set_user_id("u1")
+        canvas_svc.set_thread_id("t-cardstack")
+        self._install(monkeypatch)
+
+        result = self._rewrite()
+
+        assert result["canvas_node_updated"] is None
+        assert result["rewrite_id"] == "rw_fake"  # 改写本身不受影响
+        # 卡片栈帧照常推
+        assert ws.sent[0]["type"] == "rewrite_returned"
+
+    def test_confirmed_plan_node_is_not_overwritten(self, monkeypatch):
+        ws = FakeWS()
+        set_run_ctx({"user_id": "u1", "thread_id": "t-confirmed", "ws": ws, "run_id": None})
+        canvas_svc.set_user_id("u1")
+        canvas_svc.set_thread_id("t-confirmed")
+        node = canvas_svc.create_canvas_node("script", "✍️ 我的策划书", "已确认的旧策划书")
+        canvas_svc.approve_node(node["id"])
+        self._install(monkeypatch)
+
+        result = self._rewrite()
+
+        assert result["canvas_node_updated"] is None
+        after = canvas_svc._load_node(node["id"])
+        assert after["description"] == "已确认的旧策划书"
+        assert after["node_status"] == "confirmed"
+
+    def test_reviewing_nonempty_plan_node_gets_rewritten(self, monkeypatch):
+        # 用户给了新方向重写:策划书已有内容但还在 reviewing → 允许覆盖。
+        ws = FakeWS()
+        set_run_ctx({"user_id": "u1", "thread_id": "t-redo", "ws": ws, "run_id": None})
+        canvas_svc.set_user_id("u1")
+        canvas_svc.set_thread_id("t-redo")
+        node = canvas_svc.create_canvas_node("script", "✍️ 我的策划书", "第一版草稿")
+        self._install(monkeypatch)
+
+        result = self._rewrite()
+
+        assert result["canvas_node_updated"] == node["id"]
+        after = canvas_svc._load_node(node["id"])
+        assert after["description"].startswith("### 改写脚本")
+
+    def test_bridge_failure_does_not_break_rewrite(self, monkeypatch):
+        ws = FakeWS()
+        set_run_ctx({"user_id": "u1", "thread_id": "t-broken", "ws": ws, "run_id": None})
+        self._install(monkeypatch)
+
+        def boom(user_id, thread_id, script_markdown):
+            raise RuntimeError("canvas db unavailable")
+
+        monkeypatch.setattr(cascade_tools, "_fill_canvas_script_node", boom)
+
+        result = self._rewrite()
+
+        assert "error" not in result
+        assert result["rewrite_id"] == "rw_fake"
+        assert result["canvas_node_updated"] is None
