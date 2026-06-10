@@ -2,6 +2,7 @@ import { StrictMode, Suspense, lazy, useState, useCallback, useEffect } from "re
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
+import { syncAnonIdCookie } from "./hooks/useConsent";
 import { Login } from "./components/Login";
 import { Landing } from "./pages/Landing";
 import { InviteCode, readInviteCode } from "./pages/InviteCode";
@@ -170,6 +171,10 @@ function AppRoutes() {
     </Suspense>
   );
 }
+
+// P3(2026-06-10):app 启动即同步匿名身份 cookie 备份(存量用户续期 / 清
+// localStorage 后从 cookie 恢复)。任何路由都生效,不依赖走过同意门。
+syncAnonIdCookie();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

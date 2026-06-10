@@ -49,6 +49,29 @@ function writeAnonCookie(key: string, value: string): void {
   }
 }
 
+export function syncAnonIdCookie(): void {
+  // P3 关键补丁:anonId() 只在「点同意」时跑 —— 存量用户(同意记录已存)永远
+  // 不经过它,cookie 备份压根不存在,等清缓存时已无从恢复。app 启动时(main.tsx)
+  // 调一次:已有身份 → 续期 cookie;localStorage 空但 cookie 在 → 回填恢复。
+  try {
+    const KEY = "openrhtv_anon_id";
+    let id = window.localStorage.getItem(KEY);
+    if (!id) {
+      id = readAnonCookie(KEY);
+      if (id) {
+        window.localStorage.setItem(KEY, id);
+        // rhtv_user(auth 实际用的键)一并恢复,旧会话/画布立即可见。
+        if (!window.localStorage.getItem("rhtv_user")) {
+          window.localStorage.setItem("rhtv_user", id);
+        }
+      }
+    }
+    if (id) writeAnonCookie(KEY, id);
+  } catch {
+    /* noop — 纯加固,绝不阻塞启动 */
+  }
+}
+
 function anonId(): string {
   // P3 加固(2026-06-10 审计):匿名身份此前仅存 localStorage —— 清浏览器数据 =
   // 身份永久丢失 = 所有画布/会话静默变空白(数据按 user+thread 双键存在后端,

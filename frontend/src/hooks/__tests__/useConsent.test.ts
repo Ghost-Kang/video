@@ -112,3 +112,34 @@ describe("anonId cookie 加固(P3 2026-06-10)", () => {
     expect(window.localStorage.getItem("rhtv_user")).toBe(original);
   });
 });
+
+describe("syncAnonIdCookie(app 启动同步,存量用户保护)", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    document.cookie.split(";").forEach((c) => {
+      const k = c.split("=")[0]?.trim();
+      if (k) document.cookie = `${k}=; max-age=0; path=/`;
+    });
+  });
+
+  it("存量用户(只有 localStorage 身份)启动即补写 cookie", async () => {
+    const { syncAnonIdCookie } = await import("../useConsent");
+    window.localStorage.setItem("openrhtv_anon_id", "anon-legacy1");
+    syncAnonIdCookie();
+    expect(document.cookie).toContain("openrhtv_anon_id=anon-legacy1");
+  });
+
+  it("localStorage 被清但 cookie 在 → 启动即恢复身份(含 rhtv_user)", async () => {
+    const { syncAnonIdCookie } = await import("../useConsent");
+    document.cookie = "openrhtv_anon_id=anon-fromck1; path=/";
+    syncAnonIdCookie();
+    expect(window.localStorage.getItem("openrhtv_anon_id")).toBe("anon-fromck1");
+    expect(window.localStorage.getItem("rhtv_user")).toBe("anon-fromck1");
+  });
+
+  it("无任何身份时不乱造(留给同意门的 anonId 生成)", async () => {
+    const { syncAnonIdCookie } = await import("../useConsent");
+    syncAnonIdCookie();
+    expect(window.localStorage.getItem("openrhtv_anon_id")).toBeNull();
+  });
+});
