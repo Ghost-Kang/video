@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ImageIcon } from "lucide-react";
 import type { Scene } from "../../types/cascade";
 import { COPY } from "../../lib/cardCopy";
@@ -22,9 +22,13 @@ export function ShotCard({ scene, onGenerateFirstFrame }: Props) {
   );
 
   // Reset the local spinner once the WS frame patches the URL in.
-  useEffect(() => {
+  // render 期 adjust 模式(官方「adjust state when props change」),替代 effect 里
+  // setState(react-hooks/set-state-in-effect)— 同一渲染内收起 spinner,无多余一帧。
+  const [prevFrameUrl, setPrevFrameUrl] = useState(scene.first_frame_url);
+  if (scene.first_frame_url !== prevFrameUrl) {
+    setPrevFrameUrl(scene.first_frame_url);
     if (scene.first_frame_url) setGenerating(false);
-  }, [scene.first_frame_url]);
+  }
 
   const handlePick = (anchor: Anchor) => {
     setPicked(anchor);

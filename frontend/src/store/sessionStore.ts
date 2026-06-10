@@ -81,8 +81,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   deleteSession: (threadId) =>
     set((state) => {
       const sessions = state.sessions.filter((id) => id !== threadId);
-      const { [threadId]: _deletedName, ...names } = state.names;
-      const { [threadId]: _deletedMeta, ...meta } = state.meta;
+      // rest 解构会触发 no-unused-vars(_deletedName/_deletedMeta);显式拷贝+delete 等价。
+      const names = { ...state.names };
+      delete names[threadId];
+      const meta = { ...state.meta };
+      delete meta[threadId];
       saveJSON(lsKey("sessions", state.userId), sessions);
       saveJSON(lsKey("names", state.userId), names);
       saveJSON(lsKey("meta", state.userId), meta);

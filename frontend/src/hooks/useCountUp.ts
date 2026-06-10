@@ -8,27 +8,29 @@ import { useEffect, useRef, useState } from "react";
  * IntersectionObserver is unavailable (jsdom/tests, old browsers) — mirrors
  * useInView so callers gated on inView render the real number in tests.
  */
+function prefersInstant(): boolean {
+  const reduce =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const noRaf =
+    typeof requestAnimationFrame === "undefined" ||
+    typeof IntersectionObserver === "undefined";
+  return reduce || noRaf;
+}
+
 export function useCountUp(
   target: number,
   { start = true, duration = 900, decimals = 0 }: { start?: boolean; duration?: number; decimals?: number } = {},
 ): number {
   const [value, setValue] = useState(0);
   const raf = useRef<number | null>(null);
+  // reduced-motion / 无 rAF(jsdom)→ 终值在 return 处直接派生,不进 effect setState
+  // (react-hooks/set-state-in-effect);动画路径才需要状态。
+  const instant = prefersInstant();
 
   useEffect(() => {
-    if (!start) return;
-
-    const reduce =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const noRaf =
-      typeof requestAnimationFrame === "undefined" ||
-      typeof IntersectionObserver === "undefined";
-    if (reduce || noRaf) {
-      setValue(target);
-      return;
-    }
+    if (!start || instant) return;
 
     let t0: number | null = null;
     const tick = (t: number) => {
@@ -43,8 +45,9 @@ export function useCountUp(
     return () => {
       if (raf.current !== null) cancelAnimationFrame(raf.current);
     };
-  }, [target, start, duration]);
+  }, [target, start, duration, instant]);
 
   const factor = 10 ** decimals;
-  return Math.round(value * factor) / factor;
+  const shown = instant && start ? target : value;
+  return Math.round(shown * factor) / factor;
 }

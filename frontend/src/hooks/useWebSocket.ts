@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useEffect, useState } from "react";
 import { useToastStore } from "../store/toastStore";
 import { useWSStore } from "../store/wsStore";
 import type { WSCommand, WSEvent } from "../types/ws";
@@ -36,6 +36,21 @@ export function useWebSocket(userId: string, onMessage: Handler) {
   // 与 retryRef 双写 — retryRef 是 onopen 里同步读的真值,reconnectAttempt 是
   // React state 给 UI render 用,避免直接订阅 ref。
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+
+  // connect ⇄ scheduleReconnect 互相引用(onclose → 重连 → connect)。原代码
+  // scheduleReconnect 声明在 connect 之后、又被 connect 闭包捕获(TDZ 之外能跑,
+  // 但 react-hooks/immutability 判定「声明前访问,后续更新不会反映」)。用 ref
+  // 间接化:scheduleReconnect 先声明、经 connectRef 调到**最新的** connect。
+  const connectRef = useRef<() => void>(() => {});
+
+  const scheduleReconnect = useCallback(() => {
+    const attempt = retryRef.current + 1;
+    retryRef.current = attempt;
+    setReconnectAttempt(attempt);
+    const delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, attempt - 1), RECONNECT_MAX_MS);
+    console.log(`[WS] ${delay / 1000}s 后重连 (第${attempt}次)`);
+    timerRef.current = setTimeout(() => connectRef.current(), delay);
+  }, []);
 
   const connect = useCallback(() => {
     if (timerRef.current) {
@@ -145,15 +160,11 @@ export function useWebSocket(userId: string, onMessage: Handler) {
       setConnecting(false);
       // onerror 通常后跟 onclose，由 onclose 统一触发重连
     };
-  }, [onMessage]);
+  }, [onMessage, scheduleReconnect]);
 
-  const scheduleReconnect = useCallback(() => {
-    const attempt = retryRef.current + 1;
-    retryRef.current = attempt;
-    setReconnectAttempt(attempt);
-    const delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, attempt - 1), RECONNECT_MAX_MS);
-    console.log(`[WS] ${delay / 1000}s 后重连 (第${attempt}次)`);
-    timerRef.current = setTimeout(() => connect(), delay);
+  // 重连定时器经 connectRef 取最新 connect(onMessage 变化后重建的那个)。
+  useEffect(() => {
+    connectRef.current = connect;
   }, [connect]);
 
   const sendCommand = useCallback(<T extends WSCommand>(payload: T) => {

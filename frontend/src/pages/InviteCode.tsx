@@ -1,6 +1,5 @@
 import { useState } from "react";
-
-const STORAGE_KEY = "openrhtv_invite_code";
+import { INVITE_CODE_STORAGE_KEY as STORAGE_KEY } from "../lib/inviteCode";
 
 interface Props {
   onAccept: (code: string) => void;
@@ -42,21 +41,21 @@ export function InviteCode({ onAccept }: Props) {
     // input and only the WS auth rejected a bad code afterward, briefly flashing
     // the main UI (and, pre-loop-breaker, trapping wrong codes like 'ee' in a
     // reconnect loop). Now a wrong code is blocked at the door with a message.
-    let valid = false;
-    try {
-      const res = await fetch(`/api/invite/verify?code=${encodeURIComponent(code)}`);
-      if (res.ok) {
-        const data = await res.json();
-        valid = data?.valid === true;
-      } else {
+    const valid = await (async () => {
+      try {
+        const res = await fetch(`/api/invite/verify?code=${encodeURIComponent(code)}`);
+        if (res.ok) {
+          const data = await res.json();
+          return data?.valid === true;
+        }
         // Server reachable but errored — don't hard-block; fall back to letting
         // WS auth be the source of truth (it will reject if truly invalid).
-        valid = true;
+        return true;
+      } catch {
+        // Network/offline: can't verify. Fall back to admitting; WS auth still gates.
+        return true;
       }
-    } catch {
-      // Network/offline: can't verify. Fall back to admitting; WS auth still gates.
-      valid = true;
-    }
+    })();
 
     if (!valid) {
       setError("邀请码不对,进不去。确认一下有没有多余空格,或找发码的人再要一个。");
@@ -118,14 +117,5 @@ export function InviteCode({ onAccept }: Props) {
   );
 }
 
-export function readInviteCode(): string | null {
-  try {
-    return (
-      localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY) || null
-    );
-  } catch {
-    return null;
-  }
-}
-
-export const INVITE_CODE_STORAGE_KEY = STORAGE_KEY;
+// readInviteCode / INVITE_CODE_STORAGE_KEY 已拆到 ../lib/inviteCode(react-refresh:
+// 组件文件只导出组件)。

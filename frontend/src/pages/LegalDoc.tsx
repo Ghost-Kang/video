@@ -26,13 +26,13 @@ export function LegalDoc() {
   const title = DOC_TITLE[slug] ?? "Legal";
   const eyebrow = DOC_EYEBROW[slug] ?? "Legal · v0";
   const [content, setContent] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  // 「未知 slug」在 render 期就能判定 — 直接派生,不进 effect setState
+  // (react-hooks/set-state-in-effect)。fetch 失败才是真正的外部状态。
+  const error = !filePath ? "未找到该文档" : fetchError;
 
   useEffect(() => {
-    if (!filePath) {
-      setError("未找到该文档");
-      return;
-    }
+    if (!filePath) return;
     let cancelled = false;
     fetch(filePath)
       .then((r) => {
@@ -43,7 +43,7 @@ export function LegalDoc() {
         if (!cancelled) setContent(text);
       })
       .catch((e) => {
-        if (!cancelled) setError(String(e));
+        if (!cancelled) setFetchError(String(e));
       });
     return () => {
       cancelled = true;

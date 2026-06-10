@@ -17,8 +17,6 @@ const CONSENT_KEY = "openrhtv_consent_v0";
 const THEME_KEY = "cascade_theme";
 const USER_KEY = "rhtv_user";
 
-const seedConsent = `JSON.stringify({ version: "v0", acceptedAt: new Date().toISOString() })`;
-
 test.beforeEach(async ({ page }) => {
   // 每个 test 前清掉 localStorage,保证隔离
   await page.addInitScript(() => {
