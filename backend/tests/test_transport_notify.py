@@ -142,3 +142,39 @@ class TestNotifyUser:
         notify_user("u_missing", "t1")
         captured = capsys.readouterr()
         assert "未连接" in captured.out and "u_missing" in captured.out
+
+
+# ── 2026-06-10 真用户事故修复:notify_user 快照必须按 user 查 ─────────────────────
+
+
+class TestNotifyUserCanvasScope:
+    def test_notify_user_passes_user_id_to_canvas_data(self, monkeypatch):
+        """worker 路径推 canvas_updated:canvas_data 必须收到显式 user_id,否则
+        真实用户(非 "default")的快照恒 None → 前端静默丢 → 生成完成永不可见。"""
+        captured: dict = {}
+
+        def fake_canvas_data(thread_id, user_id=None):
+            captured["thread_id"] = thread_id
+            captured["user_id"] = user_id
+            return {"nodes": {"n1": {}}, "edges": []}
+
+        monkeypatch.setattr("agent.transport.notify.canvas_data", fake_canvas_data)
+
+        class _WS:
+            def __init__(self):
+                self.sent = []
+
+            async def send(self, data):
+                self.sent.append(data)
+
+        ws = _WS()
+        register("real-user", ws)
+        try:
+            async def _run():
+                notify_user("real-user", "t-x")
+                await asyncio.sleep(0)  # 让 create_task 的 send_to_user 跑完
+
+            asyncio.run(_run())
+        finally:
+            unregister("real-user")
+        assert captured == {"thread_id": "t-x", "user_id": "real-user"}

@@ -395,3 +395,106 @@ def test_worker_cost_guard_refuses_before_submit(monkeypatch, tmp_path):
     assert submitted["called"] is False
     assert costs == []
     assert frames[-1]["type"] == "pro_run_failed"
+
+
+# ── 2026-06-10 审计修复:失败留痕 + partial 透传 + 记账/重试口径 ──────────────────
+
+
+def test_domestic_failure_reason_persisted_and_pushed(monkeypatch, tmp_path):
+    """节点失败原因必须留痕:DB error 列 + pro_run_failed 帧带首因(不再布尔化丢失)。"""
+    frames, costs = _setup(monkeypatch, tmp_path)
+
+    class _SeedFail:
+        async def generate(self, prompt, image_urls=None):
+            return {"error": "seedream down"}
+
+    monkeypatch.setattr("agent.tools.generation.SeedreamProvider", lambda: _SeedFail())
+    monkeypatch.setattr("agent.tools.video_generation.get_video_provider", lambda: _FakeVid())
+    run = _enqueue(graph=DOMESTIC_GRAPH, provider="domestic", cost=5.0)
+    asyncio.run(pipe.process_pro_run_task(run))
+    after = repo.get_pro_run("r1", user_id="u1", thread_id="t1")
+    assert after["status"] == "failed"
+    assert "seedream down" in (after["error"] or "")
+    failed_frame = [f for f in frames if f["type"] == "pro_run_failed"][-1]
+    assert "seedream down" in failed_frame["error"]
+
+
+def test_domestic_partial_done_carries_partial_errors(monkeypatch, tmp_path):
+    """部分分镜失败仍 done,但 done 帧带 partial_errors + DB error 列存摘要。"""
+    frames, costs = _setup(monkeypatch, tmp_path)
+
+    class _SeedHalf:
+        async def generate(self, prompt, image_urls=None):
+            if "好" in (prompt or ""):
+                return {"url": "https://img/ok.png"}
+            return {"error": "ARK rate limited"}
+
+    monkeypatch.setattr("agent.tools.generation.SeedreamProvider", lambda: _SeedHalf())
+    g = {
+        "version": 1,
+        "nodes": [
+            {"id": "p1", "type": "Prompt", "params": {"text": "好镜头"}},
+            {"id": "p2", "type": "Prompt", "params": {"text": "坏镜头"}},
+            {"id": "g1", "type": "Generate"},
+            {"id": "g2", "type": "Generate"},
+            {"id": "pv1", "type": "Preview", "params": {}},
+            {"id": "pv2", "type": "Preview", "params": {}},
+        ],
+        "edges": [
+            {"id": "1", "source": "p1", "sourceHandle": "text", "target": "g1", "targetHandle": "positive"},
+            {"id": "2", "source": "p2", "sourceHandle": "text", "target": "g2", "targetHandle": "positive"},
+            {"id": "3", "source": "g1", "sourceHandle": "image", "target": "pv1", "targetHandle": "image"},
+            {"id": "4", "source": "g2", "sourceHandle": "image", "target": "pv2", "targetHandle": "image"},
+        ],
+    }
+    run = _enqueue(graph=g, provider="domestic", cost=3.0)
+    asyncio.run(pipe.process_pro_run_task(run))
+    after = repo.get_pro_run("r1", user_id="u1", thread_id="t1")
+    assert after["status"] == "done"  # 有产物
+    assert "ARK rate limited" in (after["error"] or "")  # 摘要持久化
+    done_frame = [f for f in frames if f["type"] == "pro_run_done"][-1]
+    assert done_frame["outputs"] == ["https://img/ok.png"]
+    assert any("ARK rate limited" in e for e in done_frame["partial_errors"])
+
+
+def test_comfyui_retry_does_not_rerecord_cost(monkeypatch, tmp_path):
+    """retry(attempt_count>0)重提交不再重复记全额 cost_est(防把失败重试灌爆日闸)。"""
+    frames, costs = _setup(monkeypatch, tmp_path)
+    run = _enqueue(cost=4.5)
+    run["attempt_count"] = 1  # 模拟第二次 claim(repo 在 claim 时已自增)
+    asyncio.run(pipe.process_pro_run_task(run))
+    after = repo.get_pro_run("r1", user_id="u1", thread_id="t1")
+    assert after["status"] == "done"  # fixture provider 正常完成
+    assert costs == []  # 非首跑 → 不重复记账
+
+
+def test_worker_domestic_hard_exception_fails_no_retry(monkeypatch, tmp_path):
+    """domestic 硬异常不重试(重跑会重复扣已成节点)且必须推 pro_run_failed 帧。"""
+    frames, costs = _setup(monkeypatch, tmp_path)
+    from agent.workers import generation_worker as gw
+
+    async def _boom(run):
+        raise RuntimeError("network blip")
+
+    monkeypatch.setattr(gw, "process_pro_run_task", _boom)
+    run = _enqueue(provider="domestic")
+    asyncio.run(gw._run_pro_with_sem(asyncio.Semaphore(1), run))
+    after = repo.get_pro_run("r1", user_id="u1", thread_id="t1")
+    assert after["status"] == "failed"  # 不退回 pending
+    failed = [f for f in frames if f["type"] == "pro_run_failed"]
+    assert failed and "network blip" in failed[-1]["error"]
+
+
+def test_worker_comfyui_hard_exception_still_retries(monkeypatch, tmp_path):
+    """comfyui 整图路径保留 generic retry(re-poll 不重复扣费)。"""
+    frames, costs = _setup(monkeypatch, tmp_path)
+    from agent.workers import generation_worker as gw
+
+    async def _boom(run):
+        raise RuntimeError("transient")
+
+    monkeypatch.setattr(gw, "process_pro_run_task", _boom)
+    run = _enqueue(provider="selfhosted")
+    asyncio.run(gw._run_pro_with_sem(asyncio.Semaphore(1), run))
+    after = repo.get_pro_run("r1", user_id="u1", thread_id="t1")
+    assert after["status"] == "pending"  # 已调度重试

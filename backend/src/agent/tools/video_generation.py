@@ -52,6 +52,9 @@ class SeedanceProvider:
             print(f"[Seedance提交] task_id={result.id} model={ARK_VIDEO_MODEL} duration={duration}s resolution={resolution} ratio={ratio} audio={generate_audio} images={len(image_urls or [])} videos={len(video_urls or [])}")
             return {"task_id": result.id}
         except Exception as e:
+            # 2026-06-10 审计:此前静默返回 error dict、零日志 —— 配合调用方把 error
+            # 布尔化,5/7 分镜的失败原因全部丢失,无从排查。失败必须落日志。
+            print(f"[Seedance提交失败] model={ARK_VIDEO_MODEL} duration={duration}s err={e}")
             return {"error": f"Seedance 提交失败: {e}"}
 
     async def poll(self, task_id: str, interval: int = 30, timeout: int = 900) -> dict:

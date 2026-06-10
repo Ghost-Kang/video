@@ -106,7 +106,15 @@ async def _pro_run_worker() -> None:
 
 
 async def _run_pro_with_sem(sem: asyncio.Semaphore, run: dict) -> None:
-    """semaphore-bounded 单 run 执行。pipeline 自处理预期错误;这里兜底未预期异常 → 重试/失败。"""
+    """semaphore-bounded 单 run 执行。pipeline 自处理预期错误;这里兜底未预期异常。
+
+    2026-06-10 审计:domestic(境内 per-node)run 的硬异常**不重试** —— 重跑会把已
+    成功的节点(图/视频)整批重新生成、重复扣费(pipeline 385 行口径如此,此前这条
+    兜底路径却 generic retry,自相矛盾)。comfyui 整图路径保留 retry(re-poll 不重复
+    扣费)。失败必须推 pro_run_failed 帧 —— 此前这里不推,前端永挂「running」。
+    """
+    from agent.workers.pro_run_pipeline import _COMFYUI_PROVIDERS, _push
+
     async with sem:
         rid = run.get("run_id", "?")
         uid = run.get("user_id", "")
@@ -115,9 +123,16 @@ async def _run_pro_with_sem(sem: asyncio.Semaphore, run: dict) -> None:
             await process_pro_run_task(run)
         except Exception as e:  # noqa: BLE001
             print(f"[Worker:pro_run] 任务异常 run={rid[:16]} error={e}")
-            retried = pro_runs_repo.schedule_pro_run_retry(rid, str(e), user_id=uid, thread_id=tid)
+            is_comfyui = (run.get("provider") or "domestic").lower() in _COMFYUI_PROVIDERS
+            retried = False
+            if is_comfyui:
+                retried = pro_runs_repo.schedule_pro_run_retry(rid, str(e), user_id=uid, thread_id=tid)
             if not retried:
                 pro_runs_repo.update_pro_run_state(rid, "failed", user_id=uid, thread_id=tid, error=str(e))
+                try:
+                    await _push(uid, {"type": "pro_run_failed", "thread_id": tid, "run_id": rid, "error": f"执行中断: {str(e)[:120]}"})
+                except Exception:  # noqa: BLE001
+                    pass
 
 
 # ---------- shared loop body ----------

@@ -122,6 +122,8 @@ export interface ProRunDoneEvent {
   thread_id: string;
   run_id: string;
   outputs: string[];
+  /** 部分分镜失败/后期透传的留痕(2026-06-10 审计:不能再让 7 分镜只出 2 个无声无息) */
+  partial_errors?: string[];
 }
 
 export interface ProRunFailedEvent {

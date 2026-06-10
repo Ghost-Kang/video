@@ -98,6 +98,15 @@ export default function ProCanvas({ userId }: { userId: string }) {
         if (ev.status === "running" || ev.status === "submitting") setStatus(editor, pred, "running");
         else if (ev.status === "cancelled") setStatus(editor, pred, "idle");
       } else if (ev.type === "pro_run_done") {
+        if (ev.partial_errors?.length) {
+          // 部分分镜失败也标 done(产物可用),但必须告诉用户「这是部分成片」。
+          useToastStore.getState().push({
+            kind: "error",
+            title: `有 ${ev.partial_errors.length} 个节点未完成`,
+            body: ev.partial_errors.slice(0, 3).join("\n"),
+            ttlMs: 12000,
+          });
+        }
         if (regen) {
           // 只更新目标节点的产物 + 给下游标脏(用旧产物了)。
           const url = ev.outputs[0];
