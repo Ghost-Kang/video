@@ -10,11 +10,24 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **2026-10-11 routine blocked — upstream not reachable (credentials/scope)**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-10-11T02:10Z — routine BLOCKED: upstream fetch failed
+
+- Reason: all upstream access methods unavailable in this cloud session
+  - `git fetch upstream` → HTTPS requires credentials (not configured)
+  - GitHub MCP → scoped to `ghost-kang/video` only; `waHhhHao/OpenRHTV` denied
+  - `gh api` → GH_TOKEN in session is invalid
+  - GitHub REST API via WebFetch → HTTP 403 (proxy blocks unauthenticated requests)
+  - `add_repo` tool not available in this session
+- last_evaluated_sha unchanged: `9bea52c`
+- Action required: reconnect GitHub token or add `waHhhHao/OpenRHTV` to session scope
+  so the routine can fetch upstream commits.
+- Branch `upstream-sync/20261011T0210Z` pushed with this state-file update only (no PR).
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
