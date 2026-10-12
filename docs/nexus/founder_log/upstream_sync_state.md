@@ -10,11 +10,22 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **routine blocked — upstream repo unreachable (2026-10-12)**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-10-12T02:00:00Z — routine fired, upstream unreachable
+
+- All three access paths to `waHhhHao/OpenRHTV` failed:
+  1. GitHub MCP server: session scoped to Ghost-Kang/video only — access denied
+  2. `gh` CLI: GH_TOKEN in environment is invalid (authentication failure)
+  3. GitHub REST API (public): 403 Forbidden — repo may be private or rate-limited
+- `last_evaluated_sha` unchanged: `9bea52c`
+- **Action required**: Founder must reconnect GitHub credentials or re-scope the session to include waHhhHao/OpenRHTV before this routine can run. See https://claude.ai/connect-github?org=9d3c77b3-893d-4a19-962d-f7a63c30564d to reconnect the GitHub account.
+
+---
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
