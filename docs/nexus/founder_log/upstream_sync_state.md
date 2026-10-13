@@ -16,6 +16,21 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-10-13T02:00:00Z — routine fired, upstream fetch failed (access denied)
+
+- Routine `upstream-sync-watch` fired at scheduled time.
+- `git fetch upstream main` failed: no credentials available for `waHhhHao/OpenRHTV`.
+  Session is scoped to `ghost-kang/video` only; HTTPS fetch requires GitHub auth
+  and the GitHub MCP is also restricted to `ghost-kang/video`.
+- last_evaluated_sha unchanged: `9bea52c`
+- **Action required**: Founder must grant the upstream-sync routine read access to
+  `waHhhHao/OpenRHTV`. Options:
+  1. Add `waHhhHao/OpenRHTV` to the session's GitHub app authorized repos, OR
+  2. Store a PAT with read:repo access in the session environment (e.g. `GH_UPSTREAM_TOKEN`)
+     so the routine can configure `git remote set-url upstream https://${GH_UPSTREAM_TOKEN}@github.com/waHhhHao/OpenRHTV.git`
+  3. If `waHhhHao/OpenRHTV` is public, check if any policy is blocking unauthenticated
+     HTTPS clones from this session's proxy environment.
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
