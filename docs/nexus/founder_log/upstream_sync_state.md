@@ -10,11 +10,26 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **routine blocked — upstream fetch failed 2026-10-14**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-10-14T02:12:11Z — BLOCKED: upstream fetch access denied
+
+- Routine fired at 02:00 UTC as scheduled.
+- `git fetch upstream main` failed: GitHub token in session is invalid for git HTTPS operations
+  (token length 14 chars — not a valid PAT or fine-grained token).
+- `gh` CLI and GitHub MCP are scoped to `ghost-kang/video` only; cannot read `waHhhHao/OpenRHTV`.
+- **No commits evaluated. State unchanged (last_evaluated_sha stays at `9bea52c`).**
+- **Action required from founder**: attach a valid GitHub read token for `waHhhHao/OpenRHTV`
+  to this scheduled session so `git fetch` can authenticate. Options:
+  1. Add `GH_TOKEN` or `GITHUB_TOKEN` env var in the session/routine config pointing to a PAT
+     with `repo:read` scope on `waHhhHao/OpenRHTV`.
+  2. Grant the Claude GitHub App access to `waHhhHao/OpenRHTV` (if that org is separate,
+     the owner must install the app there).
+  3. Run the sync manually: `git fetch upstream main && git log 9bea52c..upstream/main --oneline`.
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
