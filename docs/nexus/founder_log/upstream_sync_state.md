@@ -16,6 +16,15 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-10-15T02:11Z — BLOCKED (0 evaluated)
+
+- Routine fired but could NOT reach upstream `waHhhHao/OpenRHTV`.
+- Session scope restricted to `ghost-kang/video` only; proxy denied all upstream reads.
+- `add_repo` tool not available; no path to expand scope from scheduled context.
+- `last_evaluated_sha` unchanged (`9bea52c`). Next run retries from same anchor.
+- Failure detail: `docs/nexus/founder_log/upstream_sync_access_failure_2026-10-15.md`
+- **Founder action required**: add `waHhhHao/OpenRHTV` (read) to the session's repo scope.
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
