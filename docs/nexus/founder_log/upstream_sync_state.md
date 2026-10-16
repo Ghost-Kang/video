@@ -16,6 +16,14 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-10-16T02:00:00Z — routine fired; FAILED (upstream access denied)
+
+- `git fetch upstream main` failed: HTTPS auth credentials not injected for waHhhHao/OpenRHTV
+- GitHub MCP access also denied: session scope is ghost-kang/video only, waHhhHao/OpenRHTV not configured
+- gh CLI token invalid (GH_TOKEN=proxy-injected placeholder)
+- **No state change made.** last_evaluated_sha remains 9bea52c.
+- **Action required**: Add waHhhHao/OpenRHTV to the session's MCP GitHub scope, OR grant a valid GITHUB_TOKEN with read access to that repo. See https://code.claude.com/docs/en/claude-code-on-the-web for session configuration.
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
