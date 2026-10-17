@@ -16,6 +16,15 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-10-17T02:00:00Z — BLOCKED: upstream fetch denied by network policy
+
+- Routine fired on schedule (daily 02:00 UTC).
+- **Direct HTTPS to github.com blocked**: `git fetch upstream main` returned HTTP 403 from egress proxy.
+- **MCP GitHub tools scoped to ghost-kang/video only**: `mcp__github__list_commits` on `waHhhHao/OpenRHTV` denied ("repository not configured for this session").
+- `add_repo` tool not available in this session to expand scope.
+- **No evaluation performed**; `last_evaluated_sha` unchanged at `9bea52c`.
+- **Action required**: founder must either (a) add `waHhhHao/OpenRHTV` to this session's allowed GitHub repos, or (b) manually run the sync. The routine cannot proceed until upstream is reachable.
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
