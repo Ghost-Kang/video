@@ -16,6 +16,17 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-10-18T02:08Z — BLOCKED: upstream repo inaccessible from session
+
+- Routine fired at scheduled time (02:00 UTC daily).
+- `git fetch upstream main` failed: GH_TOKEN in environment is invalid.
+- GitHub MCP and gh CLI proxy both restricted to `ghost-kang/video` only; `waHhhHao/OpenRHTV` is not in allowed-repos for this session.
+- `add_repo` tool not available in this session to self-remediate.
+- **No commits evaluated. last_evaluated_sha unchanged (`9bea52c`).**
+- Action required: founder must add `waHhhHao/OpenRHTV` as a readable repo in the cloud session config (https://code.claude.com/docs/en/claude-code-on-the-web), then re-trigger or wait for next daily fire.
+
+
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
