@@ -16,6 +16,13 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-10-19T02:00:00Z — automated run BLOCKED (network policy)
+
+- `git fetch upstream main` returned: "could not read Username for 'https://github.com': terminal prompts disabled"
+- The cloud execution environment's network policy blocks unauthenticated HTTPS to github.com; the upstream repo (waHhhHao/OpenRHTV) is a different repo than the session-scoped GitHub MCP connection (ghost-kang/video), so MCP cannot read it either.
+- **No commits evaluated. last_evaluated_sha unchanged.**
+- **Action required**: founder must either (a) add a GitHub token to the session environment (GITHUB_TOKEN or git credential), or (b) add `waHhhHao/OpenRHTV` to the MCP session's allowed repo list so the routine can read upstream commits via GitHub API.
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
