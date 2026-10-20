@@ -10,11 +10,25 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ❌ **routine blocked — upstream access unavailable (2026-10-20T02:00Z)**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-10-20T02:00:00Z — routine run BLOCKED: upstream repo access unavailable
+
+- All upstream access methods failed:
+  - `git fetch upstream main` → fatal: credential.interactive=false (no HTTPS token for waHhhHao/OpenRHTV)
+  - GitHub MCP session is scoped to ghost-kang/video only; cannot read waHhhHao/OpenRHTV
+  - `gh` CLI → GH_TOKEN is invalid
+  - GitHub REST API → 403 Forbidden (repo may be private, or proxy blocks unauthenticated calls)
+- last_evaluated_sha unchanged: 9bea52c
+- **Action required**: founder must either:
+  1. Add `UPSTREAM_GITHUB_TOKEN` env var with a PAT that has read access to waHhhHao/OpenRHTV, OR
+  2. Grant this cloud session access to waHhhHao/OpenRHTV (via GitHub App or org permissions), OR
+  3. Grant the gh CLI a valid token (`GH_TOKEN` env var in session config)
+- Until resolved, the routine cannot evaluate upstream commits.
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
