@@ -10,11 +10,20 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **sync blocked 2026-10-21 — network policy denied access to upstream repo**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-10-21T02:09Z — routine run BLOCKED (network policy)
+
+- Routine fired as scheduled at 02:00 UTC.
+- Added upstream remote `https://github.com/waHhhHao/OpenRHTV`, attempted `git fetch upstream main`.
+- Proxy returned HTTP 403 for `github.com/waHhhHao/OpenRHTV` — session network policy only permits `ghost-kang/video`.
+- MCP GitHub tools are also scoped to `ghost-kang/video` only; no alternate fetch path available.
+- **No commits evaluated. last_evaluated_sha unchanged.**
+- **Action required**: founder or authorized session must re-run upstream fetch with a network policy that permits `github.com/waHhhHao/OpenRHTV`, OR manually fetch and push upstream refs into this repo so the routine can use `git log <sha>..upstream/main` locally.
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
