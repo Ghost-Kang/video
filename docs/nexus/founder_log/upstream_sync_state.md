@@ -16,6 +16,22 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-10-23T02:00:00Z — ROUTINE BLOCKED: upstream repo unreachable
+
+- Run attempted at scheduled 02:00 UTC; no commits evaluated.
+- Root cause: remote execution environment has no GitHub token in its proxy
+  (`githubToken: missing` per `/__agentproxy/status`) and terminal prompts
+  are disabled, so `git fetch upstream main` (HTTPS) fails authentication.
+  SSH URL approach was blocked by the session's auto-mode classifier.
+  GitHub MCP is scoped only to `ghost-kang/video` — `waHhhHao/OpenRHTV`
+  is not accessible.
+- last_evaluated_sha NOT advanced (still `9bea52c`).
+- Action required: founder must either (a) add a GITHUB_TOKEN env var to
+  this Claude Code cloud session's environment, or (b) add `waHhhHao/OpenRHTV`
+  to the session's allowed GitHub repositories so the MCP tool can reach it.
+  See https://code.claude.com/docs/en/claude-code-on-the-web for environment
+  configuration.
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
