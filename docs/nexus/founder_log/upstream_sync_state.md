@@ -10,11 +10,24 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **blocked — upstream access denied 2026-10-24**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-10-24T02:08Z — BLOCKED: upstream repo not accessible in this session
+
+- Routine fired as scheduled (02:00 UTC daily).
+- `last_evaluated_sha` remains: `9bea52c`
+- **Blocker**: GitHub MCP and direct API access are both scoped to `ghost-kang/video` only.
+  Neither `mcp__github__list_commits` for `waHhhHao/OpenRHTV` nor direct `api.github.com`
+  requests were permitted (session proxy blocks unscoped repos).
+- `add_repo` (mcp__claude-code-remote__add_repo) is not available in this session.
+- **Action needed**: Founder must either (a) add `waHhhHao/OpenRHTV` to the session's
+  allowed repo list at https://code.claude.com, or (b) trigger the routine from a session
+  that already has access to both repos.
+- No branch created, no PR opened.
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
