@@ -7,14 +7,34 @@
 ---
 
 last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-21 13:49 +0800)
-last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
+last_evaluation_timestamp: 2026-10-25T02:09:00Z
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **sync blocked — upstream access denied 2026-10-25**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-10-25T02:09:00Z — BLOCKED: upstream GitHub access denied
+
+- Branch: `upstream-sync/20261025T0209Z`
+- Routine fired but could not fetch `waHhhHao/OpenRHTV` (upstream remote).
+- **Root cause**: session GitHub scope is limited to `ghost-kang/video` only. All
+  access paths to `waHhhHao/OpenRHTV` are blocked by the session network policy:
+  - `git fetch upstream main` → HTTPS credential prompt disabled
+  - `gh api repos/waHhhHao/OpenRHTV/...` → GH_TOKEN invalid
+  - GitHub MCP tools → "repository not configured for this session"
+  - `curl https://api.github.com/repos/waHhhHao/...` → 403 proxy block
+  - `add_repo` tool → not available in this session type
+- **No commits evaluated** — last_evaluated_sha unchanged (still `9bea52c`).
+- **Action required by founder**: either (a) add `waHhhHao/OpenRHTV` to the
+  session's allowed repositories (see https://code.claude.com/docs/en/claude-code-on-the-web),
+  or (b) manually re-run the sync with a session that has read access to the
+  upstream repo, then update `last_evaluated_sha` in this file.
+- Cascade smoke tests: NOT RUN (blocked before cherry-pick stage).
+
+
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
