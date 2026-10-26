@@ -16,6 +16,14 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-10-26T02:09Z — 0 evaluated (0 AUTO-APPLY, 0 REVIEW, 0 SKIPPED) — BLOCKED: upstream fetch failure
+
+- **Status**: FAILED at step 2 — unable to fetch `upstream/main` from `waHhhHao/OpenRHTV`
+- **Root cause**: Session GitHub token is scoped to `ghost-kang/video` only; proxy blocks unauthenticated access to the upstream repo; `mcp__github__` tools also restricted to session scope.
+- **Action required (founder)**: Grant this routine read access to `waHhhHao/OpenRHTV`, OR switch the upstream remote to a mirror/fork accessible from this session. See `/root/.ccr/README.md` for how to add a repo to session scope.
+- **No cherry-picks attempted; no PR opened. last_evaluated_sha unchanged: `9bea52c`**
+- Branch: `upstream-sync/20261026T0209Z` (state-file-only commit, no PR)
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
