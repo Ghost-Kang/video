@@ -16,6 +16,28 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-10-27T02:09Z — ACCESS BLOCKED: upstream repo unreachable
+
+- Routine fired at 02:09 UTC (daily 02:00 UTC schedule).
+- `git fetch upstream/main` failed: upstream repo `waHhhHao/OpenRHTV` is private,
+  and this Claude Code cloud session's GitHub credentials are scoped only to
+  `ghost-kang/video`.
+- Attempted: HTTPS fetch with token header, unauthenticated fetch, SSH fetch —
+  all blocked by proxy/credential policy.
+- GitHub MCP tools also scoped to `ghost-kang/video` only; `add_repo` tool
+  is not available in this session to expand scope.
+- **No commits evaluated. last_evaluated_sha unchanged (`9bea52c`).**
+- **Founder action required**: grant this session read access to `waHhhHao/OpenRHTV`.
+  Options:
+  1. Add the upstream repo to the session's GitHub scope via the cloud session
+     configuration at https://code.claude.com/docs/en/claude-code-on-the-web.
+  2. Mirror upstream/main to a branch in ghost-kang/video that this routine
+     can fetch from (e.g. `upstream-mirror/main`), kept current by a separate
+     GitHub Action.
+  3. Change upstream remote URL to a repo this session can access.
+
+
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
