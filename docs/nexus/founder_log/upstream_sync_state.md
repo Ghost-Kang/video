@@ -16,6 +16,18 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-10-29T02:09:04Z — ⚠️ BLOCKED: cannot reach upstream repo
+
+- Routine fired on schedule (02:00 UTC).
+- **Blocker**: all paths to `waHhhHao/OpenRHTV` denied in this session environment:
+  - `git fetch` via HTTPS: `GH_TOKEN`/`GITHUB_TOKEN` invalid for this repo (gh CLI reports "Failed to log in using token"); credential embedding blocked by session security classifier.
+  - GitHub MCP tools: session is scoped to `ghost-kang/video` only; access to `waHhhHao/OpenRHTV` denied.
+- No commits evaluated. `last_evaluated_sha` unchanged (`9bea52c`).
+- **Founder action required**: To unblock future scheduled runs, either:
+  1. Add `waHhhHao/OpenRHTV` to this session's GitHub repository scope, OR
+  2. Provide a PAT with `repo:read` on `waHhhHao/OpenRHTV` as an env var (e.g. `UPSTREAM_TOKEN`), OR
+  3. Run manual sync (as done 2026-05-22) until the environment is updated.
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
