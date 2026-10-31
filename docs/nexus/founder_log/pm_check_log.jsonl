@@ -1,0 +1,9 @@
+{"ts":"2026-10-31T10:07:58Z","scope":"phase0","closed":"NO","fixtures":15,"tests":0,"skipped":0,"compliance":1,"algo_filing":0,"prereg":1}
+{"ts":"2026-10-31T10:07:58Z","scope":"pm_w1","briefs":53,"eng_done":9,"P1_2":"done","P1_1":"done","P1_3_prompts":"done","P1_3_chain":"done","P1_4":"done","P1_6_back":"done","P1_6_sb":"done","P1_7":"done","P1_8":"done","P1_9":"done"}
+{"ts":"2026-10-31T10:07:58Z","scope":"pm_w2","active":"W4","w2_eng_done":5,"P2_1":"done","P2_2":"done","P2_4":"done","P2_5":"done","P2_6":"done"}
+{"ts":"2026-10-31T10:07:58Z","scope":"pm_w3","w3_eng_done":5,"P3_3":"partial","P3_4":"done","P3_5":"done","P3_6":"done","P3_7":"done","P3_8":"done"}
+{"ts":"2026-10-31T10:07:58Z","scope":"pm_w4","active":"W4","w4_eng_done":4,"P4_1":"done","P4_2":"partial","P4_3":"partial","P4_4":"partial","P4_5":"done","P4_6":"done","P4_7":"partial","P4_8":"done","P4_9":"partial"}
+{"ts":"2026-10-31T10:07:58Z","scope":"pm_w5","active":"W4","P5_3":"done"}
+{"ts":"2026-10-31T10:07:58Z","scope":"recruit","dms":5,"calls":0,"commits":0,"runs":0,"returns":0}
+{"ts":"2026-10-31T10:07:58Z","scope":"marketing","seed":"NO","xhs":1,"douyin":0,"wechat":0,"jike":0}
+{"ts":"2026-10-31T10:07:58Z","scope":"risk","blockers":0,"quotes":0,"cost_top":"?"}
