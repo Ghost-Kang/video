@@ -10,11 +10,24 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **sync blocked 2026-10-31 — upstream access denied (see log)**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-10-31T02:09Z — BLOCKED: upstream access denied
+
+- Routine fired at 02:00 UTC (daily schedule).
+- `git fetch upstream main` failed: HTTPS credentials required even for public repo;
+  session credential.interactive=false, no stored token for waHhhHao/OpenRHTV.
+- `gh api repos/waHhhHao/OpenRHTV/...` failed: HTTP 403 — repository not in session
+  allowed list (only ghost-kang/video is authorized).
+- GitHub MCP also restricted to ghost-kang/video scope.
+- **No commits evaluated. last_evaluated_sha unchanged (9bea52c).**
+- Action required: add `waHhhHao/OpenRHTV` to session allowed repos, OR configure a
+  read token for upstream HTTPS fetch, OR run manual sync.
+  See: https://code.claude.com/docs/en/claude-code-on-the-web (environment config docs).
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
