@@ -10,11 +10,26 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **routine ran 2026-11-01T02:09Z — upstream fetch blocked (see log)**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-01T02:09Z — FETCH BLOCKED: upstream not in session GitHub scope
+
+- Routine fired on schedule (daily 02:00 UTC).
+- `git fetch upstream main` failed: session GitHub access is scoped to
+  `ghost-kang/video` only; `waHhhHao/OpenRHTV` is not included.
+- Error: `fatal: could not read Username for 'https://github.com'` (credential.interactive=false)
+- `gh api repos/waHhhHao/OpenRHTV/commits` also returned HTTP 403.
+- **No commits evaluated. last_evaluated_sha unchanged (9bea52c).**
+- **Action required by founder:** Add `waHhhHao/OpenRHTV` read access to this
+  session's GitHub scope, OR manually run `git fetch upstream main` with a
+  personal access token that can read the public upstream repo, then re-trigger
+  this routine. The upstream remote URL is: https://github.com/waHhhHao/OpenRHTV
+  Alternatively, at https://claude.ai/connect-github the session's repository
+  access can be expanded to include the upstream repo.
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
