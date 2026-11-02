@@ -7,14 +7,24 @@
 ---
 
 last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-21 13:49 +0800)
-last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
+last_evaluation_timestamp: 2026-11-02T02:09:00Z
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **routine blocked — upstream repo access failure 2026-11-02**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-02T02:09Z — BLOCKED: upstream repo inaccessible
+
+- `git fetch upstream main` failed: `fatal: could not read Username for 'https://github.com': terminal prompts disabled`
+- `gh api repos/waHhhHao/OpenRHTV/commits` failed: HTTP 403 — "GitHub access to this repository is not enabled for this session"
+- GitHub MCP access is scoped only to `ghost-kang/video`; upstream repo `waHhhHao/OpenRHTV` appears to be **private** or session credentials don't cover it
+- **No commits evaluated. last_evaluated_sha unchanged at 9bea52c.**
+- **Action required**: founder must either (a) add `waHhhHao/OpenRHTV` to this Claude Code session's GitHub access, or (b) grant a read token in the environment (e.g. UPSTREAM_GITHUB_TOKEN), or (c) make upstream repo public.
+
+
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
