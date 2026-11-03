@@ -10,11 +10,19 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **sync blocked — upstream access denied (2026-11-03T02:08Z)**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-03T02:08Z — BLOCKED: upstream repo inaccessible from session
+
+- Routine fired at 02:08 UTC (daily schedule).
+- `git remote add upstream https://github.com/waHhhHao/OpenRHTV.git` — succeeded.
+- `git fetch upstream main` — failed: session network policy restricts GitHub access to `ghost-kang/video` only; all paths to `waHhhHao/OpenRHTV` blocked (git over https, gh api, curl to api.github.com all returned 403/credential-error from proxy intercept).
+- **last_evaluated_sha unchanged** — no commits evaluated.
+- **Action required**: founder must add `waHhhHao/OpenRHTV` read access to this Claude Code session (or the scheduled routine's session) via https://claude.ai/connect-github?org=9d3c77b3-893d-4a19-962d-f7a63c30564d and/or grant the Claude GitHub App access at https://github.com/apps/claude/installations/select_target. Until that is done, the routine cannot fetch upstream and will log the same error each run.
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
