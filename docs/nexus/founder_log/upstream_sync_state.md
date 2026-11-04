@@ -16,6 +16,15 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-11-04T03:07Z — BLOCKED: upstream repo not accessible in session scope
+
+- Routine fired at 02:00 UTC (scheduled daily)
+- `git fetch upstream main` failed: `credential.interactive=false`, repo `waHhhHao/OpenRHTV` is not in the GitHub session scope
+- GitHub MCP server and `gh` CLI both return 403 for `waHhhHao/OpenRHTV` — session scope restricted to `ghost-kang/video` only
+- `add_repo` tool is not available in this session
+- **No cherry-picks performed. No PR opened. last_evaluated_sha unchanged.**
+- **Action required: founder must add `waHhhHao/OpenRHTV` to the session's GitHub repo scope (or re-create the scheduled trigger with that repo in scope)**
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
