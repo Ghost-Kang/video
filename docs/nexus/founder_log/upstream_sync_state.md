@@ -10,11 +10,22 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **run blocked 2026-11-05 — upstream repo not reachable from session**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-05T03:08:40Z — routine blocked: upstream access denied
+
+- Scheduled run fired at 02:00 UTC (10:00 CST).
+- `git fetch upstream main` failed: GH_TOKEN not authorized for `waHhhHao/OpenRHTV` via HTTPS.
+- GitHub MCP and REST API both returned "repository not configured for this session".
+- `add_repo` tool not available in this session type.
+- **No commits evaluated; last_evaluated_sha unchanged at `9bea52c`.**
+- Action required: founder must either (a) grant this session's GitHub App read access to
+  `waHhhHao/OpenRHTV`, or (b) manually re-run after adding the repo to session scope.
+  See: https://code.claude.com/docs/en/claude-code-on-the-web
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
