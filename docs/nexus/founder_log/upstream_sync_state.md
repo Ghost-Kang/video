@@ -10,11 +10,23 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **upstream fetch blocked 2026-11-06 — session scope missing waHhhHao/OpenRHTV**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-06T02:00:00Z — BLOCKED: upstream repo not accessible
+
+- Routine fired at 02:00 UTC (daily schedule).
+- `git fetch upstream main` failed: GitHub session scope is restricted to `ghost-kang/video`; proxy blocked all requests to `waHhhHao/OpenRHTV`.
+- GH_TOKEN set but GitHub Git HTTPS auth rejected ("Password authentication is not supported").
+- MCP `mcp__github__list_commits` also denied: repository not in session scope.
+- `add_repo` tool not available in this session to extend scope.
+- **Action required**: founder must add `waHhhHao/OpenRHTV` to the session's GitHub scope (or trigger a new session with both repos attached) so the routine can fetch upstream commits.
+- last_evaluated_sha unchanged at `9bea52c`.
+
+
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
