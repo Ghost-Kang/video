@@ -10,11 +10,20 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **upstream fetch blocked — 2026-11-07 run (see log)**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-07T02:00:00Z — FETCH BLOCKED (automated run)
+
+- Routine fired at 02:00 UTC.
+- `git fetch upstream main` failed: `Authentication failed for 'https://github.com/waHhhHao/OpenRHTV.git/'`
+- The upstream repo is private; this cloud session's GitHub credentials cover only `ghost-kang/video`.
+- **Action required**: founder must either (a) add `waHhhHao/OpenRHTV` read access to this cloud session's environment, or (b) make the upstream repo public, or (c) add a deploy key / GitHub App with read access to upstream.
+- last_evaluated_sha unchanged: `9bea52c`
+- No branch pushed, no PR opened.
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
