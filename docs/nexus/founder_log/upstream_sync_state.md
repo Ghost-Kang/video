@@ -7,14 +7,31 @@
 ---
 
 last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-21 13:49 +0800)
-last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
+last_evaluation_timestamp: 2026-11-08T03:08:00Z
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **routine run 2026-11-08 — upstream fetch BLOCKED (session GitHub scope restricted to ghost-kang/video)**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-08T03:08:00Z — 0 evaluated (routine BLOCKED — cannot reach upstream)
+
+**FETCH FAILURE**: Routine could not fetch `waHhhHao/OpenRHTV` upstream.
+- `git fetch upstream main` → `fatal: could not read Username for 'https://github.com': terminal prompts disabled`
+  (no GitHub credentials available for HTTPS git fetch in this cloud session)
+- `gh api repos/waHhhHao/OpenRHTV/...` → HTTP 403: GitHub access to this repository is not enabled for this session
+  (session GitHub scope is restricted to `ghost-kang/video` only)
+- `WebFetch https://api.github.com/...` → HTTP 403 (proxy enforces same scope)
+
+**Action required by founder**: Add `waHhhHao/OpenRHTV` to this session's GitHub allowed repositories,
+OR configure the cloud session environment to include read access to the upstream repo.
+Until fixed, this routine will silently fail every daily run and new upstream commits will not be evaluated.
+
+**last_evaluated_sha unchanged**: `9bea52c` — no commits evaluated this run.
+
+---
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
