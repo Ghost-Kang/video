@@ -16,6 +16,14 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-11-09T03:08Z — 0 evaluated (fetch blocked: upstream repo not accessible)
+
+- Routine fired at 02:00 UTC (10:00 CST).
+- `git fetch upstream main` failed: HTTPS credentials unavailable in this session for `waHhhHao/OpenRHTV`.
+- GitHub MCP scoped to `ghost-kang/video` only; `gh` CLI also denied access to upstream.
+- SSH fetch attempt blocked by session policy (StrictHostKeyChecking=no classified as TLS/Auth weakening).
+- **Action required**: Founder must add `waHhhHao/OpenRHTV` read access to this session (via `add_repo` or by reconfiguring the cloud environment's GitHub scope), or run a manual sync. `last_evaluated_sha` unchanged at `9bea52c`.
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
