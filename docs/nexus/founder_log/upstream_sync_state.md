@@ -10,11 +10,22 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **upstream fetch blocked — session not authorized for waHhhHao/OpenRHTV**
+last_run_attempt: 2026-11-10T03:07Z
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-10T03:07Z — FETCH FAILED: upstream repo not accessible
+
+- `git fetch upstream main` failed: "could not read Username for 'https://github.com': terminal prompts disabled"
+- `gh api /repos/waHhhHao/OpenRHTV/commits` failed: GitHub session scope limited to ghost-kang/video only
+- No commits evaluated; last_evaluated_sha unchanged at `9bea52c`
+- **Action required**: founder must attach `waHhhHao/OpenRHTV` read access to the upstream-sync session
+  (see https://code.claude.com/docs — add the upstream repo to the session's GitHub access scope),
+  OR trigger the routine manually from a session that has cross-repo read access.
+
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
