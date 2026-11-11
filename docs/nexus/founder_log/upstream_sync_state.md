@@ -10,11 +10,25 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **routine blocked — upstream repo not accessible from session (see 2026-11-11 entry)**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-11T03:08:23Z — routine blocked: upstream repo not in session scope
+
+- **Result**: NO COMMITS EVALUATED — routine could not reach upstream repo
+- **Root cause**: Session `upstream-sync-watch` is scoped to `ghost-kang/video` only.
+  All access to `waHhhHao/OpenRHTV` (via GitHub MCP, `gh` CLI, and direct `git fetch`)
+  returns 403: "GitHub access to this repository is not enabled for this session."
+- **Fix required**: Add `waHhhHao/OpenRHTV` read access to the cloud session that runs
+  this routine, OR configure the routine to use a session with that repo in scope.
+  See: https://code.claude.com/docs/en/claude-code-on-the-web
+  The `add_repo` tool (mcp__claude-code-remote__add_repo) is NOT available in this session.
+- **last_evaluated_sha unchanged**: `9bea52c` (last confirmed good anchor from 2026-05-22)
+- **Action for founder**: Re-configure the upstream-sync trigger / environment to include
+  read access to `waHhhHao/OpenRHTV`, then rerun manually or let the routine fire next day.
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
