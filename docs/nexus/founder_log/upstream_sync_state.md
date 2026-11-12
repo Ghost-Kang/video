@@ -10,11 +10,23 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **routine blocked — upstream repo access denied 2026-11-12**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-12T02:00:00Z — BLOCKED: upstream repo not accessible from session
+
+- Routine fired at 02:00 UTC but could not fetch `waHhhHao/OpenRHTV`.
+- Both `git fetch upstream main` (HTTPS, no credentials) and GitHub MCP `list_commits`
+  returned access-denied: session scope is restricted to `ghost-kang/video` only.
+- `last_evaluated_sha` unchanged (9bea52c) — no commits were evaluated.
+- **Action required**: add `waHhhHao/OpenRHTV` to the session's allowed repositories
+  so the routine can fetch upstream commits. The user can do this via
+  `add_repo` in a new session or by updating the cloud environment's GitHub
+  source to include both repos. See https://code.claude.com/docs.
+- No PR opened; no cherry-picks attempted.
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
