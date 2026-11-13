@@ -10,11 +10,20 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **routine blocked 2026-11-13 — upstream repo read access not configured for this session**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-13T03:08:00Z — ACCESS BLOCKED (automated routine)
+
+- Scheduled run fired at 02:00 UTC (10:00 CST).
+- Attempted `git fetch upstream main` and `gh api repos/waHhhHao/OpenRHTV/commits` — both refused: session is scoped to `ghost-kang/video` only; `waHhhHao/OpenRHTV` not configured.
+- `add_repo` tool not available in this session.
+- last_evaluated_sha remains unchanged at `9bea52c`.
+- **ACTION REQUIRED**: Founder must add `waHhhHao/OpenRHTV` to the Claude Code session's GitHub scope so the routine can read upstream commits. See https://code.claude.com/docs/en/claude-code-on-the-web for environment configuration.
+
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
