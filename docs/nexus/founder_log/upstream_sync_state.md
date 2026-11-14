@@ -16,6 +16,19 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-11-14T02:00:00Z — 0 evaluated (routine blocked: upstream access denied)
+
+- Automated routine fired but could NOT fetch `waHhhHao/OpenRHTV`.
+- Root cause: session GitHub scope is limited to `ghost-kang/video` only;
+  `add_repo` tool not available to expand scope; `gh` CLI token is invalid;
+  direct HTTPS git fetch also blocked by auth.
+- Action required: founder must either (a) re-create the scheduled session with
+  `waHhhHao/OpenRHTV` added to the allowed-repositories list, or (b) provide a
+  valid GITHUB_TOKEN / PAT with read access to that public repo in the session
+  environment. See https://code.claude.com/docs/en/claude-code-on-the-web for
+  environment configuration.
+- last_evaluated_sha unchanged: 9bea52c
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
