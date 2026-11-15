@@ -16,6 +16,16 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-11-15T03:08Z — BLOCKED: upstream repo not accessible
+
+- Routine fired at 02:00 UTC (10:00 CST).
+- `git fetch upstream main` failed: terminal prompts disabled (HTTPS auth unavailable).
+- `gh api repos/waHhhHao/OpenRHTV/commits` returned HTTP 403: "GitHub access to this repository is not enabled for this session."
+- `mcp__github__list_commits` for `waHhhHao/OpenRHTV` returned: "repository not configured for this session."
+- `mcp__claude-code-remote__add_repo` tool is NOT present in this session — cannot extend scope.
+- **Action required**: founder must add `waHhhHao/OpenRHTV` to the allowed repositories for the `upstream-sync-watch` cloud environment, OR configure a deploy key / PAT with read access that git can use in a non-interactive context.
+- 0 commits evaluated; state SHA unchanged.
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
