@@ -16,6 +16,21 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-11-16T03:09Z — BLOCKED: upstream repo not reachable from cloud session
+
+- Routine fired at 03:09 UTC (scheduled 03:06 UTC).
+- `git fetch upstream main` failed: terminal prompts disabled (HTTPS auth required).
+- `gh api repos/waHhhHao/OpenRHTV/commits` → HTTP 403: "GitHub access to this repository is not enabled for this session."
+- `curl` to `api.github.com` returns the same proxy-enforced 403.
+- No upstream refs cached from previous sessions (ephemeral container).
+- Root cause: cloud session GitHub access is scoped to `ghost-kang/video` only.
+  `waHhhHao/OpenRHTV` is a separate account — the Claude GitHub App or token does not cover it.
+- **Action required (founder)**: Either (a) grant the Claude GitHub App read access to `waHhhHao/OpenRHTV`,
+  or (b) manually push a `upstream/main` mirror branch to `ghost-kang/video` before each sync run,
+  or (c) configure the routine environment with a separate `GH_TOKEN` that covers both repos.
+- last_evaluated_sha unchanged at `9bea52c` — no commits evaluated this run.
+
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
