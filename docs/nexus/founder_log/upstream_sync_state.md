@@ -10,11 +10,23 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **routine blocked — upstream read access denied (2026-11-17)**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-17T03:08:01Z — BLOCKED: upstream read access denied
+
+- Routine fired at 02:00 UTC (10:00 CST) as scheduled.
+- `git fetch upstream main` failed: GH_TOKEN invalid / not scoped to `waHhhHao/OpenRHTV`.
+- GitHub MCP tools confirmed: session is scoped only to `Ghost-Kang/video`.
+- `mcp__claude-code-remote__add_repo` not available in this session type.
+- **No commits evaluated; no PR produced.**
+- **Action required**: re-run after granting `waHhhHao/OpenRHTV` read access to the
+  scheduled session, OR manually clone upstream and push commits to a known branch
+  for the routine to compare against. See session transcript for details.
+- last_evaluated_sha unchanged: `9bea52c`
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
