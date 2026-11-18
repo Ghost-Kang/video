@@ -10,11 +10,23 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **upstream access blocked — routine could not evaluate commits 2026-11-18**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-18T03:07:57Z — ROUTINE BLOCKED: upstream repo access denied
+
+- Routine fired at 02:00 UTC (scheduled daily).
+- last_evaluated_sha remains `9bea52c` (unchanged — no commits evaluated).
+- **Failure reason**: The cloud session's GitHub access is scoped to `ghost-kang/video` only.
+  `waHhhHao/OpenRHTV` is not in the allowed repository list, so git fetch, gh CLI, and
+  GitHub API all return 403. No commits could be fetched or evaluated.
+- **Action required from founder**: Add `waHhhHao/OpenRHTV` to the upstream-sync session's
+  allowed repository list (via `add_repo` or by reconfiguring the cloud environment), then
+  re-run or wait for next daily fire.
+- No branch created, no PR opened, no commits cherry-picked.
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
