@@ -10,11 +10,24 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **routine blocked 2026-11-19 — upstream access denied (see log)**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-19T02:00:00Z — ROUTINE BLOCKED: upstream access denied
+
+- `git fetch upstream main` → `fatal: could not read Username for 'https://github.com': terminal prompts disabled`
+- `gh api repos/waHhhHao/OpenRHTV` → HTTP 403: "GitHub access to this repository is not enabled for this session"
+- `gh auth status` → "The token in GH_TOKEN is invalid"
+- Root cause: The scheduled session's GH_TOKEN does not have read access to `waHhhHao/OpenRHTV` (private repo).
+- No commits evaluated. No PR opened. No state change to `last_evaluated_sha`.
+- **Action required (founder):** Re-attach credentials to the upstream-sync scheduled trigger so the session token can read `waHhhHao/OpenRHTV`. See Claude Code docs: https://code.claude.com/docs/en/claude-code-on-the-web. Options:
+  1. Add `waHhhHao/OpenRHTV` read access to the GitHub App installation used by the cloud session.
+  2. Or add it via `add_repo` in a live Claude Code session with valid GitHub credentials.
+  3. Or make `waHhhHao/OpenRHTV` public if that is acceptable.
+
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
