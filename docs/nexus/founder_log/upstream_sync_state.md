@@ -10,11 +10,24 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **routine blocked 2026-11-20 — upstream repo not accessible from session**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-20T02:00:00Z — BLOCKED: upstream repo not accessible
+
+- **Error**: Session GitHub proxy is scoped to `ghost-kang/video` only.
+  `git fetch upstream main` and `git ls-remote https://github.com/waHhhHao/OpenRHTV.git`
+  both return auth failure — proxy responds with "GitHub access to this repository is not
+  enabled for this session."
+- **Impact**: Cannot evaluate any commits since `9bea52c`. No sync branch created, no PR opened.
+- **Action required**: Founder must add `waHhhHao/OpenRHTV` read access to the session's
+  GitHub App scope, or manually run the sync. The Claude GitHub App needs to be installed
+  on the upstream repo OR the cloud session environment configured with a token that covers
+  both repos. See https://claude.ai/connect-github or the env config for this routine.
+- last_evaluated_sha unchanged (9bea52c); will retry on next scheduled run once fixed.
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
