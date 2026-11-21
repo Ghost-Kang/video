@@ -16,6 +16,15 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-11-21T03:08Z — FETCH FAILED: upstream repo inaccessible
+
+- Branch: `upstream-sync/20261121T0308Z`
+- Error: `git fetch upstream main` → `fatal: could not read Username for 'https://github.com': terminal prompts disabled`
+- Diagnosis: `waHhhHao/OpenRHTV` is a **private repo**; this cloud session has no stored credentials for it, and the GitHub MCP is scoped to `ghost-kang/video` only.
+- No commits evaluated; last_evaluated_sha unchanged (`9bea52c`).
+- Action required: founder must either (a) grant this session's GitHub App access to `waHhhHao/OpenRHTV`, or (b) add a machine-user PAT with read scope as a repo secret / environment variable (`UPSTREAM_GITHUB_TOKEN`).
+- See: https://code.claude.com/docs/en/claude-code-on-the-web for session environment config.
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
