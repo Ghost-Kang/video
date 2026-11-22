@@ -16,6 +16,27 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-11-22T02:00:00Z — FETCH FAILED — upstream unreachable
+
+- Run: `upstream-sync-watch` (trig_01AZqceZ6NDTocTUHGq3EEFd)
+- Status: **BLOCKED** — could not evaluate new upstream commits
+- Errors:
+  - `git fetch upstream main`: fatal: could not read Username — HTTPS credentials not configured in cloud container
+  - GitHub MCP (`mcp__github__list_commits`): Access denied — session scoped to `ghost-kang/video` only, cannot reach `waHhhHao/OpenRHTV`
+  - `gh auth status`: GH_TOKEN env var is invalid/expired
+- last_evaluated_sha unchanged: `9bea52c` (last good evaluation: 2026-05-22T06:00:00Z)
+- Action required: **Founder must resolve upstream access** (see action items below)
+- No PR opened; no cherry-picks attempted
+
+#### Action items for founder
+
+1. **Fix GH_TOKEN** in the cloud environment secrets — the token is expired or missing `repo` read scope for `waHhhHao/OpenRHTV`. Update at claude.ai/code environment settings.
+2. **Or**: add `waHhhHao/OpenRHTV` to the GitHub App installation so the session's MCP can read it (GitHub App → Repositories → add `waHhhHao/OpenRHTV`).
+3. After fixing, the next scheduled run (02:00 UTC) will backfill from `9bea52c` automatically — no manual intervention needed in the routine config.
+4. Note: last sync was 2026-05-22; **6 months of upstream commits are pending evaluation**. Consider requesting a manual backfill run once access is restored.
+
+
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
