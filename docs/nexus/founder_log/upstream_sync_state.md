@@ -10,11 +10,25 @@ last_evaluated_sha: 9bea52c (origin/main tip at time of manual sync — 2026-05-
 last_evaluation_timestamp: 2026-05-22T14:00:00+08:00
 last_merge_commit: e0c0aff (Merge origin/main into pm/upstream-sync-20260522)
 
-Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
+Status: ⚠️ **routine blocked — upstream read access not configured for session**
 
 ---
 
 ## Sync log (newest first)
+
+### 2026-11-23T03:08Z — ROUTINE BLOCKED: upstream access denied
+
+- Run attempted at 02:00 UTC (10:00 CST).
+- `git fetch upstream main` failed: terminal prompts disabled (no stored HTTPS credentials).
+- GitHub MCP scope restricted to `ghost-kang/video` only; `waHhhHao/OpenRHTV` not accessible.
+- `gh` CLI blocked by session proxy for repos outside session scope.
+- Raw GitHub API calls intercepted by proxy and also denied.
+- **No commits evaluated; last_evaluated_sha unchanged at `9bea52c`.**
+- **Action required**: add `waHhhHao/OpenRHTV` read access to this session's GitHub scope,
+  OR configure a deploy key / PAT so `git fetch upstream` can authenticate non-interactively.
+  See: https://code.claude.com/docs/en/claude-code-on-the-web for environment configuration.
+
+---
 
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
