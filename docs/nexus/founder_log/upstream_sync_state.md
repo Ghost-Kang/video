@@ -16,6 +16,18 @@ Status: ✅ **caught up via manual merge 2026-05-22 W3D1**
 
 ## Sync log (newest first)
 
+### 2026-11-24T03:08Z — FAILED: upstream fetch blocked
+
+- Routine fired at 02:00 UTC (10:00 CST).
+- `git fetch upstream main` failed: `Authentication failed for 'https://github.com/waHhhHao/OpenRHTV.git/'`
+- The upstream repository appears to be **private** and requires a credential that is not available in this environment.
+- The environment's auto-mode classifier also blocked embedding a PAT in the remote URL.
+- GitHub API scoping in this cloud session is limited to `ghost-kang/video` — cannot list commits on `waHhhHao/OpenRHTV`.
+- **Action needed (founder):** Add a read-capable GitHub credential for `waHhhHao/OpenRHTV` to this cloud session's environment (e.g. `UPSTREAM_GH_TOKEN` or SSH deploy key), OR make the upstream repo public, OR grant `ghost-kang/video` session cross-repo read access in GitHub settings.
+- No branch created, no PR opened. State file SHA unchanged.
+
+
+
 ### 2026-05-22T14:00:00+08:00 — manual sync of 28 commit backfill
 
 - Routine `upstream-sync-watch` did not fire / did not produce PR by W3D1 morning;
